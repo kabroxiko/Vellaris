@@ -47,3 +47,4 @@ Nortantis.jar
 build
 .claude
 .DS_Store
+*.bak
