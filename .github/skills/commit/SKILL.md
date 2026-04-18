@@ -45,3 +45,8 @@ Implementation notes for the assistant:
 - Use `ReadLints` to check recent edits for linter issues before committing.
 - If the repository contains very large files (>5MB) in the staged set, warn the user and request confirmation.
 - Always display the commit hash and a concise summary of changed files after committing.
+- If the helper script `.github/skills/commit/commit.sh` exists, prefer invoking it to perform the actual `git add` and `git commit` steps. Invoke it by piping the finalized commit message to stdin (example below). The script already performs a basic `.env` check; still run the secret and large-file scans described above before calling it.
+
+   Example invocation:
+
+   echo "<commit message>" | .github/skills/commit/commit.sh

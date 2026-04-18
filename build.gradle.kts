@@ -15,6 +15,8 @@ repositories {
 dependencies {
     implementation(fileTree(mapOf("dir" to "libraries", "include" to listOf("*.jar"))))
     implementation("com.github.wendykierp:JTransforms:3.2:with-dependencies")
+    implementation("com.sparkjava:spark-core:2.9.4")
+    implementation("com.google.code.gson:gson:2.10.1")
     testImplementation(platform("org.junit:junit-bom:5.10.2"))
     testImplementation("org.junit.jupiter:junit-jupiter")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
