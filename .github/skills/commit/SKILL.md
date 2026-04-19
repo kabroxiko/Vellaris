@@ -122,15 +122,18 @@ Helper script: `run_checks.sh`
 
 Behavior when no ESLint config exists:
 
-- If `run_checks.sh` detects JS/TS changes in the deterministic `changed_set` and there is no repository ESLint configuration, it will prompt the user (interactive runs) asking whether to provision a richer default ESLint configuration. The skill maintains a recommended template at `.github/skills/commit/templates/eslint.config.js` which contains a richer starter configuration (parser/plugins for JSX/TSX and modern syntax).
-- For non-interactive runs (CI or plumbing), the script will not prompt; to auto-provision the template in that mode, set the environment variable `AUTO_CREATE_ESLINT_CONFIG=1` before invoking the script.
-- If the user approves provisioning, the script will copy the template from `.github/skills/commit/templates/eslint.config.js` to the repository root as `eslint.config.js`. The script MUST NOT automatically `git add` or stage this file; staging is left to the user so they can review and install any required devDependencies first. The script will then run ESLint against the working tree using the copied config.
-- If the user declines (or auto-provision is not enabled), the script will run ESLint with internal/default resolution and warn that repository-level customization is recommended.
+- ESLint configuration detection and provisioning is the assistant skill's responsibility, not `run_checks.sh`.
+- Before invoking `run_checks.sh`, the assistant should check for repository ESLint config (`eslint.config.js`, `eslint.config.mjs`, `eslint.config.cjs`, `.eslintrc.*`, or `package.json` with `eslintConfig`) when JS/TS files are in `changed_set`.
+- If no config exists, the assistant should ask whether to provision the richer template at `.github/skills/commit/templates/eslint.config.js` into the repo root as `eslint.config.js`.
+- Provisioning must never auto-stage `eslint.config.js`; the user reviews/stages it explicitly.
+- The assistant should also surface required devDependencies (for the shipped template):
+  - `npm install --save-dev @babel/core @babel/eslint-parser eslint-plugin-react`
 
 Requisite: ESLint configuration richness
 
 - The repository's ESLint configuration must be "richer" than a bare minimum. "Richer" means the config should include appropriate parser and plugin settings so ESLint can parse modern JavaScript, JSX, and TypeScript files (for example, a parser such as `@babel/eslint-parser` or `@typescript-eslint/parser`, and plugins such as `eslint-plugin-react` or `@typescript-eslint`).
 - The skill ships a recommended richer starter template at `.github/skills/commit/templates/eslint.config.js`. When provisioning a default for a repository, `run_checks.sh` should copy that template into the repo root rather than generating an ad-hoc minimal file. This ensures a consistent, maintainable baseline for projects.
+- The skill ships a recommended richer starter template at `.github/skills/commit/templates/eslint.config.js`. When provisioning a default for a repository, the assistant should copy that template into the repo root rather than generating an ad-hoc minimal file. This ensures a consistent, maintainable baseline for projects.
 - The script MUST NOT stage the copied config automatically. After copying, the script should print clear guidance with exact `npm install --save-dev ...` commands for required devDependencies and instruct the user to review and stage the file when ready.
 - If the richer config references parsers or plugins that are not installed, the script will surface a clear error message and instructions for installing the missing devDependencies; the assistant will not silently assume those dependencies are present.
 
