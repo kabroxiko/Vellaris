@@ -63,7 +63,7 @@ Steps (exact order):
      2. `What:` — one-line summary of the change (implementation-neutral; no file lists). If necessary, include one short note about scope (e.g., "applies to map export flow").
      3. `Impact:` — short bullet(s) explaining who/what benefits and any backward-compatibility notes.
      4. `Test:` — deterministic test steps or automated checks run (e.g., "Ran the project's canonical test command and verified expected outcomes").
-   - Footer (appendix, optional): include a deterministic, machine-friendly appendix containing the list of changed files and the exact commands run (for audit); this must not be used as the primary message content. Example appendix header: `--- Audit: files & commands` followed by the lists.
+   - Footer: do not include any appendix, file lists, command invocations, or audit information in the commit message. Commit messages must contain only the header and the structured body (`Why:`, `What:`, `Impact:`, `Test:`).
 
 6. Commit step (deterministic)
    - Repository requirement: The repository MUST contain the helper script at `.github/skills/commit/commit.sh` to perform the final staging and commit step. If the file is missing the assistant MUST abort and request that the user add the script. The assistant must not run `git add`/`git commit` directly when the script is present.
@@ -76,9 +76,9 @@ Steps (exact order):
    - Interpret `commit.sh` exit codes: `0` indicates success — report the commit short hash and list of changed files; any non-zero exit code must be treated as failure, present the script logs, and abort.
    - If `commit.sh` is absent, do not substitute `git` commands. The assistant may offer to create a suggested `commit.sh` template only after explicit user approval.
 
-Audit & logging
+AUDIT LOGGING
 
-- The assistant logs the exact commands run, their exit codes, and the diffs produced (or summarized diffs if large). These logs are presented after the commit completes.
+- Audit records (changed files, commands run, exit codes) must never be embedded into the git commit message. The assistant may keep separate audit logs outside of the commit message for traceability, but these must not be added to the commit or its footer.
 
 Prompting and failure cases (only three deterministic pause points)
 
