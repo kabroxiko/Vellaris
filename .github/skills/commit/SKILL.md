@@ -62,7 +62,6 @@ Steps (exact order):
      1. `Why:` — one concise sentence describing the user/business/developer value (e.g., "Fixes a race that could drop user sessions", "Adds export capability for end-users").
      2. `What:` — one-line summary of the change (implementation-neutral; no file lists). If necessary, include one short note about scope (e.g., "applies to map export flow").
      3. `Impact:` — short bullet(s) explaining who/what benefits and any backward-compatibility notes.
-     4. `Test:` — deterministic test steps or automated checks run (e.g., "Ran the project's canonical test command and verified expected outcomes").
    - Footer: do not include any appendix, file lists, command invocations, or audit information in the commit message. Commit messages must contain only the header and the structured body (`Why:`, `What:`, `Impact:`, `Test:`).
 
 6. Commit step (deterministic)
