@@ -122,6 +122,34 @@ else
         echo "[run_checks] ERROR: Required ESLint template missing at $TEMPLATE_PATH. Aborting."
         exit 1
       fi
+      # Ensure the parser/plugin devDependencies required by the template are available.
+      if command -v node >/dev/null 2>&1; then
+        if node -e "require.resolve('@babel/eslint-parser')" >/dev/null 2>&1; then
+          echo "[run_checks] @babel/eslint-parser already available"
+        else
+          echo "[run_checks] @babel/eslint-parser not found; attempting to install required devDependencies"
+          if command -v npm >/dev/null 2>&1; then
+            echo "[run_checks] Installing with npm..."
+            npm install --save-dev @babel/core @babel/eslint-parser eslint-plugin-react
+          elif command -v yarn >/dev/null 2>&1; then
+            echo "[run_checks] Installing with yarn..."
+            yarn add --dev @babel/core @babel/eslint-parser eslint-plugin-react
+          else
+            echo "{\"status\":\"install_failed\",\"message\":\"npm or yarn not available to install ESLint devDependencies.\"}"
+            echo "[run_checks] ERROR: npm/yarn not found; cannot install ESLint devDependencies. Aborting."
+            exit 1
+          fi
+          # re-check installation
+          if ! node -e "require.resolve('@babel/eslint-parser')" >/dev/null 2>&1; then
+            echo "{\"status\":\"install_failed\",\"message\":\"Failed to install @babel/eslint-parser.\"}"
+            echo "[run_checks] ERROR: installation completed but parser still not resolvable. Aborting."
+            exit 1
+          fi
+        fi
+      else
+        echo "[run_checks] node not available; cannot verify or install ESLint parser. Aborting."
+        exit 1
+      fi
       # Do not stage files automatically; leave staging to the user for review
       eslint_config="eslint.config.js"
       ESLINT_CMD="$ESLINT_CMD --config $eslint_config"

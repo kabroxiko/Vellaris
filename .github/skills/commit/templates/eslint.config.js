@@ -8,23 +8,24 @@ module.exports = [
     files: ["**/*.{js,jsx,ts,tsx}"],
     ignores: ["node_modules/**"],
     languageOptions: {
-      parser: require.resolve('@babel/eslint-parser'),
+      parser: require("@babel/eslint-parser"),
       parserOptions: {
         ecmaVersion: 2021,
-        sourceType: 'module',
+        sourceType: "module",
         ecmaFeatures: { jsx: true },
-        requireConfigFile: false
-      }
+        requireConfigFile: false,
+        babelOptions: { parserOpts: { plugins: ["jsx"] } },
+      },
     },
     plugins: {
-      react: require('eslint-plugin-react')
+      react: require("eslint-plugin-react"),
     },
     rules: {
       // example rules — adapt to your project
-      'no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
-      'no-console': ['warn', { allow: ['warn', 'error'] }],
-      'react/jsx-uses-react': 'off',
-      'react/react-in-jsx-scope': 'off'
-    }
-  }
+      "no-unused-vars": ["warn", { argsIgnorePattern: "^_" }],
+      "no-console": ["warn", { allow: ["warn", "error"] }],
+      "react/jsx-uses-react": "off",
+      "react/react-in-jsx-scope": "off",
+    },
+  },
 ];
