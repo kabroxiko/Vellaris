@@ -42,6 +42,7 @@ Steps (exact order):
 3. Formatters, linters, secret-scan and checks (script-required)
    - Repository requirement: The repository MUST contain the helper script at `.github/skills/commit/run_checks.sh`. The script is a mandatory dependency for the assistant's `/commit` flow; if the file is missing the assistant MUST abort and request that the user add the script. The assistant must not proceed with per-tool invocations or fallbacks when the script is absent.
    - Execution behavior: when the script is present, the assistant MUST invoke it with the repository root as CWD. If the script exists but is not executable, the assistant MAY offer to make it executable (`chmod +x .github/skills/commit/run_checks.sh`) and re-run it; if the user declines or making it executable fails, the assistant must abort and report the error.
+   - Important: Scans and linters must run against the working tree or a computed diff (unstaged) so that checks examine the developer's current changes before any final staging or commit steps. The repository's `commit.sh` is responsible for staging and committing when the assistant invokes it.
    - Interpret `run_checks.sh` exit codes as follows:
      - `0`: all checks passed — proceed with commit.
      - `2`: linters reported non-fixable errors — pause and require explicit confirmation to continue.
@@ -90,8 +91,8 @@ Policy overrides
 - If a repository contains a policy file at `.github/commit-policy.yml` that defines a stricter required flow, the assistant stops and reports the policy; it will not auto-adapt the flow without explicit user approval to follow the repo policy.
 
 5. On user approval:
-   - Stage files (`git add -A`) and create the commit (`git commit -m "<final message>"`).
-   - Report the new commit short hash and updated branch status (e.g., ahead/behind origin).
+   - Invoke the repository helper `.github/skills/commit/commit.sh` by piping the finalized commit message to its stdin. The `commit.sh` script is responsible for staging (`git add`) and creating the commit; the assistant will not stage files itself.
+   - Report the new commit short hash and updated branch status (e.g., ahead/behind origin) after `commit.sh` exits successfully.
 
 Rules & constraints:
 
@@ -121,14 +122,16 @@ Helper script: `run_checks.sh`
 
 Behavior when no ESLint config exists:
 
-- If `run_checks.sh` detects JS/TS changes in the deterministic `changed_set` and there is no repository ESLint configuration, it will prompt the user (interactive runs) asking whether to create a default `eslint.config.js` at the repository root. This default is a minimal flat-config that enables linting for `*.js,*.jsx,*.ts,*.tsx` files.
-- For non-interactive runs (CI or plumbing), the script will not prompt; to auto-create a default config in that mode, set the environment variable `AUTO_CREATE_ESLINT_CONFIG=1` before invoking the script.
-- If the user approves creation, the script will create and stage `eslint.config.js` and then run ESLint using that config. If the user declines (or auto-create is not enabled), the script will run ESLint with internal/default resolution and warn that repository-level customization is recommended.
+- If `run_checks.sh` detects JS/TS changes in the deterministic `changed_set` and there is no repository ESLint configuration, it will prompt the user (interactive runs) asking whether to provision a richer default ESLint configuration. The skill maintains a recommended template at `.github/skills/commit/templates/eslint.config.js` which contains a richer starter configuration (parser/plugins for JSX/TSX and modern syntax).
+- For non-interactive runs (CI or plumbing), the script will not prompt; to auto-provision the template in that mode, set the environment variable `AUTO_CREATE_ESLINT_CONFIG=1` before invoking the script.
+- If the user approves provisioning, the script will copy the template from `.github/skills/commit/templates/eslint.config.js` to the repository root as `eslint.config.js`. The script MUST NOT automatically `git add` or stage this file; staging is left to the user so they can review and install any required devDependencies first. The script will then run ESLint against the working tree using the copied config.
+- If the user declines (or auto-provision is not enabled), the script will run ESLint with internal/default resolution and warn that repository-level customization is recommended.
 
 Requisite: ESLint configuration richness
 
 - The repository's ESLint configuration must be "richer" than a bare minimum. "Richer" means the config should include appropriate parser and plugin settings so ESLint can parse modern JavaScript, JSX, and TypeScript files (for example, a parser such as `@babel/eslint-parser` or `@typescript-eslint/parser`, and plugins such as `eslint-plugin-react` or `@typescript-eslint`).
-- When `run_checks.sh` creates a default `eslint.config.js`, it will generate a richer starter configuration that includes parser/plugin entries suitable for JSX/TSX and modern syntax. The script will stage the file and will also emit clear guidance and recommended `npm` install commands for any required devDependencies. CI users should set `AUTO_CREATE_ESLINT_CONFIG=1` if they want the richer config created automatically.
+- The skill ships a recommended richer starter template at `.github/skills/commit/templates/eslint.config.js`. When provisioning a default for a repository, `run_checks.sh` should copy that template into the repo root rather than generating an ad-hoc minimal file. This ensures a consistent, maintainable baseline for projects.
+- The script MUST NOT stage the copied config automatically. After copying, the script should print clear guidance with exact `npm install --save-dev ...` commands for required devDependencies and instruct the user to review and stage the file when ready.
 - If the richer config references parsers or plugins that are not installed, the script will surface a clear error message and instructions for installing the missing devDependencies; the assistant will not silently assume those dependencies are present.
 
 Implementation guidance:

@@ -112,25 +112,24 @@ else
     fi
 
     if [ "$create_default" = "yes" ]; then
-      echo "[run_checks] Creating default eslint.config.js (repo root)"
-      cat > eslint.config.js <<'JS'
-module.exports = [
-  {
-    files: ["**/*.{js,jsx,ts,tsx}"],
-    ignores: ["node_modules/**"],
-    languageOptions: {
-      ecmaVersion: 2021,
-      sourceType: 'module'
-    },
-    rules: {}
-  }
-];
-JS
-      git add eslint.config.js || true
+      # Enforce presence of the canonical template shipped with the skill.
+      TEMPLATE_PATH=".github/skills/commit/templates/eslint.config.js"
+      if [ -f "$TEMPLATE_PATH" ]; then
+        echo "[run_checks] Copying ESLint template from $TEMPLATE_PATH to ./eslint.config.js"
+        cp "$TEMPLATE_PATH" eslint.config.js
+      else
+        echo "{\"status\":\"config_missing\",\"message\":\"Required ESLint template missing: $TEMPLATE_PATH. Add the template before running checks.\"}"
+        echo "[run_checks] ERROR: Required ESLint template missing at $TEMPLATE_PATH. Aborting."
+        exit 1
+      fi
+      # Do not stage files automatically; leave staging to the user for review
       eslint_config="eslint.config.js"
       ESLINT_CMD="$ESLINT_CMD --config $eslint_config"
       ESLINT_CHECK_CMD="$ESLINT_CHECK_CMD --config $eslint_config"
-      echo "[run_checks] Created and staged eslint.config.js. You can customize rules and commit the file." 
+      echo "[run_checks] Created eslint.config.js from template. You can customize rules and commit the file."
+      echo "[run_checks] Recommended devDependencies for this template:"
+      echo "  npm install --save-dev @babel/core @babel/eslint-parser eslint-plugin-react"
+      echo "  (or: yarn add --dev @babel/core @babel/eslint-parser eslint-plugin-react)"
     else
       echo "[run_checks] Not creating a config; running ESLint with internal defaults. Set AUTO_CREATE_ESLINT_CONFIG=1 to auto-create in non-interactive runs."
       eslint_config=""
@@ -157,7 +156,7 @@ if [ -n "$js_files" ]; then
     echo "[run_checks] ESLint not available; skipping --fix step"
   fi
 
-  git add $(echo "$js_files" | tr '\n' ' ')
+  # Do not auto-stage formatted JS/TS files; leave staging to the user
 fi
 
 # Run Java formatter if Java files present and gradlew exists
@@ -165,7 +164,7 @@ if [ -n "$java_files" ]; then
   if [ -f "gradlew" ] || command -v gradle >/dev/null 2>&1; then
     echo "[run_checks] Running Gradle formatting/checks for Java files"
     run_nonfatal $GRADLEW_CMD spotlessApply $GRADLE_FLAGS || true
-    git add $(echo "$java_files" | tr '\n' ' ')
+    # Do not auto-stage formatted Java files; leave staging to the user
   else
     echo "[run_checks] Gradle wrapper not found; skipping Java format step"
   fi
@@ -177,7 +176,7 @@ if [ -n "$py_files" ]; then
   if command -v python >/dev/null 2>&1; then
     run_nonfatal $PY_BLACK_CMD $BLACK_FLAGS $(echo "$py_files" | tr '\n' ' ')
     run_nonfatal $PY_ISORT_CMD $ISORT_FLAGS $(echo "$py_files" | tr '\n' ' ')
-    git add $(echo "$py_files" | tr '\n' ' ')
+    # Do not auto-stage formatted Python files; leave staging to the user
   else
     echo "[run_checks] Python not available; skipping Python formatting"
   fi
@@ -188,7 +187,7 @@ if [ -n "$doc_files" ]; then
   if command -v ${PRETTIER_CMD%% *} >/dev/null 2>&1 || command -v npx >/dev/null 2>&1; then
     echo "[run_checks] Running Prettier on docs"
     run_nonfatal $PRETTIER_CMD $PRETTIER_FLAGS $(echo "$doc_files" | tr '\n' ' ')
-    git add $(echo "$doc_files" | tr '\n' ' ')
+    # Do not auto-stage formatted docs; leave staging to the user
   else
     echo "[run_checks] Prettier not available; skipping docs formatting"
   fi
@@ -236,20 +235,18 @@ if [ "$lint_failed" -ne 0 ]; then
 fi
 
 # Secret scan (attempt configured scanner; fail-fast on findings)
-# Ensure staged state is current
-git add -A
 if command -v gitleaks >/dev/null 2>&1; then
-  echo "[run_checks] Running secret scanner (gitleaks) on staged diff"
+  echo "[run_checks] Running secret scanner (gitleaks) on diff vs HEAD"
   # Detect supported stdin/pipe option for the installed gitleaks
   if gitleaks detect --help 2>&1 | grep -q -- '--pipe'; then
-    echo "[run_checks] Using 'gitleaks detect --pipe' to scan staged diff"
-    if ! git diff --staged | gitleaks detect --pipe; then
+    echo "[run_checks] Using 'gitleaks detect --pipe' to scan diff"
+    if ! git diff HEAD | gitleaks detect --pipe; then
       echo "{\"status\":\"secrets_found\",\"message\":\"Secret scanner detected probable secrets.\"}"
       exit 3
     fi
   elif gitleaks detect --help 2>&1 | grep -q -- '--stdin'; then
-    echo "[run_checks] Using 'gitleaks detect --stdin' to scan staged diff"
-    if ! git diff --staged | gitleaks detect --stdin; then
+    echo "[run_checks] Using 'gitleaks detect --stdin' to scan diff"
+    if ! git diff HEAD | gitleaks detect --stdin; then
       echo "{\"status\":\"secrets_found\",\"message\":\"Secret scanner detected probable secrets.\"}"
       exit 3
     fi
