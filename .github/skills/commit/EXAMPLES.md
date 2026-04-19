@@ -1,8 +1,10 @@
 Quick commit
+
 - User: `/commit`
 - Assistant: shows status/diff, proposes a one-line header + short body, user replies "Yes" → assistant commits.
 
 Edit message
+
 - User: `/commit`
 - Assistant: proposes message, user replies:
 

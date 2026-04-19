@@ -14,10 +14,7 @@ When the user invokes the `/commit` command, the assistant will:
 2. Run quick safety checks:
    - Detect obvious secrets or sensitive files (e.g. `.env`, credentials) and warn the user instead of committing them automatically.
    - Run quick project lints for recently edited files (use ReadLints) and summarize any new linter errors that would be committed. Detailed formatting, linting, and secret-scanning are handled by the deterministic commit flow below.
-   - Run a robust secret scan using a world-class scanner (recommended: Gitleaks). Scan staged diffs and any form/CI-submitted inputs for API keys, tokens, private keys, or other secrets. If secrets are detected, warn clearly and require explicit user confirmation before proceeding. Suggested commands:
-     - `gitleaks detect --source . --verbose` (scan repository)
-     - `git diff --staged | gitleaks detect --stdin` (scan staged diff)
-     - Fallback tools: `truffleHog`, `git-secrets`, or equivalent organizational scanners.
+   - Run a secret-scan using the repository-or-organization-configured scanner. Scan staged diffs (and repository-supplied inputs where policy requires) for API keys, tokens, private keys, or other secrets. If probable secrets are detected, warn clearly with masked excerpts and require explicit user confirmation before proceeding. Do not assume a specific scanner; prefer the tool the project or organization designates.
 3. Synthesize a detailed, human-friendly commit message:
    - Produce a one-line header using conventional prefixes (e.g. `feat:`, `fix:`, `chore:`) plus a concise scope and short description.
    - Provide a multi-line body (2–8 lines) explaining the rationale and high-level changes — focus on why the change was made and any important notes for reviewers.
@@ -42,35 +39,20 @@ Steps (exact order):
    - Run: `git diff --name-only --diff-filter=AM HEAD` to list files that are Added or Modified relative to HEAD, and `git ls-files --others --exclude-standard` to include untracked files. Combined, this yields the deterministic "new & modified" file set the assistant will operate on (deleted files are excluded).
    - The assistant records this file list as `changed_set` and will use it for all subsequent formatter/linter/scan steps.
 
-3. Formatters and auto-fix linters (deterministic rules)
-   - Determine file groups by extension within `changed_set` (only new & modified files):
-     - JS/TS: .js .jsx .ts .tsx .json .css .scss .html
-     - Java: .java
-     - Python: .py
-     - Docs: .md .rst
-   - Run these commands in this exact order (only on files in `changed_set`):
-     a) JS/TS group: `npx prettier --write <file1> <file2> ...` then `npx eslint --fix <file1> <file2> ...` (run only on `changed_set` JS/TS files)
-     b) Java group: `./gradlew --no-daemon spotlessApply --quiet` (applies formatting) — if Gradle is unavailable, skip and note it.
-     c) Python group: `python -m black <file1> <file2> ...` then `python -m isort <file1> <file2> ...`
-     d) Docs: `npx prettier --write <docs files>`
-   - After running each command, run `git add` on the affected files to include auto-fixed changes. The assistant never runs formatters across the whole repo — only on `changed_set` files.
-   - These commands are always run automatically; if they modify files, the assistant stages the modifications automatically and continues (no prompt).
+3. Formatters, linters, secret-scan and checks (script-required)
+    - Repository requirement: The repository MUST contain the helper script at `.github/skills/commit/run_checks.sh`. The script is a mandatory dependency for the assistant's `/commit` flow; if the file is missing the assistant MUST abort and request that the user add the script. The assistant must not proceed with per-tool invocations or fallbacks when the script is absent.
+    - Execution behavior: when the script is present, the assistant MUST invoke it with the repository root as CWD. If the script exists but is not executable, the assistant MAY offer to make it executable (`chmod +x .github/skills/commit/run_checks.sh`) and re-run it; if the user declines or making it executable fails, the assistant must abort and report the error.
+    - Interpret `run_checks.sh` exit codes as follows:
+       - `0`: all checks passed — proceed with commit.
+       - `2`: linters reported non-fixable errors — pause and require explicit confirmation to continue.
+       - `3`: secret scanner found probable secrets — pause and require explicit confirmation to continue.
+       - `4`: large files detected (>5MB) — pause and require explicit confirmation to continue.
+       - other non-zero: treat as failure, present logs, and abort.
+    - No fallback: the assistant must not substitute per-tool commands for the missing script. The repository owner or maintainer must add the required script; the assistant may offer to create a suggested template only after explicit user approval.
 
-4. Linter verification (deterministic)
-   - Run linters (non-fix mode) on `changed_set` in this order (only those files):
-     a) `npx eslint --ext .js,.jsx,.ts,.tsx <changed_set-js-ts-files>`
-     b) `./gradlew --no-daemon check --quiet` (Java checks)
-     c) `python -m flake8 <changed_set-py-files>`
-   - If any linter reports errors that were not auto-fixed, this is a deterministic failure: pause, present a concise JSON-style summary (file, rule, count) and require explicit user confirmation to continue. The assistant must not proceed without that confirmation.
+4. Commit message generation and commit step remain unchanged. The assistant treats the presence of the script as a hard requirement and will not proceed until the script is added or the user explicitly instructs creation of the script.
 
-5. Secret scan (deterministic)
-   - Run: `git add -A` (to ensure staged diff reflects current state) then `git diff --staged | gitleaks detect --stdin`.
-   - If the scanner finds any probable secrets, pause and present masked excerpts and remediation steps. Require explicit user confirmation to continue. Do not auto-redact or transmit secret content.
-
-6. Large-file check
-   - Inspect staged files for size > 5MB. If any are found, pause and require explicit confirmation to continue.
-
-7. Commit message generation (value-focused, deterministic template)
+6. Commit message generation (value-focused, deterministic template)
    - High-level rule: commit messages must describe the value delivered (why, impact) rather than simply enumerating file changes. The assistant deterministically infers the primary value from the changed code (bug fix, feature, performance improvement, refactor, docs, tests) and composes a concise, human-friendly message focused on the outcome.
    - Header (one-line): choose a conventional prefix (`feat:`, `fix:`, `perf:`, `refactor:`, `docs:`, `test:`, `style:`, `chore:`) based on the inferred value, then a short scope and value-oriented description. Examples:
      - `fix(auth): prevent token leak during login` (value: security/bug fix)
@@ -80,10 +62,10 @@ Steps (exact order):
      1. `Why:` — one concise sentence describing the user/business/developer value (e.g., "Fixes a race that could drop user sessions", "Adds export capability for end-users").
      2. `What:` — one-line summary of the change (implementation-neutral; no file lists). If necessary, include one short note about scope (e.g., "applies to map export flow").
      3. `Impact:` — short bullet(s) explaining who/what benefits and any backward-compatibility notes.
-     4. `Test:` — deterministic test steps or automated checks run (e.g., "Ran `./gradlew test` and verified export image matches expected hash").
+     4. `Test:` — deterministic test steps or automated checks run (e.g., "Ran the project's canonical test command and verified expected outcomes").
    - Footer (appendix, optional): include a deterministic, machine-friendly appendix containing the list of changed files and the exact commands run (for audit); this must not be used as the primary message content. Example appendix header: `--- Audit: files & commands` followed by the lists.
 
-8. Commit step (deterministic)
+7. Commit step (deterministic)
    - If no pause conditions were triggered, run: `git add -A` then `git commit -m "<header>\n\n<body>"`.
    - Report the commit short hash and the list of changed files.
 
@@ -94,7 +76,7 @@ Audit & logging
 Prompting and failure cases (only three deterministic pause points)
 
 - Case A: repository inconsistent (merge/rebase/conflicts) — abort and require user fix.
-- Case B: gitleaks reports probable secrets — pause, show masked excerpts, require confirmation.
+- Case B: secret scanner reports probable secrets — pause, show masked excerpts, require confirmation.
 - Case C: linters report non-fixable errors or large files found (>5MB) — pause and require confirmation.
 
 Policy overrides
@@ -125,8 +107,18 @@ Implementation notes for the assistant:
 
   echo "<commit message>" | .github/skills/commit/commit.sh
 
+Helper script: `run_checks.sh`
+
+- If present, prefer invoking `.github/skills/commit/run_checks.sh` prior to committing to perform deterministic, concrete checks (formatters, auto-fix linters, linters, secret-scan, large-file check) on the repository's new & modified files. The assistant should run this script and interpret exit codes:
+  - `0`: all checks passed — proceed with commit.
+  - `2`: linters reported non-fixable errors — pause and require explicit confirmation.
+  - `3`: secret scanner found probable secrets — pause and require explicit confirmation.
+  - `4`: large files detected (>5MB) — pause and require explicit confirmation.
+  - other non-zero: treat as failure and abort with details.
+- The script is configurable via environment variables to select concrete tools (for example: `PRETTIER_CMD`, `ESLINT_CMD`, `PY_BLACK_CMD`, `SECRET_SCANNER_CMD`). When invoking the script, prefer the project's defaults but allow overrides when the repository specifies alternative tooling.
+
 Implementation guidance:
 
-- Prefer integrating a proven secret-scanning step (Gitleaks) into the pre-commit/CI path the assistant recommends. When offering to commit, the assistant should run the scanner locally first and surface any matches with context (file, line, snippet) and recommended remediation (redact, rotate, move to secret store).
+- Prefer integrating a proven secret-scanning step (the project or organization's designated scanner) into the pre-commit/CI path the assistant recommends. When offering to commit, the assistant should run the configured scanner locally first and surface any matches with context (masked excerpts) and recommended remediation (rotate, move to secret store).
 - If the repository or org provides a managed secret-scanning service or policy, prefer that and surface its findings instead of local-only scans.
 - Never attempt to exfiltrate or transmit suspected secret contents; only present masked excerpts and clear remediation steps to the user.
