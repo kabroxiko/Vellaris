@@ -70,17 +70,18 @@ Steps (exact order):
 6) Large-file check
    - Inspect staged files for size > 5MB. If any are found, pause and require explicit confirmation to continue.
 
-7) Commit message generation (deterministic template)
-   - Header prefix selection (deterministic rules):
-     - If all changed files are docs (.md/.rst): `docs: update documentation`
-     - Else if all changed files are tests (path contains `/test/` or `/tests/`): `test: update tests`
-     - Else if only formatting changes were made (diff contains only whitespace/format-only edits): `style: format`
-     - Else: `chore: update code`
-   - Body: list changed files (one per line), followed by a deterministic footer containing the exact commands run (in order) and timestamps. Example body:
-     - `Files changed:`
-       - `src/nortantis/MapCreator.java`
-       - `web/src/app.js`
-     - `Checks run: git status -> formatters -> linters -> gitleaks -> large-file check`
+7) Commit message generation (value-focused, deterministic template)
+    - High-level rule: commit messages must describe the value delivered (why, impact) rather than simply enumerating file changes. The assistant deterministically infers the primary value from the changed code (bug fix, feature, performance improvement, refactor, docs, tests) and composes a concise, human-friendly message focused on the outcome.
+    - Header (one-line): choose a conventional prefix (`feat:`, `fix:`, `perf:`, `refactor:`, `docs:`, `test:`, `style:`, `chore:`) based on the inferred value, then a short scope and value-oriented description. Examples:
+       - `fix(auth): prevent token leak during login` (value: security/bug fix)
+       - `perf(worldgen): reduce map generation CPU by 30%` (value: performance)
+       - `feat(export): add PNG export option for maps` (value: new capability)
+    - Body (structured, deterministic): always follow this exact block order and phrasing. Fill fields deterministically using the repo context and diffs.
+       1. `Why:` — one concise sentence describing the user/business/developer value (e.g., "Fixes a race that could drop user sessions", "Adds export capability for end-users").
+       2. `What:` — one-line summary of the change (implementation-neutral; no file lists). If necessary, include one short note about scope (e.g., "applies to map export flow").
+       3. `Impact:` — short bullet(s) explaining who/what benefits and any backward-compatibility notes.
+       4. `Test:` — deterministic test steps or automated checks run (e.g., "Ran `./gradlew test` and verified export image matches expected hash").
+    - Footer (appendix, optional): include a deterministic, machine-friendly appendix containing the list of changed files and the exact commands run (for audit); this must not be used as the primary message content. Example appendix header: `--- Audit: files & commands` followed by the lists.
 
 8) Commit step (deterministic)
    - If no pause conditions were triggered, run: `git add -A` then `git commit -m "<header>\n\n<body>"`.
