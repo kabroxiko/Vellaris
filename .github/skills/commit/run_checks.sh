@@ -128,10 +128,26 @@ fi
 # Ensure staged state is current
 git add -A
 if command -v gitleaks >/dev/null 2>&1; then
-  echo "[run_checks] Running gitleaks on staged diff"
-  if ! git diff --staged | gitleaks detect --stdin; then
-    echo "{\"status\":\"secrets_found\",\"message\":\"Secret scanner detected probable secrets.\"}"
-    exit 3
+  echo "[run_checks] Running secret scanner (gitleaks) on staged diff"
+  # Detect supported stdin/pipe option for the installed gitleaks
+  if gitleaks detect --help 2>&1 | grep -q -- '--pipe'; then
+    echo "[run_checks] Using 'gitleaks detect --pipe' to scan staged diff"
+    if ! git diff --staged | gitleaks detect --pipe; then
+      echo "{\"status\":\"secrets_found\",\"message\":\"Secret scanner detected probable secrets.\"}"
+      exit 3
+    fi
+  elif gitleaks detect --help 2>&1 | grep -q -- '--stdin'; then
+    echo "[run_checks] Using 'gitleaks detect --stdin' to scan staged diff"
+    if ! git diff --staged | gitleaks detect --stdin; then
+      echo "{\"status\":\"secrets_found\",\"message\":\"Secret scanner detected probable secrets.\"}"
+      exit 3
+    fi
+  else
+    echo "[run_checks] gitleaks installed but no stdin/pipe option detected; running repo scan as fallback"
+    if ! gitleaks detect --source .; then
+      echo "{\"status\":\"secrets_found\",\"message\":\"Secret scanner detected probable secrets on repo scan.\"}"
+      exit 3
+    fi
   fi
 else
   echo "[run_checks] gitleaks not found; skipping secret scan. To require a scan, set SECRET_SCANNER_CMD or install a scanner."

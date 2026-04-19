@@ -40,19 +40,19 @@ Steps (exact order):
    - The assistant records this file list as `changed_set` and will use it for all subsequent formatter/linter/scan steps.
 
 3. Formatters, linters, secret-scan and checks (script-required)
-    - Repository requirement: The repository MUST contain the helper script at `.github/skills/commit/run_checks.sh`. The script is a mandatory dependency for the assistant's `/commit` flow; if the file is missing the assistant MUST abort and request that the user add the script. The assistant must not proceed with per-tool invocations or fallbacks when the script is absent.
-    - Execution behavior: when the script is present, the assistant MUST invoke it with the repository root as CWD. If the script exists but is not executable, the assistant MAY offer to make it executable (`chmod +x .github/skills/commit/run_checks.sh`) and re-run it; if the user declines or making it executable fails, the assistant must abort and report the error.
-    - Interpret `run_checks.sh` exit codes as follows:
-       - `0`: all checks passed — proceed with commit.
-       - `2`: linters reported non-fixable errors — pause and require explicit confirmation to continue.
-       - `3`: secret scanner found probable secrets — pause and require explicit confirmation to continue.
-       - `4`: large files detected (>5MB) — pause and require explicit confirmation to continue.
-       - other non-zero: treat as failure, present logs, and abort.
-    - No fallback: the assistant must not substitute per-tool commands for the missing script. The repository owner or maintainer must add the required script; the assistant may offer to create a suggested template only after explicit user approval.
+   - Repository requirement: The repository MUST contain the helper script at `.github/skills/commit/run_checks.sh`. The script is a mandatory dependency for the assistant's `/commit` flow; if the file is missing the assistant MUST abort and request that the user add the script. The assistant must not proceed with per-tool invocations or fallbacks when the script is absent.
+   - Execution behavior: when the script is present, the assistant MUST invoke it with the repository root as CWD. If the script exists but is not executable, the assistant MAY offer to make it executable (`chmod +x .github/skills/commit/run_checks.sh`) and re-run it; if the user declines or making it executable fails, the assistant must abort and report the error.
+   - Interpret `run_checks.sh` exit codes as follows:
+     - `0`: all checks passed — proceed with commit.
+     - `2`: linters reported non-fixable errors — pause and require explicit confirmation to continue.
+     - `3`: secret scanner found probable secrets — pause and require explicit confirmation to continue.
+     - `4`: large files detected (>5MB) — pause and require explicit confirmation to continue.
+     - other non-zero: treat as failure, present logs, and abort.
+   - No fallback: the assistant must not substitute per-tool commands for the missing script. The repository owner or maintainer must add the required script; the assistant may offer to create a suggested template only after explicit user approval.
 
 4. Commit message generation and commit step remain unchanged. The assistant treats the presence of the script as a hard requirement and will not proceed until the script is added or the user explicitly instructs creation of the script.
 
-6. Commit message generation (value-focused, deterministic template)
+5. Commit message generation (value-focused, deterministic template)
    - High-level rule: commit messages must describe the value delivered (why, impact) rather than simply enumerating file changes. The assistant deterministically infers the primary value from the changed code (bug fix, feature, performance improvement, refactor, docs, tests) and composes a concise, human-friendly message focused on the outcome.
    - Header (one-line): choose a conventional prefix (`feat:`, `fix:`, `perf:`, `refactor:`, `docs:`, `test:`, `style:`, `chore:`) based on the inferred value, then a short scope and value-oriented description. Examples:
      - `fix(auth): prevent token leak during login` (value: security/bug fix)
@@ -65,9 +65,16 @@ Steps (exact order):
      4. `Test:` — deterministic test steps or automated checks run (e.g., "Ran the project's canonical test command and verified expected outcomes").
    - Footer (appendix, optional): include a deterministic, machine-friendly appendix containing the list of changed files and the exact commands run (for audit); this must not be used as the primary message content. Example appendix header: `--- Audit: files & commands` followed by the lists.
 
-7. Commit step (deterministic)
-   - If no pause conditions were triggered, run: `git add -A` then `git commit -m "<header>\n\n<body>"`.
-   - Report the commit short hash and the list of changed files.
+6. Commit step (deterministic)
+   - Repository requirement: The repository MUST contain the helper script at `.github/skills/commit/commit.sh` to perform the final staging and commit step. If the file is missing the assistant MUST abort and request that the user add the script. The assistant must not run `git add`/`git commit` directly when the script is present.
+   - Execution behavior: when the script is present, the assistant MUST invoke it by piping the finalized commit message to stdin from the repository root, e.g.:
+
+     echo "<commit message>" | .github/skills/commit/commit.sh
+
+     If the script exists but is not executable, the assistant MAY offer to make it executable (`chmod +x .github/skills/commit/commit.sh`) and re-run it; if the user declines or making it executable fails, the assistant must abort and report the error.
+
+   - Interpret `commit.sh` exit codes: `0` indicates success — report the commit short hash and list of changed files; any non-zero exit code must be treated as failure, present the script logs, and abort.
+   - If `commit.sh` is absent, do not substitute `git` commands. The assistant may offer to create a suggested `commit.sh` template only after explicit user approval.
 
 Audit & logging
 
@@ -101,11 +108,7 @@ Implementation notes for the assistant:
 - Use `ReadLints` to check recent edits for linter issues before committing.
 - If the repository contains very large files (>5MB) in the staged set, warn the user and request confirmation.
 - Always display the commit hash and a concise summary of changed files after committing.
-- If the helper script `.github/skills/commit/commit.sh` exists, prefer invoking it to perform the actual `git add` and `git commit` steps. Invoke it by piping the finalized commit message to stdin (example below). The script already performs a basic `.env` check; still run the secret and large-file scans described above before calling it.
-
-  Example invocation:
-
-  echo "<commit message>" | .github/skills/commit/commit.sh
+- The repository MUST provide `.github/skills/commit/commit.sh` to perform the final staging and commit step. The assistant MUST pipe the finalized commit message to the script's stdin to perform the commit and must not run `git add`/`git commit` itself when the script exists. The script is expected to perform any final checks (for example, refusing an unsafe commit) and to exit with `0` on success. If the script is missing, the assistant must abort and request it be added, or ask for explicit permission to create a recommended template.
 
 Helper script: `run_checks.sh`
 
