@@ -13,19 +13,7 @@ When the user invokes the `/commit` command, the assistant will:
    - Optionally show the unified diff for specific files on request.
 2. Run quick safety checks:
    - Detect obvious secrets or sensitive files (e.g. `.env`, credentials) and warn the user instead of committing them automatically.
-    - Run project lints for recently edited files (use ReadLints) and summarize any new linter errors that would be committed.
-    - Run code formatters and linters as appropriate for the repository before committing. Examples:
-       - Web/JS/TS: run Prettier then ESLint. Suggested commands:
-          - `npx prettier --check .` (check formatting)
-          - `npx prettier --write .` (optionally fix formatting)
-          - `npx eslint . --ext .js,.jsx,.ts,.tsx` (check lint issues)
-          - `npx eslint . --ext .js,.jsx,.ts,.tsx --fix` (optionally auto-fix lintable issues)
-       - Java: prefer the project's Gradle formatting tasks (Spotless/Eclipse formatter). Suggested commands:
-          - `./gradlew spotlessCheck` (verify formatting)
-          - `./gradlew spotlessApply` (apply formatting fixes)
-          - `./gradlew check` (run general verification and tests)
-       - Other languages: run the project's configured formatter/linter (e.g., `black`/`flake8` for Python, `gofmt`/`golangci-lint` for Go).
-    - If auto-fix commands are offered, present changes to the user and require confirmation before staging/committing the fixes.
+   - Run quick project lints for recently edited files (use ReadLints) and summarize any new linter errors that would be committed. Detailed formatting, linting, and secret-scanning are handled by the deterministic commit flow below.
    - Run a robust secret scan using a world-class scanner (recommended: Gitleaks). Scan staged diffs and any form/CI-submitted inputs for API keys, tokens, private keys, or other secrets. If secrets are detected, warn clearly and require explicit user confirmation before proceeding. Suggested commands:
      - `gitleaks detect --source . --verbose` (scan repository)
      - `git diff --staged | gitleaks detect --stdin` (scan staged diff)
@@ -39,6 +27,75 @@ When the user invokes the `/commit` command, the assistant will:
    - Edit: provide an edited message to use instead.
    - Inspect: request diffs or file lists before deciding.
    - Cancel: abort without making changes.
+
+Deterministic commit flow (fully deterministic; the assistant follows these exact steps every time):
+
+Overview: the assistant executes a fixed sequence of checks and fixes. It will only pause and prompt the user for explicit confirmation in the three deterministic failure cases: (A) repository inconsistent (merge/rebase/conflict), (B) probable secret detected by the secret scanner, or (C) non-fixable linter errors or large files (>5MB). All other steps are automatic and reproducible.
+
+Steps (exact order):
+
+1) Repository sanity
+   - Run: `git status --porcelain --branch`.
+   - If output indicates an in-progress merge/rebase or unresolved conflicts, abort and report the state. Do not attempt corrections or prompt for decisions — the user must resolve and re-run `/commit`.
+
+2) Gather changed files
+   - Run: `git diff --name-only HEAD` to list working-tree changes (modified) and `git ls-files --others --exclude-standard` for untracked files.
+   - The assistant will operate on the combined set of changed + untracked files.
+
+3) Formatters and auto-fix linters (deterministic rules)
+   - Determine file groups by extension:
+     - JS/TS: .js .jsx .ts .tsx .json .css .scss .html
+     - Java: .java
+     - Python: .py
+     - Docs: .md .rst
+   - Run these commands in this exact order (only on the files in the changed set):
+     a) JS/TS group: `npx prettier --write <file1> <file2> ...` then `npx eslint --fix <file1> <file2> ...`
+     b) Java group: `./gradlew --no-daemon spotlessApply --quiet` (applies formatting) — if Gradle is unavailable, skip and note it.
+     c) Python group: `python -m black <file1> <file2> ...` then `python -m isort <file1> <file2> ...`
+     d) Docs: `npx prettier --write <docs files>`
+   - After running each command, run `git add` on the affected files to include auto-fixed changes.
+   - These commands are always run automatically; if they modify files, the assistant stages the modifications automatically and continues (no prompt).
+
+4) Linter verification (deterministic)
+   - Run linters (non-fix mode) on the changed set in this order:
+     a) `npx eslint --ext .js,.jsx,.ts,.tsx <files>`
+     b) `./gradlew --no-daemon check --quiet` (Java checks)
+     c) `python -m flake8 <files>`
+   - If any linter reports errors that were not auto-fixed, this is a deterministic failure: pause, present a concise JSON-style summary (file, rule, count) and require explicit user confirmation to continue. The assistant must not proceed without that confirmation.
+
+5) Secret scan (deterministic)
+   - Run: `git add -A` (to ensure staged diff reflects current state) then `git diff --staged | gitleaks detect --stdin`.
+   - If the scanner finds any probable secrets, pause and present masked excerpts and remediation steps. Require explicit user confirmation to continue. Do not auto-redact or transmit secret content.
+
+6) Large-file check
+   - Inspect staged files for size > 5MB. If any are found, pause and require explicit confirmation to continue.
+
+7) Commit message generation (deterministic template)
+   - Header prefix selection (deterministic rules):
+     - If all changed files are docs (.md/.rst): `docs: update documentation`
+     - Else if all changed files are tests (path contains `/test/` or `/tests/`): `test: update tests`
+     - Else if only formatting changes were made (diff contains only whitespace/format-only edits): `style: format`
+     - Else: `chore: update code`
+   - Body: list changed files (one per line), followed by a deterministic footer containing the exact commands run (in order) and timestamps. Example body:
+     - `Files changed:`
+       - `src/nortantis/MapCreator.java`
+       - `web/src/app.js`
+     - `Checks run: git status -> formatters -> linters -> gitleaks -> large-file check`
+
+8) Commit step (deterministic)
+   - If no pause conditions were triggered, run: `git add -A` then `git commit -m "<header>\n\n<body>"`.
+   - Report the commit short hash and the list of changed files.
+
+Audit & logging
+   - The assistant logs the exact commands run, their exit codes, and the diffs produced (or summarized diffs if large). These logs are presented after the commit completes.
+
+Prompting and failure cases (only three deterministic pause points)
+   - Case A: repository inconsistent (merge/rebase/conflicts) — abort and require user fix.
+   - Case B: gitleaks reports probable secrets — pause, show masked excerpts, require confirmation.
+   - Case C: linters report non-fixable errors or large files found (>5MB) — pause and require confirmation.
+
+Policy overrides
+   - If a repository contains a policy file at `.github/commit-policy.yml` that defines a stricter required flow, the assistant stops and reports the policy; it will not auto-adapt the flow without explicit user approval to follow the repo policy.
 5. On user approval:
    - Stage files (`git add -A`) and create the commit (`git commit -m "<final message>"`).
    - Report the new commit short hash and updated branch status (e.g., ahead/behind origin).
@@ -49,13 +106,7 @@ Rules & constraints:
 - If linter errors are present in the staged changes, summarize them and ask whether to proceed.
 - Keep commit messages focused on the "why" and include minimal necessary "what". Prefer small, focused commits.
 
-Example flows:
-- Quick commit:
-  - User: `/commit`
-  - Assistant: shows status/diff, proposes a one-line header + short body, user replies "Yes" → assistant commits.
-- Edit message:
-  - User: `/commit`
-  - Assistant: proposes message, user replies "Edit: fix: normalize newline handling in parser\n\nFixes inconsistent CRLF behavior across platforms." → assistant commits with the edited message.
+Examples: see `.github/skills/commit/EXAMPLES.md` for concise usage examples.
 
 Implementation notes for the assistant:
 - Use `ReadLints` to check recent edits for linter issues before committing.
@@ -71,8 +122,4 @@ Implementation guidance:
 - Prefer integrating a proven secret-scanning step (Gitleaks) into the pre-commit/CI path the assistant recommends. When offering to commit, the assistant should run the scanner locally first and surface any matches with context (file, line, snippet) and recommended remediation (redact, rotate, move to secret store).
 - If the repository or org provides a managed secret-scanning service or policy, prefer that and surface its findings instead of local-only scans.
 - Never attempt to exfiltrate or transmit suspected secret contents; only present masked excerpts and clear remediation steps to the user.
- - Format & lint guidance:
-   - Run configured formatters and linters before proposing a commit. If the repo exposes `package.json` scripts (e.g., `npm run format` or `npm run lint`) or Gradle tasks (`spotlessApply`), prefer those.
-   - When automatic fixes are available (`prettier --write`, `eslint --fix`, `spotlessApply`), ask the user whether to run them and show the resulting diff before staging.
-   - If formatter or linter checks fail and the user still wants to proceed, require explicit confirmation to commit with known issues.
-   - Prefer local, deterministic tools; if linters are slow, run checks only on changed files to save time.
+ 
