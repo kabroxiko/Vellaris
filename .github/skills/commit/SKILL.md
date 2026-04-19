@@ -13,7 +13,23 @@ When the user invokes the `/commit` command, the assistant will:
    - Optionally show the unified diff for specific files on request.
 2. Run quick safety checks:
    - Detect obvious secrets or sensitive files (e.g. `.env`, credentials) and warn the user instead of committing them automatically.
-   - Run project lints for recently edited files (use ReadLints) and summarize any new linter errors that would be committed.
+    - Run project lints for recently edited files (use ReadLints) and summarize any new linter errors that would be committed.
+    - Run code formatters and linters as appropriate for the repository before committing. Examples:
+       - Web/JS/TS: run Prettier then ESLint. Suggested commands:
+          - `npx prettier --check .` (check formatting)
+          - `npx prettier --write .` (optionally fix formatting)
+          - `npx eslint . --ext .js,.jsx,.ts,.tsx` (check lint issues)
+          - `npx eslint . --ext .js,.jsx,.ts,.tsx --fix` (optionally auto-fix lintable issues)
+       - Java: prefer the project's Gradle formatting tasks (Spotless/Eclipse formatter). Suggested commands:
+          - `./gradlew spotlessCheck` (verify formatting)
+          - `./gradlew spotlessApply` (apply formatting fixes)
+          - `./gradlew check` (run general verification and tests)
+       - Other languages: run the project's configured formatter/linter (e.g., `black`/`flake8` for Python, `gofmt`/`golangci-lint` for Go).
+    - If auto-fix commands are offered, present changes to the user and require confirmation before staging/committing the fixes.
+   - Run a robust secret scan using a world-class scanner (recommended: Gitleaks). Scan staged diffs and any form/CI-submitted inputs for API keys, tokens, private keys, or other secrets. If secrets are detected, warn clearly and require explicit user confirmation before proceeding. Suggested commands:
+     - `gitleaks detect --source . --verbose` (scan repository)
+     - `git diff --staged | gitleaks detect --stdin` (scan staged diff)
+     - Fallback tools: `truffleHog`, `git-secrets`, or equivalent organizational scanners.
 3. Synthesize a detailed, human-friendly commit message:
    - Produce a one-line header using conventional prefixes (e.g. `feat:`, `fix:`, `chore:`) plus a concise scope and short description.
    - Provide a multi-line body (2–8 lines) explaining the rationale and high-level changes — focus on why the change was made and any important notes for reviewers.
@@ -50,3 +66,13 @@ Implementation notes for the assistant:
    Example invocation:
 
    echo "<commit message>" | .github/skills/commit/commit.sh
+
+Implementation guidance:
+- Prefer integrating a proven secret-scanning step (Gitleaks) into the pre-commit/CI path the assistant recommends. When offering to commit, the assistant should run the scanner locally first and surface any matches with context (file, line, snippet) and recommended remediation (redact, rotate, move to secret store).
+- If the repository or org provides a managed secret-scanning service or policy, prefer that and surface its findings instead of local-only scans.
+- Never attempt to exfiltrate or transmit suspected secret contents; only present masked excerpts and clear remediation steps to the user.
+ - Format & lint guidance:
+   - Run configured formatters and linters before proposing a commit. If the repo exposes `package.json` scripts (e.g., `npm run format` or `npm run lint`) or Gradle tasks (`spotlessApply`), prefer those.
+   - When automatic fixes are available (`prettier --write`, `eslint --fix`, `spotlessApply`), ask the user whether to run them and show the resulting diff before staging.
+   - If formatter or linter checks fail and the user still wants to proceed, require explicit confirmation to commit with known issues.
+   - Prefer local, deterministic tools; if linters are slow, run checks only on changed files to save time.
