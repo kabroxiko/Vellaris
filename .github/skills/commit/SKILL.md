@@ -120,6 +120,18 @@ Helper script: `run_checks.sh`
   - other non-zero: treat as failure and abort with details.
 - The script is configurable via environment variables to select concrete tools (for example: `PRETTIER_CMD`, `ESLINT_CMD`, `PY_BLACK_CMD`, `SECRET_SCANNER_CMD`). When invoking the script, prefer the project's defaults but allow overrides when the repository specifies alternative tooling.
 
+Behavior when no ESLint config exists:
+
+- If `run_checks.sh` detects JS/TS changes in the deterministic `changed_set` and there is no repository ESLint configuration, it will prompt the user (interactive runs) asking whether to create a default `eslint.config.js` at the repository root. This default is a minimal flat-config that enables linting for `*.js,*.jsx,*.ts,*.tsx` files.
+- For non-interactive runs (CI or plumbing), the script will not prompt; to auto-create a default config in that mode, set the environment variable `AUTO_CREATE_ESLINT_CONFIG=1` before invoking the script.
+- If the user approves creation, the script will create and stage `eslint.config.js` and then run ESLint using that config. If the user declines (or auto-create is not enabled), the script will run ESLint with internal/default resolution and warn that repository-level customization is recommended.
+
+Requisite: ESLint configuration richness
+
+- The repository's ESLint configuration must be "richer" than a bare minimum. "Richer" means the config should include appropriate parser and plugin settings so ESLint can parse modern JavaScript, JSX, and TypeScript files (for example, a parser such as `@babel/eslint-parser` or `@typescript-eslint/parser`, and plugins such as `eslint-plugin-react` or `@typescript-eslint`).
+- When `run_checks.sh` creates a default `eslint.config.js`, it will generate a richer starter configuration that includes parser/plugin entries suitable for JSX/TSX and modern syntax. The script will stage the file and will also emit clear guidance and recommended `npm` install commands for any required devDependencies. CI users should set `AUTO_CREATE_ESLINT_CONFIG=1` if they want the richer config created automatically.
+- If the richer config references parsers or plugins that are not installed, the script will surface a clear error message and instructions for installing the missing devDependencies; the assistant will not silently assume those dependencies are present.
+
 Implementation guidance:
 
 - Prefer integrating a proven secret-scanning step (the project or organization's designated scanner) into the pre-commit/CI path the assistant recommends. When offering to commit, the assistant should run the configured scanner locally first and surface any matches with context (masked excerpts) and recommended remediation (rotate, move to secret store).
