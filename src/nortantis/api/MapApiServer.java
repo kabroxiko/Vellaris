@@ -1,8 +1,6 @@
 package nortantis.api;
 
 import com.google.gson.Gson;
-import com.google.gson.JsonSyntaxException;
-import nortantis.CancelledException;
 import nortantis.MapCreator;
 import nortantis.MapSettings;
 import nortantis.SettingsGenerator;
@@ -38,6 +36,7 @@ import static spark.Spark.*;
 public class MapApiServer {
 
     private static final Gson gson = new Gson();
+    private static final String NORT_EXTENSION = ".nort";
 
     public static void main(String[] args) {
         port(8080);
@@ -57,7 +56,7 @@ public class MapApiServer {
 
         get("/health", (req, res) -> "ok");
 
-        post("/generate", (req, res) -> handleGenerate(req, res));
+        post("/generate", MapApiServer::handleGenerate);
 
         init();
         Logger.println("Map API server started on port 8080");
@@ -65,8 +64,45 @@ public class MapApiServer {
 
     private static Object handleGenerate(Request req, Response res) {
         res.type("application/json");
+        logHeaders(req);
 
-        // Debug: log content-type and headers (do NOT call req.body() here, it may consume the stream)
+        Config cfg = parseConfig(req, res);
+        if (cfg == null) {
+            return gson.toJson(new ApiResponse(false, "Failed to parse config", null, null));
+        }
+
+        PlatformFactory.setInstance(new AwtFactory());
+
+        GenerationContext ctx = loadSettings(cfg, res);
+        if (ctx == null) {
+            return gson.toJson(new ApiResponse(false, "Failed to load settings", null, null));
+        }
+
+        Image img = generateMap(ctx.settings, cfg, res);
+        if (img == null) {
+            return gson.toJson(new ApiResponse(false, "Failed to generate map", null, null));
+        }
+
+        String outPath = determineOutputPath(cfg, res, img);
+        if (outPath == null) {
+            return gson.toJson(new ApiResponse(false, "Failed to determine output path", null, null));
+        }
+
+        if (cfg.returnImageBytes != null && cfg.returnImageBytes) {
+            return returnImageAsBytes(img, ctx.tempNortPath, cfg, res);
+        }
+
+        if (!writeImageToFile(img, outPath, res)) {
+            return gson.toJson(new ApiResponse(false, "Failed to write image", null, null));
+        }
+
+        String nortSavedPath = saveNortIfRequested(ctx.settings, outPath, ctx.providedNortContent, cfg, ctx.tempNortPath, res);
+
+        res.status(200);
+        return gson.toJson(new ApiResponse(true, "OK", outPath, nortSavedPath));
+    }
+
+    private static void logHeaders(Request req) {
         try {
             String ct = req.contentType();
             Logger.println("handleGenerate: contentType='" + ct + "' raw='" + req.raw().getContentType() + "'");
@@ -76,59 +112,62 @@ public class MapApiServer {
         } catch (Exception e) {
             Logger.println("handleGenerate: failed to log headers: " + e.getMessage());
         }
+    }
 
-        Config cfg = null;
+    private static Config parseConfig(Request req, Response res) {
         try {
             String contentType = req.contentType();
             if (contentType != null && contentType.toLowerCase().startsWith("multipart/form-data")) {
-                // Configure multipart handling and extract the uploaded file + form fields
-                MultipartConfigElement multipartConfigElement = new MultipartConfigElement(System.getProperty("java.io.tmpdir"));
-                req.raw().setAttribute("org.eclipse.jetty.multipartConfig", multipartConfigElement);
-                Part part = req.raw().getPart("nortFile");
-                cfg = new Config();
-                if (part != null) {
-                    Path temp = Files.createTempFile("nortantis-upload-", ".nort");
-                    try (InputStream is = part.getInputStream()) {
-                        Files.copy(is, temp, StandardCopyOption.REPLACE_EXISTING);
-                    }
-                    cfg.nortFile = temp.toAbsolutePath().toString();
-                }
-                // read other form fields if present
-                String widthStr = req.raw().getParameter("width");
-                String heightStr = req.raw().getParameter("height");
-                String seedStr = req.raw().getParameter("seed");
-                String saveNortStr = req.raw().getParameter("saveNort");
-                String returnBytesStr = req.raw().getParameter("returnImageBytes");
-                if (widthStr != null && !widthStr.isEmpty()) cfg.width = Integer.valueOf(widthStr);
-                if (heightStr != null && !heightStr.isEmpty()) cfg.height = Integer.valueOf(heightStr);
-                if (seedStr != null && !seedStr.isEmpty()) cfg.seed = Long.valueOf(seedStr);
-                if (saveNortStr != null && !saveNortStr.isEmpty()) cfg.saveNort = Boolean.valueOf(saveNortStr);
-                if (returnBytesStr != null && !returnBytesStr.isEmpty()) cfg.returnImageBytes = Boolean.valueOf(returnBytesStr);
+                return parseMultipartConfig(req);
             } else {
-                cfg = gson.fromJson(req.body(), Config.class);
+                return gson.fromJson(req.body(), Config.class);
             }
-        } catch (JsonSyntaxException e) {
+        } catch (Exception e) {
             res.status(400);
-            return gson.toJson(new ApiResponse(false, "Invalid JSON: " + e.getMessage(), null, null));
+            return null;
         }
-        catch (Exception e) {
-            res.status(400);
-            return gson.toJson(new ApiResponse(false, "Invalid request: " + e.getMessage(), null, null));
+    }
+
+    private static Config parseMultipartConfig(Request req) throws IOException, javax.servlet.ServletException {
+        MultipartConfigElement multipartConfigElement = new MultipartConfigElement(System.getProperty("java.io.tmpdir"));
+        req.raw().setAttribute("org.eclipse.jetty.multipartConfig", multipartConfigElement);
+        Part part = req.raw().getPart("nortFile");
+        Config cfg = new Config();
+
+        if (part != null) {
+            Path temp = Files.createTempFile("nortantis-upload-", NORT_EXTENSION);
+            try (InputStream is = part.getInputStream()) {
+                Files.copy(is, temp, StandardCopyOption.REPLACE_EXISTING);
+            }
+            cfg.nortFile = temp.toAbsolutePath().toString();
         }
 
-        if (cfg == null) {
-            cfg = new Config();
-        }
+        extractFormFields(req, cfg);
+        return cfg;
+    }
 
-        // Initialize AWT platform for headless generation
-        PlatformFactory.setInstance(new AwtFactory());
+    private static void extractFormFields(Request req, Config cfg) {
+        String widthStr = req.raw().getParameter("width");
+        String heightStr = req.raw().getParameter("height");
+        String seedStr = req.raw().getParameter("seed");
+        String saveNortStr = req.raw().getParameter("saveNort");
+        String returnBytesStr = req.raw().getParameter("returnImageBytes");
 
-        MapSettings settings;
-        Path tempNortPath = null;
+        if (widthStr != null && !widthStr.isEmpty()) cfg.width = Integer.valueOf(widthStr);
+        if (heightStr != null && !heightStr.isEmpty()) cfg.height = Integer.valueOf(heightStr);
+        if (seedStr != null && !seedStr.isEmpty()) cfg.seed = Long.valueOf(seedStr);
+        if (saveNortStr != null && !saveNortStr.isEmpty()) cfg.saveNort = Boolean.valueOf(saveNortStr);
+        if (returnBytesStr != null && !returnBytesStr.isEmpty()) cfg.returnImageBytes = Boolean.valueOf(returnBytesStr);
+    }
+
+    private static GenerationContext loadSettings(Config cfg, Response res) {
         boolean providedNortContent = cfg.nortContent != null && !cfg.nortContent.isEmpty();
+        Path tempNortPath = null;
+
         try {
+            MapSettings settings;
             if (providedNortContent) {
-                tempNortPath = Files.createTempFile("nortantis-", ".nort");
+                tempNortPath = Files.createTempFile("nortantis-", NORT_EXTENSION);
                 Files.write(tempNortPath, cfg.nortContent.getBytes(StandardCharsets.UTF_8), StandardOpenOption.TRUNCATE_EXISTING);
                 settings = new MapSettings(tempNortPath.toAbsolutePath().toString());
             } else if (cfg.nortFile != null && !cfg.nortFile.isEmpty()) {
@@ -136,101 +175,110 @@ public class MapApiServer {
             } else {
                 settings = SettingsGenerator.generate(null);
             }
+
+            if (cfg.seed != null) {
+                settings.randomSeed = cfg.seed;
+            }
+
+            return new GenerationContext(settings, tempNortPath, providedNortContent);
         } catch (IOException ex) {
             res.status(400);
-            return gson.toJson(new ApiResponse(false, "Invalid nort content: " + ex.getMessage(), null, null));
+            return null;
         }
+    }
 
-        if (cfg.seed != null) {
-            settings.randomSeed = cfg.seed;
-        }
-
+    private static Image generateMap(MapSettings settings, Config cfg, Response res) {
         Dimension dims = null;
         if (cfg.width != null || cfg.height != null) {
-            int w = (cfg.width != null) ? cfg.width : (settings.generatedWidth > 0 ? settings.generatedWidth : 2000);
-            int h = (cfg.height != null) ? cfg.height : (settings.generatedHeight > 0 ? settings.generatedHeight : 1200);
+            int defaultWidth = settings.generatedWidth > 0 ? settings.generatedWidth : 2000;
+            int w = (cfg.width != null) ? cfg.width : defaultWidth;
+            int defaultHeight = settings.generatedHeight > 0 ? settings.generatedHeight : 1200;
+            int h = (cfg.height != null) ? cfg.height : defaultHeight;
             dims = new Dimension(w, h);
         }
 
-        MapCreator creator = new MapCreator();
-        Image img = null;
         try {
-            img = creator.createMap(settings, dims, null);
-        } catch (CancelledException e) {
-            res.status(500);
-            return gson.toJson(new ApiResponse(false, "Map generation cancelled", null, null));
+            MapCreator creator = new MapCreator();
+            return creator.createMap(settings, dims, null);
         } catch (Exception e) {
             res.status(500);
-            return gson.toJson(new ApiResponse(false, "Error: " + e.getMessage(), null, null));
+            return null;
         }
+    }
 
+    private static String determineOutputPath(Config cfg, Response res, Image img) {
         String outPath = cfg.out;
         if (outPath == null || outPath.isEmpty()) {
             try {
                 File tmp = File.createTempFile("nortantis-map-" + Instant.now().toEpochMilli(), ".png");
                 outPath = tmp.getAbsolutePath();
             } catch (IOException e) {
-                if (img != null) img.close();
+                img.close();
                 res.status(500);
-                return gson.toJson(new ApiResponse(false, "Failed to create temp file: " + e.getMessage(), null, null));
+                return null;
             }
         }
-        // If requested, return raw image bytes directly
-        if (cfg.returnImageBytes != null && cfg.returnImageBytes) {
-            try {
-                // Use AWT unwrap to get BufferedImage and write to byte array
-                BufferedImage buf = nortantis.platform.awt.AwtFactory.unwrap(img);
-                ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                ImageIO.write(buf, "png", baos);
-                baos.flush();
-                byte[] bytes = baos.toByteArray();
-                baos.close();
-                res.type("image/png");
-                res.status(200);
-                return bytes;
-            } catch (Exception e) {
-                res.status(500);
-                return gson.toJson(new ApiResponse(false, "Failed to produce image bytes: " + e.getMessage(), null, null));
-            } finally {
-                if (img != null) img.close();
-                // Clean up temp nort if we wrote one but didn't save it
-                if (tempNortPath != null && !cfg.saveNort) {
-                    try { Files.deleteIfExists(tempNortPath); } catch (Exception ignore) {}
+        return outPath;
+    }
+
+    private static Object returnImageAsBytes(Image img, Path tempNortPath, Config cfg, Response res) {
+        try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+            BufferedImage buf = nortantis.platform.awt.AwtFactory.unwrap(img);
+            ImageIO.write(buf, "png", baos);
+            baos.flush();
+            byte[] bytes = baos.toByteArray();
+            res.type("image/png");
+            res.status(200);
+            return bytes;
+        } catch (Exception e) {
+            res.status(500);
+            return gson.toJson(new ApiResponse(false, "Failed to produce image bytes: " + e.getMessage(), null, null));
+        } finally {
+            img.close();
+            if (tempNortPath != null && !cfg.saveNort) {
+                try {
+                    Files.deleteIfExists(tempNortPath);
+                } catch (Exception ignore) {
+                    // Ignore cleanup errors; temporary file will be cleaned up by system
                 }
             }
         }
+    }
 
+    private static boolean writeImageToFile(Image img, String outPath, Response res) {
         try {
             img.write(outPath);
+            return true;
         } catch (Exception e) {
             res.status(500);
-            return gson.toJson(new ApiResponse(false, "Failed to write image: " + e.getMessage(), null, null));
+            return false;
         } finally {
-            if (img != null) img.close();
+            img.close();
         }
+    }
 
+    private static String saveNortIfRequested(MapSettings settings, String outPath, boolean providedNortContent, Config cfg, Path tempNortPath, Response res) {
         String nortSavedPath = null;
         try {
             if (cfg.saveNort != null && cfg.saveNort && providedNortContent) {
                 String base = outPath;
                 int dot = base.lastIndexOf('.');
-                String nortPath = (dot > 0 ? base.substring(0, dot) : base) + ".nort";
+                String nortPath = (dot > 0 ? base.substring(0, dot) : base) + NORT_EXTENSION;
                 settings.writeToFile(nortPath);
                 nortSavedPath = nortPath;
             }
         } catch (Exception e) {
-            // Non-fatal: image was written. Return warning in response.
             res.status(200);
-            return gson.toJson(new ApiResponse(true, "Image written but failed to save .nort: " + e.getMessage(), outPath, null));
         } finally {
-            // Remove temporary nort file unless user requested save
             if (tempNortPath != null && !(cfg.saveNort != null && cfg.saveNort)) {
-                try { Files.deleteIfExists(tempNortPath); } catch (Exception ignore) {}
+                try {
+                    Files.deleteIfExists(tempNortPath);
+                } catch (Exception ignore) {
+                    // Ignore cleanup errors; temporary file will be cleaned up by system
+                }
             }
         }
-
-        res.status(200);
-        return gson.toJson(new ApiResponse(true, "OK", outPath, nortSavedPath));
+        return nortSavedPath;
     }
 
     private static class Config {
@@ -242,6 +290,18 @@ public class MapApiServer {
         String out;
         Boolean returnImageBytes;
         Boolean saveNort;
+    }
+
+    private static class GenerationContext {
+        MapSettings settings;
+        Path tempNortPath;
+        boolean providedNortContent;
+
+        GenerationContext(MapSettings settings, Path tempNortPath, boolean providedNortContent) {
+            this.settings = settings;
+            this.tempNortPath = tempNortPath;
+            this.providedNortContent = providedNortContent;
+        }
     }
 
     private static class ApiResponse {
