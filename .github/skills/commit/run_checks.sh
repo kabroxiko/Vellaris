@@ -58,12 +58,14 @@ echo "[run_checks] Files to process:"
 echo "$changed_set"
 
 # helpers to filter by extension
-js_files=$(echo "$changed_set" | grep -E '\.(js|jsx|ts|tsx|json|css|scss|html)$' || true)
+prettier_files=$(echo "$changed_set" | grep -E '\.(js|jsx|ts|tsx|json|css|scss|html)$' || true)
+eslint_files=$(echo "$changed_set" | grep -E '\.(js|jsx|ts|tsx)$' || true)
 java_files=$(echo "$changed_set" | grep -E '\.(java)$' || true)
 py_files=$(echo "$changed_set" | grep -E '\.(py)$' || true)
 doc_files=$(echo "$changed_set" | grep -E '\.(md|rst)$' || true)
 
-echo "[run_checks-debug] js_files=<<EOF\n$js_files\nEOF"
+echo "[run_checks-debug] prettier_files=<<EOF\n$prettier_files\nEOF"
+echo "[run_checks-debug] eslint_files=<<EOF\n$eslint_files\nEOF"
 echo "[run_checks-debug] java_files=<<EOF\n$java_files\nEOF"
 echo "[run_checks-debug] py_files=<<EOF\n$py_files\nEOF"
 echo "[run_checks-debug] doc_files=<<EOF\n$doc_files\nEOF"
@@ -143,7 +145,7 @@ run_eslint_per_pkg() {
 }
 
 # Run JS/TS formatters & auto-fixers
-if [ -n "$js_files" ]; then
+if [ -n "$prettier_files" ]; then
   echo "[run_checks] Running Prettier on JS/TS files"
   if command -v npx >/dev/null 2>&1; then
     # Run Prettier per package root so it picks up the nearest config
@@ -155,14 +157,17 @@ if [ -n "$js_files" ]; then
       else
         run_nonfatal $PRETTIER_CMD $PRETTIER_FLAGS "$f"
       fi
-    done <<< "$js_files"
+    done <<< "$prettier_files"
   else
     echo "[run_checks] Prettier not available; skipping"
   fi
 
+fi
+
+if [ -n "$eslint_files" ]; then
   echo "[run_checks] Running ESLint --fix on JS/TS files"
   if command -v npx >/dev/null 2>&1; then
-    run_eslint_per_pkg "--fix" "" "$js_files" || true
+    run_eslint_per_pkg "--fix" "" "$eslint_files" || true
   else
     echo "[run_checks] ESLint not available; skipping --fix step"
   fi
@@ -207,10 +212,10 @@ fi
 # Run linters (non-fix mode) on changed_set. Use project's canonical tools when configured.
 lint_failed=0
 
-if [ -n "$js_files" ]; then
+if [ -n "$eslint_files" ]; then
   if command -v npx >/dev/null 2>&1; then
     echo "[run_checks] Running ESLint (check-only) on JS/TS files"
-    if ! run_eslint_per_pkg "" "" "$js_files" 2>&1; then
+    if ! run_eslint_per_pkg "" "" "$eslint_files" 2>&1; then
       lint_failed=1
     fi
   else
