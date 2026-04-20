@@ -1,0 +1,22 @@
+{
+  "name": "vellaris-web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "npm run make-favicon && vite",
+    "build": "npm run make-favicon && vite build",
+    "preview": "vite preview",
+    "make-favicon": "sh scripts/make-favicon.sh",
+    "format": "prettier --write \"src/**/*.{js,jsx,ts,tsx,css,md,json}\"",
+    "format:check": "prettier --check \"src/**/*.{js,jsx,ts,tsx,css,md,json}\""
+  },
+  "dependencies": {
+    "react": "18.2.0",
+    "react-dom": "18.2.0"
+  },
+  "devDependencies": {
+    "prettier": "^3.8.3",
+    "vite": "^5.0.0",
+    "prop-types": "^15.8.1"
+  }
+}

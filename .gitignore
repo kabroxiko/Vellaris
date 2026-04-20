@@ -48,3 +48,12 @@ build
 .claude
 .DS_Store
 *.bak
+node_modules/
+# Generated favicons/icons from web/public/vellaris.svg
+web/public/favicon-*.png
+web/public/favicon.ico
+web/public/android-chrome-*.png
+web/public/apple-touch-icon.png
+web/public/*.png
+web/public/*.ico
+dist/

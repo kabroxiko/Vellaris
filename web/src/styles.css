@@ -1,0 +1,553 @@
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Merriweather:ital,wght@0,300;0,700;1,700&display=swap');
+
+/* Base theme variables are defined later (parchment theme). */
+* {
+  box-sizing: border-box;
+}
+.root-font {
+  font-family:
+    'Inter',
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    'Helvetica Neue',
+    Arial;
+}
+/* margin merged into canonical body block further below */
+.app-root {
+  max-width: 1100px;
+  margin: 28px auto;
+  padding: 20px;
+}
+header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 30;
+}
+.branding {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.branding .logo {
+  font-size: 28px;
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.35));
+}
+/* content-card styles consolidated in theme block below */
+.generate-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.form-grid {
+  display: grid;
+  grid-template-columns: var(--form-grid-template, 1fr 320px);
+  gap: 18px;
+}
+.input-column {
+  min-width: 0;
+}
+.controls-column {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.03);
+  padding: 12px;
+  border-radius: 8px;
+  order: var(--controls-column-order, initial);
+}
+.generate-form input[type='file'] {
+  max-width: 100%;
+}
+.generate-form textarea {
+  background: rgba(255, 255, 255, 0.95);
+  color: #2b1f15;
+  padding: 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(107, 86, 63, 0.08);
+  width: 100%;
+  min-height: 200px;
+}
+.controls-column label {
+  display: block;
+  margin-top: 8px;
+  font-size: 13px;
+}
+.controls-column input[type='number'],
+.controls-column input[type='text'] {
+  width: 100%;
+  padding: 6px;
+  margin-top: 4px;
+}
+.checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+}
+.actions button {
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  background: linear-gradient(180deg, #ffd96b, #c78f18);
+  color: #24160b;
+  border: 1px solid rgba(107, 86, 63, 0.14);
+  box-shadow: 0 6px 18px rgba(16, 10, 6, 0.15);
+}
+.actions button[disabled] {
+  opacity: 0.6;
+  cursor: default;
+}
+.hint {
+  font-size: 12px;
+}
+.status {
+  margin-top: 8px;
+  color: #333;
+}
+.error {
+  color: #a00;
+  margin-top: 8px;
+}
+.preview {
+  margin-top: 18px;
+}
+.preview h3 {
+  margin-bottom: 6px;
+}
+.preview-controls {
+  display: flex;
+  flex-direction: var(--preview-controls-flex-direction, row);
+  gap: var(--preview-controls-gap, 12px);
+  align-items: var(--preview-controls-align, center);
+  margin-bottom: 8px;
+}
+.modal .preview-controls,
+.modal .preview-controls .download,
+.modal .preview-controls .open,
+.preview-controls .download,
+.preview-controls .open {
+  position: relative;
+  z-index: 20;
+  background: #eee;
+  padding: var(--preview-controls-button-padding, 6px 10px);
+  border-radius: 6px;
+  text-decoration: none;
+  color: #111;
+}
+
+/* Zoom/pan styles for preview image inside modal */
+/* zoom-pan behavior merged into preview img block above */
+
+.zoom-container {
+  position: relative;
+  overflow: auto; /* switch to scroll-based panning */
+  width: 100%;
+  cursor: grab;
+  touch-action: none;
+}
+
+.modal-overlay-dismiss {
+  /* ensure it's visually invisible but accessible */
+  opacity: 0;
+  z-index: 10;
+  /* cover the overlay area to receive outside clicks; positioned absolutely */
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: transparent;
+  /* make the overlay dismiss element visually inert (don't show pointer or button hover) */
+  cursor: default;
+}
+
+/* Toasts */
+.toast-container {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 100;
+}
+.toast {
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0.007));
+  color: #e9f3ff;
+  padding: 10px;
+  border-radius: 10px;
+  min-width: 220px;
+  box-shadow: 0 8px 24px rgba(2, 6, 23, 0.6);
+  overflow: hidden;
+  position: relative;
+  border: 1px solid rgba(255, 255, 255, 0.03);
+}
+.toast-accent {
+  display: none;
+}
+
+/* type-specific full border (replaces left-only accent) */
+.toast.info {
+  border-color: rgba(110, 168, 255, 0.95);
+}
+.toast.success {
+  border-color: rgba(105, 230, 164, 0.95);
+}
+.toast.error {
+  border-color: rgba(255, 107, 107, 0.95);
+}
+.toast-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 8px 6px 0;
+  flex: 1;
+}
+.toast-message {
+  flex: 1;
+  color: #ecf6ff;
+}
+.toast-close {
+  background: transparent;
+  border: none;
+  color: #cfe7ff;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 6px;
+}
+.toast-close:focus {
+  outline: 2px solid rgba(255, 255, 255, 0.06);
+}
+.toast-progress {
+  height: 4px;
+  background: rgba(255, 255, 255, 0.04);
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  transform-origin: right;
+  animation-name: toast-progress;
+  animation-timing-function: linear;
+}
+@keyframes toast-progress {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
+/* footer top margin and alignment merged into canonical footer block below */
+
+@media (max-width: 880px) {
+  /* responsive layout adjustments */
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+  .app-root .controls-column {
+    order: 2;
+  }
+  .branding h1 {
+    font-size: 28px;
+  }
+}
+
+/* Mobile tweaks for modal preview */
+@media (max-width: 480px) {
+  /* Modal sizing on very small screens: keep margins and proportional sizing */
+  /* mobile modal sizing */
+  .modal {
+    max-width: calc(100% - 24px);
+    margin: 12px;
+    padding: 10px;
+    border-radius: 8px;
+    max-height: calc(100vh - 24px);
+  }
+  .modal-body {
+    padding: 6px;
+    /* give more vertical room for the image on narrow screens */
+    max-height: calc(100vh - 88px);
+  }
+  /* mobile-specific close button vars moved into .modal */
+  /* mobile preview adjustments */
+  .zoom-container {
+    width: 100%;
+    max-height: calc(100vh - 120px) !important;
+  }
+  .app-root .preview img,
+  .app-root .zoom-pan {
+    width: 100%;
+    height: auto;
+    transform: none;
+  }
+  .app-root .preview-controls {
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-start;
+  }
+  .app-root .preview-controls .download,
+  .app-root .preview-controls .open {
+    padding: 6px 8px;
+  }
+  /* preview image responsive overrides consolidated below */
+}
+
+/* --- Epic fantasy / parchment theme overrides --- */
+:root {
+  --pf-bg-1: #f6eddc;
+  --pf-bg-2: #efe1bf;
+  --pf-card: #fbf3e6;
+  --pf-muted: #6b563f;
+  --pf-accent: #b8860b;
+  --pf-accent-2: #8b5e2b;
+  /* page edge color used when overscroll/bounce exposes html background */
+  --pf-bg-edge: #dccdb0;
+  /* Responsive / modal variables (consolidated) */
+  --branding-h1-font-size: 36px;
+  --modal-padding: 16px;
+  --form-grid-template: 1fr 320px;
+  --controls-column-order: initial;
+  --modal-max-width: none;
+  --modal-margin: 24px;
+  --modal-border-radius: 12px;
+  --modal-max-height: none;
+  --modal-height: auto;
+  --modal-close-right: 14px;
+  --modal-close-top: 12px;
+  --modal-close-font-size: 18px;
+  --zoom-pan-width: 100%;
+  --zoom-pan-height: auto;
+  --zoom-pan-transform: none;
+  --preview-controls-flex-direction: row;
+  --preview-controls-gap: 12px;
+  --preview-controls-align: center;
+  --preview-controls-button-padding: 6px 10px;
+}
+
+/* Ensure the page uses full viewport height */
+html,
+body {
+  height: 100%;
+  /* ensure there's no different base color shown on overscroll */
+  background-color: var(--pf-bg-edge);
+  background-attachment: fixed;
+  background-size: cover;
+}
+
+body {
+  margin: 0;
+  /* exact full-viewport height to avoid layout gaps */
+  height: 100vh;
+  overflow-y: auto;
+  /* keep same visual background as the html element */
+  background:
+    radial-gradient(ellipse at center, rgba(0, 0, 0, 0.05) 0%, rgba(0, 0, 0, 0.12) 100%),
+    linear-gradient(180deg, var(--pf-bg-1), var(--pf-bg-2));
+  background-repeat: no-repeat;
+  color: #2b1f15;
+  font-family: Merriweather, Georgia, 'Times New Roman', serif;
+  /* contain overscroll to avoid showing UI chrome or different background */
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Branding */
+.branding h1 {
+  font-family: Cinzel, Merriweather, serif;
+  color: var(--pf-accent-2);
+  font-size: var(--branding-h1-font-size, 36px);
+  font-weight: 700;
+  text-shadow:
+    0 2px 0 rgba(255, 255, 255, 0.25),
+    0 6px 18px rgba(16, 10, 6, 0.45);
+}
+/* branding .logo filter is defined above with font-size; duplicate removed */
+
+/* Cards and inputs */
+.content-card {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.6), rgba(255, 245, 220, 0.6));
+  border: 1px solid rgba(107, 86, 63, 0.12);
+  box-shadow:
+    0 8px 30px rgba(16, 10, 6, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  padding: 18px;
+  border-radius: 12px;
+}
+.dropzone {
+  border: 2px dashed rgba(107, 86, 63, 0.18);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.05));
+  padding: 18px;
+  border-radius: 6px;
+  margin-top: 8px;
+  transition:
+    box-shadow 180ms ease,
+    border-color 180ms ease,
+    background 180ms ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 88px;
+  box-sizing: border-box;
+}
+.dropzone span {
+  font-size: 13px;
+}
+
+/* Visible outline and hover state for dropzone */
+.dropzone:hover,
+.dropzone:focus,
+.dropzone:focus-within {
+  border-color: var(--pf-accent-2);
+  box-shadow:
+    0 6px 18px rgba(11, 8, 6, 0.12),
+    0 0 0 6px rgba(184, 134, 11, 0.06);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.08));
+  outline: none;
+}
+
+/* Upload group stacks label/input and dropzone vertically */
+.upload-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.upload-group input[type='file'] {
+  max-width: 240px;
+}
+
+/* Buttons - gold / parchment look */
+.btn {
+  font-family: Cinzel, Merriweather, serif;
+  border: 1px solid rgba(107, 86, 63, 0.12);
+  box-shadow: 0 6px 18px rgba(11, 8, 6, 0.45);
+}
+.btn-primary {
+  background: linear-gradient(180deg, #ffd974, #c98f12);
+  color: #2b1606;
+}
+.btn-ghost {
+  background: rgba(255, 255, 255, 0.04);
+  color: #2b1606;
+  border-color: rgba(107, 86, 63, 0.08);
+}
+/* duplicate actions button removed; canonical rule earlier */
+
+/* Modal styling - parchment frame */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.35);
+  z-index: 60;
+  padding: 24px;
+}
+
+.modal {
+  background: linear-gradient(180deg, #fbf3e6, #efe6cf);
+  border: 3px solid rgba(40, 28, 18, 0.7);
+  box-shadow:
+    0 20px 60px rgba(6, 4, 2, 0.7),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  /* keep horizontal centering when <dialog> is promoted to the native top layer */
+  margin: 0 auto;
+  padding: var(--modal-padding, 16px);
+  border-radius: var(--modal-border-radius, 12px);
+  max-height: calc(100vh - 48px);
+  height: var(--modal-height, auto);
+  max-width: calc(100vw - 48px);
+  box-sizing: border-box;
+  overflow: hidden;
+  position: relative;
+  z-index: 30; /* ensure modal is above the full-screen dismiss button */
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-body {
+  overflow: auto;
+  padding: 12px 0;
+  flex: 0 1 auto;
+}
+.modal-header {
+  background: linear-gradient(180deg, rgba(16, 10, 6, 0.03), rgba(16, 10, 6, 0.01));
+  border-bottom: 1px solid rgba(107, 86, 63, 0.08);
+}
+.modal-close {
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  color: #24160b;
+  width: var(--modal-close-size, 34px);
+  height: var(--modal-close-size, 34px);
+  border-radius: 6px;
+  padding: 0;
+  margin: 0;
+  font-size: var(--modal-close-font-size, 18px);
+  position: absolute;
+  right: var(--modal-close-right, 14px);
+  top: var(--modal-close-top, 12px);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 40;
+  cursor: pointer;
+}
+.modal-close svg {
+  display: block;
+  width: 18px;
+  height: 18px;
+  stroke: currentColor;
+}
+.modal-close:focus {
+  outline: none;
+}
+.modal-close:focus-visible {
+  outline: 2px solid rgba(36, 22, 11, 0.12);
+  border-radius: 6px;
+}
+/* don't show a translucent rounded background on hover; instead change icon color */
+.modal-close:hover {
+  background: transparent;
+  color: #7a5a3a;
+}
+.preview img,
+.zoom-pan {
+  width: var(--zoom-pan-width, 100%);
+  height: var(--zoom-pan-height, auto);
+  transform: var(--zoom-pan-transform, none);
+  border-radius: 6px;
+  display: block;
+  border: 12px solid #efe3c6;
+  box-shadow:
+    0 12px 36px rgba(11, 8, 6, 0.45),
+    inset 0 2px 0 rgba(255, 255, 255, 0.6);
+  touch-action: none;
+  user-select: none;
+  -webkit-user-drag: none;
+  will-change: width, height;
+  z-index: 10;
+}
+
+/* Footer / links */
+footer {
+  margin-top: 20px;
+  color: var(--pf-muted);
+  text-align: center;
+}
+
+/* small responsive tweaks (moved into primary media block) */
