@@ -25,7 +25,7 @@ set -euo pipefail
 # By default enable verbose flags for formatters/linters so outputs are shown to user
 : ${VERBOSE:=1}
 if [ "$VERBOSE" -ne 0 ]; then
-  PRETTIER_FLAGS="--loglevel debug"
+  PRETTIER_FLAGS=""
   ESLINT_FLAGS="--debug"
   ESLINT_CHECK_FLAGS="--debug"
   BLACK_FLAGS="-v"
