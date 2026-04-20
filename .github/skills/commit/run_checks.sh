@@ -71,18 +71,98 @@ echo "[run_checks-debug] doc_files=<<EOF\n$doc_files\nEOF"
 # ESLint config detection/provisioning is handled by the commit skill, not this script.
 # This script only runs concrete checks against changed files.
 
+# Helper: find the nearest directory containing package.json for a given file path.
+# Returns the directory (relative to repo root) or empty string if none found.
+find_pkg_root() {
+  local file="$1"
+  local dir
+  dir=$(dirname "$file")
+  while [ "$dir" != "." ] && [ "$dir" != "/" ] && [ "$dir" != "" ]; do
+    if [ -f "$dir/package.json" ]; then
+      echo "$dir"
+      return
+    fi
+    dir=$(dirname "$dir")
+  done
+  # fallback: repo root
+  if [ -f "package.json" ]; then
+    echo "."
+  else
+    echo ""
+  fi
+}
+
+# Helper: run ESLint (with optional --fix) from the nearest package.json directory for each file group.
+run_eslint_per_pkg() {
+  local fix_flag="${1:-}"   # "--fix" or ""
+  local extra_flags="${2:-}"
+  local files="${3:-}"
+  local failed=0
+
+  # Collect unique package roots
+  local pkg_roots
+  pkg_roots=$(while IFS= read -r f; do
+    r=$(find_pkg_root "$f")
+    [ -n "$r" ] && echo "$r"
+  done <<< "$files" | sort -u)
+
+  if [ -z "$pkg_roots" ]; then
+    echo "[run_checks] No package.json root found for JS/TS files; skipping ESLint"
+    return 0
+  fi
+
+  while IFS= read -r pkg_root; do
+    # Collect files under this package root
+    local root_files
+    root_files=$(while IFS= read -r f; do
+      r=$(find_pkg_root "$f")
+      [ "$r" = "$pkg_root" ] && echo "$f"
+    done <<< "$files")
+    [ -z "$root_files" ] && continue
+
+    # Convert absolute repo-relative paths to paths relative to pkg_root
+    local rel_files
+    rel_files=$(while IFS= read -r f; do
+      if [ "$pkg_root" = "." ]; then
+        echo "$f"
+      else
+        # strip the pkg_root/ prefix
+        echo "${f#${pkg_root}/}"
+      fi
+    done <<< "$root_files")
+
+    echo "[run_checks] Running ESLint $fix_flag from '$pkg_root' on:"
+    echo "$rel_files"
+
+    if ! (cd "$pkg_root" && npx eslint $fix_flag $extra_flags $(echo "$rel_files" | tr '\n' ' ')); then
+      failed=1
+    fi
+  done <<< "$pkg_roots"
+
+  return $failed
+}
+
 # Run JS/TS formatters & auto-fixers
 if [ -n "$js_files" ]; then
   echo "[run_checks] Running Prettier on JS/TS files"
-  if command -v ${PRETTIER_CMD%% *} >/dev/null 2>&1 || command -v npx >/dev/null 2>&1; then
-    run_nonfatal $PRETTIER_CMD $PRETTIER_FLAGS $(echo "$js_files" | tr '\n' ' ')
+  if command -v npx >/dev/null 2>&1; then
+    # Run Prettier per package root so it picks up the nearest config
+    while IFS= read -r f; do
+      pkg_root=$(find_pkg_root "$f")
+      if [ -n "$pkg_root" ]; then
+        rel_f=$([ "$pkg_root" = "." ] && echo "$f" || echo "${f#${pkg_root}/}")
+        run_nonfatal "(cd '$pkg_root' && $PRETTIER_CMD $PRETTIER_FLAGS '$rel_f')"
+      else
+        run_nonfatal $PRETTIER_CMD $PRETTIER_FLAGS "$f"
+      fi
+    done <<< "$js_files"
   else
     echo "[run_checks] Prettier not available; skipping"
   fi
 
   echo "[run_checks] Running ESLint --fix on JS/TS files"
-  if command -v ${ESLINT_CMD%% *} >/dev/null 2>&1 || command -v npx >/dev/null 2>&1; then
-    run_nonfatal $ESLINT_CMD $ESLINT_FLAGS $(echo "$js_files" | tr '\n' ' ')
+  if command -v npx >/dev/null 2>&1; then
+    run_eslint_per_pkg "--fix" "" "$js_files" || true
   else
     echo "[run_checks] ESLint not available; skipping --fix step"
   fi
@@ -128,9 +208,9 @@ fi
 lint_failed=0
 
 if [ -n "$js_files" ]; then
-  if command -v ${ESLINT_CHECK_CMD%% *} >/dev/null 2>&1 || command -v npx >/dev/null 2>&1; then
+  if command -v npx >/dev/null 2>&1; then
     echo "[run_checks] Running ESLint (check-only) on JS/TS files"
-    if ! $ESLINT_CHECK_CMD $ESLINT_CHECK_FLAGS $(echo "$js_files" | tr '\n' ' '); then
+    if ! run_eslint_per_pkg "" "" "$js_files" 2>&1; then
       lint_failed=1
     fi
   else
