@@ -304,6 +304,7 @@ public class MapApiServer {
         }
     }
 
+    @SuppressWarnings("unused")
     private static class ApiResponse {
         boolean success;
         String message;
