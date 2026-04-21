@@ -21,7 +21,9 @@ export default function App() {
         <div className="branding">
           <h1>Vellaris — Online Map Generator</h1>
         </div>
-        <p>Upload a map settings file, or drag-and-drop — then click Generate.</p>
+        <p>
+          Generate a random map instantly, or upload a map settings file to render it as an image.
+        </p>
       </header>
       <main>
         <div className="content-card">

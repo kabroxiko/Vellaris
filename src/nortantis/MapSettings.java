@@ -324,6 +324,12 @@ public class MapSettings implements Serializable
 		FileHelper.writeToFile(filePath, json);
 	}
 
+	public String toJsonString()
+	{
+		version = currentVersion;
+		return toJson();
+	}
+
 	private String toJson()
 	{
 		return toJson(false);

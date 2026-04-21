@@ -165,9 +165,8 @@ public class LandWaterTool extends EditorTool
 
 				if (brushSizeComboBox != null)
 				{
-					brushSizeHider.setVisible(
-							oceanButton.isSelected() || lakesButton.isSelected() || landButton.isSelected() || (riversButton.isSelected() && modeWidget.isEraseMode()) || (roadsButton.isSelected()
-									&& modeWidget.isEraseMode()));
+					brushSizeHider.setVisible(oceanButton.isSelected() || lakesButton.isSelected() || landButton.isSelected() || (riversButton.isSelected() && modeWidget.isEraseMode())
+							|| (roadsButton.isSelected() && modeWidget.isEraseMode()));
 				}
 
 				showOrHideRoadAndRiverOptions();
@@ -204,8 +203,8 @@ public class LandWaterTool extends EditorTool
 					() -> brushActionListener.actionPerformed(null));
 			modeHider = modeWidget.addToOrganizer(organizer, Translation.get("landWaterTool.riverMode.help"));
 
- 			int maxSliderValue = 1 + (int) Math.round(Math.sqrt((River.MAX_RIVER_LEVEL - River.RIVERS_THIS_SIZE_OR_SMALLER_WILL_NOT_BE_DRAWN - 1) / 2.0));
-		riverWidthSlider = new JSlider(1, maxSliderValue);
+			int maxSliderValue = 1 + (int) Math.round(Math.sqrt((River.MAX_RIVER_LEVEL - River.RIVERS_THIS_SIZE_OR_SMALLER_WILL_NOT_BE_DRAWN - 1) / 2.0));
+			riverWidthSlider = new JSlider(1, maxSliderValue);
 			final int initialValue = 1;
 			riverWidthSlider.setValue(initialValue);
 			SliderWithDisplayedValue sliderWithDisplay = new SliderWithDisplayedValue(riverWidthSlider);
@@ -292,9 +291,8 @@ public class LandWaterTool extends EditorTool
 			public void actionPerformed(ActionEvent e)
 			{
 				cancelSelectColorFromMap();
-				Color newColor = AwtBridge.toAwtColor(
-						MapCreator.generateColorFromBaseColor(new Random(), AwtBridge.fromAwtColor(baseColorPanel.getBackground()), hueSlider.getValue(), saturationSlider.getValue(),
-								brightnessSlider.getValue()));
+				Color newColor = AwtBridge.toAwtColor(MapCreator.generateColorFromBaseColor(new Random(), AwtBridge.fromAwtColor(baseColorPanel.getBackground()), hueSlider.getValue(),
+						saturationSlider.getValue(), brightnessSlider.getValue()));
 				colorDisplay.setBackground(newColor);
 			}
 		});
@@ -390,7 +388,8 @@ public class LandWaterTool extends EditorTool
 	}
 
 	/**
-	 * Updates the road control point display (orange/yellow snap circles) and the free-hand in-progress preview. Also sets freeHandSnapPoint.
+	 * Updates the road control point display (orange/yellow snap circles) and the free-hand in-progress preview. Also sets
+	 * freeHandSnapPoint.
 	 */
 	private void updateRoadControlPointDisplay(java.awt.Point mouseLocation)
 	{
@@ -653,9 +652,8 @@ public class LandWaterTool extends EditorTool
 					{
 						// Find the nearest political region when drawing in water.
 						nortantis.geom.Point graphPoint = getPointOnGraph(e.getPoint());
-						Optional<CenterEdit> nearest = mainWindow.edits.centerEdits.values().stream().filter(cEdit -> cEdit.regionId != null)
-								.min((c1, c2) -> Double.compare(updater.mapParts.graph.centers.get(c1.index).loc.distanceTo(graphPoint),
-										updater.mapParts.graph.centers.get(c2.index).loc.distanceTo(graphPoint)));
+						Optional<CenterEdit> nearest = mainWindow.edits.centerEdits.values().stream().filter(cEdit -> cEdit.regionId != null).min((c1, c2) -> Double
+								.compare(updater.mapParts.graph.centers.get(c1.index).loc.distanceTo(graphPoint), updater.mapParts.graph.centers.get(c2.index).loc.distanceTo(graphPoint)));
 						regionIdToExpand = nearest.map(edit -> edit.regionId).orElse(null);
 					}
 					else
@@ -1040,9 +1038,8 @@ public class LandWaterTool extends EditorTool
 		}
 
 		// Find the closest center with a region.
-		Optional<CenterEdit> opt = mainWindow.edits.centerEdits.values().stream().filter(cEdit1 -> cEdit1.regionId != null)
-				.min((cEdit1, cEdit2) -> Double.compare(updater.mapParts.graph.centers.get(cEdit1.index).loc.distanceTo(center.loc),
-						updater.mapParts.graph.centers.get(cEdit2.index).loc.distanceTo(center.loc)));
+		Optional<CenterEdit> opt = mainWindow.edits.centerEdits.values().stream().filter(cEdit1 -> cEdit1.regionId != null).min((cEdit1, cEdit2) -> Double
+				.compare(updater.mapParts.graph.centers.get(cEdit1.index).loc.distanceTo(center.loc), updater.mapParts.graph.centers.get(cEdit2.index).loc.distanceTo(center.loc)));
 		if (opt.isPresent())
 		{
 			return opt.get().regionId;
@@ -1436,9 +1433,7 @@ public class LandWaterTool extends EditorTool
 						Center endNeighbor = endEdge.d0 == end ? endEdge.d1 : endEdge.d0;
 						if (endNeighbor != null)
 						{
-							mapEditingPanel.addPolylinesToHighlight(List.of(
-									endNeighbor.loc,
-									currentEndSnapPoint.mult(mainWindow.displayQualityScale)));
+							mapEditingPanel.addPolylinesToHighlight(List.of(endNeighbor.loc, currentEndSnapPoint.mult(mainWindow.displayQualityScale)));
 						}
 					}
 					if (snapStartActive)
@@ -1447,9 +1442,7 @@ public class LandWaterTool extends EditorTool
 						Center snapNeighbor = roadStartEdge.d0 == roadStart ? roadStartEdge.d1 : roadStartEdge.d0;
 						if (snapNeighbor != null)
 						{
-							mapEditingPanel.addPolylinesToHighlight(List.of(
-									polygonSnapStart.mult(mainWindow.displayQualityScale),
-									snapNeighbor.loc));
+							mapEditingPanel.addPolylinesToHighlight(List.of(polygonSnapStart.mult(mainWindow.displayQualityScale), snapNeighbor.loc));
 						}
 					}
 				}

@@ -64,8 +64,8 @@ public class River implements Iterable<Edge>
 	}
 
 	/**
-	 * Returns the corners along this river in order, with one corner per edge endpoint. The list has {@code edges.size() + 1} entries: corners[i] and corners[i+1] are the two endpoints of
-	 * edges[i].
+	 * Returns the corners along this river in order, with one corner per edge endpoint. The list has {@code edges.size() + 1} entries:
+	 * corners[i] and corners[i+1] are the two endpoints of edges[i].
 	 */
 	public List<Corner> getOrderedCorners()
 	{
