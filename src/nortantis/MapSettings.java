@@ -796,11 +796,11 @@ public class MapSettings implements Serializable
 			throw new RuntimeException("The map cannot be loaded because it was made in a new version of Nortantis. That map's version is " + version + ", but you're Nortantis version is "
 					+ currentVersion + ". Try again with a newer version of Nortantis.");
 		}
-		randomSeed = (long) root.get("randomSeed");
-		resolution = (double) root.get("resolution");
-		coastShadingLevel = (int) (long) root.get("coastShadingLevel");
+		randomSeed = asLong(root.get("randomSeed"));
+		resolution = asDouble(root.get("resolution"));
+		coastShadingLevel = asInt(root.get("coastShadingLevel"));
 
-		concentricWaveCount = (int) (long) root.get("concentricWaveCount");
+		concentricWaveCount = asInt(root.get("concentricWaveCount"));
 		if (root.containsKey("fadeConcentricWaves"))
 		{
 			fadeConcentricWaves = (boolean) root.get("fadeConcentricWaves");
@@ -813,7 +813,7 @@ public class MapSettings implements Serializable
 		{
 			jitterToConcentricWaves = (boolean) root.get("jitterToConcentricWaves");
 		}
-		worldSize = (int) (long) root.get("worldSize");
+		worldSize = asInt(root.get("worldSize"));
 		riverColor = parseColor((String) root.get("riverColor"));
 		if (root.containsKey("roadColor"))
 		{
@@ -855,7 +855,7 @@ public class MapSettings implements Serializable
 		coastlineColor = parseColor((String) root.get("coastlineColor"));
 		if (root.containsKey("coastlineWidth"))
 		{
-			coastlineWidth = (double) root.get("coastlineWidth");
+			coastlineWidth = asDouble(root.get("coastlineWidth"));
 		}
 		else
 		{
@@ -866,13 +866,13 @@ public class MapSettings implements Serializable
 		// oceanEffectsLevel was replaced by oceanShadingLevel and oceanWavesLevel, so convert the values here.
 		if (root.containsKey("oceanShadingLevel"))
 		{
-			oceanShadingLevel = (int) (long) root.get("oceanShadingLevel");
+			oceanShadingLevel = asInt(root.get("oceanShadingLevel"));
 		}
 		else
 		{
 			if (oceanWavesType == OceanWaves.Blur)
 			{
-				oceanShadingLevel = (int) (long) root.get("oceanEffectsLevel");
+				oceanShadingLevel = asInt(root.get("oceanEffectsLevel"));
 			}
 			else
 			{
@@ -882,13 +882,13 @@ public class MapSettings implements Serializable
 
 		if (root.containsKey("oceanWavesLevel"))
 		{
-			oceanWavesLevel = (int) (long) root.get("oceanWavesLevel");
+			oceanWavesLevel = asInt(root.get("oceanWavesLevel"));
 		}
 		else
 		{
 			if (oceanWavesType != OceanWaves.Blur)
 			{
-				oceanWavesLevel = (int) (long) root.get("oceanEffectsLevel");
+				oceanWavesLevel = asInt(root.get("oceanEffectsLevel"));
 			}
 			else
 			{
@@ -902,15 +902,15 @@ public class MapSettings implements Serializable
 		}
 
 		drawOceanEffectsInLakes = root.containsKey("drawOceanEffectsInLakes") ? (boolean) root.get("drawOceanEffectsInLakes") : false;
-		centerLandToWaterProbability = (double) root.get("centerLandToWaterProbability");
-		edgeLandToWaterProbability = (double) root.get("edgeLandToWaterProbability");
+		centerLandToWaterProbability = asDouble(root.get("centerLandToWaterProbability"));
+		edgeLandToWaterProbability = asDouble(root.get("edgeLandToWaterProbability"));
 		if (root.containsKey("landShape"))
 		{
 			landShape = LandShape.valueOf((String) root.get("landShape"));
 		}
 		if (root.containsKey("regionCount"))
 		{
-			regionCount = (int) (long) root.get("regionCount");
+			regionCount = asInt(root.get("regionCount"));
 		}
 		frayedBorder = (boolean) root.get("frayedBorder");
 		if (root.containsKey("frayedBorderColor"))
@@ -919,9 +919,9 @@ public class MapSettings implements Serializable
 		}
 		if (root.containsKey("frayedBorderColor"))
 		{
-			frayedBorderBlurLevel = (int) (long) root.get("frayedBorderBlurLevel");
+			frayedBorderBlurLevel = asInt(root.get("frayedBorderBlurLevel"));
 		}
-		grungeWidth = (int) (long) root.get("grungeWidth");
+		grungeWidth = asInt(root.get("grungeWidth"));
 		if (root.containsKey("drawGrunge"))
 		{
 			drawGrunge = (boolean) root.get("drawGrunge");
@@ -930,7 +930,7 @@ public class MapSettings implements Serializable
 		{
 			drawGrunge = true;
 		}
-		cityProbability = (double) root.get("cityProbability");
+		cityProbability = asDouble(root.get("cityProbability"));
 
 		String lineStyleString = (String) root.get("lineStyle");
 		// Convert old value.
@@ -943,10 +943,10 @@ public class MapSettings implements Serializable
 			lineStyle = LineStyle.valueOf((String) root.get("lineStyle"));
 		}
 
-		pointPrecision = (double) root.get("pointPrecision");
+		pointPrecision = asDouble(root.get("pointPrecision"));
 		if (root.containsKey("lloydRelaxationsScale"))
 		{
-			lloydRelaxationsScale = (double) root.get("lloydRelaxationsScale");
+			lloydRelaxationsScale = asDouble(root.get("lloydRelaxationsScale"));
 		}
 		else
 		{
@@ -982,8 +982,8 @@ public class MapSettings implements Serializable
 		{
 			backgroundTextureResource = NamedResource.fromJson((JSONObject) root.get("backgroundTextureResource"));
 		}
-		backgroundRandomSeed = (long) root.get("backgroundRandomSeed");
-		frayedBorderSeed = root.containsKey("frayedBorderSeed") ? (long) root.get("frayedBorderSeed") : backgroundRandomSeed;
+		backgroundRandomSeed = asLong(root.get("backgroundRandomSeed"));
+		frayedBorderSeed = root.containsKey("frayedBorderSeed") ? asLong(root.get("frayedBorderSeed")) : backgroundRandomSeed;
 		oceanColor = parseColor((String) root.get("oceanColor"));
 		landColor = parseColor((String) root.get("landColor"));
 
@@ -996,14 +996,14 @@ public class MapSettings implements Serializable
 			regionBaseColor = landColor;
 		}
 
-		generatedWidth = (int) (long) root.get("generatedWidth");
-		generatedHeight = (int) (long) root.get("generatedHeight");
+		generatedWidth = asInt(root.get("generatedWidth"));
+		generatedHeight = asInt(root.get("generatedHeight"));
 
 		drawRegionColors = (boolean) root.get("drawRegionColors");
-		regionsRandomSeed = (long) root.get("regionsRandomSeed");
-		hueRange = (int) (long) root.get("hueRange");
-		saturationRange = (int) (long) root.get("saturationRange");
-		brightnessRange = (int) (long) root.get("brightnessRange");
+		regionsRandomSeed = asLong(root.get("regionsRandomSeed"));
+		hueRange = asInt(root.get("hueRange"));
+		saturationRange = asInt(root.get("saturationRange"));
+		brightnessRange = asInt(root.get("brightnessRange"));
 		drawRegionBoundaries = root.containsKey(("drawRegionBoundaries")) ? (boolean) root.get("drawRegionBoundaries") : drawRegionColors;
 		regionBoundaryStyle = parseRegionBoundaryStyle((JSONObject) root.get("regionBoundaryStyle"));
 		regionBoundaryColor = parseColor((String) root.get("regionBoundaryColor"));
@@ -1028,7 +1028,7 @@ public class MapSettings implements Serializable
 		}
 
 		drawText = (boolean) root.get("drawText");
-		textRandomSeed = (long) root.get("textRandomSeed");
+		textRandomSeed = asLong(root.get("textRandomSeed"));
 
 		JSONArray booksArray = (JSONArray) root.get("books");
 		books = new TreeSet<String>();
@@ -1062,7 +1062,7 @@ public class MapSettings implements Serializable
 
 		if (root.containsKey("borderWidth"))
 		{
-			borderWidth = (int) (long) root.get("borderWidth");
+			borderWidth = asInt(root.get("borderWidth"));
 		}
 		else
 		{
@@ -1097,7 +1097,7 @@ public class MapSettings implements Serializable
 			borderColor = landColor;
 		}
 
-		frayedBorderSize = (int) (long) root.get("frayedBorderSize");
+		frayedBorderSize = asInt(root.get("frayedBorderSize"));
 		if (frayedBorderSize >= 100)
 		{
 			// Convert from the old format the held the number of the polygons to the new format that uses a small scale.
@@ -1109,7 +1109,7 @@ public class MapSettings implements Serializable
 		heightmapExportPath = (String) root.get("heightmapExportPath");
 		if (root.containsKey("heightmapResolution"))
 		{
-			heightmapResolution = (double) root.get("heightmapResolution");
+			heightmapResolution = asDouble(root.get("heightmapResolution"));
 		}
 
 		if (root.containsKey("customImagesPath"))
@@ -1128,7 +1128,7 @@ public class MapSettings implements Serializable
 
 		if (root.containsKey("treeHeightScale"))
 		{
-			treeHeightScale = (double) root.get("treeHeightScale");
+			treeHeightScale = asDouble(root.get("treeHeightScale"));
 		}
 		else
 		{
@@ -1137,22 +1137,22 @@ public class MapSettings implements Serializable
 
 		if (root.containsKey("mountainScale"))
 		{
-			mountainScale = (double) root.get("mountainScale");
+			mountainScale = asDouble(root.get("mountainScale"));
 		}
 
 		if (root.containsKey("hillScale"))
 		{
-			hillScale = (double) root.get("hillScale");
+			hillScale = asDouble(root.get("hillScale"));
 		}
 
 		if (root.containsKey("duneScale"))
 		{
-			duneScale = (double) root.get("duneScale");
+			duneScale = asDouble(root.get("duneScale"));
 		}
 
 		if (root.containsKey("cityScale"))
 		{
-			cityScale = (double) root.get("cityScale");
+			cityScale = asDouble(root.get("cityScale"));
 		}
 
 		if (root.containsKey("defaultMapExportAction"))
@@ -1177,12 +1177,12 @@ public class MapSettings implements Serializable
 		{
 			drawOverlayImage = (boolean) root.get("drawOverlayImage");
 			overlayImagePath = (String) root.get("overlayImagePath");
-			overlayImageTransparency = (int) (long) root.get("overlayImageTransparency");
+			overlayImageTransparency = asInt(root.get("overlayImageTransparency"));
 			if (root.containsKey("overlayOffsetResolutionInvariant") && root.get("overlayOffsetResolutionInvariant") != null)
 			{
 				overlayOffsetResolutionInvariant = Point.fromJSonValue((String) root.get("overlayOffsetResolutionInvariant"));
 			}
-			overlayScale = (double) root.get("overlayScale");
+			overlayScale = asDouble(root.get("overlayScale"));
 		}
 		else
 		{
@@ -1193,7 +1193,7 @@ public class MapSettings implements Serializable
 
 		if (root.containsKey("rightRotationCount"))
 		{
-			rightRotationCount = (int) (long) root.get("rightRotationCount");
+			rightRotationCount = asInt(root.get("rightRotationCount"));
 		}
 		else
 		{
@@ -1306,10 +1306,10 @@ public class MapSettings implements Serializable
 			drawGridOverlay = (boolean) root.get("drawGridOverlay");
 			gridOverlayShape = Enum.valueOf(GridOverlayShape.class, ((String) root.get("gridOverlayShape")).replace(" ", "_"));
 			gridOverlayColor = parseColor((String) root.get("gridOverlayColor"));
-			gridOverlayRowOrColCount = (int) (long) root.get("gridOverlayRowOrColCount");
+			gridOverlayRowOrColCount = asInt(root.get("gridOverlayRowOrColCount"));
 			gridOverlayXOffset = GridOverlayOffset.parse((String) root.get("gridOverlayXOffset"));
 			gridOverlayYOffset = GridOverlayOffset.parse((String) root.get("gridOverlayYOffset"));
-			gridOverlayLineWidth = (int) (long) root.get("gridOverlayLineWidth");
+			gridOverlayLineWidth = asInt(root.get("gridOverlayLineWidth"));
 			gridOverlayLayer = Enum.valueOf(GridOverlayLayer.class, ((String) root.get("gridOverlayLayer")).replace(" ", "_"));
 			if (root.containsKey("drawVoronoiGridOverlayOnlyOnLand"))
 			{
@@ -1700,16 +1700,16 @@ public class MapSettings implements Serializable
 		{
 			JSONObject jsonObj = (JSONObject) obj;
 			String text = (String) jsonObj.get("text");
-			Point location = new Point((Double) jsonObj.get("locationX"), (Double) jsonObj.get("locationY"));
-			double angle = jsonObj.containsKey("angle") ? (Double) jsonObj.get("angle") : 0.0;
+			Point location = new Point(asDouble(jsonObj.get("locationX")), asDouble(jsonObj.get("locationY")));
+			double angle = jsonObj.containsKey("angle") ? asDouble(jsonObj.get("angle")) : 0.0;
 			TextType type = Enum.valueOf(TextType.class, ((String) jsonObj.get("type")).replace(" ", "_"));
 			LineBreak lineBreak = jsonObj.containsKey("lineBreak") ? Enum.valueOf(LineBreak.class, ((String) jsonObj.get("lineBreak")).replace(" ", "_")) : LineBreak.Auto;
 			Color colorOverride = jsonObj.containsKey("colorOverride") ? parseColor((String) jsonObj.get("colorOverride")) : null;
 			Color boldBackgroundColorOverride = jsonObj.containsKey("boldBackgroundColorOverride") ? parseColor((String) jsonObj.get("boldBackgroundColorOverride")) : null;
-			double curvature = jsonObj.containsKey("curvature") ? (Double) jsonObj.get("curvature") : 0.0;
-			int spacing = jsonObj.containsKey("spacing") ? (int) (long) jsonObj.get("spacing") : 0;
+			double curvature = jsonObj.containsKey("curvature") ? asDouble(jsonObj.get("curvature")) : 0.0;
+			int spacing = jsonObj.containsKey("spacing") ? asInt(jsonObj.get("spacing")) : 0;
 			Font fontOverride = jsonObj.containsKey("fontOverride") ? parseFont((String) jsonObj.get("fontOverride")) : null;
-			double backgroundFade = jsonObj.containsKey("backgroundFade") ? (Double) jsonObj.get("backgroundFade") : MapText.defaultBackgroundFade;
+			double backgroundFade = jsonObj.containsKey("backgroundFade") ? asDouble(jsonObj.get("backgroundFade")) : MapText.defaultBackgroundFade;
 			MapText mp = new MapText(text, location, angle, type, lineBreak, colorOverride, boldBackgroundColorOverride, curvature, spacing, fontOverride, backgroundFade);
 			result.add(mp);
 		}
@@ -1736,7 +1736,7 @@ public class MapSettings implements Serializable
 			JSONObject jsonObj = (JSONObject) obj;
 			boolean isWater = jsonObj.containsKey("isWater") ? (boolean) jsonObj.get("isWater") : false;
 			boolean isLake = jsonObj.containsKey("isLake") ? (boolean) jsonObj.get("isLake") : false;
-			Integer regionId = jsonObj.get("regionId") == null ? null : ((Long) jsonObj.get("regionId")).intValue();
+			Integer regionId = jsonObj.get("regionId") == null ? null : asInt(jsonObj.get("regionId"));
 
 			CenterIcon icon = null;
 			{
@@ -1754,7 +1754,7 @@ public class MapSettings implements Serializable
 						artPack = hasCustomImagesPath ? Assets.customArtPack : Assets.installedArtPack;
 					}
 					String iconGroupId = (String) iconObj.get("iconGroupId");
-					int iconIndex = (int) (long) iconObj.get("iconIndex");
+					int iconIndex = asInt(iconObj.get("iconIndex"));
 					CenterIconType iconType = CenterIconType.valueOf((String) iconObj.get("iconType"));
 					String iconName = (String) iconObj.get("iconName");
 					if (iconName != null && !iconName.isEmpty())
@@ -1784,8 +1784,8 @@ public class MapSettings implements Serializable
 						artPack = hasCustomImagesPath ? Assets.customArtPack : Assets.installedArtPack;
 					}
 					String treeType = (String) treesObj.get("treeType");
-					double density = (Double) treesObj.get("density");
-					long randomSeed = (Long) treesObj.get("randomSeed");
+					double density = asDouble(treesObj.get("density"));
+					long randomSeed = asLong(treesObj.get("randomSeed"));
 					boolean isDormant = treesObj.containsKey("isDormant") ? (Boolean) treesObj.get("isDormant") : false;
 					trees = new CenterTrees(artPack, treeType, density, randomSeed, isDormant);
 				}
@@ -1830,16 +1830,16 @@ public class MapSettings implements Serializable
 				artPack = hasCustomImagesPath ? Assets.customArtPack : Assets.installedArtPack;
 			}
 			String groupId = (String) iconObj.get("groupId");
-			int iconIndex = (int) (long) iconObj.get("iconIndex");
+			int iconIndex = asInt(iconObj.get("iconIndex"));
 			String iconName = iconObj.containsKey("iconName") ? (String) iconObj.get("iconName") : null;
 			Point locationResolutionInvariant = Point.fromJSonValue((String) iconObj.get("locationResolutionInvariant"));
-			double scale = iconObj.containsKey("scale") ? (double) iconObj.get("scale") : 1.0;
+			double scale = iconObj.containsKey("scale") ? asDouble(iconObj.get("scale")) : 1.0;
 			Integer centerIndex = null;
 			if (iconObj.containsKey("centerIndex") && iconObj.get("centerIndex") != null)
 			{
-				centerIndex = (int) (long) iconObj.get("centerIndex");
+				centerIndex = asInt(iconObj.get("centerIndex"));
 			}
-			double density = iconObj.containsKey("density") ? (double) iconObj.get("density") : 0.0;
+			double density = iconObj.containsKey("density") ? asDouble(iconObj.get("density")) : 0.0;
 			Color fillColorFromJSon = iconObj.containsKey("color") ? parseColor((String) iconObj.get("color")) : null;
 			Color fillColor;
 			// The old default fill color was transparent black, which causes the icon to not be filled with color. So if that was selected,
@@ -1869,7 +1869,7 @@ public class MapSettings implements Serializable
 			double originalScale;
 			if (iconObj.containsKey("originalScale") && iconObj.get("originalScale") != null)
 			{
-				originalScale = (double) iconObj.get("originalScale");
+				originalScale = asDouble(iconObj.get("originalScale"));
 			}
 			else
 			{
@@ -1943,7 +1943,7 @@ public class MapSettings implements Serializable
 		{
 			JSONObject jsonObj = (JSONObject) obj;
 			Color color = parseColor((String) jsonObj.get("color"));
-			int regionId = (int) (long) jsonObj.get("regionId");
+			int regionId = asInt(jsonObj.get("regionId"));
 			result.put(regionId, new RegionEdit(regionId, color));
 		}
 
@@ -1969,7 +1969,7 @@ public class MapSettings implements Serializable
 		}
 
 		StrokeType type = Enum.valueOf(StrokeType.class, ((String) obj.get("type")).replace(" ", "_"));
-		float width = (float) (double) obj.get("width");
+		float width = asFloat(obj.get("width"));
 		return new Stroke(type, width);
 	}
 
@@ -1987,13 +1987,13 @@ public class MapSettings implements Serializable
 			int riverLevel = 0;
 			if (jsonObj.containsKey("riverLevel"))
 			{
-				riverLevel = (int) (long) jsonObj.get("riverLevel");
+				riverLevel = asInt(jsonObj.get("riverLevel"));
 			}
 			if (riverLevel <= River.RIVERS_THIS_SIZE_OR_SMALLER_WILL_NOT_BE_DRAWN)
 			{
 				continue;
 			}
-			int index = (int) (long) jsonObj.get("index");
+			int index = asInt(jsonObj.get("index"));
 			result.put(index, new EdgeEdit(index, riverLevel));
 		}
 
@@ -2016,6 +2016,26 @@ public class MapSettings implements Serializable
 			return Color.create(Integer.parseInt(parts[0]), Integer.parseInt(parts[1]), Integer.parseInt(parts[2]), Integer.parseInt(parts[3]));
 		}
 		throw new IllegalArgumentException("Unable to parse color from string: " + str);
+	}
+
+	private static long asLong(Object value)
+	{
+		return ((Number) value).longValue();
+	}
+
+	private static int asInt(Object value)
+	{
+		return ((Number) value).intValue();
+	}
+
+	private static double asDouble(Object value)
+	{
+		return ((Number) value).doubleValue();
+	}
+
+	private static float asFloat(Object value)
+	{
+		return ((Number) value).floatValue();
 	}
 
 	public static Font parseFont(String str)

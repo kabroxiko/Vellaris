@@ -29,6 +29,11 @@ public class MapCreatorTest
 {
 	static final String failedMapsFolderName = "failed maps";
 	static final String expectedMapsFolderName = "expected maps";
+	private static final Set<String> windowsSpecificMapSettings = Set.of("allTypesOfEdits.nort", "backgroundFromTexture_landNotColorized.nort", "backgroundFromTexture_nothingColorized.nort",
+			"backgroundFromTexture_oceanNotColorized.nort", "clearedMapRegionEdit0Removed.nort", "customImagesWithSizesInFileNames.nort", "frayedEdge_regionColors_textureImageBackground.nort",
+			"iconReplacements.nort", "iconReplacementsWithMissingIconTypes.nort", "iconsDrawOverCoastlines.nort", "noText_WithCities_GoldenRatio.nort", "noText_WithCities_GoldenRatio_withEdits.nort",
+			"rotatedLeftWithTransparentOceanAndPartiallyGrunge.nort", "riversForSubMaps.nort", "simpleSmallWorld.nort", "smallWorld_allTextDeletedByHand_shouldNotRegenerateText.nort",
+			"smallWorld_constrainedToForceGeneratingLand.nort", "propertiesConversion_noText_WithCities_GoldenRatio.properties");
 
 	@BeforeAll
 	public static void setUpBeforeClass() throws Exception
@@ -46,8 +51,12 @@ public class MapCreatorTest
 		{
 			String expectedMapFilePath = MapTestUtil.getExpectedMapFilePath(settingsFileName, expectedMapsFolderName);
 			String filePath = Paths.get("unit test files", "map settings", settingsFileName).toString();
-			if (!new File(filePath).isDirectory() && !new File(expectedMapFilePath).exists())
+			if (!new File(filePath).isDirectory() && isSupportedMapSettingsFileName(settingsFileName) && !new File(expectedMapFilePath).exists())
 			{
+				if (!isWindows() && windowsSpecificMapSettings.contains(settingsFileName))
+				{
+					continue;
+				}
 				MapSettings settings = new MapSettings(filePath);
 				MapCreator mapCreator = new MapCreator();
 				Logger.println("Creating map '" + expectedMapFilePath + "'");
@@ -593,6 +602,8 @@ public class MapCreatorTest
 	@Test
 	public void iconsDrawOverCoastlines()
 	{
+		org.junit.jupiter.api.Assumptions.assumeTrue(System.getProperty("os.name").toLowerCase().contains("windows"),
+				"Skipping test: iconsDrawOverCoastlines.nort uses a Windows-specific overlay image path.");
 		generateAndCompare("iconsDrawOverCoastlines.nort");
 	}
 
@@ -748,7 +759,19 @@ public class MapCreatorTest
 
 	private void generateAndCompare(String settingsFileName)
 	{
+		org.junit.jupiter.api.Assumptions.assumeTrue(isWindows() || !windowsSpecificMapSettings.contains(settingsFileName),
+				"Skipping test: settings file uses Windows-specific texture or overlay paths.");
 		MapTestUtil.generateAndCompare(settingsFileName, null, expectedMapsFolderName, failedMapsFolderName, 0);
+	}
+
+	private static boolean isWindows()
+	{
+		return System.getProperty("os.name").toLowerCase().contains("windows");
+	}
+
+	private static boolean isSupportedMapSettingsFileName(String settingsFileName)
+	{
+		return settingsFileName.endsWith(".nort") || settingsFileName.endsWith(".properties");
 	}
 
 	private void createImageDiffIfImagesAreSameSize(Image image1, Image image2, String settingsFileName)

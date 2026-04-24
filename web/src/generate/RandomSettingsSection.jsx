@@ -1,6 +1,17 @@
 import React from 'react'
 import PropTypes from 'prop-types'
 import { DIMENSIONS } from './constants'
+import FileUploadButton from './FileUploadButton'
+
+const MAP_LANGUAGE_OPTIONS = [
+  { value: 'en', label: 'English' },
+  { value: 'es', label: 'Español' },
+  { value: 'de', label: 'Deutsch' },
+  { value: 'fr', label: 'Français' },
+  { value: 'pt', label: 'Português' },
+  { value: 'ru', label: 'Русский' },
+  { value: 'zh', label: '中文' },
+]
 
 export default function RandomSettingsSection({ values, handlers, options, ui }) {
   const {
@@ -14,6 +25,7 @@ export default function RandomSettingsSection({ values, handlers, options, ui })
     cityFrequency,
     selectedBooks,
     randomSeed,
+    mapLanguage,
     fileName,
   } = values
 
@@ -28,137 +40,62 @@ export default function RandomSettingsSection({ values, handlers, options, ui })
     setCityFrequency,
     setSelectedBooks,
     setRandomSeed,
+    setMapLanguage,
     handleRandomMap,
     handleFileInput,
     onDrop,
   } = handlers
 
-  const { artPacks, cityIconTypes, allBooks } = options
-  const { loading, dropRef } = ui
+  const { artPacks, cityIconTypes, allBooks, i18n } = options
+  const { loading } = ui
+
+  const labels = i18n?.labels || {}
+  const backendOptions = i18n?.options || {}
+  const translateLabel = (key) => labels[key] || key
+  const randomOption = { value: '', label: translateLabel('ui.select.random') }
+  const dimensions = backendOptions.dimensions
+    ? [randomOption, ...backendOptions.dimensions]
+    : DIMENSIONS
+  const landShapes = backendOptions.landShapes
+    ? [randomOption, ...backendOptions.landShapes]
+    : [randomOption]
+  const landColoringMethods = backendOptions.landColoringMethods
+    ? [randomOption, ...backendOptions.landColoringMethods]
+    : [randomOption]
 
   return (
     <section className="generator-section">
-      <h3>Create or Load Settings</h3>
-      <p className="section-hint">Start from random settings, or load a settings file.</p>
+      <h3>{translateLabel('ui.title')}</h3>
+      <p className="section-hint">
+        {translateLabel('ui.subtitle')}
+      </p>
       <form className="section-fields" onSubmit={handleRandomMap}>
         <div className="fields-grid two-col-layout">
           <div className="fields-column">
-            <label htmlFor="dimension-input">Aspect ratio</label>
+            <label htmlFor="map-language-input">
+              {translateLabel('ui.mapLanguage')}
+            </label>
             <select
-              id="dimension-input"
-              value={dimension}
-              onChange={(e) => setDimension(e.target.value)}
+              id="map-language-input"
+              value={mapLanguage}
+              onChange={(e) => setMapLanguage(e.target.value)}
             >
-              {DIMENSIONS.map((item) => (
+              {MAP_LANGUAGE_OPTIONS.map((item) => (
                 <option key={item.value} value={item.value}>
                   {item.label}
                 </option>
               ))}
             </select>
 
-            <label htmlFor="world-size-input">World size: {worldSize.toLocaleString()}</label>
-            <input
-              id="world-size-input"
-              type="range"
-              min={2000}
-              max={32000}
-              step={1000}
-              value={worldSize}
-              onChange={(e) => setWorldSize(Number(e.target.value))}
-            />
-
-            <label htmlFor="land-shape-input">Land shape</label>
-            <select
-              id="land-shape-input"
-              value={landShape}
-              onChange={(e) => setLandShape(e.target.value)}
-            >
-              <option value="">Random</option>
-              <option value="Continents">Continents</option>
-              <option value="Inland_Sea">Inland sea</option>
-              <option value="Scattered">Scattered</option>
-            </select>
-
-            <label htmlFor="region-count-input">Number of regions: {regionCount}</label>
-            <input
-              id="region-count-input"
-              type="range"
-              min={2}
-              max={20}
-              step={1}
-              value={regionCount}
-              onChange={(e) => setRegionCount(Number(e.target.value))}
-            />
-
-            <label htmlFor="land-coloring-input">Land coloring method</label>
-            <select
-              id="land-coloring-input"
-              value={landColoringMethod}
-              onChange={(e) => setLandColoringMethod(e.target.value)}
-            >
-              <option value="">Random</option>
-              <option value="SingleColor">Single color</option>
-              <option value="ColorPoliticalRegions">Color political regions</option>
-            </select>
-
-            {artPacks.length > 0 && (
-              <>
-                <label htmlFor="art-pack-input">Art pack</label>
-                <select
-                  id="art-pack-input"
-                  value={artPack}
-                  onChange={(e) => setArtPack(e.target.value)}
-                >
-                  <option value="">Random</option>
-                  {artPacks.map((item) => (
-                    <option key={item} value={item}>
-                      {item}
-                    </option>
-                  ))}
-                </select>
-              </>
-            )}
-
-            {cityIconTypes.length > 0 && (
-              <>
-                <label htmlFor="city-icon-type-input">City icon type</label>
-                <select
-                  id="city-icon-type-input"
-                  value={cityIconType}
-                  onChange={(e) => setCityIconType(e.target.value)}
-                >
-                  <option value="">Random</option>
-                  {cityIconTypes.map((item) => (
-                    <option key={item} value={item}>
-                      {item}
-                    </option>
-                  ))}
-                </select>
-              </>
-            )}
-
-            <label htmlFor="city-frequency-input">City frequency: {cityFrequency}%</label>
-            <input
-              id="city-frequency-input"
-              type="range"
-              min={0}
-              max={100}
-              step={1}
-              value={cityFrequency}
-              onChange={(e) => setCityFrequency(Number(e.target.value))}
-            />
-          </div>
-
-          <div className="fields-column">
             {allBooks.length > 0 && (
               <fieldset className="books-widget">
-                <legend>Books for generating text</legend>
+                <legend>{translateLabel('ui.books.legend')}</legend>
                 <div className="books-actions">
                   <button type="button" onClick={() => setSelectedBooks(new Set(allBooks))}>
-                    Check all
+                    {translateLabel('ui.books.checkAll')}
                   </button>
                   <button type="button" onClick={() => setSelectedBooks(new Set())}>
-                    Uncheck all
+                    {translateLabel('ui.books.uncheckAll')}
                   </button>
                 </div>
                 <div className="books-list">
@@ -174,56 +111,167 @@ export default function RandomSettingsSection({ values, handlers, options, ui })
                           setSelectedBooks(next)
                         }}
                       />
-                      {book}
+                      <span className="book-title">{book}</span>
                     </label>
                   ))}
                 </div>
               </fieldset>
             )}
+          </div>
 
-            <label htmlFor="random-seed-input">Seed (optional)</label>
+          <div className="fields-column">
+            <label htmlFor="dimension-input">{translateLabel('ui.dimension')}</label>
+            <select
+              id="dimension-input"
+              value={dimension}
+              onChange={(e) => setDimension(e.target.value)}
+            >
+              {dimensions.map((item) => (
+                <option key={item.value} value={item.value}>
+                  {item.label}
+                </option>
+              ))}
+            </select>
+
+            <label htmlFor="world-size-input">
+              {translateLabel('ui.worldSize')}: {worldSize.toLocaleString()}
+            </label>
+            <input
+              id="world-size-input"
+              type="range"
+              min={2000}
+              max={32000}
+              step={1000}
+              value={worldSize}
+              onChange={(e) => setWorldSize(Number(e.target.value))}
+            />
+
+            <label htmlFor="land-shape-input">{translateLabel('ui.landShape')}</label>
+            <select
+              id="land-shape-input"
+              value={landShape}
+              onChange={(e) => setLandShape(e.target.value)}
+            >
+              {landShapes.map((item) => (
+                <option key={item.value} value={item.value}>
+                  {item.label}
+                </option>
+              ))}
+            </select>
+
+            <label htmlFor="region-count-input">
+              {translateLabel('ui.regionCount')}: {regionCount}
+            </label>
+            <input
+              id="region-count-input"
+              type="range"
+              min={2}
+              max={20}
+              step={1}
+              value={regionCount}
+              onChange={(e) => setRegionCount(Number(e.target.value))}
+            />
+
+            <label htmlFor="land-coloring-input">
+              {translateLabel('theme.landColoringMethod.label')}{' '}
+            </label>
+            <select
+              id="land-coloring-input"
+              value={landColoringMethod}
+              onChange={(e) => setLandColoringMethod(e.target.value)}
+            >
+              {landColoringMethods.map((item) => (
+                <option key={item.value} value={item.value}>
+                  {item.label}
+                </option>
+              ))}
+            </select>
+
+            {artPacks.length > 0 && (
+              <>
+                <label htmlFor="art-pack-input">{translateLabel('ui.artPack')}</label>
+                <select
+                  id="art-pack-input"
+                  value={artPack}
+                  onChange={(e) => setArtPack(e.target.value)}
+                >
+                  <option value="">{translateLabel('ui.select.random')}</option>
+                  {artPacks.map((item) => (
+                    <option key={item} value={item}>
+                      {item}
+                    </option>
+                  ))}
+                </select>
+              </>
+            )}
+
+            {cityIconTypes.length > 0 && (
+              <>
+                  <label htmlFor="city-icon-type-input">
+                  {translateLabel('ui.cityIconType')}
+                </label>
+                <select
+                  id="city-icon-type-input"
+                  value={cityIconType}
+                  onChange={(e) => setCityIconType(e.target.value)}
+                >
+                  <option value="">{translateLabel('ui.select.random')}</option>
+                  {cityIconTypes.map((item) => (
+                    <option key={item} value={item}>
+                      {item}
+                    </option>
+                  ))}
+                </select>
+              </>
+            )}
+
+            <label htmlFor="city-frequency-input">
+              {translateLabel('ui.cityFrequency')}: {cityFrequency}%
+            </label>
+            <input
+              id="city-frequency-input"
+              type="range"
+              min={0}
+              max={100}
+              step={1}
+              value={cityFrequency}
+              onChange={(e) => setCityFrequency(Number(e.target.value))}
+            />
+
+            <label htmlFor="random-seed-input">{translateLabel('theme.randomSeed.label')}</label>
             <input
               id="random-seed-input"
               type="text"
               value={randomSeed}
               onChange={(e) => setRandomSeed(e.target.value)}
-              placeholder="e.g. 12345"
+              placeholder={translateLabel('ui.seed.placeholder')}
             />
           </div>
         </div>
 
         <div className="section-actions">
           <button type="submit" disabled={loading}>
-            {loading ? 'Generating…' : 'Generate Random Map'}
+            {loading
+              ? translateLabel('ui.generating')
+              : translateLabel('ui.generate')}
           </button>
         </div>
 
         <div className="section-divider">
-          <span>or</span>
+          <span>{translateLabel('ui.section.or')}</span>
         </div>
 
         <div className="upload-group">
-          <input
-            id="nort-file-input"
-            type="file"
-            accept=".json,.txt,.nort,text/plain,application/json"
-            onChange={handleFileInput}
-          />
-          <button
-            ref={dropRef}
-            type="button"
-            className="dropzone"
+          <FileUploadButton
+            onFileSelect={(file) => handleFileInput({ target: { files: [file] } })}
             onDrop={onDrop}
-            onDragOver={(e) => e.preventDefault()}
-            onClick={() => document.getElementById('nort-file-input')?.click()}
-            aria-label="Upload or drop settings file"
-          >
-            {fileName ? (
-              <span>Loaded: {fileName}</span>
-            ) : (
-              <span>Drag and drop a settings file here</span>
-            )}
-          </button>
+            ariaLabel={translateLabel('ui.upload.aria')}
+            chooseLabel={translateLabel('ui.upload.chooseFile')}
+            fileName={fileName}
+            loadedPrefix={translateLabel('ui.upload.loadedPrefix')}
+            uploadHint={translateLabel('ui.upload.hint')}
+            disabled={loading}
+          />
         </div>
       </form>
     </section>
@@ -242,6 +290,7 @@ RandomSettingsSection.propTypes = {
     cityFrequency: PropTypes.number.isRequired,
     selectedBooks: PropTypes.instanceOf(Set).isRequired,
     randomSeed: PropTypes.string.isRequired,
+    mapLanguage: PropTypes.string.isRequired,
     fileName: PropTypes.string.isRequired,
   }).isRequired,
   handlers: PropTypes.shape({
@@ -255,6 +304,7 @@ RandomSettingsSection.propTypes = {
     setCityFrequency: PropTypes.func.isRequired,
     setSelectedBooks: PropTypes.func.isRequired,
     setRandomSeed: PropTypes.func.isRequired,
+    setMapLanguage: PropTypes.func.isRequired,
     handleRandomMap: PropTypes.func.isRequired,
     handleFileInput: PropTypes.func.isRequired,
     onDrop: PropTypes.func.isRequired,
@@ -263,6 +313,7 @@ RandomSettingsSection.propTypes = {
     artPacks: PropTypes.arrayOf(PropTypes.string).isRequired,
     cityIconTypes: PropTypes.arrayOf(PropTypes.string).isRequired,
     allBooks: PropTypes.arrayOf(PropTypes.string).isRequired,
+    i18n: PropTypes.object,
   }).isRequired,
   ui: PropTypes.shape({
     loading: PropTypes.bool.isRequired,

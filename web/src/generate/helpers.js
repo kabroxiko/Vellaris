@@ -37,6 +37,8 @@ export async function handleResponseError(res) {
     const j = JSON.parse(txt)
     txt = j.message || txt
   } catch (e) {
+    const condensed = txt.replaceAll(/\s+/g, ' ').trim()
+    txt = condensed ? condensed.slice(0, 400) : 'No response body'
     console.warn('Failed to parse error response as JSON', e)
   }
   console.error('API /generate error:', {

@@ -14,7 +14,9 @@ import nortantis.SettingsGenerator;
 import nortantis.Stroke;
 import nortantis.StrokeType;
 import nortantis.TextureSource;
+import nortantis.editor.UserPreferences;
 import nortantis.swing.ThemePanel.LandColoringMethod;
+import nortantis.swing.translation.Translation;
 import nortantis.util.Assets;
 import nortantis.platform.Color;
 import nortantis.platform.Font;
@@ -41,6 +43,7 @@ import java.util.Random;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import javax.imageio.ImageIO;
 import javax.imageio.IIOImage;
 import javax.imageio.ImageWriteParam;
@@ -151,11 +154,52 @@ public class MapApiServer
 			return gson.toJson(result);
 		});
 
+		get("/ui-options", (req, res) ->
+		{
+			res.type(CONTENT_TYPE_JSON);
+			String requestedLanguage = req.queryParams("language");
+			String previousLanguage = UserPreferences.getInstance().language;
+			applyRequestLanguage(requestedLanguage);
+			try
+			{
+				return gson.toJson(buildWebUiOptions());
+			}
+			finally
+			{
+				restorePreviousLanguage(previousLanguage);
+			}
+		});
+
 		post("/generate", MapApiServer::handleGenerate);
+		post("/resolve-random-settings", MapApiServer::handleResolveRandomSettings);
 		post("/background-preview", MapApiServer::handleBackgroundPreview);
+
+		exception(Exception.class, (exception, req, res) ->
+		{
+			Logger.println("Unhandled API exception: " + exception);
+			res.type(CONTENT_TYPE_JSON);
+			res.status(500);
+			res.body(gson.toJson(new ApiResponse(false, "Unhandled exception: " + formatExceptionMessage(exception), null, null)));
+		});
 
 		init();
 		Logger.println("Map API server started on port 8080");
+	}
+
+	private static String formatExceptionMessage(Exception exception)
+	{
+		if (exception == null)
+		{
+			return "unknown";
+		}
+
+		String message = exception.getMessage();
+		if (message == null || message.isBlank())
+		{
+			return exception.getClass().getSimpleName();
+		}
+
+		return exception.getClass().getSimpleName() + " - " + message;
 	}
 
 	private static Object handleGenerate(Request req, Response res)
@@ -170,41 +214,333 @@ public class MapApiServer
 		}
 
 		PlatformFactory.setInstance(new AwtFactory());
+		String previousLanguage = UserPreferences.getInstance().language;
+		applyRequestLanguage(resolveGenerationLanguage(cfg));
 
-		GenerationContext ctx = loadSettings(cfg, res);
-		if (ctx == null)
+		try
 		{
-			return gson.toJson(new ApiResponse(false, MSG_FAILED_TO_LOAD_SETTINGS, null, null));
+			GenerationContext ctx = loadSettings(cfg, res);
+			if (ctx == null)
+			{
+				return gson.toJson(new ApiResponse(false, MSG_FAILED_TO_LOAD_SETTINGS, null, null));
+			}
+
+			GenerationResult generation = generateMap(ctx.settings, cfg);
+			if (generation.image == null)
+			{
+				res.status(500);
+				return gson.toJson(new ApiResponse(false, generation.errorMessage, null, null));
+			}
+			Image img = generation.image;
+
+			if (cfg.returnImageBytes != null && cfg.returnImageBytes)
+			{
+				return returnImageResponse(img, ctx.settings, ctx.tempNortPath, cfg, res);
+			}
+
+			String outPath = determineOutputPath(cfg, res, img);
+			if (outPath == null)
+			{
+				return gson.toJson(new ApiResponse(false, "Failed to determine output path", null, null));
+			}
+
+			if (!writeImageToFile(img, outPath, res))
+			{
+				return gson.toJson(new ApiResponse(false, "Failed to write image", null, null));
+			}
+
+			String nortSavedPath = saveNortIfRequested(ctx.settings, outPath, ctx.providedNortContent, cfg, ctx.tempNortPath, res);
+
+			res.status(200);
+			return gson.toJson(new ApiResponse(true, "OK", outPath, nortSavedPath));
+		}
+		finally
+		{
+			restorePreviousLanguage(previousLanguage);
+		}
+	}
+
+	private static Object handleResolveRandomSettings(Request req, Response res)
+	{
+		res.type(CONTENT_TYPE_JSON);
+		logHeaders(req);
+
+		Config cfg = parseConfig(req, res);
+		if (cfg == null)
+		{
+			return gson.toJson(new ApiResponse(false, MSG_FAILED_TO_PARSE_CONFIG, null, null));
 		}
 
-		GenerationResult generation = generateMap(ctx.settings, cfg);
-		if (generation.image == null)
+		PlatformFactory.setInstance(new AwtFactory());
+		String previousLanguage = UserPreferences.getInstance().language;
+		applyRequestLanguage(resolveGenerationLanguage(cfg));
+
+		try
+		{
+			GenerationContext ctx = loadSettings(cfg, res);
+			if (ctx == null)
+			{
+				return gson.toJson(new ApiResponse(false, MSG_FAILED_TO_LOAD_SETTINGS, null, null));
+			}
+
+			return resolveRandomOnlyResponse(ctx, res);
+		}
+		finally
+		{
+			restorePreviousLanguage(previousLanguage);
+		}
+	}
+
+	private static Object resolveRandomOnlyResponse(GenerationContext ctx, Response res)
+	{
+		try
+		{
+			String nortContent = ctx.settings.toJsonString();
+			@SuppressWarnings("unchecked")
+			Map<String, Object> settings = gson.fromJson(nortContent, Map.class);
+			// Build a small map of UI-friendly default values (hex colors, numeric scales, booleans)
+			Map<String, Object> uiDefaults = new LinkedHashMap<>();
+			// Color fields: provide hex strings (omit alpha if fully opaque)
+			if (ctx.settings.oceanShadingColor != null)
+			{
+				String hex = colorToHex(ctx.settings.oceanShadingColor);
+				uiDefaults.put("oceanShadingColor", hex);
+				uiDefaults.put("oceanShadingColorHex", hex);
+			}
+			if (ctx.settings.coastShadingColor != null)
+			{
+				String hex = colorToHex(ctx.settings.coastShadingColor);
+				uiDefaults.put("coastShadingColor", hex);
+				uiDefaults.put("coastShadingColorHex", hex);
+			}
+
+			// Concentric waves / effects flags
+			uiDefaults.put("fadeConcentricWaves", ctx.settings.fadeConcentricWaves);
+			uiDefaults.put("brokenLinesForConcentricWaves", ctx.settings.brokenLinesForConcentricWaves);
+
+			// Scale fields
+			uiDefaults.put("hillScale", ctx.settings.hillScale);
+			uiDefaults.put("treeHeightScale", ctx.settings.treeHeightScale);
+			uiDefaults.put("cityScale", ctx.settings.cityScale);
+			uiDefaults.put("mountainScale", ctx.settings.mountainScale);
+			uiDefaults.put("duneScale", ctx.settings.duneScale);
+
+			res.type(CONTENT_TYPE_JSON);
+			res.status(200);
+			return gson.toJson(new ResolvedSettingsResponse(settings, uiDefaults));
+		}
+		catch (Exception e)
 		{
 			res.status(500);
-			return gson.toJson(new ApiResponse(false, generation.errorMessage, null, null));
+			return gson.toJson(new ApiResponse(false, "Failed to serialize settings: " + e.getMessage(), null, null));
 		}
-		Image img = generation.image;
-
-		if (cfg.returnImageBytes != null && cfg.returnImageBytes)
+		finally
 		{
-			return returnImageResponse(img, ctx.settings, ctx.tempNortPath, cfg, res);
+			if (ctx.tempNortPath != null)
+			{
+				try
+				{
+					Files.deleteIfExists(ctx.tempNortPath);
+				}
+				catch (Exception ignore)
+				{
+					// Ignore cleanup errors; temporary file will be cleaned up by system
+				}
+			}
 		}
+	}
 
-		String outPath = determineOutputPath(cfg, res, img);
-		if (outPath == null)
+	private static void applyRequestLanguage(String language)
+	{
+		if (language == null || language.isEmpty())
 		{
-			return gson.toJson(new ApiResponse(false, "Failed to determine output path", null, null));
+			return;
 		}
 
-		if (!writeImageToFile(img, outPath, res))
+		for (Locale locale : Translation.getSupportedLocales())
 		{
-			return gson.toJson(new ApiResponse(false, "Failed to write image", null, null));
+			if (locale.getLanguage().equals(language))
+			{
+				UserPreferences.getInstance().language = language;
+				Translation.initialize();
+				return;
+			}
+		}
+	}
+
+	private static String resolveGenerationLanguage(Config cfg)
+	{
+		if (cfg == null)
+		{
+			return null;
 		}
 
-		String nortSavedPath = saveNortIfRequested(ctx.settings, outPath, ctx.providedNortContent, cfg, ctx.tempNortPath, res);
+		if (cfg.mapLanguage != null && !cfg.mapLanguage.isEmpty())
+		{
+			return cfg.mapLanguage;
+		}
 
-		res.status(200);
-		return gson.toJson(new ApiResponse(true, "OK", outPath, nortSavedPath));
+		return cfg.language;
+	}
+
+	private static void restorePreviousLanguage(String previousLanguage)
+	{
+		UserPreferences.getInstance().language = previousLanguage;
+		Translation.initialize();
+	}
+
+	private static Map<String, Object> buildWebUiOptions()
+	{
+		Map<String, Object> options = new LinkedHashMap<>();
+		options.put("tabs", List.of(option("background", tr("theme.tab.background", "Background")), option("border", tr("theme.tab.border", "Border")),
+				option("effects", tr("theme.tab.effects", "Effects")), option("fonts", tr("theme.tab.fonts", "Fonts"))));
+		options.put("dimensions", List.of(option("Square", tr("GeneratedDimension.Square", "Square")), option("Sixteen_by_9", tr("GeneratedDimension.Sixteen_by_9", "16 by 9")),
+				option("Golden_Ratio", tr("GeneratedDimension.Golden_Ratio", "Golden Ratio"))));
+		options.put("landShapes", List.of(option("Continents", tr("LandShape.Continents", "Continents")), option("Inland_Sea", tr("LandShape.Inland_Sea", "Inland Sea")),
+				option("Scattered", tr("LandShape.Scattered", "Scattered"))));
+		options.put("landColoringMethods", List.of(option("SingleColor", tr("LandColoringMethod.SingleColor", "Single color")),
+				option("ColorPoliticalRegions", tr("LandColoringMethod.ColorPoliticalRegions", "Color political regions"))));
+		options.put("backgroundTypes", List.of(option("FractalNoise", tr("theme.background.fractalNoise", "Fractal noise")),
+				option("GeneratedFromTexture", tr("theme.background.generatedFromTexture", "Generated from texture")), option("SolidColor", tr("theme.background.solidColor", "Solid color"))));
+		options.put("strokeTypes", List.of(option("Solid", tr("StrokeType.Solid", "Solid")), option("Dashes", tr("StrokeType.Dashes", "Dashes")),
+				option("Rounded_Dashes", tr("StrokeType.Rounded_Dashes", "Rounded dashes")), option("Dots", tr("StrokeType.Dots", "Dots"))));
+		options.put("borderPositions", List.of(option("Outside_map", tr("BorderPosition.Outside_map", "Outside map")), option("Over_map", tr("BorderPosition.Over_map", "Over map"))));
+		options.put("borderColorOptions",
+				List.of(option("Ocean_color", tr("BorderColorOption.Ocean_color", "Ocean color")), option("Choose_color", tr("BorderColorOption.Choose_color", "Choose color"))));
+		options.put("lineStyles", List.of(option("Jagged", tr("theme.lineStyle.jagged", "Jagged")), option("Splines", tr("theme.lineStyle.splines", "Splines")),
+				option("SplinesWithSmoothedCoastlines", tr("theme.lineStyle.splinesSmoothed", "Splines with smoothed coastlines"))));
+		options.put("oceanWaveTypes", List.of(option("ConcentricWaves", tr("theme.waveType.concentricWaves", "Concentric waves")), option("Ripples", tr("theme.waveType.ripples", "Ripples")),
+				option("None", tr("theme.waveType.none", "None"))));
+
+		// Build a labels map only for keys that are translated by the backend (no fallbacks).
+		Map<String, String> labels = new LinkedHashMap<>();
+		String[] backendLabelKeys = new String[] {
+				// Added keys used by web UI but previously missing from the returned labels
+				"theme.landColoringMethod.label",
+				"theme.randomSeed.label",
+				"theme.tab.background",
+				"theme.tab.border",
+				"theme.tab.effects",
+				"theme.tab.fonts",
+				"theme.style.label",
+				"theme.borderPosition.label",
+				"theme.borderColor.label",
+				"theme.drawBorder",
+				"theme.drawGrid",
+				"theme.drawRegionBoundaries",
+				"theme.colorLand",
+				"theme.colorOcean",
+				"theme.background.label",
+				"theme.texture.label",
+				"theme.borderType.label",
+				"theme.width.label",
+				"theme.rows.label",
+				"theme.landColor.label",
+				"theme.oceanColor.label",
+				"theme.regionBoundaryColor.title",
+				"theme.regionBoundaryWidth.help",
+				"theme.borderWidth.label",
+				"theme.borderColor.title",
+				"theme.frayEdges",
+				"theme.grungeWidth.help",
+				"theme.shadingWidth.label",
+				"theme.fraySize.label",
+				"theme.drawGrunge",
+				"theme.grungeColor.label",
+				"theme.lineStyle.label",
+				"theme.coastlineWidth.label",
+				"theme.coastlineColor.label",
+				"theme.coastShadingWidth.label",
+				"theme.coastShadingTransparency.label",
+				"theme.coastShadingColor.label",
+	                "theme.coastShadingColor.disabled",
+				"theme.oceanShadingWidth.label",
+				"theme.oceanShadingColor.label",
+				"theme.waveType.label",
+                "theme.waveWidth.label",
+                "theme.waveCount.label",
+                "theme.fadeOuterWaves",
+                "theme.jitter",
+                "theme.brokenLines",
+				"theme.waveColor.label",
+				"theme.drawOceanEffectsInLakes",
+				"theme.riverColor.label",
+				"theme.drawRoads",
+				"theme.roadStyle.label",
+				"theme.roadWidth.label",
+				"theme.roadColor.label",
+				"theme.mountainSize.label",
+				"theme.hillSize.label",
+				"theme.duneSize.label",
+				"theme.treeHeight.label",
+				"theme.citySize.label",
+				"theme.enableText",
+				"theme.textColor.label",
+				"theme.boldBackground",
+				"theme.boldBackgroundColor.label",
+				"theme.titleFont.label",
+				"theme.regionFont.label",
+				"theme.mountainRangeFont.label",
+				"theme.otherMountainsFont.label",
+				"theme.citiesFont.label",
+				"theme.riverLakeFont.label"
+		};
+
+		for (String k : backendLabelKeys)
+		{
+			String v = Translation.get(k);
+			if (v != null && !v.equals(k))
+			{
+				// Normalize label punctuation: remove trailing colons (normal and fullwidth)
+				String normalized = stripTrailingColon(v);
+				labels.put(k, normalized);
+			}
+		}
+
+		Map<String, Object> result = new LinkedHashMap<>();
+		result.put("options", options);
+		if (!labels.isEmpty())
+		{
+			result.put("labels", labels);
+		}
+
+		return result;
+	}
+
+	private static Map<String, String> option(String value, String label)
+	{
+		Map<String, String> entry = new LinkedHashMap<>();
+		entry.put("value", value);
+		entry.put("label", label);
+		return entry;
+	}
+
+	private static String tr(String key, String fallback)
+	{
+		String translated = Translation.get(key);
+		return translated.equals(key) ? fallback : translated;
+	}
+
+	private static String stripTrailingColon(String s)
+	{
+		if (s == null)
+		{
+			return null;
+		}
+		int end = s.length();
+		while (end > 0)
+		{
+			char c = s.charAt(end - 1);
+			if (c == ':' || c == '：' || Character.isWhitespace(c))
+			{
+				end--;
+			}
+			else
+			{
+				break;
+			}
+		}
+		return s.substring(0, end);
 	}
 
 	private static Object handleBackgroundPreview(Request req, Response res)
@@ -378,34 +714,44 @@ public class MapApiServer
 			{
 				Files.copy(is, temp, StandardCopyOption.REPLACE_EXISTING);
 			}
-			cfg.nortFile = temp.toAbsolutePath().toString();
+            // Keep the uploaded file path. Do NOT parse the uploaded JSON here;
+            // preserve the original file contents so downstream JSON parsing
+            // (which expects integer types) isn't affected by intermediate
+            // re-serialization that can turn integers into doubles.
+            cfg.nortFile = temp.toAbsolutePath().toString();
 		}
 
+		// Extract basic control fields (width/height/seed/saveNort/return flags).
+		// Theme-specific form fields are intentionally NOT extracted for
+		// multipart uploads: customization must be embedded into the uploaded
+		// .nort JSON. This preserves backward compatibility for clients that
+		// still send individual fields but prefers the JSON content.
 		extractFormFields(req, cfg);
-		extractThemeFormFields(req, cfg);
 		return cfg;
 	}
 
 	private static void extractFormFields(Request req, Config cfg)
 	{
-		String widthStr = req.raw().getParameter("width");
-		String heightStr = req.raw().getParameter("height");
-		String seedStr = req.raw().getParameter("seed");
-		String saveNortStr = req.raw().getParameter("saveNort");
-		String returnBytesStr = req.raw().getParameter("returnImageBytes");
-		String returnNortContentStr = req.raw().getParameter("returnNortContent");
+		String widthStr = param(req, "width");
+		String heightStr = param(req, "height");
+		String seedStr = param(req, "seed");
+		String saveNortStr = param(req, "saveNort");
+		String returnBytesStr = param(req, "returnImageBytes");
+		String returnNortContentStr = param(req, "returnNortContent");
 
-		if (widthStr != null && !widthStr.isEmpty())
+		if (widthStr != null)
 			cfg.width = Integer.valueOf(widthStr);
-		if (heightStr != null && !heightStr.isEmpty())
+		if (heightStr != null)
 			cfg.height = Integer.valueOf(heightStr);
-		if (seedStr != null && !seedStr.isEmpty())
+		if (seedStr != null)
 			cfg.seed = Long.valueOf(seedStr);
-		if (saveNortStr != null && !saveNortStr.isEmpty())
+		cfg.language = param(req, "language");
+		cfg.mapLanguage = param(req, "mapLanguage");
+		if (saveNortStr != null)
 			cfg.saveNort = Boolean.valueOf(saveNortStr);
-		if (returnBytesStr != null && !returnBytesStr.isEmpty())
+		if (returnBytesStr != null)
 			cfg.returnImageBytes = Boolean.valueOf(returnBytesStr);
-		if (returnNortContentStr != null && !returnNortContentStr.isEmpty())
+		if (returnNortContentStr != null)
 			cfg.returnNortContent = Boolean.valueOf(returnNortContentStr);
 	}
 
@@ -444,6 +790,102 @@ public class MapApiServer
 		String dGrid = param(req, "drawGridOverlay");
 		if (dGrid != null)
 			cfg.drawGridOverlay = Boolean.valueOf(dGrid);
+
+		String fBorder = param(req, "frayedBorder");
+		if (fBorder != null)
+			cfg.frayedBorder = Boolean.valueOf(fBorder);
+		String fBlur = param(req, "frayedBorderBlurLevel");
+		if (fBlur != null)
+			cfg.frayedBorderBlurLevel = Integer.valueOf(fBlur);
+		String fSize = param(req, "frayedBorderSize");
+		if (fSize != null)
+			cfg.frayedBorderSize = Integer.valueOf(fSize);
+		String fSeed = param(req, "frayedBorderSeed");
+		if (fSeed != null)
+			cfg.frayedBorderSeed = Long.valueOf(fSeed);
+		cfg.frayedBorderColorHex = param(req, "frayedBorderColorHex");
+
+		String gDraw = param(req, "drawGrunge");
+		if (gDraw != null)
+			cfg.drawGrunge = Boolean.valueOf(gDraw);
+		String gWidth = param(req, "grungeWidth");
+		if (gWidth != null)
+			cfg.grungeWidth = Integer.valueOf(gWidth);
+
+		cfg.lineStyle = param(req, "lineStyle");
+		String cWidth = param(req, "coastlineWidth");
+		if (cWidth != null)
+			cfg.coastlineWidth = Double.valueOf(cWidth);
+		cfg.coastlineColorHex = param(req, "coastlineColorHex");
+		String coastShade = param(req, "coastShadingLevel");
+		if (coastShade != null)
+			cfg.coastShadingLevel = Integer.valueOf(coastShade);
+		cfg.coastShadingColorHex = param(req, "coastShadingColorHex");
+		String coastAlpha = param(req, "coastShadingAlpha");
+		if (coastAlpha != null)
+			cfg.coastShadingAlpha = Integer.valueOf(coastAlpha);
+
+		String oceanShade = param(req, "oceanShadingLevel");
+		if (oceanShade != null)
+			cfg.oceanShadingLevel = Integer.valueOf(oceanShade);
+		cfg.oceanShadingColorHex = param(req, "oceanShadingColorHex");
+		cfg.oceanWavesType = param(req, "oceanWavesType");
+		String oceanWaveLevel = param(req, "oceanWavesLevel");
+		if (oceanWaveLevel != null)
+			cfg.oceanWavesLevel = Integer.valueOf(oceanWaveLevel);
+		cfg.oceanWavesColorHex = param(req, "oceanWavesColorHex");
+		String drawOceanLakes = param(req, "drawOceanEffectsInLakes");
+		if (drawOceanLakes != null)
+			cfg.drawOceanEffectsInLakes = Boolean.valueOf(drawOceanLakes);
+
+		String concentricCount = param(req, "concentricWaveCount");
+		if (concentricCount != null)
+			cfg.concentricWaveCount = Integer.valueOf(concentricCount);
+		String fadeConcentric = param(req, "fadeConcentricWaves");
+		if (fadeConcentric != null)
+			cfg.fadeConcentricWaves = Boolean.valueOf(fadeConcentric);
+		String jitterConcentric = param(req, "jitterToConcentricWaves");
+		if (jitterConcentric != null)
+			cfg.jitterToConcentricWaves = Boolean.valueOf(jitterConcentric);
+		String brokenConcentric = param(req, "brokenLinesForConcentricWaves");
+		if (brokenConcentric != null)
+			cfg.brokenLinesForConcentricWaves = Boolean.valueOf(brokenConcentric);
+
+		cfg.riverColorHex = param(req, "riverColorHex");
+
+		String dRoads = param(req, "drawRoads");
+		if (dRoads != null)
+			cfg.drawRoads = Boolean.valueOf(dRoads);
+		cfg.roadStyle = param(req, "roadStyle");
+		String rWidth = param(req, "roadWidth");
+		if (rWidth != null)
+			cfg.roadWidth = Double.valueOf(rWidth);
+		cfg.roadColorHex = param(req, "roadColorHex");
+
+		String mSize = param(req, "mountainSize");
+		if (mSize != null)
+			cfg.mountainSize = Double.valueOf(mSize);
+		String hSize = param(req, "hillSize");
+		if (hSize != null)
+			cfg.hillSize = Double.valueOf(hSize);
+		String dSize = param(req, "duneSize");
+		if (dSize != null)
+			cfg.duneSize = Double.valueOf(dSize);
+		String tHeight = param(req, "treeHeight");
+		if (tHeight != null)
+			cfg.treeHeight = Double.valueOf(tHeight);
+		String cSize = param(req, "citySize");
+		if (cSize != null)
+			cfg.citySize = Double.valueOf(cSize);
+
+		String dText = param(req, "drawText");
+		if (dText != null)
+			cfg.drawText = Boolean.valueOf(dText);
+		cfg.textColorHex = param(req, "textColorHex");
+		String dBold = param(req, "drawBoldBackground");
+		if (dBold != null)
+			cfg.drawBoldBackground = Boolean.valueOf(dBold);
+		cfg.boldBackgroundColorHex = param(req, "boldBackgroundColorHex");
 		cfg.landColoringMethod = param(req, "landColoringMethod");
 		cfg.titleFontFamily = param(req, "titleFontFamily");
 		cfg.regionFontFamily = param(req, "regionFontFamily");
@@ -455,16 +897,17 @@ public class MapApiServer
 
 	private static GenerationContext loadSettings(Config cfg, Response res)
 	{
-		boolean providedNortContent = cfg.nortContent != null && !cfg.nortContent.isEmpty();
+		boolean providedSettings = cfg.settings != null && !cfg.settings.isEmpty();
 		Path tempNortPath = null;
 
 		try
 		{
 			MapSettings settings;
-			if (providedNortContent)
+			if (providedSettings)
 			{
 				tempNortPath = Files.createTempFile("nortantis-", NORT_EXTENSION);
-				Files.write(tempNortPath, cfg.nortContent.getBytes(StandardCharsets.UTF_8), StandardOpenOption.TRUNCATE_EXISTING);
+				String settingsJson = gson.toJson(cfg.settings);
+				Files.write(tempNortPath, settingsJson.getBytes(StandardCharsets.UTF_8), StandardOpenOption.TRUNCATE_EXISTING);
 				settings = new MapSettings(tempNortPath.toAbsolutePath().toString());
 			}
 			else if (cfg.nortFile != null && !cfg.nortFile.isEmpty())
@@ -476,10 +919,42 @@ public class MapApiServer
 				settings = generateRandomMapSettings(cfg);
 			}
 
+			// Concise diagnostics: log only counts and flags (avoid printing full .nort JSON)
+			try {
+				int freeIconsCount = 0;
+				int centerEditsCount = 0;
+				boolean hasIconEdits = false;
+				if (settings.edits != null) {
+					if (settings.edits.freeIcons != null) freeIconsCount = settings.edits.freeIcons.calcSize();
+					if (settings.edits.centerEdits != null) centerEditsCount = settings.edits.centerEdits.size();
+					hasIconEdits = settings.edits.hasIconEdits;
+				}
+				Logger.println(String.format("Settings edits: hasIconEdits=%s, freeIcons=%d, centerEdits=%d", hasIconEdits, freeIconsCount, centerEditsCount));
+			} catch (Exception ignore) {
+				// best-effort diagnostics; ignore failures
+			}
 			applyCommonSettings(cfg, settings);
+			// Safety: if the provided settings JSON contains icon edits (freeIcons or centerEdits),
+			// ensure the hasIconEdits flag is set so MapCreator does not generate icons again.
+			try {
+				if (settings.edits != null) {
+					// Only mark hasIconEdits true when centerEdits are present (initialized).
+					// If only freeIcons are present without initialized centerEdits, the
+					// editor state is incomplete and IconDrawer expects centerEdits to exist
+					// for full-map icon updates. The frontend should send initialized
+					// centerEdits when it intends to re-use edits; do not infer from
+					// freeIcons alone to avoid NPEs in the generation pipeline.
+					boolean hasCenterEdits = settings.edits.centerEdits != null && !settings.edits.centerEdits.isEmpty();
+					if (hasCenterEdits) {
+						settings.edits.hasIconEdits = true;
+					}
+				}
+			} catch (Exception ignore) {
+				// best-effort; if this fails, default behavior remains unchanged
+			}
 			applyThemeOverrides(cfg, settings);
 
-			return new GenerationContext(settings, tempNortPath, providedNortContent);
+			return new GenerationContext(settings, tempNortPath, providedSettings);
 		}
 		catch (IOException ex)
 		{
@@ -795,22 +1270,52 @@ public class MapApiServer
 		}
 		catch (Exception ignored)
 		{
-			// Fallback to original source content if serialization fails for legacy settings.
-			if (cfg.nortContent != null && !cfg.nortContent.isEmpty())
-			{
-				return cfg.nortContent;
-			}
-			if (cfg.nortFile != null && !cfg.nortFile.isEmpty())
-			{
-				try
-				{
-					return Files.readString(Path.of(cfg.nortFile), StandardCharsets.UTF_8);
-				}
-				catch (Exception ignored2)
-				{
-					return null;
-				}
-			}
+			return fallbackNortContent(cfg);
+		}
+	}
+
+	private static String fallbackNortContent(Config cfg)
+	{
+		// Fallback to original source content if serialization fails for legacy settings.
+		String settingsJson = serializeSettingsJson(cfg);
+		if (settingsJson != null)
+		{
+			return settingsJson;
+		}
+
+		return readNortFileContent(cfg);
+	}
+
+	private static String serializeSettingsJson(Config cfg)
+	{
+		if (cfg.settings == null || cfg.settings.isEmpty())
+		{
+			return null;
+		}
+
+		try
+		{
+			return gson.toJson(cfg.settings);
+		}
+		catch (Exception ignored)
+		{
+			return null;
+		}
+	}
+
+	private static String readNortFileContent(Config cfg)
+	{
+		if (cfg.nortFile == null || cfg.nortFile.isEmpty())
+		{
+			return null;
+		}
+
+		try
+		{
+			return Files.readString(Path.of(cfg.nortFile), StandardCharsets.UTF_8);
+		}
+		catch (Exception ignored)
+		{
 			return null;
 		}
 	}
@@ -922,10 +1427,12 @@ public class MapApiServer
 	private static class Config
 	{
 		String nortFile;
-		String nortContent;
+		Map<String, Object> settings;
 		Integer width;
 		Integer height;
 		Long seed;
+		String language;
+		String mapLanguage;
 		String out;
 		Boolean returnImageBytes;
 		Boolean returnNortContent;
@@ -954,6 +1461,43 @@ public class MapApiServer
 		String regionBoundaryColorHex;
 		Boolean drawBorder;
 		Boolean drawGridOverlay;
+		Boolean frayedBorder;
+		Integer frayedBorderBlurLevel;
+		Integer frayedBorderSize;
+		Long frayedBorderSeed;
+		String frayedBorderColorHex;
+		Boolean drawGrunge;
+		Integer grungeWidth;
+		String lineStyle;
+		Double coastlineWidth;
+		String coastlineColorHex;
+		Integer coastShadingLevel;
+		String coastShadingColorHex;
+		Integer coastShadingAlpha;
+		Integer oceanShadingLevel;
+		String oceanShadingColorHex;
+		String oceanWavesType;
+		Integer oceanWavesLevel;
+		String oceanWavesColorHex;
+		Boolean drawOceanEffectsInLakes;
+		Integer concentricWaveCount;
+		Boolean fadeConcentricWaves;
+		Boolean jitterToConcentricWaves;
+		Boolean brokenLinesForConcentricWaves;
+		String riverColorHex;
+		Boolean drawRoads;
+		String roadStyle;
+		Double roadWidth;
+		String roadColorHex;
+		Double mountainSize;
+		Double hillSize;
+		Double duneSize;
+		Double treeHeight;
+		Double citySize;
+		Boolean drawText;
+		String textColorHex;
+		Boolean drawBoldBackground;
+		String boldBackgroundColorHex;
 		Integer previewWidth;
 		Integer previewHeight;
 		String titleFontFamily;
@@ -1010,6 +1554,8 @@ public class MapApiServer
 		applyBorderSettings(cfg, settings);
 		applyLandColoringMethod(cfg, settings);
 		applyFontFamilies(cfg, settings);
+		applyEffectsAndVisualOverrides(cfg, settings);
+		applyRoadAndScaleOverrides(cfg, settings);
 	}
 
 	private static void applyBackgroundType(Config cfg, MapSettings settings)
@@ -1137,6 +1683,191 @@ public class MapApiServer
 		applyFontFamily(cfg.riverFontFamily, settings.riverFont, font -> settings.riverFont = font);
 	}
 
+	private static void applyEffectsAndVisualOverrides(Config cfg, MapSettings settings)
+	{
+		if (cfg.frayedBorder != null)
+		{
+			settings.frayedBorder = cfg.frayedBorder;
+		}
+		if (cfg.frayedBorderBlurLevel != null)
+		{
+			settings.frayedBorderBlurLevel = cfg.frayedBorderBlurLevel;
+		}
+		if (cfg.frayedBorderSize != null)
+		{
+			settings.frayedBorderSize = cfg.frayedBorderSize;
+		}
+		if (cfg.frayedBorderSeed != null)
+		{
+			settings.frayedBorderSeed = cfg.frayedBorderSeed;
+		}
+		if (cfg.frayedBorderColorHex != null && !cfg.frayedBorderColorHex.isEmpty())
+		{
+			settings.frayedBorderColor = hexToColor(cfg.frayedBorderColorHex);
+		}
+
+		if (cfg.drawGrunge != null)
+		{
+			settings.drawGrunge = cfg.drawGrunge;
+		}
+		if (cfg.grungeWidth != null)
+		{
+			settings.grungeWidth = cfg.grungeWidth;
+		}
+
+		if (cfg.lineStyle != null && !cfg.lineStyle.isEmpty())
+		{
+            try
+            {
+                settings.lineStyle = MapSettings.LineStyle.valueOf(cfg.lineStyle);
+            }
+			catch (IllegalArgumentException ignored) {}
+		}
+
+		if (cfg.coastlineWidth != null)
+		{
+			settings.coastlineWidth = cfg.coastlineWidth;
+		}
+		if (cfg.coastlineColorHex != null && !cfg.coastlineColorHex.isEmpty())
+		{
+			settings.coastlineColor = hexToColor(cfg.coastlineColorHex);
+		}
+
+		if (cfg.coastShadingLevel != null)
+		{
+			settings.coastShadingLevel = cfg.coastShadingLevel;
+		}
+		if (cfg.coastShadingColorHex != null && !cfg.coastShadingColorHex.isEmpty())
+		{
+			if (cfg.coastShadingAlpha != null)
+			{
+				String h = cfg.coastShadingColorHex.startsWith("#") ? cfg.coastShadingColorHex.substring(1) : cfg.coastShadingColorHex;
+				int r = Integer.parseInt(h.substring(0, 2), 16);
+				int g = Integer.parseInt(h.substring(2, 4), 16);
+				int b = Integer.parseInt(h.substring(4, 6), 16);
+				int alpha = (int) ((1.0 - cfg.coastShadingAlpha / 100.0) * 255);
+				settings.coastShadingColor = Color.create(r, g, b, alpha);
+			}
+			else
+			{
+				settings.coastShadingColor = hexToColor(cfg.coastShadingColorHex);
+			}
+		}
+
+		if (cfg.oceanShadingLevel != null)
+		{
+			settings.oceanShadingLevel = cfg.oceanShadingLevel;
+		}
+		if (cfg.oceanShadingColorHex != null && !cfg.oceanShadingColorHex.isEmpty())
+		{
+			settings.oceanShadingColor = hexToColor(cfg.oceanShadingColorHex);
+		}
+
+		if (cfg.oceanWavesType != null && !cfg.oceanWavesType.isEmpty())
+		{
+            try
+            {
+                settings.oceanWavesType = MapSettings.OceanWaves.valueOf(cfg.oceanWavesType);
+            }
+			catch (IllegalArgumentException ignored) {}
+		}
+		if (cfg.oceanWavesLevel != null)
+		{
+			settings.oceanWavesLevel = cfg.oceanWavesLevel;
+		}
+		if (cfg.oceanWavesColorHex != null && !cfg.oceanWavesColorHex.isEmpty())
+		{
+			settings.oceanWavesColor = hexToColor(cfg.oceanWavesColorHex);
+		}
+
+		if (cfg.drawOceanEffectsInLakes != null)
+		{
+			settings.drawOceanEffectsInLakes = cfg.drawOceanEffectsInLakes;
+		}
+
+		if (cfg.concentricWaveCount != null)
+		{
+			settings.concentricWaveCount = cfg.concentricWaveCount;
+		}
+		if (cfg.fadeConcentricWaves != null)
+		{
+			settings.fadeConcentricWaves = cfg.fadeConcentricWaves;
+		}
+		if (cfg.jitterToConcentricWaves != null)
+		{
+			settings.jitterToConcentricWaves = cfg.jitterToConcentricWaves;
+		}
+		if (cfg.brokenLinesForConcentricWaves != null)
+		{
+			settings.brokenLinesForConcentricWaves = cfg.brokenLinesForConcentricWaves;
+		}
+
+		if (cfg.riverColorHex != null && !cfg.riverColorHex.isEmpty())
+		{
+			settings.riverColor = hexToColor(cfg.riverColorHex);
+		}
+	}
+
+	private static void applyRoadAndScaleOverrides(Config cfg, MapSettings settings)
+	{
+		if (cfg.drawRoads != null)
+		{
+			settings.drawRoads = cfg.drawRoads;
+		}
+		if (cfg.roadStyle != null && !cfg.roadStyle.isEmpty())
+		{
+			try
+			{
+				StrokeType strokeType = StrokeType.valueOf(cfg.roadStyle);
+				float width = cfg.roadWidth != null ? cfg.roadWidth.floatValue() : (settings.roadStyle != null ? settings.roadStyle.width : 1.0f);
+				settings.roadStyle = new Stroke(strokeType, width);
+			}
+			catch (IllegalArgumentException ignored) {}
+		}
+		if (cfg.roadColorHex != null && !cfg.roadColorHex.isEmpty())
+		{
+			settings.roadColor = hexToColor(cfg.roadColorHex);
+		}
+
+		if (cfg.mountainSize != null)
+		{
+			settings.mountainScale = cfg.mountainSize;
+		}
+		if (cfg.hillSize != null)
+		{
+			settings.hillScale = cfg.hillSize;
+		}
+		if (cfg.duneSize != null)
+		{
+			settings.duneScale = cfg.duneSize;
+		}
+		if (cfg.treeHeight != null)
+		{
+			settings.treeHeightScale = cfg.treeHeight;
+		}
+		if (cfg.citySize != null)
+		{
+			settings.cityScale = cfg.citySize;
+		}
+
+		if (cfg.drawText != null)
+		{
+			settings.drawText = cfg.drawText;
+		}
+		if (cfg.textColorHex != null && !cfg.textColorHex.isEmpty())
+		{
+			settings.textColor = hexToColor(cfg.textColorHex);
+		}
+		if (cfg.drawBoldBackground != null)
+		{
+			settings.drawBoldBackground = cfg.drawBoldBackground;
+		}
+		if (cfg.boldBackgroundColorHex != null && !cfg.boldBackgroundColorHex.isEmpty())
+		{
+			settings.boldBackgroundColor = hexToColor(cfg.boldBackgroundColorHex);
+		}
+	}
+
 	private static void applyFontFamily(String fontFamily, Font currentFont, java.util.function.Consumer<Font> setter)
 	{
 		if (fontFamily != null && !fontFamily.isEmpty() && currentFont != null)
@@ -1170,7 +1901,6 @@ public class MapApiServer
 			this.nortPath = nortPath;
 		}
 	}
-
 	@SuppressWarnings("unused")
 	private static class ImageAndSettingsResponse
 	{
@@ -1183,4 +1913,28 @@ public class MapApiServer
 			this.nortContent = nortContent;
 		}
 	}
+
+	@SuppressWarnings("unused")
+	private static class ResolvedSettingsResponse
+	{
+		Map<String, Object> settings;
+		Map<String, Object> uiDefaults;
+
+		ResolvedSettingsResponse(Map<String, Object> settings, Map<String, Object> uiDefaults)
+		{
+			this.settings = settings;
+			this.uiDefaults = uiDefaults;
+		}
+	}
+
+	private static String colorToHex(nortantis.platform.Color c)
+	{
+		if (c == null)
+			return null;
+		int r = c.getRed();
+		int g = c.getGreen();
+		int b = c.getBlue();
+		return String.format("#%02X%02X%02X", r, g, b);
+	}
+
 }

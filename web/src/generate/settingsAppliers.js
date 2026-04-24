@@ -175,11 +175,15 @@ export function createSettingsAppliers(setters) {
       if (Number.isFinite(Number(settings.coastlineWidth)))
         setCoastlineWidth(Number(settings.coastlineWidth))
       const coastlineHex = colorToHex(settings.coastlineColor)
-      if (coastlineHex) setCoastlineColorHex(coastlineHex)
+      if (coastlineHex) {
+        setCoastlineColorHex(coastlineHex)
+      }
       if (Number.isFinite(Number(settings.coastShadingLevel)))
         setCoastShadingLevel(Number(settings.coastShadingLevel))
       const coastShadingHex = colorToHex(settings.coastShadingColor)
-      if (coastShadingHex) setCoastShadingColorHex(coastShadingHex)
+      if (coastShadingHex) {
+        setCoastShadingColorHex(coastShadingHex)
+      }
       setCoastShadingAlpha(colorToAlphaPercent(settings.coastShadingColor, 100))
     },
 
@@ -239,6 +243,40 @@ export function createSettingsAppliers(setters) {
         setDrawBoldBackground(settings.drawBoldBackground)
       const boldBackgroundHex = colorToHex(settings.boldBackgroundColor)
       if (boldBackgroundHex) setBoldBackgroundColorHex(boldBackgroundHex)
+    },
+
+    applyRoadAndScaleSettings(settings) {
+      const {
+        setDrawRoads,
+        setRoadStyle,
+        setRoadWidth,
+        setRoadColorHex,
+        setMountainSize,
+        setHillSize,
+        setDuneSize,
+        setTreeHeight,
+        setCitySize,
+      } = setters
+
+      if (typeof settings.drawRoads === 'boolean') setDrawRoads(settings.drawRoads)
+
+      // roadStyle may be an object {type, width} or a string
+      if (typeof settings.roadStyle === 'string' && settings.roadStyle) {
+        setRoadStyle(settings.roadStyle)
+      } else if (settings.roadStyle && typeof settings.roadStyle === 'object') {
+        if (typeof settings.roadStyle.type === 'string') setRoadStyle(settings.roadStyle.type)
+        if (Number.isFinite(Number(settings.roadStyle.width))) setRoadWidth(Number(settings.roadStyle.width))
+      }
+
+      if (Number.isFinite(Number(settings.roadWidth))) setRoadWidth(Number(settings.roadWidth))
+      const roadHex = colorToHex(settings.roadColor)
+      if (roadHex) setRoadColorHex(roadHex)
+
+      if (Number.isFinite(Number(settings.mountainScale))) setMountainSize(Number(settings.mountainScale))
+      if (Number.isFinite(Number(settings.hillScale))) setHillSize(Number(settings.hillScale))
+      if (Number.isFinite(Number(settings.duneScale))) setDuneSize(Number(settings.duneScale))
+      if (Number.isFinite(Number(settings.treeHeightScale))) setTreeHeight(Number(settings.treeHeightScale))
+      if (Number.isFinite(Number(settings.cityScale))) setCitySize(Number(settings.cityScale))
     },
   }
 }
