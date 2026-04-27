@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
+import { ChromePicker } from 'react-color'
 import PropTypes from 'prop-types'
 
 const TABS = [
@@ -86,6 +87,7 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     coastShadingLevel,
     coastShadingColorHex,
     coastShadingAlpha,
+    oceanShadingAlpha,
     oceanShadingLevel,
     oceanShadingColorHex,
     oceanWavesType,
@@ -164,6 +166,7 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     setCoastShadingLevel,
     setCoastShadingColorHex,
     setCoastShadingAlpha,
+    setOceanShadingAlpha,
     setOceanShadingLevel,
     setOceanShadingColorHex,
     setOceanWavesType,
@@ -250,12 +253,62 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     t = t.replace(/\s+/g, ' ').trim()
     return t
   }
+
+  // Small helpers to convert between hex and rgba used by the picker.
+  function hexToRgba(hex, transparencyPercent = 0) {
+    if (!hex) return { r: 0, g: 0, b: 0, a: 1 }
+    const h = hex.replace(/^#/, '')
+    if (!/^[0-9a-fA-F]{6}$/.test(h)) return { r: 0, g: 0, b: 0, a: 1 }
+    const r = parseInt(h.substring(0, 2), 16)
+    const g = parseInt(h.substring(2, 4), 16)
+    const b = parseInt(h.substring(4, 6), 16)
+    const opacity = 1 - (Number(transparencyPercent || 0) / 100)
+    return { r, g, b, a: Math.max(0, Math.min(1, opacity)) }
+  }
+
+  function rgbaToHex(col) {
+    const r = Math.round(col.r || 0)
+    const g = Math.round(col.g || 0)
+    const b = Math.round(col.b || 0)
+    return (
+      '#' +
+      r.toString(16).padStart(2, '0') +
+      g.toString(16).padStart(2, '0') +
+      b.toString(16).padStart(2, '0')
+    )
+  }
+
+  const [showCoastPicker, setShowCoastPicker] = useState(false)
+  const [showOceanPicker, setShowOceanPicker] = useState(false)
+
+  const modalBackdropStyle = {
+    position: 'fixed',
+    left: 0,
+    top: 0,
+    right: 0,
+    bottom: 0,
+    background: 'rgba(0,0,0,0.4)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 2000,
+  }
+
+  const modalContentStyle = {
+    background: '#fff',
+    padding: 12,
+    borderRadius: 6,
+    boxShadow: '0 6px 24px rgba(0,0,0,0.3)',
+  }
   const showTextureOptions = backgroundType === 'GeneratedFromTexture'
   const hasTextures = textures.length > 0
+  // Keep Customize panel disabled unless the user explicitly has a .nort
+  // source (uploaded file or current nortContent). Do not enable the
+  // panel merely because `resolve-random-settings` returned a payload —
+  // that should not be treated as an editable customization source.
   const hasCustomizationSource = Boolean(
     fileObj ||
-    currentSource?.nortContent ||
-    (currentSource?.type === 'random' && currentSource?.payload)
+    currentSource?.nortContent
   )
   const canSubmit = !loading && hasCustomizationSource
   const gatedControlValue = (value) => (hasCustomizationSource ? value : '')
@@ -337,6 +390,22 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
       currentSource?.type === 'random' && currentSource?.payload
     )
 
+    // If a prefetch was performed on page load, use it and skip the
+    // immediate fetch. This lets the UI show a warm preview without
+    // waiting for the normal fetch cycle.
+    try {
+      if (typeof window !== 'undefined' && window.__prefetchedBackgroundPreviewBlob) {
+        const blob = window.__prefetchedBackgroundPreviewBlob
+        try { delete window.__prefetchedBackgroundPreviewBlob } catch (e) {}
+        const url = URL.createObjectURL(blob)
+        setBackgroundPreviewUrl((previous) => {
+          if (previous) URL.revokeObjectURL(previous)
+          return url
+        })
+        return
+      }
+    } catch (e) {}
+
     if (!hasNortContentSource && !hasRandomPayloadSource) {
       setBackgroundPreviewUrl((previous) => {
         if (previous) URL.revokeObjectURL(previous)
@@ -356,25 +425,49 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     let timerId = setTimeout(async () => {
       if (controller.signal.aborted) return
       try {
+        // Build a minimal preview payload. If the user has an explicit
+        // `nortContent` source, send only that JSON plus preview dimensions
+        // and light overrides. Avoid sending duplicated UI-only fields that
+        // are already included inside `nortContent`.
         const payload = {
-          colorizeLand,
-          colorizeOcean,
-          oceanColorHex,
-          landColorHex,
           previewWidth: 520,
           previewHeight: 170,
         }
 
         if (hasNortContentSource) {
-          payload.nortContent = currentSource.nortContent
+          // Do NOT send `nortContent` to the background-preview endpoint.
+          // Instead send only a compact set of explicit overrides so the
+          // server can render a representative preview without consuming or
+          // merging the full settings JSON.
+          if (backgroundType) payload.backgroundType = backgroundType
+          if (textureRef) payload.textureRef = textureRef
+          if (backgroundSeed) payload.backgroundSeed = Number(backgroundSeed)
+          if (finalSeed) payload.seed = Number(finalSeed)
+          // Include a few lightweight visual overrides that are cheap to
+          // apply and commonly adjusted in the Customize panel.
+          payload.colorizeLand = colorizeLand
+          payload.colorizeOcean = colorizeOcean
+          payload.oceanColorHex = oceanColorHex
+          payload.landColorHex = landColorHex
         } else if (hasRandomPayloadSource) {
+          // For random payload sources we still send the resolver payload
+          // as before since that represents the canonical settings used
+          // to generate the preview.
           Object.assign(payload, currentSource.payload)
+        } else {
+          // No explicit nortContent nor random payload: fallback to lightweight
+          // explicit fields used to render the background preview.
+          Object.assign(payload, {
+            colorizeLand,
+            colorizeOcean,
+            oceanColorHex,
+            landColorHex,
+          })
+          if (backgroundType) payload.backgroundType = backgroundType
+          if (textureRef) payload.textureRef = textureRef
+          if (backgroundSeed) payload.backgroundSeed = Number(backgroundSeed)
+          if (finalSeed) payload.seed = Number(finalSeed)
         }
-
-        if (backgroundType) payload.backgroundType = backgroundType
-        if (textureRef) payload.textureRef = textureRef
-        if (backgroundSeed) payload.backgroundSeed = Number(backgroundSeed)
-        if (finalSeed) payload.seed = Number(finalSeed)
 
         const response = await fetch(`${API_BASE}/background-preview`, {
           method: 'POST',
@@ -403,7 +496,7 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
           return null
         })
       }
-    }, 0)
+    }, 100)
 
     return () => {
       clearTimeout(timerId)
@@ -933,12 +1026,46 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
               )}
             </div>
           ) : (
-            <input
-              id="coast-shading-color-input"
-              type="color"
-              value={coastShadingColorHex}
-              onChange={(e) => setCoastShadingColorHex(e.target.value)}
-            />
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+              <div
+                role="button"
+                aria-label="Open coast shading color picker"
+                onClick={() => setShowCoastPicker(true)}
+                style={{
+                  width: 36,
+                  height: 24,
+                  background: coastShadingColorHex || '#000000',
+                  border: '1px solid #bbb',
+                  cursor: 'pointer',
+                }}
+              />
+              <input
+                id="coast-shading-color-input"
+                type="text"
+                value={coastShadingColorHex}
+                onChange={(e) => setCoastShadingColorHex(e.target.value)}
+              />
+
+              {showCoastPicker && (
+                <div style={modalBackdropStyle} onClick={() => setShowCoastPicker(false)}>
+                  <div style={modalContentStyle} onClick={(e) => e.stopPropagation()}>
+                    <ChromePicker
+                      color={hexToRgba(coastShadingColorHex, coastShadingAlpha)}
+                      onChange={(col) => {
+                        const hex = rgbaToHex(col.rgb)
+                        setCoastShadingColorHex(hex)
+                        setCoastShadingAlpha(Math.round((1 - (col.rgb.a ?? 1)) * 100))
+                      }}
+                    />
+                    <div style={{ marginTop: 8, display: 'flex', justifyContent: 'flex-end' }}>
+                      <button type="button" onClick={() => setShowCoastPicker(false)}>
+                        Close
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           )}
 
           <label htmlFor="ocean-shading-level-input">
@@ -954,15 +1081,67 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
             onChange={(e) => setOceanShadingLevel(Number(e.target.value))}
           />
 
+          {finalLandColoringMethod !== 'SingleColor' && (
+            <>
+              <label htmlFor="ocean-shading-alpha-input">
+                {translateLabel('theme.oceanShadingTransparency.label')}:{' '}
+                {Math.round(oceanShadingAlpha)}
+              </label>
+              <input
+                id="ocean-shading-alpha-input"
+                type="range"
+                min={0}
+                max={100}
+                step={1}
+                value={oceanShadingAlpha}
+                onChange={(e) => setOceanShadingAlpha(Number(e.target.value))}
+              />
+            </>
+          )}
+
           <label htmlFor="ocean-shading-color-input">
             {translateLabel('theme.oceanShadingColor.label')}
           </label>
-          <input
-            id="ocean-shading-color-input"
-            type="color"
-            value={oceanShadingColorHex}
-            onChange={(e) => setOceanShadingColorHex(e.target.value)}
-          />
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+            <div
+              role="button"
+              aria-label="Open ocean shading color picker"
+              onClick={() => setShowOceanPicker(true)}
+              style={{
+                width: 36,
+                height: 24,
+                background: oceanShadingColorHex || '#000000',
+                border: '1px solid #bbb',
+                cursor: 'pointer',
+              }}
+            />
+            <input
+              id="ocean-shading-color-input"
+              type="text"
+              value={oceanShadingColorHex}
+              onChange={(e) => setOceanShadingColorHex(e.target.value)}
+            />
+
+            {showOceanPicker && (
+              <div style={modalBackdropStyle} onClick={() => setShowOceanPicker(false)}>
+                <div style={modalContentStyle} onClick={(e) => e.stopPropagation()}>
+                  <ChromePicker
+                    color={hexToRgba(oceanShadingColorHex, oceanShadingAlpha)}
+                    onChange={(col) => {
+                      const hex = rgbaToHex(col.rgb)
+                      setOceanShadingColorHex(hex)
+                      setOceanShadingAlpha(Math.round((1 - (col.rgb.a ?? 1)) * 100))
+                    }}
+                  />
+                  <div style={{ marginTop: 8, display: 'flex', justifyContent: 'flex-end' }}>
+                    <button type="button" onClick={() => setShowOceanPicker(false)}>
+                      Close
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="fields-column">

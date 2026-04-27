@@ -1,9 +1,55 @@
 import { colorToHex, colorToAlphaPercent, fontSpecToFamily } from './utils'
 import { seedStringOrEmpty, stringValueOrEmpty, dimensionFromSize } from './helpers'
 
-export function createSettingsAppliers(setters) {
+// Lightweight runtime instrumentation to record where applier functions
+// are created and invoked. Useful for debugging duplicate invocation
+// paths under React StrictMode. Inspect via `window.__applierCallCache`.
+const applierCallCache = new Map()
+
+export function createSettingsAppliers(setters, currentValues = {}) {
+  // Helper to call a state setter only when the new value differs from
+  // the current value. `key` is the property name inside `currentValues`.
+  function setIfChanged(setter, key, newValue) {
+    try {
+      const oldValue = currentValues ? currentValues[key] : undefined
+      // Normalize numbers vs strings where reasonable
+      if (typeof newValue === 'number' || (typeof newValue === 'string' && !Number.isNaN(Number(newValue)))) {
+        const nOld = Number(oldValue)
+        const nNew = Number(newValue)
+        if (Number.isFinite(nOld) && Number.isFinite(nNew) && Object.is(nOld, nNew)) return
+      }
+      if (Object.is(oldValue, newValue)) return
+    } catch (e) {
+      // ignore comparison errors, fallthrough to setter
+    }
+    try {
+      setter(newValue)
+    } catch (e) {
+      try { setter(String(newValue)) } catch (e2) {}
+    }
+  }
+
+  // Per-applier instrumentation: record creation and calls.
+  const applierId = `applier-${Date.now()}-${Math.random().toString(36).slice(2,8)}`
+  const createdStack = (new Error('applier-created')).stack
+  try {
+    applierCallCache.set(applierId, { createdAt: Date.now(), createdStack, calls: [] })
+    if (typeof window !== 'undefined') window.__applierCallCache = applierCallCache
+  } catch (e) {}
+
+  function recordCall(name) {
+    try {
+      const info = applierCallCache.get(applierId) || { createdAt: Date.now(), createdStack, calls: [] }
+      const entry = { name, ts: Date.now(), stack: (new Error()).stack }
+      info.calls.push(entry)
+      applierCallCache.set(applierId, info)
+      try { console.debug('[applier-instrument]', applierId, name, 'call#', info.calls.length) } catch (e) {}
+    } catch (e) {}
+  }
+
   return {
     applyMapSizeAndSeedSettings(settings) {
+      recordCall('applyMapSizeAndSeedSettings')
       const {
         setFinalWidth,
         setFinalHeight,
@@ -19,44 +65,42 @@ export function createSettingsAppliers(setters) {
       } = setters
 
       if (Number.isFinite(Number(settings.generatedWidth)))
-        setFinalWidth(Number(settings.generatedWidth))
+        setIfChanged(setFinalWidth, 'finalWidth', Number(settings.generatedWidth))
       if (Number.isFinite(Number(settings.generatedHeight)))
-        setFinalHeight(Number(settings.generatedHeight))
+        setIfChanged(setFinalHeight, 'finalHeight', Number(settings.generatedHeight))
       const seedStr = seedStringOrEmpty(settings.randomSeed)
       if (seedStr) {
-        setFinalSeed(seedStr)
-        setRandomSeed(seedStr)
+        setIfChanged(setFinalSeed, 'finalSeed', seedStr)
+        setIfChanged(setRandomSeed, 'randomSeed', seedStr)
       }
-      setArtPack(stringValueOrEmpty(settings.artPack))
-      setLandShape(stringValueOrEmpty(settings.landShape))
+      setIfChanged(setArtPack, 'artPack', stringValueOrEmpty(settings.artPack))
+      setIfChanged(setLandShape, 'landShape', stringValueOrEmpty(settings.landShape))
       if (Number.isFinite(Number(settings.regionCount)))
-        setRegionCount(Number(settings.regionCount))
-      if (Number.isFinite(Number(settings.worldSize))) setWorldSize(Number(settings.worldSize))
-      setCityIconType(
-        stringValueOrEmpty(settings.cityIconSetName) ||
-          stringValueOrEmpty(settings.cityIconTypeName)
-      )
+        setIfChanged(setRegionCount, 'regionCount', Number(settings.regionCount))
+      if (Number.isFinite(Number(settings.worldSize))) setIfChanged(setWorldSize, 'worldSize', Number(settings.worldSize))
+      setIfChanged(setCityIconType, 'cityIconType', stringValueOrEmpty(settings.cityIconSetName) || stringValueOrEmpty(settings.cityIconTypeName))
       if (Array.isArray(settings.books) && settings.books.length > 0)
-        setSelectedBooks(new Set(settings.books))
+        setIfChanged(setSelectedBooks, 'selectedBooks', new Set(settings.books))
       const width = Number(settings.generatedWidth)
       const height = Number(settings.generatedHeight)
       if (Number.isFinite(width) && Number.isFinite(height))
-        setDimension(dimensionFromSize(width, height))
+        setIfChanged(setDimension, 'dimension', dimensionFromSize(width, height))
     },
 
     applyRegionBoundaryStyle(regionStyle) {
       const { setRegionBoundaryStyle, setRegionBoundaryWidth } = setters
       if (typeof regionStyle === 'string' && regionStyle) {
-        setRegionBoundaryStyle(regionStyle)
+        setIfChanged(setRegionBoundaryStyle, 'regionBoundaryStyle', regionStyle)
         return
       }
       if (!regionStyle || typeof regionStyle !== 'object') return
-      if (typeof regionStyle.type === 'string') setRegionBoundaryStyle(regionStyle.type)
+      if (typeof regionStyle.type === 'string') setIfChanged(setRegionBoundaryStyle, 'regionBoundaryStyle', regionStyle.type)
       if (Number.isFinite(Number(regionStyle.width)))
-        setRegionBoundaryWidth(Number(regionStyle.width))
+        setIfChanged(setRegionBoundaryWidth, 'regionBoundaryWidth', Number(regionStyle.width))
     },
 
     applyBackgroundTypeSettings(settings) {
+      recordCall('applyBackgroundTypeSettings')
       const {
         setBackgroundType,
         setTextureRef,
@@ -66,25 +110,24 @@ export function createSettingsAppliers(setters) {
         setColorizeOcean,
       } = setters
 
-      if (settings.solidColorBackground === true) setBackgroundType('SolidColor')
+      if (settings.solidColorBackground === true) setIfChanged(setBackgroundType, 'backgroundType', 'SolidColor')
       else if (settings.generateBackgroundFromTexture === true)
-        setBackgroundType('GeneratedFromTexture')
-      else setBackgroundType('FractalNoise')
+        setIfChanged(setBackgroundType, 'backgroundType', 'GeneratedFromTexture')
+      else setIfChanged(setBackgroundType, 'backgroundType', 'FractalNoise')
       if (settings.backgroundTextureResource?.artPack && settings.backgroundTextureResource?.name) {
-        setTextureRef(
-          `${settings.backgroundTextureResource.artPack}|${settings.backgroundTextureResource.name}`
-        )
+        setIfChanged(setTextureRef, 'textureRef', `${settings.backgroundTextureResource.artPack}|${settings.backgroundTextureResource.name}`)
       } else {
-        setTextureRef('')
+        setIfChanged(setTextureRef, 'textureRef', '')
       }
-      setBackgroundSeed(seedStringOrEmpty(settings.backgroundRandomSeed))
+      setIfChanged(setBackgroundSeed, 'backgroundSeed', seedStringOrEmpty(settings.backgroundRandomSeed))
       if (typeof settings.drawRegionBoundaries === 'boolean')
-        setDrawRegionBoundaries(settings.drawRegionBoundaries)
-      if (typeof settings.colorizeLand === 'boolean') setColorizeLand(settings.colorizeLand)
-      if (typeof settings.colorizeOcean === 'boolean') setColorizeOcean(settings.colorizeOcean)
+        setIfChanged(setDrawRegionBoundaries, 'drawRegionBoundaries', settings.drawRegionBoundaries)
+      if (typeof settings.colorizeLand === 'boolean') setIfChanged(setColorizeLand, 'colorizeLand', settings.colorizeLand)
+      if (typeof settings.colorizeOcean === 'boolean') setIfChanged(setColorizeOcean, 'colorizeOcean', settings.colorizeOcean)
     },
 
     applyColorAndBoundarySettings(settings) {
+      recordCall('applyColorAndBoundarySettings')
       const {
         setOceanColorHex,
         setLandColorHex,
@@ -96,23 +139,24 @@ export function createSettingsAppliers(setters) {
       } = setters
 
       const oceanHex = colorToHex(settings.oceanColor)
-      if (oceanHex) setOceanColorHex(oceanHex)
+      if (oceanHex) setIfChanged(setOceanColorHex, 'oceanColorHex', oceanHex)
       const landHex = colorToHex(settings.landColor)
-      if (landHex) setLandColorHex(landHex)
+      if (landHex) setIfChanged(setLandColorHex, 'landColorHex', landHex)
       const boundaryHex = colorToHex(settings.regionBoundaryColor)
-      if (boundaryHex) setRegionBoundaryColorHex(boundaryHex)
+      if (boundaryHex) setIfChanged(setRegionBoundaryColorHex, 'regionBoundaryColorHex', boundaryHex)
       this.applyRegionBoundaryStyle(settings.regionBoundaryStyle)
-      if (typeof settings.drawBorder === 'boolean') setDrawBorder(settings.drawBorder)
+      if (typeof settings.drawBorder === 'boolean') setIfChanged(setDrawBorder, 'drawBorder', settings.drawBorder)
       if (typeof settings.drawGridOverlay === 'boolean')
-        setDrawGridOverlay(settings.drawGridOverlay)
+        setIfChanged(setDrawGridOverlay, 'drawGridOverlay', settings.drawGridOverlay)
       if (typeof settings.drawRegionColors === 'boolean') {
         const method = settings.drawRegionColors ? 'ColorPoliticalRegions' : 'SingleColor'
-        setLandColoringMethod(method)
-        setFinalLandColoringMethod(method)
+        setIfChanged(setLandColoringMethod, 'landColoringMethod', method)
+        setIfChanged(setFinalLandColoringMethod, 'finalLandColoringMethod', method)
       }
     },
 
     applyBorderSettings(settings) {
+      recordCall('applyBorderSettings')
       const {
         setBorderRef,
         setBorderWidth,
@@ -122,21 +166,22 @@ export function createSettingsAppliers(setters) {
       } = setters
 
       if (settings.borderResource?.artPack && settings.borderResource?.name) {
-        setBorderRef(`${settings.borderResource.artPack}|${settings.borderResource.name}`)
+        setIfChanged(setBorderRef, 'borderRef', `${settings.borderResource.artPack}|${settings.borderResource.name}`)
       } else {
-        setBorderRef('')
+        setIfChanged(setBorderRef, 'borderRef', '')
       }
       if (Number.isFinite(Number(settings.borderWidth)))
-        setBorderWidth(Number(settings.borderWidth))
+        setIfChanged(setBorderWidth, 'borderWidth', Number(settings.borderWidth))
       if (typeof settings.borderPosition === 'string' && settings.borderPosition)
-        setBorderPosition(settings.borderPosition)
+        setIfChanged(setBorderPosition, 'borderPosition', settings.borderPosition)
       if (typeof settings.borderColorOption === 'string' && settings.borderColorOption)
-        setBorderColorOption(settings.borderColorOption)
+        setIfChanged(setBorderColorOption, 'borderColorOption', settings.borderColorOption)
       const borderHex = colorToHex(settings.borderColor)
-      if (borderHex) setBorderColorHex(borderHex)
+      if (borderHex) setIfChanged(setBorderColorHex, 'borderColorHex', borderHex)
     },
 
     applyFrayedBorderSettings(settings) {
+      recordCall('applyFrayedBorderSettings')
       const {
         setFrayedBorder,
         setFrayedBorderBlurLevel,
@@ -147,20 +192,21 @@ export function createSettingsAppliers(setters) {
         setFrayedBorderColorHex,
       } = setters
 
-      if (typeof settings.frayedBorder === 'boolean') setFrayedBorder(settings.frayedBorder)
+      if (typeof settings.frayedBorder === 'boolean') setIfChanged(setFrayedBorder, 'frayedBorder', settings.frayedBorder)
       if (Number.isFinite(Number(settings.frayedBorderBlurLevel)))
-        setFrayedBorderBlurLevel(Number(settings.frayedBorderBlurLevel))
+        setIfChanged(setFrayedBorderBlurLevel, 'frayedBorderBlurLevel', Number(settings.frayedBorderBlurLevel))
       if (Number.isFinite(Number(settings.frayedBorderSize)))
-        setFrayedBorderSize(Number(settings.frayedBorderSize))
-      setFrayedBorderSeed(seedStringOrEmpty(settings.frayedBorderSeed))
-      if (typeof settings.drawGrunge === 'boolean') setDrawGrunge(settings.drawGrunge)
+        setIfChanged(setFrayedBorderSize, 'frayedBorderSize', Number(settings.frayedBorderSize))
+      setIfChanged(setFrayedBorderSeed, 'frayedBorderSeed', seedStringOrEmpty(settings.frayedBorderSeed))
+      if (typeof settings.drawGrunge === 'boolean') setIfChanged(setDrawGrunge, 'drawGrunge', settings.drawGrunge)
       if (Number.isFinite(Number(settings.grungeWidth)))
-        setGrungeWidth(Number(settings.grungeWidth))
+        setIfChanged(setGrungeWidth, 'grungeWidth', Number(settings.grungeWidth))
       const frayedBorderHex = colorToHex(settings.frayedBorderColor)
-      if (frayedBorderHex) setFrayedBorderColorHex(frayedBorderHex)
+      if (frayedBorderHex) setIfChanged(setFrayedBorderColorHex, 'frayedBorderColorHex', frayedBorderHex)
     },
 
     applyCoastlineSettings(settings) {
+      recordCall('applyCoastlineSettings')
       const {
         setLineStyle,
         setCoastlineWidth,
@@ -171,25 +217,41 @@ export function createSettingsAppliers(setters) {
       } = setters
 
       if (typeof settings.lineStyle === 'string' && settings.lineStyle)
-        setLineStyle(settings.lineStyle)
+        setIfChanged(setLineStyle, 'lineStyle', settings.lineStyle)
       if (Number.isFinite(Number(settings.coastlineWidth)))
-        setCoastlineWidth(Number(settings.coastlineWidth))
+        setIfChanged(setCoastlineWidth, 'coastlineWidth', Number(settings.coastlineWidth))
       const coastlineHex = colorToHex(settings.coastlineColor)
       if (coastlineHex) {
-        setCoastlineColorHex(coastlineHex)
+        setIfChanged(setCoastlineColorHex, 'coastlineColorHex', coastlineHex)
       }
       if (Number.isFinite(Number(settings.coastShadingLevel)))
-        setCoastShadingLevel(Number(settings.coastShadingLevel))
-      const coastShadingHex = colorToHex(settings.coastShadingColor)
-      if (coastShadingHex) {
-        setCoastShadingColorHex(coastShadingHex)
+        setIfChanged(setCoastShadingLevel, 'coastShadingLevel', Number(settings.coastShadingLevel))
+      // Prefer numeric RGBA fields from backend (always use rgba when present).
+      // Debug: show raw incoming coast shading fields
+      try {
+        console.debug('[applier] incoming coastShadingColor type=', typeof settings.coastShadingColor, 'value=', settings.coastShadingColor)
+        console.debug('[applier] incoming coastShadingColorHex type=', typeof settings.coastShadingColorHex, 'value=', settings.coastShadingColorHex)
+        console.debug('[applier] incoming coastShadingAlpha type=', typeof settings.coastShadingAlpha, 'value=', settings.coastShadingAlpha)
+      } catch (dbg) {}
+
+      if (settings.coastShadingColor) {
+        const coastShadingHex = colorToHex(settings.coastShadingColor)
+        if (coastShadingHex) setIfChanged(setCoastShadingColorHex, 'coastShadingColorHex', coastShadingHex)
+        const opacityPercent = colorToAlphaPercent(settings.coastShadingColor, 100)
+        setIfChanged(setCoastShadingAlpha, 'coastShadingAlpha', 100 - opacityPercent)
+      } else {
+        // Fallback: use any UI-provided hex/alpha helpers if backend rgba absent
+        const fallbackHex = settings.coastShadingColorHex || null
+        if (fallbackHex) setIfChanged(setCoastShadingColorHex, 'coastShadingColorHex', fallbackHex)
+        if (Number.isFinite(Number(settings.coastShadingAlpha))) setIfChanged(setCoastShadingAlpha, 'coastShadingAlpha', Number(settings.coastShadingAlpha))
       }
-      setCoastShadingAlpha(colorToAlphaPercent(settings.coastShadingColor, 100))
     },
 
     applyOceanSettings(settings) {
+      recordCall('applyOceanSettings')
       const {
         setOceanShadingLevel,
+        setOceanShadingAlpha,
         setOceanShadingColorHex,
         setOceanWavesType,
         setOceanWavesLevel,
@@ -199,22 +261,38 @@ export function createSettingsAppliers(setters) {
       } = setters
 
       if (Number.isFinite(Number(settings.oceanShadingLevel)))
-        setOceanShadingLevel(Number(settings.oceanShadingLevel))
-      const oceanShadingHex = colorToHex(settings.oceanShadingColor)
-      if (oceanShadingHex) setOceanShadingColorHex(oceanShadingHex)
+          setIfChanged(setOceanShadingLevel, 'oceanShadingLevel', Number(settings.oceanShadingLevel))
+      // Debug: show raw incoming ocean shading fields
+      try {
+        console.debug('[applier] incoming oceanShadingColor type=', typeof settings.oceanShadingColor, 'value=', settings.oceanShadingColor)
+        console.debug('[applier] incoming oceanShadingColorHex type=', typeof settings.oceanShadingColorHex, 'value=', settings.oceanShadingColorHex)
+        console.debug('[applier] incoming oceanShadingAlpha type=', typeof settings.oceanShadingAlpha, 'value=', settings.oceanShadingAlpha)
+      } catch (dbg) {}
+      // Prefer numeric RGBA fields from backend (always use rgba when present).
+      if (settings.oceanShadingColor) {
+        const oceanShadingHex = colorToHex(settings.oceanShadingColor)
+        if (oceanShadingHex) setIfChanged(setOceanShadingColorHex, 'oceanShadingColorHex', oceanShadingHex)
+        const oceanOpacityPercent = colorToAlphaPercent(settings.oceanShadingColor, 100)
+        setIfChanged(setOceanShadingAlpha, 'oceanShadingAlpha', 100 - oceanOpacityPercent)
+      } else {
+        const fallbackHex = settings.oceanShadingColorHex || null
+        if (fallbackHex) setIfChanged(setOceanShadingColorHex, 'oceanShadingColorHex', fallbackHex)
+        if (Number.isFinite(Number(settings.oceanShadingAlpha))) setIfChanged(setOceanShadingAlpha, 'oceanShadingAlpha', Number(settings.oceanShadingAlpha))
+      }
       if (typeof settings.oceanWavesType === 'string' && settings.oceanWavesType)
-        setOceanWavesType(settings.oceanWavesType)
+        setIfChanged(setOceanWavesType, 'oceanWavesType', settings.oceanWavesType)
       if (Number.isFinite(Number(settings.oceanWavesLevel)))
-        setOceanWavesLevel(Number(settings.oceanWavesLevel))
+        setIfChanged(setOceanWavesLevel, 'oceanWavesLevel', Number(settings.oceanWavesLevel))
       const oceanWavesHex = colorToHex(settings.oceanWavesColor)
-      if (oceanWavesHex) setOceanWavesColorHex(oceanWavesHex)
+      if (oceanWavesHex) setIfChanged(setOceanWavesColorHex, 'oceanWavesColorHex', oceanWavesHex)
       if (typeof settings.drawOceanEffectsInLakes === 'boolean')
-        setDrawOceanEffectsInLakes(settings.drawOceanEffectsInLakes)
+        setIfChanged(setDrawOceanEffectsInLakes, 'drawOceanEffectsInLakes', settings.drawOceanEffectsInLakes)
       const riverHex = colorToHex(settings.riverColor)
-      if (riverHex) setRiverColorHex(riverHex)
+      if (riverHex) setIfChanged(setRiverColorHex, 'riverColorHex', riverHex)
     },
 
     applyTextSettings(settings) {
+      recordCall('applyTextSettings')
       const {
         setDrawRoads,
         setDrawText,
@@ -229,23 +307,24 @@ export function createSettingsAppliers(setters) {
         setBoldBackgroundColorHex,
       } = setters
 
-      if (typeof settings.drawRoads === 'boolean') setDrawRoads(settings.drawRoads)
-      if (typeof settings.drawText === 'boolean') setDrawText(settings.drawText)
-      setTitleFontFamily(fontSpecToFamily(settings.titleFont))
-      setRegionFontFamily(fontSpecToFamily(settings.regionFont))
-      setMountainRangeFontFamily(fontSpecToFamily(settings.mountainRangeFont))
-      setOtherMountainsFontFamily(fontSpecToFamily(settings.otherMountainsFont))
-      setCitiesFontFamily(fontSpecToFamily(settings.citiesFont))
-      setRiverFontFamily(fontSpecToFamily(settings.riverFont))
+      if (typeof settings.drawRoads === 'boolean') setIfChanged(setDrawRoads, 'drawRoads', settings.drawRoads)
+      if (typeof settings.drawText === 'boolean') setIfChanged(setDrawText, 'drawText', settings.drawText)
+      setIfChanged(setTitleFontFamily, 'titleFontFamily', fontSpecToFamily(settings.titleFont))
+      setIfChanged(setRegionFontFamily, 'regionFontFamily', fontSpecToFamily(settings.regionFont))
+      setIfChanged(setMountainRangeFontFamily, 'mountainRangeFontFamily', fontSpecToFamily(settings.mountainRangeFont))
+      setIfChanged(setOtherMountainsFontFamily, 'otherMountainsFontFamily', fontSpecToFamily(settings.otherMountainsFont))
+      setIfChanged(setCitiesFontFamily, 'citiesFontFamily', fontSpecToFamily(settings.citiesFont))
+      setIfChanged(setRiverFontFamily, 'riverFontFamily', fontSpecToFamily(settings.riverFont))
       const textHex = colorToHex(settings.textColor)
-      if (textHex) setTextColorHex(textHex)
+      if (textHex) setIfChanged(setTextColorHex, 'textColorHex', textHex)
       if (typeof settings.drawBoldBackground === 'boolean')
-        setDrawBoldBackground(settings.drawBoldBackground)
+        setIfChanged(setDrawBoldBackground, 'drawBoldBackground', settings.drawBoldBackground)
       const boldBackgroundHex = colorToHex(settings.boldBackgroundColor)
-      if (boldBackgroundHex) setBoldBackgroundColorHex(boldBackgroundHex)
+      if (boldBackgroundHex) setIfChanged(setBoldBackgroundColorHex, 'boldBackgroundColorHex', boldBackgroundHex)
     },
 
     applyRoadAndScaleSettings(settings) {
+      recordCall('applyRoadAndScaleSettings')
       const {
         setDrawRoads,
         setRoadStyle,
@@ -258,25 +337,83 @@ export function createSettingsAppliers(setters) {
         setCitySize,
       } = setters
 
-      if (typeof settings.drawRoads === 'boolean') setDrawRoads(settings.drawRoads)
+      if (typeof settings.drawRoads === 'boolean') setIfChanged(setDrawRoads, 'drawRoads', settings.drawRoads)
 
       // roadStyle may be an object {type, width} or a string
       if (typeof settings.roadStyle === 'string' && settings.roadStyle) {
-        setRoadStyle(settings.roadStyle)
+        setIfChanged(setRoadStyle, 'roadStyle', settings.roadStyle)
       } else if (settings.roadStyle && typeof settings.roadStyle === 'object') {
-        if (typeof settings.roadStyle.type === 'string') setRoadStyle(settings.roadStyle.type)
-        if (Number.isFinite(Number(settings.roadStyle.width))) setRoadWidth(Number(settings.roadStyle.width))
+        if (typeof settings.roadStyle.type === 'string') setIfChanged(setRoadStyle, 'roadStyle', settings.roadStyle.type)
+        if (Number.isFinite(Number(settings.roadStyle.width))) setIfChanged(setRoadWidth, 'roadWidth', Number(settings.roadStyle.width))
       }
 
-      if (Number.isFinite(Number(settings.roadWidth))) setRoadWidth(Number(settings.roadWidth))
+      if (Number.isFinite(Number(settings.roadWidth))) setIfChanged(setRoadWidth, 'roadWidth', Number(settings.roadWidth))
       const roadHex = colorToHex(settings.roadColor)
-      if (roadHex) setRoadColorHex(roadHex)
+      if (roadHex) setIfChanged(setRoadColorHex, 'roadColorHex', roadHex)
 
-      if (Number.isFinite(Number(settings.mountainScale))) setMountainSize(Number(settings.mountainScale))
-      if (Number.isFinite(Number(settings.hillScale))) setHillSize(Number(settings.hillScale))
-      if (Number.isFinite(Number(settings.duneScale))) setDuneSize(Number(settings.duneScale))
-      if (Number.isFinite(Number(settings.treeHeightScale))) setTreeHeight(Number(settings.treeHeightScale))
-      if (Number.isFinite(Number(settings.cityScale))) setCitySize(Number(settings.cityScale))
+      // Convert MapSettings scales back into slider values used by the UI.
+      const sliderValueFor1Scale = 5
+      const scaleMax = 3.0
+      const scaleMin = 0.5
+      const minScaleSliderValue = 1
+      const maxScaleSliderValue = 15
+
+      function inverseGetSliderFromScale(scale) {
+        const s = Number(scale)
+        if (!Number.isFinite(s)) return undefined
+        const v1Slope = (sliderValueFor1Scale - minScaleSliderValue) / (1.0 - scaleMin)
+        const v1YIntercept = sliderValueFor1Scale - v1Slope
+        const v2Slope = (maxScaleSliderValue - sliderValueFor1Scale) / (scaleMax - 1.0)
+        const v2YIntercept = sliderValueFor1Scale - v2Slope * 1.0
+        let v
+        if (s <= 1.0) {
+          v = v1Slope * s + v1YIntercept
+        } else {
+          v = v2Slope * s + v2YIntercept
+        }
+        v = Math.round(v)
+        if (v < minScaleSliderValue) v = minScaleSliderValue
+        if (v > maxScaleSliderValue) v = maxScaleSliderValue
+        return v
+      }
+
+      function inverseGetTreeHeightSliderFromScale(scale) {
+        const s = Number(scale)
+        if (!Number.isFinite(s)) return undefined
+        // forward: treeScale = 0.1 + v * 0.05 -> inverse: v = (scale - 0.1)/0.05
+        let v = (s - 0.1) / 0.05
+        v = Math.round(v)
+        if (v < 1) v = 1
+        if (v > 15) v = 15
+        return v
+      }
+
+      const ms = settings.mountainScale ?? settings.mountainSize
+      const hs = settings.hillScale ?? settings.hillSize
+      const ds = settings.duneScale ?? settings.duneSize
+      const ts = settings.treeHeightScale ?? settings.treeHeight
+      const cs = settings.cityScale ?? settings.citySize
+
+      if (Number.isFinite(Number(ms))) {
+        const v = inverseGetSliderFromScale(ms)
+        if (v !== undefined) setIfChanged(setMountainSize, 'mountainSize', v)
+      }
+      if (Number.isFinite(Number(hs))) {
+        const v = inverseGetSliderFromScale(hs)
+        if (v !== undefined) setIfChanged(setHillSize, 'hillSize', v)
+      }
+      if (Number.isFinite(Number(ds))) {
+        const v = inverseGetSliderFromScale(ds)
+        if (v !== undefined) setIfChanged(setDuneSize, 'duneSize', v)
+      }
+      if (Number.isFinite(Number(ts))) {
+        const v = inverseGetTreeHeightSliderFromScale(ts)
+        if (v !== undefined) setIfChanged(setTreeHeight, 'treeHeight', v)
+      }
+      if (Number.isFinite(Number(cs))) {
+        const v = inverseGetSliderFromScale(cs)
+        if (v !== undefined) setIfChanged(setCitySize, 'citySize', v)
+      }
     },
   }
 }

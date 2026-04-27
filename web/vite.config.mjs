@@ -21,8 +21,7 @@ export default defineConfig(({ mode, command }) => {
   // remove duplicates and falsy values
   allowedHosts = allowedHosts.filter(Boolean).filter((v, i, a) => a.indexOf(v) === i)
 
-  // Debug: show computed hosts and HMR settings when the server starts
-  console.log('Vite config: allowedHosts=', allowedHosts, 'hmrHost=', hmrHost, 'hmrPort=', hmrPort, 'hmrProtocol=', hmrProtocol)
+  // Computed hosts and HMR settings (no debug output)
 
   return {
     server: {

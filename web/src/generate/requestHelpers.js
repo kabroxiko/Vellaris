@@ -1,47 +1,6 @@
-export function requestWantsNortContent(requestOptions) {
-  if (!requestOptions?.body) return false
-  if (typeof requestOptions.body === 'string') {
-    try {
-      const parsed = JSON.parse(requestOptions.body)
-      return !!parsed.returnNortContent
-    } catch {
-      return false
-    }
-  }
-  if (requestOptions.body instanceof FormData) {
-    return requestOptions.body.get('returnNortContent') === 'true'
-  }
-  return false
-}
-
-export function cloneRequestWithoutNortContent(requestOptions) {
-  if (!requestOptions?.body) return null
-  if (typeof requestOptions.body === 'string') {
-    try {
-      const parsed = JSON.parse(requestOptions.body)
-      delete parsed.returnNortContent
-      return {
-        ...requestOptions,
-        body: JSON.stringify(parsed),
-      }
-    } catch {
-      return null
-    }
-  }
-  if (requestOptions.body instanceof FormData) {
-    const form = new FormData()
-    for (const [key, value] of requestOptions.body.entries()) {
-      if (key !== 'returnNortContent') {
-        form.append(key, value)
-      }
-    }
-    return {
-      ...requestOptions,
-      body: form,
-    }
-  }
-  return null
-}
+// Legacy compatibility helpers trimmed: server no longer supports the
+// merged-settings return flag. Keep only functions needed for nortContent
+// sanitization and form-building.
 
 function appendOptionalField(form, key, value) {
   if (value !== undefined && value !== null && value !== '') {
@@ -57,7 +16,6 @@ function buildFormDataFromParsedJson(parsed) {
   appendOptionalField(form, 'height', parsed.height)
   appendOptionalField(form, 'seed', parsed.seed)
   if (parsed.saveNort) form.append('saveNort', 'true')
-  form.append('returnImageBytes', 'true')
   return form
 }
 
@@ -69,7 +27,6 @@ function buildFormDataFromFormData(original) {
       form.append(key, value)
     }
   }
-  form.append('returnImageBytes', 'true')
   return form
 }
 
@@ -148,7 +105,7 @@ export function buildSanitizedNortContentRequest(requestOptions) {
     const parsed = JSON.parse(requestOptions.body)
     if (!parsed.nortContent) return null
     parsed.nortContent = sanitizeNortContentForServer(parsed.nortContent)
-    delete parsed.returnNortContent
+    // The merged-settings return flag is no longer used by the server; no-op.
     return {
       ...requestOptions,
       body: JSON.stringify(parsed),

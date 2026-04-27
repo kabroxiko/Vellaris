@@ -35,6 +35,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.zip.GZIPOutputStream;
 import java.time.Instant;
 import java.awt.image.BufferedImage;
 import java.util.Base64;
@@ -68,6 +69,7 @@ public class MapApiServer
 {
 
 	private static final Gson gson = new Gson();
+	private static final boolean API_DEBUG = true;
 	private static final String CONTENT_TYPE_JSON = "application/json";
 	private static final String CONTENT_TYPE_PNG = "image/png";
 	private static final String PNG_FORMAT_NAME = "png";
@@ -99,21 +101,21 @@ public class MapApiServer
 		});
 		before((req, res) -> res.header("Access-Control-Allow-Origin", "*"));
 
-		get("/health", (req, res) -> "ok");
+		get("/api/health", (req, res) -> "ok");
 
-		get("/art-packs", (req, res) ->
+		get("/api/art-packs", (req, res) ->
 		{
 			res.type(CONTENT_TYPE_JSON);
 			return gson.toJson(Assets.listArtPacks(false));
 		});
 
-		get("/books", (req, res) ->
+		get("/api/books", (req, res) ->
 		{
 			res.type(CONTENT_TYPE_JSON);
 			return gson.toJson(SettingsGenerator.getAllBooks());
 		});
 
-		get("/city-icon-types", (req, res) ->
+		get("/api/city-icon-types", (req, res) ->
 		{
 			res.type(CONTENT_TYPE_JSON);
 			String artPack = req.queryParams(ART_PACK);
@@ -124,7 +126,7 @@ public class MapApiServer
 			return gson.toJson(types);
 		});
 
-		get("/textures", (req, res) ->
+		get("/api/textures", (req, res) ->
 		{
 			res.type(CONTENT_TYPE_JSON);
 			List<NamedResource> textures = Assets.listBackgroundTexturesForAllArtPacks(null);
@@ -139,7 +141,7 @@ public class MapApiServer
 			return gson.toJson(result);
 		});
 
-		get("/border-types", (req, res) ->
+		get("/api/border-types", (req, res) ->
 		{
 			res.type(CONTENT_TYPE_JSON);
 			List<NamedResource> borderTypes = Assets.listAllBorderTypes(null);
@@ -154,7 +156,7 @@ public class MapApiServer
 			return gson.toJson(result);
 		});
 
-		get("/ui-options", (req, res) ->
+		get("/api/ui-options", (req, res) ->
 		{
 			res.type(CONTENT_TYPE_JSON);
 			String requestedLanguage = req.queryParams("language");
@@ -170,9 +172,9 @@ public class MapApiServer
 			}
 		});
 
-		post("/generate", MapApiServer::handleGenerate);
-		post("/resolve-random-settings", MapApiServer::handleResolveRandomSettings);
-		post("/background-preview", MapApiServer::handleBackgroundPreview);
+		post("/api/generate", MapApiServer::handleGenerate);
+		post("/api/resolve-random-settings", MapApiServer::handleResolveRandomSettings);
+		post("/api/background-preview", MapApiServer::handleBackgroundPreview);
 
 		exception(Exception.class, (exception, req, res) ->
 		{
@@ -183,7 +185,7 @@ public class MapApiServer
 		});
 
 		init();
-		Logger.println("Map API server started on port 8080");
+		if (API_DEBUG) Logger.println("Map API server started on port 8080");
 	}
 
 	private static String formatExceptionMessage(Exception exception)
@@ -226,33 +228,14 @@ public class MapApiServer
 			}
 
 			GenerationResult generation = generateMap(ctx.settings, cfg);
-			if (generation.image == null)
-			{
-				res.status(500);
-				return gson.toJson(new ApiResponse(false, generation.errorMessage, null, null));
-			}
-			Image img = generation.image;
-
-			if (cfg.returnImageBytes != null && cfg.returnImageBytes)
-			{
-				return returnImageResponse(img, ctx.settings, ctx.tempNortPath, cfg, res);
-			}
-
-			String outPath = determineOutputPath(cfg, res, img);
-			if (outPath == null)
-			{
-				return gson.toJson(new ApiResponse(false, "Failed to determine output path", null, null));
-			}
-
-			if (!writeImageToFile(img, outPath, res))
-			{
-				return gson.toJson(new ApiResponse(false, "Failed to write image", null, null));
-			}
-
-			String nortSavedPath = saveNortIfRequested(ctx.settings, outPath, ctx.providedNortContent, cfg, ctx.tempNortPath, res);
-
-			res.status(200);
-			return gson.toJson(new ApiResponse(true, "OK", outPath, nortSavedPath));
+				if (generation.image == null)
+				{
+					res.status(500);
+					return gson.toJson(new ApiResponse(false, generation.errorMessage, null, null));
+				}
+				Image img = generation.image;
+				// Always return image bytes for /generate requests.
+				return returnImageResponse(req, img, ctx.settings, ctx.tempNortPath, cfg, res);
 		}
 		finally
 		{
@@ -306,12 +289,31 @@ public class MapApiServer
 				String hex = colorToHex(ctx.settings.oceanShadingColor);
 				uiDefaults.put("oceanShadingColor", hex);
 				uiDefaults.put("oceanShadingColorHex", hex);
+				// expose transparency percent for the UI (100 = fully transparent)
+				int oceanAlpha = ctx.settings.oceanShadingColor.getAlpha();
+				int oceanOpacityPercent = Math.round((oceanAlpha / 255.0f) * 100.0f);
+				uiDefaults.put("oceanShadingAlpha", 100 - oceanOpacityPercent);
 			}
 			if (ctx.settings.coastShadingColor != null)
 			{
 				String hex = colorToHex(ctx.settings.coastShadingColor);
 				uiDefaults.put("coastShadingColor", hex);
 				uiDefaults.put("coastShadingColorHex", hex);
+				int coastAlpha = ctx.settings.coastShadingColor.getAlpha();
+				int coastOpacityPercent = Math.round((coastAlpha / 255.0f) * 100.0f);
+				uiDefaults.put("coastShadingAlpha", 100 - coastOpacityPercent);
+			}
+
+			// Focused API debug: log derived hex + transparency for coast/ocean shading
+			if (API_DEBUG) {
+				try {
+					String oHex = ctx.settings.oceanShadingColor != null ? colorToHex(ctx.settings.oceanShadingColor) : "<none>";
+					String cHex = ctx.settings.coastShadingColor != null ? colorToHex(ctx.settings.coastShadingColor) : "<none>";
+					int oAlpha = ctx.settings.oceanShadingColor != null ? ctx.settings.oceanShadingColor.getAlpha() : -1;
+					int cAlpha = ctx.settings.coastShadingColor != null ? ctx.settings.coastShadingColor.getAlpha() : -1;
+					Logger.println("Resolved UI defaults - oceanShadingColorHex=" + oHex + " oceanAlpha=" + oAlpha
+						+ " coastShadingColorHex=" + cHex + " coastAlpha=" + cAlpha);
+				} catch (Exception ignore) {}
 			}
 
 			// Concentric waves / effects flags
@@ -324,10 +326,24 @@ public class MapApiServer
 			uiDefaults.put("cityScale", ctx.settings.cityScale);
 			uiDefaults.put("mountainScale", ctx.settings.mountainScale);
 			uiDefaults.put("duneScale", ctx.settings.duneScale);
+			// Attempt to run a lightweight generation to populate MapEdits (text/icons/region/edge edits).
+			// This is expensive but ensures the `.nort` returned after resolving random settings
+			// contains the generated `edits` structure rather than empty arrays.
+			try {
+				GenerationResult gen = generateMap(ctx.settings, new Config());
+				if (gen != null && gen.image != null) {
+					try { gen.image.close(); } catch (Exception ignore) {}
+					// Re-serialize settings now that edits have been populated by generation
+					nortContent = ctx.settings.toJsonString();
+				}
+			} catch (Exception genEx) {
+				Logger.println("resolveRandomOnlyResponse generation failed: " + genEx);
+				// Fall back to returning the serialized settings without edits populated
+			}
 
 			res.type(CONTENT_TYPE_JSON);
 			res.status(200);
-			return gson.toJson(new ResolvedSettingsResponse(settings, uiDefaults));
+			return nortContent;
 		}
 		catch (Exception e)
 		{
@@ -664,6 +680,7 @@ public class MapApiServer
 
 	private static void logHeaders(Request req)
 	{
+		if (!API_DEBUG) return;
 		try
 		{
 			String ct = req.contentType();
@@ -675,7 +692,7 @@ public class MapApiServer
 		}
 		catch (Exception e)
 		{
-			Logger.println("handleGenerate: failed to log headers: " + e.getMessage());
+			if (API_DEBUG) Logger.println("handleGenerate: failed to log headers: " + e.getMessage());
 		}
 	}
 
@@ -736,8 +753,6 @@ public class MapApiServer
 		String heightStr = param(req, "height");
 		String seedStr = param(req, "seed");
 		String saveNortStr = param(req, "saveNort");
-		String returnBytesStr = param(req, "returnImageBytes");
-		String returnNortContentStr = param(req, "returnNortContent");
 
 		if (widthStr != null)
 			cfg.width = Integer.valueOf(widthStr);
@@ -749,10 +764,9 @@ public class MapApiServer
 		cfg.mapLanguage = param(req, "mapLanguage");
 		if (saveNortStr != null)
 			cfg.saveNort = Boolean.valueOf(saveNortStr);
-		if (returnBytesStr != null)
-			cfg.returnImageBytes = Boolean.valueOf(returnBytesStr);
-		if (returnNortContentStr != null)
-			cfg.returnNortContent = Boolean.valueOf(returnNortContentStr);
+		// The merged-settings return flag is no longer supported. The server
+		// always returns image bytes for generate requests; clients should
+		// not request merged .nort content from /generate.
 	}
 
 	private static String param(Request req, String name)
@@ -824,6 +838,9 @@ public class MapApiServer
 		String coastAlpha = param(req, "coastShadingAlpha");
 		if (coastAlpha != null)
 			cfg.coastShadingAlpha = Integer.valueOf(coastAlpha);
+		String oceanAlpha = param(req, "oceanShadingAlpha");
+		if (oceanAlpha != null)
+			cfg.oceanShadingAlpha = Integer.valueOf(oceanAlpha);
 
 		String oceanShade = param(req, "oceanShadingLevel");
 		if (oceanShade != null)
@@ -1198,18 +1215,16 @@ public class MapApiServer
 
 	private static final int MAX_BASE64_PREVIEW_DIMENSION = 1920;
 
-	private static Object returnImageResponse(Image img, MapSettings settings, Path tempNortPath, Config cfg, Response res)
+	private static Object returnImageResponse(Request req, Image img, MapSettings settings, Path tempNortPath, Config cfg, Response res)
 	{
 		try
 		{
 			BufferedImage buf = nortantis.platform.awt.AwtFactory.unwrap(img);
 
-			if (cfg.returnNortContent != null && cfg.returnNortContent)
-			{
-				return returnJsonResponse(buf, settings, cfg, res);
-			}
-
-			return returnPngResponse(res, buf);
+			// The server always returns PNG image bytes for preview/generate
+			// requests. If the client indicates support for gzip, compress
+			// the HTTP response body to reduce transfer size.
+			return returnPngResponse(req, res, buf);
 		}
 		catch (Exception e)
 		{
@@ -1320,12 +1335,34 @@ public class MapApiServer
 		}
 	}
 
-	private static Object returnPngResponse(Response res, BufferedImage buf) throws IOException
+	private static Object returnPngResponse(Request req, Response res, BufferedImage buf) throws IOException
 	{
 		res.type(CONTENT_TYPE_PNG);
 		res.status(200);
-		writeCompressedPng(buf, res.raw().getOutputStream());
-		res.raw().getOutputStream().flush();
+
+		String acceptEnc = req.headers("Accept-Encoding");
+		if (API_DEBUG) Logger.println("Accept-Encoding: " + acceptEnc);
+		// Echo the header for easier client-side debugging
+		res.header("X-Debug-Accept-Encoding", acceptEnc == null ? "" : acceptEnc);
+		boolean useGzip = acceptEnc != null && acceptEnc.toLowerCase().contains("gzip");
+
+		OutputStream out = res.raw().getOutputStream();
+		if (useGzip) {
+			// Indicate to the client that the payload is gzipped
+			res.header("Content-Encoding", "gzip");
+			GZIPOutputStream gos = new GZIPOutputStream(out, true);
+			try {
+				writeCompressedPng(buf, gos);
+				gos.finish();
+				gos.flush();
+			} finally {
+				// Do not close the underlying servlet output stream directly
+				// (finish above writes gzip footer). Let the container manage it.
+			}
+		} else {
+			writeCompressedPng(buf, out);
+		}
+		out.flush();
 		return res.raw();
 	}
 
@@ -1434,8 +1471,6 @@ public class MapApiServer
 		String language;
 		String mapLanguage;
 		String out;
-		Boolean returnImageBytes;
-		Boolean returnNortContent;
 		Boolean saveNort;
 		// Random map generation parameters
 		String artPack;
@@ -1476,6 +1511,7 @@ public class MapApiServer
 		Integer coastShadingAlpha;
 		Integer oceanShadingLevel;
 		String oceanShadingColorHex;
+		Integer oceanShadingAlpha;
 		String oceanWavesType;
 		Integer oceanWavesLevel;
 		String oceanWavesColorHex;
@@ -1760,7 +1796,19 @@ public class MapApiServer
 		}
 		if (cfg.oceanShadingColorHex != null && !cfg.oceanShadingColorHex.isEmpty())
 		{
-			settings.oceanShadingColor = hexToColor(cfg.oceanShadingColorHex);
+			if (cfg.oceanShadingAlpha != null)
+			{
+				String h = cfg.oceanShadingColorHex.startsWith("#") ? cfg.oceanShadingColorHex.substring(1) : cfg.oceanShadingColorHex;
+				int r = Integer.parseInt(h.substring(0, 2), 16);
+				int g = Integer.parseInt(h.substring(2, 4), 16);
+				int b = Integer.parseInt(h.substring(4, 6), 16);
+				int alpha = (int) ((1.0 - cfg.oceanShadingAlpha / 100.0) * 255);
+				settings.oceanShadingColor = Color.create(r, g, b, alpha);
+			}
+			else
+			{
+				settings.oceanShadingColor = hexToColor(cfg.oceanShadingColorHex);
+			}
 		}
 
 		if (cfg.oceanWavesType != null && !cfg.oceanWavesType.isEmpty())
@@ -1919,11 +1967,13 @@ public class MapApiServer
 	{
 		Map<String, Object> settings;
 		Map<String, Object> uiDefaults;
+		String nortContent;
 
-		ResolvedSettingsResponse(Map<String, Object> settings, Map<String, Object> uiDefaults)
+		ResolvedSettingsResponse(Map<String, Object> settings, Map<String, Object> uiDefaults, String nortContent)
 		{
 			this.settings = settings;
 			this.uiDefaults = uiDefaults;
+			this.nortContent = nortContent;
 		}
 	}
 

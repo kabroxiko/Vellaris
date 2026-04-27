@@ -1,10 +1,5 @@
 import { base64ToBlob } from './utils'
-import {
-  requestWantsNortContent,
-  cloneRequestWithoutNortContent,
-  buildLegacyCompatibleRequest,
-  buildSanitizedNortContentRequest,
-} from './requestHelpers'
+import { buildLegacyCompatibleRequest, buildSanitizedNortContentRequest } from './requestHelpers'
 
 export async function readResponseBytesWithProgress(res, onDownloadingStarted) {
   const reader = res.body?.getReader?.()
@@ -36,8 +31,52 @@ export async function readResponseBytesWithProgress(res, onDownloadingStarted) {
 }
 
 export function downloadNortContent(nortContent, baseName) {
-  const filename = `${baseName || 'generated-settings'}.nort`
-  const blob = new Blob([nortContent], { type: 'application/json;charset=utf-8' })
+  let pretty = null
+  let filenameBase = baseName || 'generated-settings'
+  try {
+    let parsed = null
+    if (typeof nortContent === 'string') {
+      parsed = JSON.parse(nortContent)
+    } else {
+      parsed = nortContent
+    }
+    pretty = JSON.stringify(parsed, null, 2)
+    // try to derive a title from edits.textEdits (newer .nort) or edits.text (legacy)
+    if (!baseName && parsed && parsed.edits) {
+      const textList = Array.isArray(parsed.edits.textEdits)
+        ? parsed.edits.textEdits
+        : Array.isArray(parsed.edits.text)
+        ? parsed.edits.text
+        : null
+      if (Array.isArray(textList)) {
+        for (const t of textList) {
+          const tType = t && (t.type || t.typeName || t.Type)
+          const tText = t && (t.text || t.value || t.Text)
+          if (tType === 'Title' && typeof tText === 'string' && tText.trim()) {
+            filenameBase = tText.trim()
+            break
+          }
+        }
+      }
+    }
+    // If the caller didn't provide a baseName and we couldn't find a Title
+    // in the edits, fail early instead of silently falling back to a
+    // generic filename. This enforces the requirement that downloadable
+    // .nort files be named from the map Title.
+    if (!baseName && (filenameBase === 'generated-settings' || !filenameBase)) {
+      throw new Error('Cannot derive filename: edits.textEdits does not contain a Title entry')
+    }
+  } catch (e) {
+    // fall back to raw content if parsing fails
+  }
+  if (pretty === null) {
+    // ensure we still write something sensible
+    pretty = typeof nortContent === 'string' ? nortContent : JSON.stringify(nortContent)
+  }
+  // sanitize filenameBase
+  filenameBase = String(filenameBase).trim().replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, '-') || 'generated-settings'
+  const filename = `${filenameBase}.nort`
+  const blob = new Blob([pretty], { type: 'application/json;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const anchor = document.createElement('a')
   anchor.href = url
@@ -72,7 +111,17 @@ export function handleSuccess(blob, options) {
       nortContent,
     })
   } else if (source) {
-    setCurrentSource(source)
+    // Preserve existing `nortContent` (e.g., resolved random settings)
+    // when the source is a random-origin source to avoid disabling
+    // the Customize panel after a generate completes.
+    setCurrentSource((prev) => {
+      try {
+        if (source?.originType === 'random' && prev && prev.nortContent) return prev
+      } catch (e) {
+        // ignore
+      }
+      return source
+    })
   }
   try {
     globalThis.showToast?.('Map generated', { type: 'success', duration: 3000 })
@@ -89,16 +138,6 @@ export async function retryWithCompatibilityFallbacks(
   apiBase
 ) {
   if (outputMode === 'nort-only') return res
-  if (!res.ok && res.status >= 500 && requestWantsNortContent(requestOptions)) {
-    const fallbackRequestOptions = cloneRequestWithoutNortContent(requestOptions)
-    if (fallbackRequestOptions) {
-      console.warn(
-        'Primary /generate failed with returnNortContent; retrying without it for compatibility.'
-      )
-      showProgressToast('Retrying generation with compatibility mode...')
-      res = await fetch(`${apiBase}/generate`, fallbackRequestOptions)
-    }
-  }
   if (!res.ok && res.status >= 500) {
     const legacyRequestOptions = buildLegacyCompatibleRequest(requestOptions)
     if (legacyRequestOptions) {
@@ -145,7 +184,12 @@ export async function processGenerateResponse(bytes, contentType, options) {
     return
   }
   if (!data.nortContent) throw new Error('Server did not return settings content for download.')
-  downloadNortContent(data.nortContent, baseName)
+  try {
+    downloadNortContent(data.nortContent, baseName)
+  } catch (e) {
+    try { globalThis.showToast?.(e.message || 'Failed to download settings', { type: 'error', duration: 5000 }) } catch (err) {}
+    throw e
+  }
   setCurrentSource({
     type: 'nort-content',
     name: source?.name || fileName || 'Generated settings',

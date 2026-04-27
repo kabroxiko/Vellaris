@@ -14,6 +14,11 @@
     "react": "18.2.0",
     "react-dom": "18.2.0"
   },
+  "dependencies": {
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "react-color": "^2.19.3"
+  },
   "devDependencies": {
     "eslint-plugin-react-hooks": "^7.1.1",
     "prettier": "^3.8.3",

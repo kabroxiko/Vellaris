@@ -2,7 +2,7 @@ import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import PropTypes from 'prop-types'
 import CustomizeSettingsSection from './generate/CustomizeSettingsSection'
 import RandomSettingsSection from './generate/RandomSettingsSection'
-import { base64ToBlob } from './generate/utils'
+import { base64ToBlob, formatColorString, colorToHex, colorToAlphaPercent } from './generate/utils'
 import { selectCityIconType, fetchJson, handleResponseError } from './generate/helpers'
 import { createSettingsAppliers } from './generate/settingsAppliers'
 import { getFrontendLabels } from './i18n/webLabels'
@@ -55,9 +55,70 @@ function loadUiOptions(language = 'en') {
   return fetchJson(`${API_BASE}/ui-options?language=${encodeURIComponent(language)}`)
 }
 
+// Log resolved-setting-applier results after React applies state updates.
+// We rely on a timestamp marker `lastApplierRunRef` to avoid spurious logs.
+function usePostApplierLogger(lastApplierRunRef, deps) {
+  const marker = lastApplierRunRef?.current
+  useEffect(() => {
+    if (!marker) return
+    // Defer to next macrotask to ensure state is stable in concurrent mode.
+    const id = setTimeout(() => {
+      try {
+        console.debug('[resolvedSettings] post-appliers',
+          'coastlineColorHex=', deps[0],
+          'coastShadingColorHex=', deps[1],
+          'coastShadingAlpha=', deps[2],
+          'oceanShadingColorHex=', deps[3],
+          'oceanShadingAlpha=', deps[4]
+        )
+      } catch (e) {}
+      // clear marker
+      if (lastApplierRunRef) lastApplierRunRef.current = 0
+    }, 0)
+    return () => clearTimeout(id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [marker, ...deps])
+}
+
 function downloadNortContent(nortContent, baseName) {
-  const filename = `${baseName || 'generated-settings'}.nort`
-  const blob = new Blob([nortContent], { type: 'application/json;charset=utf-8' })
+  let pretty = null
+  let filenameBase = baseName || 'generated-settings'
+  try {
+    let parsed = null
+    if (typeof nortContent === 'string') {
+      parsed = JSON.parse(nortContent)
+    } else {
+      parsed = nortContent
+    }
+    pretty = JSON.stringify(parsed, null, 2)
+    // Prefer edits.textEdits (newer format) then edits.text (legacy)
+    if (!baseName && parsed && parsed.edits) {
+      const textList = Array.isArray(parsed.edits.textEdits)
+        ? parsed.edits.textEdits
+        : Array.isArray(parsed.edits.text)
+        ? parsed.edits.text
+        : null
+      if (Array.isArray(textList)) {
+        for (const t of textList) {
+          const tType = t && (t.type || t.typeName || t.Type)
+          const tText = t && (t.text || t.value || t.Text)
+          if (tType === 'Title' && typeof tText === 'string' && tText.trim()) {
+            filenameBase = tText.trim()
+            break
+          }
+        }
+      }
+    }
+  } catch (e) {
+    // ignore parse errors and fall back to raw content
+  }
+  if (pretty === null) {
+    pretty = typeof nortContent === 'string' ? nortContent : JSON.stringify(nortContent)
+  }
+  // sanitize filename
+  filenameBase = String(filenameBase).trim().replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, '-') || 'generated-settings'
+  const filename = `${filenameBase}.nort`
+  const blob = new Blob([pretty], { type: 'application/json;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const anchor = document.createElement('a')
   anchor.href = url
@@ -66,6 +127,29 @@ function downloadNortContent(nortContent, baseName) {
   anchor.click()
   anchor.remove()
   URL.revokeObjectURL(url)
+}
+
+function deriveNortFilenameFromContent(nortContent) {
+  try {
+    const parsed = typeof nortContent === 'string' ? JSON.parse(nortContent) : nortContent
+    if (parsed && parsed.edits) {
+      const textList = Array.isArray(parsed.edits.textEdits)
+        ? parsed.edits.textEdits
+        : Array.isArray(parsed.edits.text)
+        ? parsed.edits.text
+        : null
+      if (Array.isArray(textList)) {
+        for (const t of textList) {
+          const tType = t && (t.type || t.typeName || t.Type)
+          const tText = t && (t.text || t.value || t.Text)
+          if (tType === 'Title' && typeof tText === 'string' && tText.trim()) {
+            return String(tText.trim()).replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, '-')
+          }
+        }
+      }
+    }
+  } catch (e) {}
+  return null
 }
 
 function appendIfSet(fd, key, value) {
@@ -195,6 +279,7 @@ export default function GenerateForm({ language = 'en' }) {
   const [coastShadingLevel, setCoastShadingLevel] = useState(40)
   const [coastShadingColorHex, setCoastShadingColorHex] = useState('#000000')
   const [coastShadingAlpha, setCoastShadingAlpha] = useState(65)
+  const [oceanShadingAlpha, setOceanShadingAlpha] = useState(0)
   const [oceanShadingLevel, setOceanShadingLevel] = useState(10)
   const [oceanShadingColorHex, setOceanShadingColorHex] = useState('#4a4a4a')
   const [oceanWavesType, setOceanWavesType] = useState('')
@@ -232,7 +317,20 @@ export default function GenerateForm({ language = 'en' }) {
   const [uiI18n, setUiI18n] = useState({ labels: {}, options: {} })
   const dropRef = useRef(null)
   const [randomOverrides, setRandomOverrides] = useState(initialRandomOverrides)
+  const lastApplierRunRef = useRef(0)
   const booksLoadedRef = useRef(false)
+  const lastUiDefaultsRef = useRef(null)
+  // In-memory canonical merged settings received from server (random/file/or generate)
+  const mergedSettingsRef = useRef(null)
+
+  // Log applied settings after appliers run (hook must be called at top-level)
+  usePostApplierLogger(lastApplierRunRef, [
+    coastlineColorHex,
+    coastShadingColorHex,
+    coastShadingAlpha,
+    oceanShadingColorHex,
+    oceanShadingAlpha,
+  ])
 
   useEffect(() => {
     localStorage.setItem(RANDOM_OVERRIDES_STORAGE_KEY, JSON.stringify(randomOverrides))
@@ -363,6 +461,7 @@ export default function GenerateForm({ language = 'en' }) {
         setCoastShadingColorHex,
         setCoastShadingAlpha,
         setOceanShadingLevel,
+        setOceanShadingAlpha,
         setOceanShadingColorHex,
         setOceanWavesType,
         setOceanWavesLevel,
@@ -388,9 +487,161 @@ export default function GenerateForm({ language = 'en' }) {
         setTextColorHex,
         setDrawBoldBackground,
         setBoldBackgroundColorHex,
+      },
+      {
+        // current values used for idempotent setter comparisons
+        finalWidth,
+        finalHeight,
+        finalSeed,
+        randomSeed,
+        artPack,
+        landShape,
+        regionCount,
+        worldSize,
+        cityIconType,
+        selectedBooks,
+        dimension,
+        backgroundType,
+        textureRef,
+        backgroundSeed,
+        drawRegionBoundaries,
+        colorizeLand,
+        colorizeOcean,
+        oceanColorHex,
+        landColorHex,
+        regionBoundaryColorHex,
+        drawBorder,
+        drawGridOverlay,
+        landColoringMethod,
+        finalLandColoringMethod,
+        borderRef,
+        borderWidth,
+        borderPosition,
+        borderColorOption,
+        borderColorHex,
+        frayedBorder,
+        frayedBorderBlurLevel,
+        frayedBorderSize,
+        frayedBorderSeed,
+        drawGrunge,
+        grungeWidth,
+        frayedBorderColorHex,
+        lineStyle,
+        coastlineWidth,
+        coastlineColorHex,
+        coastShadingLevel,
+        coastShadingColorHex,
+        coastShadingAlpha,
+        oceanShadingLevel,
+        oceanShadingAlpha,
+        oceanShadingColorHex,
+        oceanWavesType,
+        oceanWavesLevel,
+        oceanWavesColorHex,
+        drawOceanEffectsInLakes,
+        riverColorHex,
+        drawRoads,
+        roadStyle,
+        roadWidth,
+        roadColorHex,
+        mountainSize,
+        hillSize,
+        duneSize,
+        treeHeight,
+        citySize,
+        drawText,
+        titleFontFamily,
+        regionFontFamily,
+        mountainRangeFontFamily,
+        otherMountainsFontFamily,
+        citiesFontFamily,
+        riverFontFamily,
+        textColorHex,
+        drawBoldBackground,
+        boldBackgroundColorHex,
       }),
-    []
+    [
+      // Recreate appliers when any current UI value used for comparisons changes
+      finalWidth,
+      finalHeight,
+      finalSeed,
+      randomSeed,
+      artPack,
+      landShape,
+      regionCount,
+      worldSize,
+      cityIconType,
+      selectedBooks,
+      dimension,
+      backgroundType,
+      textureRef,
+      backgroundSeed,
+      drawRegionBoundaries,
+      colorizeLand,
+      colorizeOcean,
+      oceanColorHex,
+      landColorHex,
+      regionBoundaryColorHex,
+      drawBorder,
+      drawGridOverlay,
+      landColoringMethod,
+      finalLandColoringMethod,
+      borderRef,
+      borderWidth,
+      borderPosition,
+      borderColorOption,
+      borderColorHex,
+      frayedBorder,
+      frayedBorderBlurLevel,
+      frayedBorderSize,
+      frayedBorderSeed,
+      drawGrunge,
+      grungeWidth,
+      frayedBorderColorHex,
+      lineStyle,
+      coastlineWidth,
+      coastlineColorHex,
+      coastShadingLevel,
+      coastShadingColorHex,
+      coastShadingAlpha,
+      oceanShadingLevel,
+      oceanShadingAlpha,
+      oceanShadingColorHex,
+      oceanWavesType,
+      oceanWavesLevel,
+      oceanWavesColorHex,
+      drawOceanEffectsInLakes,
+      riverColorHex,
+      drawRoads,
+      roadStyle,
+      roadWidth,
+      roadColorHex,
+      mountainSize,
+      hillSize,
+      duneSize,
+      treeHeight,
+      citySize,
+      drawText,
+      titleFontFamily,
+      regionFontFamily,
+      mountainRangeFontFamily,
+      otherMountainsFontFamily,
+      citiesFontFamily,
+      riverFontFamily,
+      textColorHex,
+      drawBoldBackground,
+      boldBackgroundColorHex,
+    ]
   ) // setters from useState are stable references
+
+  // Keep a ref to the latest appliers so effects can use a stable
+  // dependency list that doesn't re-run when the applier object identity
+  // changes under React StrictMode. Update the ref whenever appliers
+  // is recreated.
+  const appliersRef = useRef(appliers)
+  useEffect(() => {
+    appliersRef.current = appliers
+  }, [appliers])
 
   useEffect(() => {
     return () => {
@@ -445,6 +696,39 @@ export default function GenerateForm({ language = 'en' }) {
       .catch(() => {})
   }, [requestLanguage, initialRandomOverrides])
 
+  // Prefetch a lightweight background preview on first page load so the
+  // Customize panel can show an image immediately. Store the blob on
+  // `window.__prefetchedBackgroundPreviewBlob` so the preview component
+  // can reuse it and avoid an extra round-trip.
+  useEffect(() => {
+    // Use a global promise to avoid React StrictMode mount/unmount
+    // causing an intermediate abort. Store the promise on window so
+    // repeated mounts reuse the same in-flight request.
+    try {
+      if (typeof window === 'undefined') return
+      if (window.__prefetchedBackgroundPreviewBlob) return
+      if (!window.__prefetchBackgroundPreviewPromise) {
+        window.__prefetchBackgroundPreviewPromise = (async () => {
+          try {
+            const payload = { previewWidth: 520, previewHeight: 170 }
+            const res = await fetch(`${API_BASE}/background-preview`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload),
+            })
+            if (!res.ok) return null
+            const blob = await res.blob()
+            try { window.__prefetchedBackgroundPreviewBlob = blob } catch (e) {}
+            return blob
+          } catch (e) {
+            return null
+          }
+        })()
+      }
+    } catch (e) {}
+    // no cleanup: global promise intentionally not aborted
+  }, [])
+
   function handleCityIconTypesLoaded(types, previousType) {
     setCityIconTypes(types)
     setCityIconType(selectCityIconType(previousType, types))
@@ -460,29 +744,28 @@ export default function GenerateForm({ language = 'en' }) {
   useEffect(() => {
     if (!currentSource?.nortContent) return
     try {
-      try { console.debug('[useEffect currentSource] parsing nortContent length=', currentSource.nortContent.length, 'name=', currentSource.name, 'originType=', currentSource.originType) } catch(e) {}
-      try {
-        const m = /"coastlineColor"\s*:\s*"([^"]+)"/.exec(currentSource.nortContent)
-        if (m) console.debug('[useEffect currentSource] nortContent coastlineColor=', m[1])
-      } catch(e) {}
-      const settings = JSON.parse(currentSource.nortContent)
+      // Parse the current source content and apply appliers. Do not perform
+      // ad-hoc, case-by-case merges here — the canonical merged settings
+      // are stored in `mergedSettingsRef` and UI helper values (hex/alpha)
+      // are derived from canonical numeric colors where appropriate.
+      let settings = JSON.parse(currentSource.nortContent)
       // mark origin so appliers can log which source triggered them
       try { settings.__applierSource = 'currentSource' } catch (e) {}
-      if (currentSource?.originType !== 'random') {
-        appliers.applyMapSizeAndSeedSettings(settings)
-      }
-      appliers.applyBackgroundTypeSettings(settings)
-      appliers.applyColorAndBoundarySettings(settings)
-      appliers.applyBorderSettings(settings)
-      appliers.applyFrayedBorderSettings(settings)
-      appliers.applyCoastlineSettings(settings)
-      appliers.applyOceanSettings(settings)
-      appliers.applyRoadAndScaleSettings(settings)
-      appliers.applyTextSettings(settings)
+      // Always apply map size and seed settings so the Random panel
+      // reflects server-resolved values (width, height, seed, worldSize, etc.).
+      try { appliersRef.current.applyMapSizeAndSeedSettings(settings) } catch (e) {}
+      appliersRef.current.applyBackgroundTypeSettings(settings)
+      appliersRef.current.applyColorAndBoundarySettings(settings)
+      appliersRef.current.applyBorderSettings(settings)
+      appliersRef.current.applyFrayedBorderSettings(settings)
+      appliersRef.current.applyCoastlineSettings(settings)
+      appliersRef.current.applyOceanSettings(settings)
+      appliersRef.current.applyRoadAndScaleSettings(settings)
+      appliersRef.current.applyTextSettings(settings)
     } catch {
       // Ignore parse failures; form keeps current values.
     }
-  }, [currentSource?.nortContent, currentSource?.originType, appliers])
+  }, [currentSource?.nortContent, currentSource?.originType])
 
   const handleFile = useCallback(
     (f) => {
@@ -502,13 +785,13 @@ export default function GenerateForm({ language = 'en' }) {
           } catch {
             throw new Error('Loaded settings file is not valid JSON.')
           }
+              try { mergedSettingsRef.current = JSON.parse(text) } catch (e) { mergedSettingsRef.current = parsedSettings }
               const settingsBlob = new Blob([JSON.stringify(parsedSettings)], {
                 type: 'application/json',
               })
               const payload = new FormData()
               payload.append('nortFile', settingsBlob, f.name || 'uploaded-settings.nort')
               appendIfSet(payload, 'language', requestLanguage)
-              payload.append('returnImageBytes', 'true')
           await runGenerate(
             {
               method: 'POST',
@@ -552,19 +835,36 @@ export default function GenerateForm({ language = 'en' }) {
       }
     })
     if (nortContent) {
-      try { console.debug('[handleSuccess] received nortContent length=', nortContent?.length, 'source=', source) } catch (e) {}
-      try {
-        const m = /"coastlineColor"\s*:\s*"([^"]+)"/.exec(nortContent)
-        if (m) console.debug('[handleSuccess] received nortContent coastlineColor=', m[1])
-      } catch (e) {}
+          // suppressed debug: handleSuccess nortContent details
       setCurrentSource({
         type: 'nort-content',
         name: source?.name || fileName || 'Generated settings',
         nortContent,
         originType: source?.type,
       })
+      try {
+        mergedSettingsRef.current = JSON.parse(nortContent)
+      } catch (e) {
+        // ignore parse failures
+      }
     } else if (source) {
-      setCurrentSource(source)
+      // Do not overwrite currentSource when server did not return merged
+      // nortContent. In particular, generating from the Customize panel
+      // should not reset custom control values by replacing the source
+      // with a bare `source` object. If the previous `currentSource` had
+      // a `nortContent` blob (and thus the UI has state derived from it),
+      // keep it.
+      setCurrentSource((prev) => {
+        try {
+          if (source?.type === 'random' && prev && prev.nortContent) return prev
+          // If the source we're about to set already contains nortContent,
+          // avoid clobbering the previous source which may have UI overrides.
+          if (source?.nortContent && prev && prev.nortContent) return prev
+        } catch (e) {
+          // ignore
+        }
+        return source
+      })
     }
     try {
       globalThis.showToast?.('Map generated', { type: 'success', duration: 3000 })
@@ -586,6 +886,11 @@ export default function GenerateForm({ language = 'en' }) {
       return
     }
     if (!data.nortContent) throw new Error('Server did not return settings content for download.')
+    try {
+      mergedSettingsRef.current = JSON.parse(data.nortContent)
+    } catch (e) {
+      // ignore parse failures
+    }
     downloadNortContent(data.nortContent, baseName)
     setCurrentSource({
       type: 'nort-content',
@@ -603,6 +908,68 @@ export default function GenerateForm({ language = 'en' }) {
 
     try {
       if (!externalToast) toast.show(outputMode === 'nort-only' ? 'Preparing settings...' : 'Generating map..')
+      // Debug: if we're sending FormData, capture and expose its entries
+      try {
+        const body = requestOptions.body
+        if (body && typeof FormData !== 'undefined' && body instanceof FormData) {
+          const entries = []
+          for (const [k, v] of body.entries()) {
+            if (v instanceof File || (typeof Blob !== 'undefined' && v instanceof Blob)) {
+              let info = { key: k, type: 'file', name: v.name || 'blob', size: v.size }
+              // reuse previously read nort text if available
+              if (k === 'nortFile' && window.__lastUploadedNort) {
+                info.snippet = window.__lastUploadedNort.slice(0, 800)
+              } else if (typeof v.text === 'function') {
+                try {
+                  const txt = await v.text()
+                  info.snippet = txt.slice(0, 800)
+                } catch (e) {
+                  info.snippet = '<unreadable>'
+                }
+              }
+              entries.push(info)
+            } else {
+              entries.push({ key: k, type: 'field', value: String(v) })
+            }
+          }
+          try { window.__lastUploadedFormData = entries } catch (e) {}
+          try { console.debug('[runGenerate] outgoing FormData', entries) } catch (e) {}
+        }
+      } catch (dbg) { console.warn('FormData debug failed', dbg) }
+      // Attempt to build a fresh merged nort payload from current UI state
+      // at the moment of POST and replace the outgoing `nortFile` with it.
+      try {
+        const body = requestOptions.body
+        if (body && typeof FormData !== 'undefined' && body instanceof FormData) {
+          try {
+            // Build merged content using the current UI state
+            const mergedResult = buildNortContentRequest()
+            const mergedFd = mergedResult.requestOptions && mergedResult.requestOptions.body
+            if (mergedFd && typeof mergedFd.get === 'function') {
+              const nf = mergedFd.get('nortFile')
+              if (nf && typeof nf.text === 'function') {
+                const mergedText = await nf.text()
+                const blob = new Blob([mergedText], { type: 'application/json' })
+                if (typeof body.delete === 'function') body.delete('nortFile')
+                body.append('nortFile', blob, 'merged-settings.nort')
+                try { console.debug('[runGenerate] replaced nortFile with freshly built merged settings') } catch (e) {}
+              }
+            }
+          } catch (e) {
+            // fallback: try using lastMergedParsedSettings if available
+            if (window.__lastMergedParsedSettings) {
+              try {
+                const mergedJson = JSON.stringify(window.__lastMergedParsedSettings)
+                const blob = new Blob([mergedJson], { type: 'application/json' })
+                if (typeof body.delete === 'function') body.delete('nortFile')
+                body.append('nortFile', blob, 'merged-settings.nort')
+                try { console.debug('[runGenerate] replaced nortFile with cached merged settings') } catch (e2) {}
+              } catch (e2) {}
+            }
+          }
+        }
+      } catch (dbg) { console.warn('runGenerate merge-replace failed', dbg) }
+
       let res = await fetch(`${API_BASE}/generate`, requestOptions)
       if (!res.ok) await handleResponseError(res)
       const contentType = res.headers.get('content-type') || ''
@@ -652,55 +1019,135 @@ export default function GenerateForm({ language = 'en' }) {
         body: JSON.stringify(resolvePayload),
       })
       if (!resolveRes.ok) await handleResponseError(resolveRes)
-      const resolveData = await resolveRes.json()
-      const resolvedSettings = resolveData.settings
+      // Read raw response text so we preserve the exact .nort serialization
+      const resolveText = await resolveRes.text()
+      let resolveData = null
+      try {
+        resolveData = JSON.parse(resolveText)
+      } catch (e) {
+        // If parsing fails, fall back to empty object
+        resolveData = {}
+      }
+      try { console.debug('[resolveRandomSettings] response (parsed)', resolveData) } catch (e) {}
+      const resolvedSettings = resolveData
+      // Compute UI-friendly defaults locally from resolved settings so
+      // form controls receive normalized values (hex colors, slider values).
+      // Do NOT mutate `resolvedSettings` because it will be uploaded back to
+      // the server for rendering and the server expects numeric color arrays.
+      let uiSettings = Object.assign({}, resolvedSettings)
+      try {
+        const ui = {}
+        if (resolvedSettings.oceanShadingColor) {
+          const hex = colorToHex(resolvedSettings.oceanShadingColor)
+          ui.oceanShadingColor = hex
+          ui.oceanShadingColorHex = hex
+          ui.oceanShadingAlpha = 100 - colorToAlphaPercent(resolvedSettings.oceanShadingColor)
+        }
+        if (resolvedSettings.coastShadingColor) {
+          const hex = colorToHex(resolvedSettings.coastShadingColor)
+          ui.coastShadingColor = hex
+          ui.coastShadingColorHex = hex
+          ui.coastShadingAlpha = 100 - colorToAlphaPercent(resolvedSettings.coastShadingColor)
+        }
+        ui.fadeConcentricWaves = resolvedSettings.fadeConcentricWaves
+        ui.brokenLinesForConcentricWaves = resolvedSettings.brokenLinesForConcentricWaves
+        ui.hillScale = resolvedSettings.hillScale
+        ui.treeHeightScale = resolvedSettings.treeHeightScale
+        ui.cityScale = resolvedSettings.cityScale
+        ui.mountainScale = resolvedSettings.mountainScale
+        ui.duneScale = resolvedSettings.duneScale
+        try { lastUiDefaultsRef.current = ui } catch (e) {}
+        const allowedUiKeys = new Set([
+          'coastShadingColorHex',
+          'coastShadingAlpha',
+          'oceanShadingColorHex',
+          'oceanShadingAlpha',
+          'fadeConcentricWaves',
+          'brokenLinesForConcentricWaves',
+          'hillScale',
+          'treeHeightScale',
+          'cityScale',
+          'mountainScale',
+          'duneScale',
+        ])
+        for (const k of Object.keys(ui)) {
+          if (allowedUiKeys.has(k) || k.endsWith('Hex') || k.endsWith('Alpha')) {
+            uiSettings[k] = ui[k]
+          }
+        }
+      } catch (e) {
+        // suppressed debug: failed to compute uiDefaults
+      }
       if (!resolvedSettings || typeof resolvedSettings !== 'object') {
         throw new Error('Server did not return resolved settings.')
       }
 
-      // Step 2: apply resolved settings to form controls
+      // Step 2: store resolved settings as current source and let the
+      // top-level effect apply appliers exactly once when `currentSource`
+      // is updated. This avoids applying appliers both here and in the
+      // effect (which would cause duplicate side-effects/logging).
+      // We still computed `uiSettings` above for potential use elsewhere,
+      // but we intentionally do NOT call appliers here.
+      // If there is no explicit uploaded file or existing nortContent, store
+      // the resolved settings as `currentSource.nortContent` so the Customize
+      // panel can be enabled and the user can edit these settings locally.
+      // Mark originType='random' so downstream logic knows these came from
+      // the random resolver (this is not the server-returned merged .nort).
       try {
-        appliers.applyMapSizeAndSeedSettings(resolvedSettings)
-        // Apply full set of appliers so the UI reflects the resolved settings
-        appliers.applyBackgroundTypeSettings(resolvedSettings)
-        appliers.applyColorAndBoundarySettings(resolvedSettings)
-        appliers.applyBorderSettings(resolvedSettings)
-        appliers.applyFrayedBorderSettings(resolvedSettings)
-        // mark origin so appliers can log which source triggered them
-        try { resolvedSettings.__applierSource = 'resolvedSettings' } catch (e) {}
-        appliers.applyCoastlineSettings(resolvedSettings)
-        appliers.applyOceanSettings(resolvedSettings)
-        appliers.applyRoadAndScaleSettings(resolvedSettings)
-        appliers.applyTextSettings(resolvedSettings)
-        if (typeof resolvedSettings.drawRegionColors === 'boolean') {
-          const method = resolvedSettings.drawRegionColors
-            ? 'ColorPoliticalRegions'
-            : 'SingleColor'
-          setLandColoringMethod(method)
-          setFinalLandColoringMethod(method)
+        if (!fileObj && !currentSource?.nortContent) {
+          // Preserve the raw server-produced .nort content when available
+          const serialized = resolveText || JSON.stringify(resolvedSettings)
+          setCurrentSource({ type: 'nort-content', name: 'Resolved settings', nortContent: serialized, originType: 'random' })
+          try { mergedSettingsRef.current = JSON.parse(serialized) } catch (e) { mergedSettingsRef.current = resolvedSettings }
         }
-      } catch {
-        // keep current form values if parse fails
+      } catch (e) {
+        // ignore failures setting current source
       }
-      // Post-apply debug: check UI state values shortly after appliers ran
-      setTimeout(() => {
-        try {
-          console.debug('[resolvedSettings] post-appliers state coastlineColorHex=', coastlineColorHex, 'coastShadingColorHex=', coastShadingColorHex)
-        } catch (e) {}
-      }, 0)
+      // Mark we just ran appliers; a useEffect will log the actual state
+      // after React commits the updates (avoid stale-closure logs).
+      try {
+        lastApplierRunRef.current = Date.now()
+      } catch (e) {}
 
       // Step 3: render map using the resolved nortContent
       toast.show('Generating map...')
-      const settingsBlob = new Blob([JSON.stringify(resolvedSettings)], {
+      // Prepare outgoing settings for upload: copy original resolved settings
+      // but ensure color fields that the UI edits (hex + alpha) are converted
+      // back into the numeric strings the backend expects ("r,g,b" or "r,g,b,a").
+      const outgoingSettings = Object.assign({}, resolvedSettings)
+      try {
+        if (coastShadingColorHex) {
+          // `coastShadingAlpha` in the UI is a transparency percent (100 = fully transparent).
+          // `formatColorString` expects an opacity percent (100 = fully opaque), so invert it.
+          const opacityPercent = 100 - Number(coastShadingAlpha || 0)
+          outgoingSettings.coastShadingColor = formatColorString(coastShadingColorHex, opacityPercent)
+        }
+      } catch (e) {
+        // fallback to resolvedSettings values if conversion fails
+      }
+
+      try {
+        if (oceanShadingColorHex) {
+          // Use UI transparency slider (100 = fully transparent) to compute opacity
+          const oceanOpacityPercent = 100 - Number(oceanShadingAlpha || 0)
+          outgoingSettings.oceanShadingColor = formatColorString(oceanShadingColorHex, oceanOpacityPercent)
+        }
+      } catch (e) {}
+
+      const settingsBlob = new Blob([JSON.stringify(outgoingSettings)], {
         type: 'application/json',
       })
       const renderFormData = new FormData()
       renderFormData.append('nortFile', settingsBlob, 'resolved-settings.nort')
       appendIfSet(renderFormData, 'language', requestLanguage)
       appendIfSet(renderFormData, 'mapLanguage', mapLanguage)
-      renderFormData.append('returnImageBytes', 'true')
-      renderFormData.append('returnNortContent', 'true')
+      // Server always returns image bytes; no flag required.
+      // For preview/generate requests triggered from "Random Map" we only
+      // want the image bytes. Avoid requesting merged .nort content which
+      // can trigger a second apply of settings and overwrite UI values.
       const source = { type: 'random', name: 'Random Map' }
+
+      
       await runGenerate(
         {
           method: 'POST',
@@ -733,18 +1180,38 @@ export default function GenerateForm({ language = 'en' }) {
     return finalLandColoringMethod || fallbackMethod || undefined
   }
 
-  function buildNortContentRequest({ forceSaveNort = false, returnNortContent = false, explicitNortContent = null } = {}) {
+  function buildNortContentRequest({ forceSaveNort = false, explicitNortContent = null } = {}) {
     let parsedSettings = null
     try {
-      const sourceContent = explicitNortContent ?? currentSource?.nortContent
-      parsedSettings = JSON.parse(sourceContent)
-    } catch {
+      if (explicitNortContent) {
+        parsedSettings = JSON.parse(explicitNortContent)
+      } else if (mergedSettingsRef && mergedSettingsRef.current) {
+        // clone the in-memory canonical settings so we can safely mutate
+        parsedSettings = JSON.parse(JSON.stringify(mergedSettingsRef.current))
+      } else {
+        const sourceContent = currentSource?.nortContent
+        parsedSettings = JSON.parse(sourceContent)
+      }
+    } catch (e) {
       throw new Error('Current settings are not valid JSON.')
     }
 
     // Merge current UI border/fringe settings into the parsed settings so
     // regenerated maps reflect changes made in the Customize panel.
     try {
+      // Handle background type flags that need to be set for server-side processing
+      if (backgroundType === 'SolidColor') {
+        parsedSettings.solidColorBackground = true
+        parsedSettings.generateBackgroundFromTexture = false
+      } else if (backgroundType === 'GeneratedFromTexture') {
+        parsedSettings.solidColorBackground = false
+        parsedSettings.generateBackgroundFromTexture = true
+      } else {
+        // FractalNoise or unknown - ensure texture flags are off
+        parsedSettings.solidColorBackground = false
+        parsedSettings.generateBackgroundFromTexture = false
+      }
+
       // Border resource (artPack|name)
       if (borderRef) {
         const parts = borderRef.split('|', 2)
@@ -768,7 +1235,7 @@ export default function GenerateForm({ language = 'en' }) {
       }
 
       if (coastlineColorHex) {
-        try { console.debug('[buildNortContentRequest] appending coastlineColorHex=', coastlineColorHex) } catch(e) {}
+        // suppressed debug: appending coastlineColorHex
       }
 
       // Frayed border / grunge
@@ -788,6 +1255,12 @@ export default function GenerateForm({ language = 'en' }) {
         } else {
           parsedSettings.frayedBorderColor = frayedBorderColorHex
         }
+      }
+      
+      // Region boundary style (merge type only; width is handled separately)
+      if (regionBoundaryStyle) {
+        if (!parsedSettings.regionBoundaryStyle || typeof parsedSettings.regionBoundaryStyle !== 'object') parsedSettings.regionBoundaryStyle = {}
+        parsedSettings.regionBoundaryStyle.type = regionBoundaryStyle
       }
 
       // Line / coastline settings
@@ -809,28 +1282,43 @@ export default function GenerateForm({ language = 'en' }) {
       if (Number.isFinite(Number(coastShadingLevel))) parsedSettings.coastShadingLevel = Number(coastShadingLevel)
       if (Number.isFinite(Number(coastShadingAlpha))) parsedSettings.coastShadingAlpha = Number(coastShadingAlpha)
       if (coastShadingColorHex) {
-        const csh = coastShadingColorHex.replace(/^#/, '')
-        if (/^[0-9a-fA-F]{6}$/.test(csh)) {
-          const csr = parseInt(csh.substring(0, 2), 16)
-          const csg = parseInt(csh.substring(2, 4), 16)
-          const csb = parseInt(csh.substring(4, 6), 16)
-          parsedSettings.coastShadingColor = `${csr},${csg},${csb}`
-        } else {
-          parsedSettings.coastShadingColor = coastShadingColorHex
+        // UI `coastShadingAlpha` is a transparency percent (100 = fully transparent).
+        // Convert to opacity percent for formatColorString (100 = fully opaque).
+        try {
+          const opacityPercent = 100 - Number(coastShadingAlpha || 0)
+          const formatted = formatColorString(coastShadingColorHex, opacityPercent)
+          if (formatted) parsedSettings.coastShadingColor = formatted
+        } catch (e) {
+          const csh = coastShadingColorHex.replace(/^#/, '')
+          if (/^[0-9a-fA-F]{6}$/.test(csh)) {
+            const csr = parseInt(csh.substring(0, 2), 16)
+            const csg = parseInt(csh.substring(2, 4), 16)
+            const csb = parseInt(csh.substring(4, 6), 16)
+            parsedSettings.coastShadingColor = `${csr},${csg},${csb}`
+          } else {
+            parsedSettings.coastShadingColor = coastShadingColorHex
+          }
         }
       }
 
       // Ocean shading / waves
       if (Number.isFinite(Number(oceanShadingLevel))) parsedSettings.oceanShadingLevel = Number(oceanShadingLevel)
+      if (Number.isFinite(Number(oceanShadingAlpha))) parsedSettings.oceanShadingAlpha = Number(oceanShadingAlpha)
       if (oceanShadingColorHex) {
-        const osh = oceanShadingColorHex.replace(/^#/, '')
-        if (/^[0-9a-fA-F]{6}$/.test(osh)) {
-          const osr = parseInt(osh.substring(0, 2), 16)
-          const osg = parseInt(osh.substring(2, 4), 16)
-          const osb = parseInt(osh.substring(4, 6), 16)
-          parsedSettings.oceanShadingColor = `${osr},${osg},${osb}`
-        } else {
-          parsedSettings.oceanShadingColor = oceanShadingColorHex
+        try {
+          const oceanOpacityPercent = 100 - Number(oceanShadingAlpha || 0)
+          const formattedOcean = formatColorString(oceanShadingColorHex, oceanOpacityPercent)
+          if (formattedOcean) parsedSettings.oceanShadingColor = formattedOcean
+        } catch (e) {
+          const osh = oceanShadingColorHex.replace(/^#/, '')
+          if (/^[0-9a-fA-F]{6}$/.test(osh)) {
+            const osr = parseInt(osh.substring(0, 2), 16)
+            const osg = parseInt(osh.substring(2, 4), 16)
+            const osb = parseInt(osh.substring(4, 6), 16)
+            parsedSettings.oceanShadingColor = `${osr},${osg},${osb}`
+          } else {
+            parsedSettings.oceanShadingColor = oceanShadingColorHex
+          }
         }
       }
       if (oceanWavesType) parsedSettings.oceanWavesType = oceanWavesType
@@ -941,67 +1429,19 @@ export default function GenerateForm({ language = 'en' }) {
         } else {
           parsedSettings.boldBackgroundColor = boldBackgroundColorHex
         }
-        // Debug: log merged visual overrides to help diagnose missing values
+        // Focused debug: only log coast/ocean shading values
         try {
-            console.debug('Merged settings before send:', {
-            // Roads
-            drawRoads: parsedSettings.drawRoads,
-            roadStyle: parsedSettings.roadStyle,
-            roadWidth: parsedSettings.roadStyle?.width ?? parsedSettings.roadWidth,
-            roadColor: parsedSettings.roadColor,
-
-            // Coast / line
-            lineStyle: parsedSettings.lineStyle,
-            coastlineWidth: parsedSettings.coastlineWidth,
-            coastlineColor: parsedSettings.coastlineColor,
-            coastShadingLevel: parsedSettings.coastShadingLevel,
+          console.debug('Merged settings - coast/ocean shading:', {
             coastShadingColor: parsedSettings.coastShadingColor,
             coastShadingAlpha: parsedSettings.coastShadingAlpha,
-
-            // Ocean
-            oceanShadingLevel: parsedSettings.oceanShadingLevel,
             oceanShadingColor: parsedSettings.oceanShadingColor,
-            oceanWavesType: parsedSettings.oceanWavesType,
-            oceanWavesLevel: parsedSettings.oceanWavesLevel,
-            oceanWavesColor: parsedSettings.oceanWavesColor,
-            drawOceanEffectsInLakes: parsedSettings.drawOceanEffectsInLakes,
-
-            // Rivers
-            riverColor: parsedSettings.riverColor,
-
-            // Terrain scales
-            mountainScale: parsedSettings.mountainScale,
-            hillScale: parsedSettings.hillScale,
-            duneScale: parsedSettings.duneScale,
-            treeHeightScale: parsedSettings.treeHeightScale,
-            cityScale: parsedSettings.cityScale,
-
-            // Text / fonts
-            drawText: parsedSettings.drawText,
-            titleFont: parsedSettings.titleFont,
-            regionFont: parsedSettings.regionFont,
-            mountainRangeFont: parsedSettings.mountainRangeFont,
-            otherMountainsFont: parsedSettings.otherMountainsFont,
-            citiesFont: parsedSettings.citiesFont,
-            riverFont: parsedSettings.riverFont,
-            textColor: parsedSettings.textColor,
-            drawBoldBackground: parsedSettings.drawBoldBackground,
-            boldBackgroundColor: parsedSettings.boldBackgroundColor,
-
-            // Frayed / grunge
-            frayedBorder: parsedSettings.frayedBorder,
-            frayedBorderBlurLevel: parsedSettings.frayedBorderBlurLevel,
-            frayedBorderSize: parsedSettings.frayedBorderSize,
-            frayedBorderSeed: parsedSettings.frayedBorderSeed,
-            drawGrunge: parsedSettings.drawGrunge,
-            grungeWidth: parsedSettings.grungeWidth,
-            frayedBorderColor: parsedSettings.frayedBorderColor,
+            oceanShadingAlpha: parsedSettings.oceanShadingAlpha,
           })
         } catch (dbg) {
           // ignore logging errors
         }
       }
-      try { console.debug('[buildNortContentRequest] parsedSettings JSON=', JSON.stringify(parsedSettings)) } catch (e) {}
+      // suppressed: parsedSettings JSON debug
     } catch (e) {
       // Ignore merge failures; fall back to original parsedSettings
     }
@@ -1012,6 +1452,17 @@ export default function GenerateForm({ language = 'en' }) {
     if (finalHeight) parsedSettings.height = Number(finalHeight)
     if (finalSeed) parsedSettings.seed = finalSeed ? Number(finalSeed) : undefined
 
+    // Expose merged settings for debugging and log key UI->merged mappings.
+    try {
+      if (typeof window !== 'undefined') {
+        window.__lastMergedParsedSettings = parsedSettings
+        console.debug('Merged settings debug', {
+          ui: { borderWidth, coastlineWidth, drawBoldBackground, hillSize },
+          merged: { borderWidth: parsedSettings.borderWidth, coastlineWidth: parsedSettings.coastlineWidth, drawBoldBackground: parsedSettings.drawBoldBackground, hillScale: parsedSettings.hillScale },
+        })
+      }
+    } catch (dbg) {}
+
     const settingsBlob = new Blob([JSON.stringify(parsedSettings)], {
       type: 'application/json',
     })
@@ -1020,10 +1471,7 @@ export default function GenerateForm({ language = 'en' }) {
     appendIfSet(payload, 'language', requestLanguage)
     appendIfSet(payload, 'mapLanguage', mapLanguage)
     if (forceSaveNort) payload.append('saveNort', 'true')
-    payload.append('returnImageBytes', 'true')
-    // Always request the server to return the merged .nort content so the frontend
-    // can stay authoritative and avoid stale-state overwrites.
-    payload.append('returnNortContent', 'true')
+    // Server always returns image bytes; no flag required.
     return {
       requestOptions: {
         method: 'POST',
@@ -1038,7 +1486,7 @@ export default function GenerateForm({ language = 'en' }) {
     }
   }
 
-  function buildFileRequest({ forceSaveNort = false, returnNortContent = false } = {}) {
+  function buildFileRequest({ forceSaveNort = false } = {}) {
     const fd = new FormData()
     fd.append('nortFile', fileObj, fileObj.name)
     if (finalWidth) fd.append('width', String(finalWidth))
@@ -1068,6 +1516,7 @@ export default function GenerateForm({ language = 'en' }) {
     appendIfSet(fd, 'coastShadingLevel', coastShadingLevel)
     appendIfSet(fd, 'coastShadingColorHex', coastShadingColorHex)
     appendIfSet(fd, 'coastShadingAlpha', coastShadingAlpha)
+    appendIfSet(fd, 'oceanShadingAlpha', oceanShadingAlpha)
     appendIfSet(fd, 'oceanShadingLevel', oceanShadingLevel)
     appendIfSet(fd, 'oceanShadingColorHex', oceanShadingColorHex)
     appendIfSet(fd, 'oceanWavesType', oceanWavesType)
@@ -1124,9 +1573,7 @@ export default function GenerateForm({ language = 'en' }) {
     appendIfSet(fd, 'otherMountainsFontFamily', otherMountainsFontFamily)
     appendIfSet(fd, 'citiesFontFamily', citiesFontFamily)
     appendIfSet(fd, 'riverFontFamily', riverFontFamily)
-    fd.append('returnImageBytes', 'true')
-    // Always request the server to return the merged .nort content.
-    fd.append('returnNortContent', 'true')
+    // Server always returns image bytes; no flag required.
     return {
       requestOptions: { method: 'POST', body: fd },
       baseName: fileName ? fileName.replace(/\.[^.]+$/, '') : undefined,
@@ -1139,15 +1586,22 @@ export default function GenerateForm({ language = 'en' }) {
     await runGenerateFromCurrentSource()
   }
 
-  async function handleGenerateFromSettingsAndSaveNort(evt) {
+  async function handleGenerateAndSaveNort(evt) {
     evt.preventDefault()
-    if (currentSource?.nortContent) {
-      const baseName = currentSource.name || 'generated-settings'
-      downloadNortContent(currentSource.nortContent, baseName)
+    // Download in-memory merged settings directly without calling buildNortContentRequest.
+    try {
+      const mergedSettings = mergedSettingsRef.current
+      if (!mergedSettings) {
+        throw new Error('No merged settings available to download.')
+      }
+      const serialized = JSON.stringify(mergedSettings, null, 2)
+      const derived = deriveNortFilenameFromContent(serialized)
+      const baseName = derived || (currentSource?.name || 'generated-settings')
+      downloadNortContent(serialized, baseName)
       globalThis.showToast?.('Settings file downloaded', { type: 'success', duration: 3000 })
-      return
+    } catch (e) {
+      globalThis.showToast?.(e.message || 'Cannot download merged settings. Open the Customize panel and save settings locally first.', { type: 'warning', duration: 6000 })
     }
-    await runGenerateFromCurrentSource({ returnNortContent: true }, 'nort-only')
   }
 
   async function runGenerateFromCurrentSource(requestBehavior = null, outputMode = 'preview') {
@@ -1281,6 +1735,7 @@ export default function GenerateForm({ language = 'en' }) {
           coastShadingLevel,
           coastShadingColorHex,
           coastShadingAlpha,
+          oceanShadingAlpha,
           oceanShadingLevel,
           oceanShadingColorHex,
           oceanWavesType,
@@ -1350,6 +1805,7 @@ export default function GenerateForm({ language = 'en' }) {
           setCoastShadingLevel,
           setCoastShadingColorHex,
           setCoastShadingAlpha,
+          setOceanShadingAlpha,
           setOceanShadingLevel,
           setOceanShadingColorHex,
           setOceanWavesType,
@@ -1381,7 +1837,7 @@ export default function GenerateForm({ language = 'en' }) {
           setDrawBoldBackground,
           setBoldBackgroundColorHex,
           handleGenerateFromSettings,
-          handleGenerateAndSaveNort: handleGenerateFromSettingsAndSaveNort,
+          handleGenerateAndSaveNort,
           openPreviewModal,
           handleDownloadMap,
         }}
