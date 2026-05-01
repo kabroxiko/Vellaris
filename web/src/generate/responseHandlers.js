@@ -1,5 +1,4 @@
 import { base64ToBlob } from './utils'
-import { buildLegacyCompatibleRequest, buildSanitizedNortContentRequest } from './requestHelpers'
 
 export async function readResponseBytesWithProgress(res, onDownloadingStarted) {
   const reader = res.body?.getReader?.()
@@ -130,32 +129,7 @@ export function handleSuccess(blob, options) {
   }
 }
 
-export async function retryWithCompatibilityFallbacks(
-  res,
-  requestOptions,
-  outputMode,
-  showProgressToast,
-  apiBase
-) {
-  if (outputMode === 'nort-only') return res
-  if (!res.ok && res.status >= 500) {
-    const legacyRequestOptions = buildLegacyCompatibleRequest(requestOptions)
-    if (legacyRequestOptions) {
-      console.warn('Compatibility retry: using legacy-safe /generate request.')
-      showProgressToast('Retrying generation with legacy compatibility...')
-      res = await fetch(`${apiBase}/generate`, legacyRequestOptions)
-    }
-  }
-  if (!res.ok && res.status >= 500) {
-    const sanitizedNortRequestOptions = buildSanitizedNortContentRequest(requestOptions)
-    if (sanitizedNortRequestOptions) {
-      console.warn('Compatibility retry: sanitizing custom image references in nortContent.')
-      showProgressToast('Retrying generation after sanitizing settings...')
-      res = await fetch(`${apiBase}/generate`, sanitizedNortRequestOptions)
-    }
-  }
-  return res
-}
+// Compatibility fallbacks removed: server and client should fail-fast on errors.
 
 export async function processGenerateResponse(bytes, contentType, options) {
   const { outputMode, baseName, source, fileName, setPreview, setCurrentSource } = options

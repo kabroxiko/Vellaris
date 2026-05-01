@@ -5,25 +5,16 @@ const esLabels = {
   'ui.title': 'Crear o cargar configuracion',
   'ui.subtitle':
     'Empieza desde una configuracion aleatoria o carga un archivo de configuracion.',
-  'ui.dimension': 'Relacion de aspecto',
-  'ui.worldSize': 'Tamano del mundo',
-  'ui.landShape': 'Forma de la tierra',
-  'ui.regionCount': 'Numero de regiones',
-  'ui.artPack': 'Paquete de arte',
-  'ui.cityIconType': 'Tipo de icono de ciudad',
-  'ui.cityFrequency': 'Frecuencia de ciudades',
-  'ui.books.legend': 'Libros para generar texto',
-  'ui.books.checkAll': 'Marcar todo',
-  'ui.books.uncheckAll': 'Desmarcar todo',
   'ui.seed': 'Semilla (opcional)',
   'ui.seed.placeholder': 'ej. 12345',
   'ui.upload.aria': 'Subir o soltar archivo de configuracion',
-  'ui.upload.chooseFile': 'Elegir archivo',
+  
   'ui.upload.loadedPrefix': 'Cargado',
   'ui.upload.hint': 'Arrastra y suelta un archivo de configuracion aqui',
-  'ui.select.random': 'Aleatorio',
+  
   'ui.section.or': 'o',
   'ui.section.then': 'luego',
+  'ui.preview.empty': 'Vista previa no disponible',
   'ui.title.customize': 'Personalizar mapa',
   'ui.subtitle.customize': 'Personaliza la configuracion actual y genera un mapa actualizado.',
   'ui.noSource': 'Primero establece un .nort o genera un mapa',
@@ -35,14 +26,6 @@ const esLabels = {
   'ui.font.keepCurrent': 'Mantener actual',
   'ui.texture.keepCurrent': 'Mantener textura actual',
   'ui.texture.noneAvailable': 'No hay texturas disponibles',
-  
-  'ui.width.override': 'Anular ancho',
-  'ui.height.override': 'Anular alto',
-  'ui.preview.open': 'Abrir vista previa del mapa',
-  'ui.preview.empty': 'La vista previa del mapa aparecera aqui',
-  'ui.preview.background.aria': 'Vista previa del fondo',
-  'ui.preview.background.alt': 'Vista previa del fondo',
-  'ui.border.keepCurrent': 'Mantener borde actual',
 }
 
 export default esLabels

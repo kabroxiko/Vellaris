@@ -32,10 +32,10 @@ export function createSettingsAppliers(setters, currentValues = {}) {
   // Per-applier instrumentation: record creation and calls.
   const applierId = `applier-${Date.now()}-${Math.random().toString(36).slice(2,8)}`
   const createdStack = (new Error('applier-created')).stack
-  try {
-    applierCallCache.set(applierId, { createdAt: Date.now(), createdStack, calls: [] })
-    if (typeof window !== 'undefined') window.__applierCallCache = applierCallCache
-  } catch (e) {}
+    try {
+      applierCallCache.set(applierId, { createdAt: Date.now(), createdStack, calls: [] })
+      if (typeof window !== 'undefined') window.__applierCallCache = applierCallCache
+    } catch (e) {}
 
   function recordCall(name) {
     try {
@@ -43,7 +43,6 @@ export function createSettingsAppliers(setters, currentValues = {}) {
       const entry = { name, ts: Date.now(), stack: (new Error()).stack }
       info.calls.push(entry)
       applierCallCache.set(applierId, info)
-      try { console.debug('[applier-instrument]', applierId, name, 'call#', info.calls.length) } catch (e) {}
     } catch (e) {}
   }
 
@@ -78,7 +77,7 @@ export function createSettingsAppliers(setters, currentValues = {}) {
       if (Number.isFinite(Number(settings.regionCount)))
         setIfChanged(setRegionCount, 'regionCount', Number(settings.regionCount))
       if (Number.isFinite(Number(settings.worldSize))) setIfChanged(setWorldSize, 'worldSize', Number(settings.worldSize))
-      setIfChanged(setCityIconType, 'cityIconType', stringValueOrEmpty(settings.cityIconSetName) || stringValueOrEmpty(settings.cityIconTypeName))
+      setIfChanged(setCityIconType, 'cityIconType', stringValueOrEmpty(settings.cityIconSetName))
       if (Array.isArray(settings.books) && settings.books.length > 0)
         setIfChanged(setSelectedBooks, 'selectedBooks', new Set(settings.books))
       const width = Number(settings.generatedWidth)
@@ -227,12 +226,7 @@ export function createSettingsAppliers(setters, currentValues = {}) {
       if (Number.isFinite(Number(settings.coastShadingLevel)))
         setIfChanged(setCoastShadingLevel, 'coastShadingLevel', Number(settings.coastShadingLevel))
       // Prefer numeric RGBA fields from backend (always use rgba when present).
-      // Debug: show raw incoming coast shading fields
-      try {
-        console.debug('[applier] incoming coastShadingColor type=', typeof settings.coastShadingColor, 'value=', settings.coastShadingColor)
-        console.debug('[applier] incoming coastShadingColorHex type=', typeof settings.coastShadingColorHex, 'value=', settings.coastShadingColorHex)
-        console.debug('[applier] incoming coastShadingAlpha type=', typeof settings.coastShadingAlpha, 'value=', settings.coastShadingAlpha)
-      } catch (dbg) {}
+      // suppressed verbose coast shading debug logs
 
       if (settings.coastShadingColor) {
         const coastShadingHex = colorToHex(settings.coastShadingColor)
@@ -247,6 +241,34 @@ export function createSettingsAppliers(setters, currentValues = {}) {
       }
     },
 
+    applyGridOverlaySettings(settings) {
+      recordCall('applyGridOverlaySettings')
+      const {
+        setDrawGridOverlay,
+        setGridOverlayShape,
+        setGridOverlayRowOrColCount,
+        setGridOverlayColorHex,
+        setGridOverlayXOffset,
+        setGridOverlayYOffset,
+        setGridOverlayLineWidth,
+        setGridOverlayLayer,
+        setDrawVoronoiGridOverlayOnlyOnLand,
+      } = setters
+
+      if (typeof settings.drawGridOverlay === 'boolean') setIfChanged(setDrawGridOverlay, 'drawGridOverlay', settings.drawGridOverlay)
+      if (typeof settings.gridOverlayShape === 'string') setIfChanged(setGridOverlayShape, 'gridOverlayShape', settings.gridOverlayShape)
+      if (Number.isFinite(Number(settings.gridOverlayRowOrColCount))) setIfChanged(setGridOverlayRowOrColCount, 'gridOverlayRowOrColCount', Number(settings.gridOverlayRowOrColCount))
+      if (settings.gridOverlayColor) {
+        const hex = colorToHex(settings.gridOverlayColor)
+        if (hex) setIfChanged(setGridOverlayColorHex, 'gridOverlayColorHex', hex)
+      }
+      if (typeof settings.gridOverlayXOffset === 'string') setIfChanged(setGridOverlayXOffset, 'gridOverlayXOffset', settings.gridOverlayXOffset)
+      if (typeof settings.gridOverlayYOffset === 'string') setIfChanged(setGridOverlayYOffset, 'gridOverlayYOffset', settings.gridOverlayYOffset)
+      if (Number.isFinite(Number(settings.gridOverlayLineWidth))) setIfChanged(setGridOverlayLineWidth, 'gridOverlayLineWidth', Number(settings.gridOverlayLineWidth))
+      if (typeof settings.gridOverlayLayer === 'string') setIfChanged(setGridOverlayLayer, 'gridOverlayLayer', settings.gridOverlayLayer)
+      if (typeof settings.drawVoronoiGridOverlayOnlyOnLand === 'boolean') setIfChanged(setDrawVoronoiGridOverlayOnlyOnLand, 'drawVoronoiGridOverlayOnlyOnLand', settings.drawVoronoiGridOverlayOnlyOnLand)
+    },
+
     applyOceanSettings(settings) {
       recordCall('applyOceanSettings')
       const {
@@ -255,19 +277,19 @@ export function createSettingsAppliers(setters, currentValues = {}) {
         setOceanShadingColorHex,
         setOceanWavesType,
         setOceanWavesLevel,
+        setOceanWavesAlpha,
         setOceanWavesColorHex,
         setDrawOceanEffectsInLakes,
         setRiverColorHex,
+        setConcentricWaveCount,
+        setFadeConcentricWaves,
+        setJitterToConcentricWaves,
+        setBrokenLinesForConcentricWaves,
       } = setters
 
       if (Number.isFinite(Number(settings.oceanShadingLevel)))
           setIfChanged(setOceanShadingLevel, 'oceanShadingLevel', Number(settings.oceanShadingLevel))
-      // Debug: show raw incoming ocean shading fields
-      try {
-        console.debug('[applier] incoming oceanShadingColor type=', typeof settings.oceanShadingColor, 'value=', settings.oceanShadingColor)
-        console.debug('[applier] incoming oceanShadingColorHex type=', typeof settings.oceanShadingColorHex, 'value=', settings.oceanShadingColorHex)
-        console.debug('[applier] incoming oceanShadingAlpha type=', typeof settings.oceanShadingAlpha, 'value=', settings.oceanShadingAlpha)
-      } catch (dbg) {}
+      // suppressed verbose ocean shading debug logs
       // Prefer numeric RGBA fields from backend (always use rgba when present).
       if (settings.oceanShadingColor) {
         const oceanShadingHex = colorToHex(settings.oceanShadingColor)
@@ -277,18 +299,37 @@ export function createSettingsAppliers(setters, currentValues = {}) {
       } else {
         const fallbackHex = settings.oceanShadingColorHex || null
         if (fallbackHex) setIfChanged(setOceanShadingColorHex, 'oceanShadingColorHex', fallbackHex)
-        if (Number.isFinite(Number(settings.oceanShadingAlpha))) setIfChanged(setOceanShadingAlpha, 'oceanShadingAlpha', Number(settings.oceanShadingAlpha))
+        // Do not read settings.oceanShadingAlpha: alpha must be encoded in oceanShadingColor
       }
-      if (typeof settings.oceanWavesType === 'string' && settings.oceanWavesType)
+      // Prefer the newer `oceanWavesType` field, but fall back to the
+      // legacy `oceanEffect` when present so uploaded .nort files that
+      // contain `oceanEffect` still update the UI correctly.
+      if (typeof settings.oceanWavesType === 'string' && settings.oceanWavesType) {
         setIfChanged(setOceanWavesType, 'oceanWavesType', settings.oceanWavesType)
+      } else if (typeof settings.oceanEffect === 'string' && settings.oceanEffect) {
+        setIfChanged(setOceanWavesType, 'oceanWavesType', settings.oceanEffect)
+      }
       if (Number.isFinite(Number(settings.oceanWavesLevel)))
         setIfChanged(setOceanWavesLevel, 'oceanWavesLevel', Number(settings.oceanWavesLevel))
       const oceanWavesHex = colorToHex(settings.oceanWavesColor)
       if (oceanWavesHex) setIfChanged(setOceanWavesColorHex, 'oceanWavesColorHex', oceanWavesHex)
+      if (settings.oceanWavesColor) {
+        const wavesOpacityPercent = colorToAlphaPercent(settings.oceanWavesColor, 100)
+        setIfChanged(setOceanWavesAlpha, 'oceanWavesAlpha', 100 - wavesOpacityPercent)
+      }
       if (typeof settings.drawOceanEffectsInLakes === 'boolean')
         setIfChanged(setDrawOceanEffectsInLakes, 'drawOceanEffectsInLakes', settings.drawOceanEffectsInLakes)
       const riverHex = colorToHex(settings.riverColor)
       if (riverHex) setIfChanged(setRiverColorHex, 'riverColorHex', riverHex)
+
+      if (Number.isFinite(Number(settings.concentricWaveCount)))
+        setIfChanged(setConcentricWaveCount, 'concentricWaveCount', Number(settings.concentricWaveCount))
+      if (typeof settings.fadeConcentricWaves === 'boolean')
+        setIfChanged(setFadeConcentricWaves, 'fadeConcentricWaves', settings.fadeConcentricWaves)
+      if (typeof settings.jitterToConcentricWaves === 'boolean')
+        setIfChanged(setJitterToConcentricWaves, 'jitterToConcentricWaves', settings.jitterToConcentricWaves)
+      if (typeof settings.brokenLinesForConcentricWaves === 'boolean')
+        setIfChanged(setBrokenLinesForConcentricWaves, 'brokenLinesForConcentricWaves', settings.brokenLinesForConcentricWaves)
     },
 
     applyTextSettings(settings) {

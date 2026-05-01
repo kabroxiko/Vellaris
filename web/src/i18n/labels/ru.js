@@ -4,25 +4,16 @@ const ruLabels = {
   'ui.mapLanguage': 'Язык карты',
   'ui.title': 'Создать или загрузить настройки',
   'ui.subtitle': 'Начните со случайных настроек или загрузите файл настроек.',
-  'ui.dimension': 'Соотношение сторон',
-  'ui.worldSize': 'Размер мира',
-  'ui.landShape': 'Форма суши',
-  'ui.regionCount': 'Количество регионов',
-  'ui.artPack': 'Пакет графики',
-  'ui.cityIconType': 'Тип значка города',
-  'ui.cityFrequency': 'Частота городов',
-  'ui.books.legend': 'Книги для создания текста',
-  'ui.books.checkAll': 'Выбрать все',
-  'ui.books.uncheckAll': 'Снять все',
   'ui.seed': 'Семя (опционально)',
   'ui.seed.placeholder': 'напр. 12345',
   'ui.upload.aria': 'Загрузить или перетащить файл настроек',
-  'ui.upload.chooseFile': 'Выбрать файл',
+  
   'ui.upload.loadedPrefix': 'Загружено',
   'ui.upload.hint': 'Перетащите файл настроек сюда',
-  'ui.select.random': 'Случайно',
+  
   'ui.section.or': 'или',
   'ui.section.then': 'затем',
+  'ui.preview.empty': 'Предварительный просмотр недоступен',
   'ui.title.customize': 'Настроить карту',
   'ui.subtitle.customize': 'Настройте текущие параметры и создайте обновленную карту.',
   'ui.noSource': 'Сначала установите .nort или создайте карту',
@@ -34,14 +25,6 @@ const ruLabels = {
   'ui.font.keepCurrent': 'Сохранить текущий',
   'ui.texture.keepCurrent': 'Сохранить текущую текстуру',
   'ui.texture.noneAvailable': 'Текстуры недоступны',
-  
-  'ui.width.override': 'Переопределение ширины',
-  'ui.height.override': 'Переопределение высоты',
-  'ui.preview.open': 'Открыть предпросмотр карты',
-  'ui.preview.empty': 'Предпросмотр карты появится здесь',
-  'ui.preview.background.aria': 'Предпросмотр фона',
-  'ui.preview.background.alt': 'Предпросмотр фона',
-  'ui.border.keepCurrent': 'Сохранить текущую границу',
 }
 
 export default ruLabels

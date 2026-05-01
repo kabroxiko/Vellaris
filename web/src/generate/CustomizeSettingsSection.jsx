@@ -1,13 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { ChromePicker } from 'react-color'
+import { RgbaColorPicker } from 'react-colorful'
 import PropTypes from 'prop-types'
-
-const TABS = [
-  { id: 'background', label: 'Background' },
-  { id: 'border', label: 'Border' },
-  { id: 'effects', label: 'Effects' },
-  { id: 'fonts', label: 'Fonts' },
-]
 
 const API_BASE = import.meta.env.VITE_API_BASE || '/api'
 
@@ -26,16 +19,25 @@ const FONT_FAMILY_OPTIONS = [
 ]
 
 export default function CustomizeSettingsSection({ values, handlers, options, ui }) {
-  const [debugMode, setDebugMode] = React.useState(false);
 
-  const debugOutlineStyle = debugMode
-    ? { outline: '3px dashed magenta', outlineOffset: '6px' }
-    : undefined;
   const [activeTab, setActiveTab] = useState('background')
   const [openFontComboId, setOpenFontComboId] = useState(null)
   const [backgroundPreviewUrl, setBackgroundPreviewUrl] = useState(null)
+  const [previewRefreshNonce, setPreviewRefreshNonce] = useState(0)
+
+  // Testing override: set to true to force the Customize panel enabled
+  // regardless of having an uploaded .nort source. Remove or set to false
+  // for normal behavior.
+  const FORCE_ENABLE_CUSTOMIZE = true
 
   useEffect(() => {
+    try {
+      console.log('background-preview effect start', {
+        previewTriggerKey,
+        currentSource,
+        previewFieldsPreviewSample: Object.keys(previewFields).slice(0, 8),
+      })
+    } catch (e) {}
     const onDocumentMouseDown = (event) => {
       const target = event.target
       if (!(target instanceof Element)) return
@@ -69,6 +71,14 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     drawRegionBoundaries,
     drawBorder,
     drawGridOverlay,
+    gridOverlayShape,
+    gridOverlayRowOrColCount,
+    gridOverlayColorHex,
+    gridOverlayXOffset,
+    gridOverlayYOffset,
+    gridOverlayLineWidth,
+    gridOverlayLayer,
+    drawVoronoiGridOverlayOnlyOnLand,
     borderRef,
     borderWidth,
     borderPosition,
@@ -92,6 +102,7 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     oceanShadingColorHex,
     oceanWavesType,
     oceanWavesLevel,
+    oceanWavesAlpha,
     oceanWavesColorHex,
     concentricWaveCount,
     fadeConcentricWaves,
@@ -122,6 +133,161 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     currentSource,
   } = values
 
+
+  // Aggregate all customization fields we want to send to the preview
+  const previewFields = useMemo(() => {
+    return {
+      backgroundType,
+      textureRef,
+      backgroundSeed: backgroundSeed ? Number(backgroundSeed) : undefined,
+      randomSeed: finalSeed ? Number(finalSeed) : undefined,
+      finalWidth,
+      finalHeight,
+      colorizeLand,
+      colorizeOcean,
+      landColorHex,
+      oceanColorHex,
+      drawRegionBoundaries,
+      drawBorder,
+      drawGridOverlay,
+      gridOverlayShape,
+      gridOverlayRowOrColCount,
+      gridOverlayColorHex,
+      gridOverlayXOffset,
+      gridOverlayYOffset,
+      gridOverlayLineWidth,
+      borderRef,
+      borderWidth,
+      borderPosition,
+      borderColorOption,
+      borderColorHex,
+      frayedBorder,
+      frayedBorderBlurLevel,
+      frayedBorderSize,
+      frayedBorderSeed,
+      frayedBorderColorHex,
+      drawGrunge,
+      grungeWidth,
+      lineStyle,
+      coastlineWidth,
+      coastlineColorHex,
+      coastShadingLevel,
+      coastShadingColorHex,
+      coastShadingAlpha,
+      oceanShadingAlpha,
+      oceanShadingLevel,
+      oceanShadingColorHex,
+      oceanWavesType,
+      oceanWavesLevel,
+      oceanWavesAlpha,
+      oceanWavesColorHex,
+      concentricWaveCount,
+      fadeConcentricWaves,
+      jitterToConcentricWaves,
+      brokenLinesForConcentricWaves,
+      drawOceanEffectsInLakes,
+      riverColorHex,
+      drawRoads,
+      roadStyle,
+      roadWidth,
+      roadColorHex,
+      mountainSize,
+      hillSize,
+      duneSize,
+      treeHeight,
+      citySize,
+      drawText,
+      titleFontFamily,
+      regionFontFamily,
+      mountainRangeFontFamily,
+      otherMountainsFontFamily,
+      citiesFontFamily,
+      riverFontFamily,
+      textColorHex,
+      drawBoldBackground,
+      boldBackgroundColorHex,
+    }
+  }, [
+    backgroundType,
+    textureRef,
+    backgroundSeed,
+    finalSeed,
+    finalWidth,
+    finalHeight,
+    colorizeLand,
+    colorizeOcean,
+    landColorHex,
+    oceanColorHex,
+    drawRegionBoundaries,
+    drawBorder,
+    drawGridOverlay,
+    gridOverlayShape,
+    gridOverlayRowOrColCount,
+    gridOverlayColorHex,
+    gridOverlayXOffset,
+    gridOverlayYOffset,
+    gridOverlayLineWidth,
+    borderRef,
+    borderWidth,
+    borderPosition,
+    borderColorOption,
+    borderColorHex,
+    frayedBorder,
+    frayedBorderBlurLevel,
+    frayedBorderSize,
+    frayedBorderSeed,
+    frayedBorderColorHex,
+    drawGrunge,
+    grungeWidth,
+    lineStyle,
+    coastlineWidth,
+    coastlineColorHex,
+    coastShadingLevel,
+    coastShadingColorHex,
+    coastShadingAlpha,
+    oceanShadingAlpha,
+    oceanShadingLevel,
+    oceanShadingColorHex,
+    oceanWavesType,
+    oceanWavesLevel,
+    oceanWavesAlpha,
+    oceanWavesColorHex,
+    concentricWaveCount,
+    fadeConcentricWaves,
+    jitterToConcentricWaves,
+    brokenLinesForConcentricWaves,
+    drawOceanEffectsInLakes,
+    riverColorHex,
+    drawRoads,
+    roadStyle,
+    roadWidth,
+    roadColorHex,
+    mountainSize,
+    hillSize,
+    duneSize,
+    treeHeight,
+    citySize,
+    drawText,
+    titleFontFamily,
+    regionFontFamily,
+    mountainRangeFontFamily,
+    otherMountainsFontFamily,
+    citiesFontFamily,
+    riverFontFamily,
+    textColorHex,
+    drawBoldBackground,
+    boldBackgroundColorHex,
+  ])
+
+  // Use previewFields as the serialized key so any change triggers the effect
+  const previewTriggerKey = useMemo(() => {
+    try {
+      return JSON.stringify(previewFields)
+    } catch (e) {
+      return ''
+    }
+  }, [previewFields])
+
   const {
     setBackgroundType,
     setTextureRef,
@@ -140,6 +306,14 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     setDrawRegionBoundaries,
     setDrawBorder,
     setDrawGridOverlay,
+    setGridOverlayShape,
+    setGridOverlayRowOrColCount,
+    setGridOverlayColorHex,
+    setGridOverlayXOffset,
+    setGridOverlayYOffset,
+    setGridOverlayLineWidth,
+    setGridOverlayLayer,
+    setDrawVoronoiGridOverlayOnlyOnLand,
     setBorderRef,
     setBorderWidth,
     setBorderPosition,
@@ -171,6 +345,7 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     setOceanShadingColorHex,
     setOceanWavesType,
     setOceanWavesLevel,
+    setOceanWavesAlpha,
     setOceanWavesColorHex,
     setConcentricWaveCount,
     setFadeConcentricWaves,
@@ -205,6 +380,9 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     label: tab.label,
   }))
   const landColoringMethods = backendOptions.landColoringMethods || []
+  const gridOverlayShapes = backendOptions.gridOverlayShapes || []
+  const gridOverlayOffsets = backendOptions.gridOverlayOffsets || []
+  const gridOverlayLayers = backendOptions.gridOverlayLayers || []
   const backgroundTypes = backendOptions.backgroundTypes || []
   const strokeTypes = backendOptions.strokeTypes || []
   const borderPositions = backendOptions.borderPositions || []
@@ -215,41 +393,45 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
   const rippleWaveValue = oceanWaveTypes.find(o => o && o.value && /Ripple|Ripples/i.test(o.value))?.value
   const noneWaveValue = oceanWaveTypes.find(o => o && o.value && /^(None|No|NoEffect|NoneWaves)$/i.test(o.value))?.value
   const translateLabel = (key) => {
-    if (labels && Object.prototype.hasOwnProperty.call(labels, key) && labels[key]) {
-      return labels[key]
+    const has = labels && Object.prototype.hasOwnProperty.call(labels, key) && labels[key]
+    const txt = has ? labels[key] : null
+    const baseKey = (!txt && key && key.endsWith('.label')) ? key.substring(0, key.length - '.label'.length) : null
+    const alternate = baseKey && labels && Object.prototype.hasOwnProperty.call(labels, baseKey) ? labels[baseKey] : null
+    const value = txt || alternate || key
+    // If the translation contains literal <br> tags, return React nodes
+    if (typeof value === 'string' && /<br\s*\/?\>/i.test(value)) {
+      const parts = value.split(/<br\s*\/?\>/i)
+      return parts.flatMap((p, i) => (i === parts.length - 1 ? [p] : [p, React.createElement('br', { key: i })]))
     }
-    // If caller asked for a ".label" key but backend only provided the
-    // base key (e.g. "theme.fadeOuterWaves"), try that next.
-    if (key && key.endsWith('.label')) {
-      const alt = key.substring(0, key.length - '.label'.length)
-      if (labels && Object.prototype.hasOwnProperty.call(labels, alt) && labels[alt]) {
-        return labels[alt]
-      }
-    }
-    return key
+    return value
   }
 
   const translateLabelWithArgs = (key, ...args) => {
-    let txt = translateLabel(key)
+    const txt = translateLabel(key)
     if (!txt) return txt
+    if (typeof txt !== 'string') return txt
     // Simple replacement for {0}, {1} placeholders
+    let out = txt
     args.forEach((a, i) => {
-      txt = txt.replace(new RegExp(`\\{${i}\\}`, 'g'), String(a))
+      out = out.replace(new RegExp(`\\{${i}\\}`, 'g'), String(a))
     })
-    return txt
+    return out
   }
 
   const sanitizeTranslation = (s) => {
     if (!s) return s
-    // Remove surrounding <html> wrappers and any tags, then decode doubled single-quotes.
+    if (typeof s !== 'string') return s
+    // Remove surrounding <html> wrappers and preserve <br> as line breaks
     let t = String(s)
-    // Remove leading/trailing <html> tags (case-insensitive)
-    t = t.replace(/^\s*<html>\s*/i, '').replace(/\s*<html>\s*$/i, '')
-    // Strip any other HTML tags
+    t = t.replace(/^\s*<html>\s*/i, '').replace(/\s*<\/html>\s*$/i, '')
+    // If there are <br> tags, convert to React nodes with breaks
+    if (/<br\s*\/?\>/i.test(t)) {
+      const parts = t.split(/<br\s*\/?\>/i)
+      return parts.flatMap((p, i) => (i === parts.length - 1 ? [p] : [p, React.createElement('br', { key: i })]))
+    }
+    // Otherwise strip any other HTML tags
     t = t.replace(/<[^>]*>/g, '')
-    // Replace doubled single-quotes used in translations with a single quote
     t = t.replace(/''/g, "'")
-    // Collapse whitespace
     t = t.replace(/\s+/g, ' ').trim()
     return t
   }
@@ -279,7 +461,18 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
   }
 
   const [showCoastPicker, setShowCoastPicker] = useState(false)
+  const [showGridPicker, setShowGridPicker] = useState(false)
   const [showOceanPicker, setShowOceanPicker] = useState(false)
+  const [showRegionBoundaryPicker, setShowRegionBoundaryPicker] = useState(false)
+  const [showLandPicker, setShowLandPicker] = useState(false)
+  const [showBorderColorPicker, setShowBorderColorPicker] = useState(false)
+  const [showFrayedBorderPicker, setShowFrayedBorderPicker] = useState(false)
+  const [showCoastlinePicker, setShowCoastlinePicker] = useState(false)
+  const [showOceanWavesPicker, setShowOceanWavesPicker] = useState(false)
+  const [showRiverPicker, setShowRiverPicker] = useState(false)
+  const [showRoadPicker, setShowRoadPicker] = useState(false)
+  const [showTextColorPicker, setShowTextColorPicker] = useState(false)
+  const [showBoldBackgroundPicker, setShowBoldBackgroundPicker] = useState(false)
 
   const modalBackdropStyle = {
     position: 'fixed',
@@ -300,20 +493,42 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     borderRadius: 6,
     boxShadow: '0 6px 24px rgba(0,0,0,0.3)',
   }
+  // Notify parent that the user manually changed a customization control.
+  // The parent decides whether to mark the UI as dirty (only after
+  // the first successful generation) and therefore disable downloads.
+  const notifyManualChange = () => {
+    try {
+      if (typeof handlers.notifyManualChange === 'function') handlers.notifyManualChange()
+    } catch (e) {}
+  }
+  const triggerPreviewRefresh = () => {
+    try {
+      setPreviewRefreshNonce((n) => n + 1)
+    } catch (e) {}
+  }
+  
   const showTextureOptions = backgroundType === 'GeneratedFromTexture'
   const hasTextures = textures.length > 0
   // Keep Customize panel disabled unless the user explicitly has a .nort
   // source (uploaded file or current nortContent). Do not enable the
-  // panel merely because `resolve-random-settings` returned a payload —
+  // panel merely because a random generation produced settings —
   // that should not be treated as an editable customization source.
   const hasCustomizationSource = Boolean(
     fileObj ||
-    currentSource?.nortContent
+    currentSource?.nortContent ||
+    FORCE_ENABLE_CUSTOMIZE
   )
+  const customizationDirty = ui?.customizationDirty || false
+  const hasGeneratedOnce = ui?.hasGeneratedOnce || false
+  // Regenerate should remain enabled so users can apply manual changes.
   const canSubmit = !loading && hasCustomizationSource
+  // Downloads must be disabled if the user manually edited controls after
+  // a prior generation until a new map is generated.
+  const canDownloadSettings = !loading && hasCustomizationSource && !(customizationDirty && hasGeneratedOnce)
+  const canDownloadMap = !loading && hasCustomizationSource && Boolean(preview?.url) && !(customizationDirty && hasGeneratedOnce)
   const gatedControlValue = (value) => (hasCustomizationSource ? value : '')
   const emptyComboOption = hasCustomizationSource ? null : (
-    <option value="">{translateLabel('ui.select.random')}</option>
+    <option value=""></option>
   )
 
   const fontFields = useMemo(
@@ -395,6 +610,7 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     // waiting for the normal fetch cycle.
     try {
       if (typeof window !== 'undefined' && window.__prefetchedBackgroundPreviewBlob) {
+        try { console.log('using __prefetchedBackgroundPreviewBlob') } catch (e) {}
         const blob = window.__prefetchedBackgroundPreviewBlob
         try { delete window.__prefetchedBackgroundPreviewBlob } catch (e) {}
         const url = URL.createObjectURL(blob)
@@ -406,7 +622,13 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
       }
     } catch (e) {}
 
-    if (!hasNortContentSource && !hasRandomPayloadSource) {
+    // If there is no customization source available, there's nothing to
+    // preview. However, allow the panel's force-enable flag (used during
+    // development) to permit preview generation even when there's no
+    // `nortContent` source. Use `hasCustomizationSource` which respects the
+    // `FORCE_ENABLE_CUSTOMIZE` override.
+    if (!hasCustomizationSource && !hasRandomPayloadSource) {
+      try { console.log('background-preview: no source present, clearing previewUrl and returning', { hasCustomizationSource, hasRandomPayloadSource }) } catch (e) {}
       setBackgroundPreviewUrl((previous) => {
         if (previous) URL.revokeObjectURL(previous)
         return null
@@ -429,56 +651,62 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
         // `nortContent` source, send only that JSON plus preview dimensions
         // and light overrides. Avoid sending duplicated UI-only fields that
         // are already included inside `nortContent`.
-        const payload = {
-          previewWidth: 520,
-          previewHeight: 170,
-        }
+        // Build a payload containing the explicit previewFields so the
+        // server receives the full set of visual parameters regardless of
+        // whether we also have a nortContent source. If the current source
+        // is a random payload, merge it on top of these fields so the
+        // resolver's canonical values take precedence.
+        // Only send the minimal background controls that affect the
+        // background preview (as shown in the screenshot): draw region
+        // boundaries, color land flag and land color, color ocean flag and
+        // ocean color. Keep preview dimensions.
+        const allowedPreviewKeys = [
+          'drawRegionBoundaries',
+          'colorizeLand',
+          'landColorHex',
+          'colorizeOcean',
+          'oceanColorHex',
+        ]
 
-        if (hasNortContentSource) {
-          // Do NOT send `nortContent` to the background-preview endpoint.
-          // Instead send only a compact set of explicit overrides so the
-          // server can render a representative preview without consuming or
-          // merging the full settings JSON.
-          if (backgroundType) payload.backgroundType = backgroundType
-          if (textureRef) payload.textureRef = textureRef
-          if (backgroundSeed) payload.backgroundSeed = Number(backgroundSeed)
-          if (finalSeed) payload.seed = Number(finalSeed)
-          // Include a few lightweight visual overrides that are cheap to
-          // apply and commonly adjusted in the Customize panel.
-          payload.colorizeLand = colorizeLand
-          payload.colorizeOcean = colorizeOcean
-          payload.oceanColorHex = oceanColorHex
-          payload.landColorHex = landColorHex
-        } else if (hasRandomPayloadSource) {
-          // For random payload sources we still send the resolver payload
-          // as before since that represents the canonical settings used
-          // to generate the preview.
+        const normalizedPreviewFields = {}
+        allowedPreviewKeys.forEach((k) => {
+          const v = previewFields[k]
+          normalizedPreviewFields[k] = v === undefined ? null : v
+        })
+
+        const payload = Object.assign({ previewWidth: 520, previewHeight: 170 }, normalizedPreviewFields)
+
+        if (hasRandomPayloadSource) {
           Object.assign(payload, currentSource.payload)
-        } else {
-          // No explicit nortContent nor random payload: fallback to lightweight
-          // explicit fields used to render the background preview.
-          Object.assign(payload, {
-            colorizeLand,
-            colorizeOcean,
-            oceanColorHex,
-            landColorHex,
-          })
-          if (backgroundType) payload.backgroundType = backgroundType
-          if (textureRef) payload.textureRef = textureRef
-          if (backgroundSeed) payload.backgroundSeed = Number(backgroundSeed)
-          if (finalSeed) payload.seed = Number(finalSeed)
         }
 
-        const response = await fetch(`${API_BASE}/background-preview`, {
+        // Dev log: show the exact payload sent to the background-preview
+        try {
+          console.log('background-preview payload', payload)
+        } catch (e) {}
+
+        // Retry fetch a few times to handle transient network changes (ERR_NETWORK_CHANGED)
+        async function doFetchWithRetries(url, opts, attempts = 3, delayMs = 300) {
+          for (let i = 0; i < attempts; i++) {
+            try {
+              const resp = await fetch(url, opts)
+              if (!resp.ok) throw new Error('Non-OK response')
+              return resp
+            } catch (err) {
+              if (i === attempts - 1) throw err
+              // If aborted, rethrow immediately
+              if (opts.signal && opts.signal.aborted) throw err
+              await new Promise((r) => setTimeout(r, delayMs))
+            }
+          }
+        }
+
+        const response = await doFetchWithRetries(`${API_BASE}/background-preview`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
           signal: controller.signal,
-        })
-
-        if (!response.ok) {
-          throw new Error('Failed to load background preview')
-        }
+        }, 3, 300)
 
         const blob = await response.blob()
         const url = URL.createObjectURL(blob)
@@ -503,18 +731,66 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
       controller.abort()
     }
   }, [
-    backgroundSeed,
-    backgroundType,
-    colorizeLand,
-    colorizeOcean,
+    // Keep a single serialized key of all customization values so any change
+    // to the customization UI triggers the background-preview fetch.
+    previewTriggerKey,
     currentSource?.nortContent,
     currentSource?.payload,
     currentSource?.type,
-    finalSeed,
-    landColorHex,
-    oceanColorHex,
-    textureRef,
+    previewRefreshNonce,
   ])
+
+    function renderColorControl({ id, label, hexValue, onHexChange, alphaValue, onAlphaChange, disabled, showState, setShowState, swatchStyle }) {
+      const openerClick = (e) => { if (!disabled) setShowState(true) }
+      const openerKey = (e) => { if ((e.key === 'Enter' || e.key === ' ') && !disabled) { e.preventDefault(); setShowState(true) } }
+      return (
+        <>
+          <label htmlFor={`${id}`} className={disabled ? 'is-disabled' : ''}>{label}</label>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+            <div
+              role="button"
+              tabIndex={disabled ? -1 : 0}
+              aria-label={`Open ${label} color picker`}
+              aria-disabled={disabled ? 'true' : 'false'}
+              onClick={openerClick}
+              onKeyDown={openerKey}
+                style={{
+                flex: '1 1 auto',
+                minWidth: 48,
+                height: 28,
+                background: hexValue || '#000000',
+                border: '1px solid #bbb',
+                cursor: disabled ? 'default' : 'pointer',
+                opacity: disabled ? 0.5 : 1,
+                pointerEvents: disabled ? 'none' : undefined,
+                ...(swatchStyle || {}),
+              }}
+            />
+          </div>
+          {showState && (
+            <div style={modalBackdropStyle} onClick={() => setShowState(false)}>
+              <div style={modalContentStyle} onClick={(e) => e.stopPropagation()}>
+                <RgbaColorPicker
+                  color={hexToRgba(hexValue, alphaValue || 0)}
+                  onChange={(col) => {
+                    const hex = rgbaToHex(col)
+                    onHexChange(hex)
+                    if (typeof onAlphaChange === 'function') {
+                      onAlphaChange(Math.round((1 - (col.a ?? 1)) * 100))
+                    }
+                  }}
+                />
+                <div style={{ marginTop: 8, display: 'flex', justifyContent: 'flex-end' }}>
+                  <button type="button" onClick={() => setShowState(false)}>
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </>
+      )
+    }
 
   useEffect(() => {
     return () => {
@@ -537,8 +813,8 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
 
   function renderBackgroundTab() {
     return (
-      <div className="fields-grid two-col-layout" style={debugOutlineStyle}>
-        <div className={`fields-column${!drawBorder ? ' is-disabled' : ''}`} style={debugMode ? debugOutlineStyle : undefined}>
+      <div className="fields-grid two-col-layout">
+        <div className={`fields-column${!drawBorder ? ' is-disabled' : ''}`}>
           <label htmlFor="bg-type-input">{translateLabel('theme.background.label')}</label>
           <select
             id="bg-type-input"
@@ -553,129 +829,167 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
             ))}
           </select>
 
-          {showTextureOptions && (
-            <>
-              <label htmlFor="texture-input">{translateLabel('theme.texture.label')}</label>
-              <select
-                id="texture-input"
-                value={gatedControlValue(textureRef)}
-                onChange={(e) => setTextureRef(e.target.value)}
-                disabled={!hasTextures}
-              >
-                {emptyComboOption}
-                <option value="">
-                  {translateLabel('ui.texture.keepCurrent')}
+          <>
+            <label htmlFor="texture-input" className={!showTextureOptions ? 'is-disabled' : ''}>{translateLabel('theme.texture.label')}</label>
+            <select
+              id="texture-input"
+              value={gatedControlValue(textureRef)}
+              onChange={(e) => setTextureRef(e.target.value)}
+              disabled={!showTextureOptions || !hasTextures}
+            >
+              {emptyComboOption}
+              <option value="">
+                {translateLabel('ui.texture.keepCurrent')}
+              </option>
+              {!hasTextures && (
+                <option value="" disabled>
+                  {translateLabel('ui.texture.noneAvailable')}
                 </option>
-                {!hasTextures && (
-                  <option value="" disabled>
-                    {translateLabel('ui.texture.noneAvailable')}
+              )}
+              {textures.map((texture) => {
+                const ref = `${texture.artPack}|${texture.name}`
+                return (
+                  <option key={ref} value={ref}>
+                    {texture.name.replace(/\.[^.]+$/, '')} [{texture.artPack}]
                   </option>
-                )}
-                {textures.map((texture) => {
-                  const ref = `${texture.artPack}|${texture.name}`
-                  return (
-                    <option key={ref} value={ref}>
-                      {texture.name.replace(/\.[^.]+$/, '')} [{texture.artPack}]
-                    </option>
-                  )
-                })}
-              </select>
+                )
+              })}
+            </select>
+          </>
 
-              <div />
-              <label className="checkbox-label checkbox-col2">
-                <input
-                  type="checkbox"
-                  checked={colorizeLand}
-                  onChange={(e) => setColorizeLand(e.target.checked)}
-                />
-                <span>{translateLabel('theme.colorLand')}</span>
-              </label>
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={drawRegionBoundaries}
+                onChange={(e) => setDrawRegionBoundaries(e.target.checked)}
+              />
+              <span>{translateLabel('theme.drawRegionBoundaries')}</span>
+            </label>
 
-              <div />
-              <label className="checkbox-label checkbox-col2">
-                <input
-                  type="checkbox"
-                  checked={colorizeOcean}
-                  onChange={(e) => setColorizeOcean(e.target.checked)}
-                />
-                <span>{translateLabel('theme.colorOcean')}</span>
-              </label>
-            </>
-          )}
+          
 
-            <label htmlFor="final-land-coloring-input">
-            {translateLabel('theme.landColoringMethod.label')}
-          </label>
-          <select
-            id="final-land-coloring-input"
-            value={gatedControlValue(finalLandColoringMethod)}
-            onChange={(e) => setFinalLandColoringMethod(e.target.value)}
+          <div
+            className={`control-group${!drawRegionBoundaries ? ' is-disabled' : ''}`}
+            style={!drawRegionBoundaries ? { opacity: 0.5, pointerEvents: 'none' } : undefined}
           >
-            {emptyComboOption}
-            {landColoringMethods
-              .filter((item) => item.value)
-              .map((item) => (
+            <label htmlFor="region-boundary-style-input">
+              {translateLabel('theme.style.label')}
+            </label>
+            <select
+              id="region-boundary-style-input"
+              value={gatedControlValue(regionBoundaryStyle)}
+              onChange={(e) => setRegionBoundaryStyle(e.target.value)}
+              disabled={!drawRegionBoundaries}
+            >
+              {emptyComboOption}
+              {strokeTypes.map((item) => (
                 <option key={item.value} value={item.value}>
                   {item.label}
                 </option>
               ))}
-          </select>
+            </select>
 
-          <label htmlFor="region-boundary-style-input">
-            {translateLabel('theme.style.label')}
+            <label htmlFor="region-boundary-width-input">
+              {translateLabel('theme.regionBoundaryWidth.help')}
+            </label>
+            <div className="slider-row">
+              <input
+                id="region-boundary-width-input"
+                type="range"
+                min={0.5}
+                max={10}
+                step={0.1}
+                value={regionBoundaryWidth}
+                onChange={(e) => setRegionBoundaryWidth(Number(e.target.value))}
+                disabled={!drawRegionBoundaries}
+              />
+              <span className="slider-value">{regionBoundaryWidth.toFixed(1)}</span>
+            </div>
+
+            {renderColorControl({
+              id: 'region-boundary-color',
+              label: translateLabel('theme.regionBoundaryColor.title'),
+              hexValue: regionBoundaryColorHex,
+              onHexChange: setRegionBoundaryColorHex,
+              showState: showRegionBoundaryPicker,
+              setShowState: setShowRegionBoundaryPicker,
+              disabled: !drawRegionBoundaries,
+            })}
+          </div>
+
+          <div />
+          <label className="checkbox-label">
+            <input
+              type="checkbox"
+              checked={colorizeLand}
+              onChange={(e) => setColorizeLand(e.target.checked)}
+            />
+            <span>{translateLabel('theme.colorLand')}</span>
           </label>
-          <select
-            id="region-boundary-style-input"
-            value={gatedControlValue(regionBoundaryStyle)}
-            onChange={(e) => setRegionBoundaryStyle(e.target.value)}
+
+          <div
+            className={`control-group${!colorizeLand ? ' is-disabled' : ''}`}
+            style={!colorizeLand ? { opacity: 0.5, pointerEvents: 'none' } : undefined}
           >
-            {emptyComboOption}
-            {strokeTypes.map((item) => (
-              <option key={item.value} value={item.value}>
-                {item.label}
-              </option>
-            ))}
-          </select>
+            <label htmlFor="final-land-coloring-input">
+              {translateLabel('theme.landColoringMethod.label')}
+            </label>
+            <select
+              id="final-land-coloring-input"
+              value={gatedControlValue(finalLandColoringMethod)}
+              onChange={(e) => setFinalLandColoringMethod(e.target.value)}
+              disabled={!colorizeLand}
+            >
+              {emptyComboOption}
+              {landColoringMethods
+                .filter((item) => item.value)
+                .map((item) => (
+                  <option key={item.value} value={item.value}>
+                    {item.label}
+                  </option>
+                ))}
+            </select>
 
-          <label htmlFor="region-boundary-width-input">
-            {translateLabel('theme.regionBoundaryWidth.help')}:{' '}
-            {regionBoundaryWidth.toFixed(1)}
+            {renderColorControl({
+              id: 'land-color',
+              label: translateLabel('theme.landColor.label'),
+              hexValue: landColorHex,
+              onHexChange: setLandColorHex,
+              showState: showLandPicker,
+              setShowState: setShowLandPicker,
+              disabled: !colorizeLand || finalLandColoringMethod === 'ColorPoliticalRegions',
+            })}
+          </div>
+
+          <div />
+          <label className="checkbox-label">
+            <input
+              type="checkbox"
+              checked={colorizeOcean}
+              onChange={(e) => {
+                const v = e.target.checked
+                setColorizeOcean(v)
+                notifyManualChange()
+                triggerPreviewRefresh()
+              }}
+            />
+            <span>{translateLabel('theme.colorOcean')}</span>
           </label>
-          <input
-            id="region-boundary-width-input"
-            type="range"
-            min={0.5}
-            max={10}
-            step={0.1}
-            value={regionBoundaryWidth}
-            onChange={(e) => setRegionBoundaryWidth(Number(e.target.value))}
-          />
 
-          <label htmlFor="region-boundary-color-input">
-            {translateLabel('theme.regionBoundaryColor.title')}
-          </label>
-          <input
-            id="region-boundary-color-input"
-            type="color"
-            value={regionBoundaryColorHex}
-            onChange={(e) => setRegionBoundaryColorHex(e.target.value)}
-          />
-
-          <label htmlFor="land-color-input">{translateLabel('theme.landColor.label')}</label>
-          <input
-            id="land-color-input"
-            type="color"
-            value={landColorHex}
-            onChange={(e) => setLandColorHex(e.target.value)}
-          />
-
-          <label htmlFor="ocean-color-input">{translateLabel('theme.oceanColor.label')}</label>
-          <input
-            id="ocean-color-input"
-            type="color"
-            value={oceanColorHex}
-            onChange={(e) => setOceanColorHex(e.target.value)}
-          />
+          <div
+            className={`control-group${!colorizeOcean ? ' is-disabled' : ''}`}
+            style={!colorizeOcean ? { opacity: 0.5, pointerEvents: 'none' } : undefined}
+          >
+            {renderColorControl({
+              id: 'ocean-color',
+              label: translateLabel('theme.oceanColor.label'),
+              hexValue: oceanColorHex,
+              onHexChange: (hex) => { setOceanColorHex(hex); notifyManualChange(); triggerPreviewRefresh() },
+              showState: showOceanPicker,
+              setShowState: setShowOceanPicker,
+              disabled: !colorizeOcean,
+            })}
+          </div>
         </div>
 
         <div className="fields-column">
@@ -692,36 +1006,6 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
             }
           />
 
-          <label htmlFor="final-width-input">
-            {translateLabel('ui.width.override')}
-          </label>
-          <input
-            id="final-width-input"
-            type="number"
-            min={200}
-            value={gatedControlValue(finalWidth)}
-            onChange={(e) => setFinalWidth(Number(e.target.value))}
-          />
-
-          <label htmlFor="final-height-input">
-            {translateLabel('ui.height.override')}
-          </label>
-          <input
-            id="final-height-input"
-            type="number"
-            min={200}
-            value={gatedControlValue(finalHeight)}
-            onChange={(e) => setFinalHeight(Number(e.target.value))}
-          />
-
-          <label className="checkbox-label">
-            <input
-              type="checkbox"
-              checked={drawRegionBoundaries}
-              onChange={(e) => setDrawRegionBoundaries(e.target.checked)}
-            />
-            <span>{translateLabel('theme.drawRegionBoundaries')}</span>
-          </label>
 
           <label className="checkbox-label">
             <input
@@ -733,15 +1017,135 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
           </label>
 
           <div
+            className={`control-group${!drawGridOverlay ? ' is-disabled' : ''}`}
+            style={!drawGridOverlay ? { opacity: 0.5, pointerEvents: 'none' } : undefined}
+          >
+            <label htmlFor="grid-shape-input">{translateLabel('theme.shape.label')}</label>
+            <select
+              id="grid-shape-input"
+              value={gatedControlValue(gridOverlayShape)}
+              onChange={(e) => setGridOverlayShape(e.target.value)}
+              disabled={!drawGridOverlay}
+            >
+              {emptyComboOption}
+              {gridOverlayShapes.map((item) => (
+                <option key={item.value} value={item.value}>
+                  {item.label}
+                </option>
+              ))}
+            </select>
+
+            {(() => {
+              const shapeVal = gridOverlayShape || ''
+              const lower = String(shapeVal).toLowerCase()
+              const isVerticalHex = lower.includes('vertical')
+              const isVoronoi = lower.includes('voronoi')
+              return (
+                <>
+                  <label htmlFor="grid-rows-input" className={!drawGridOverlay || isVoronoi ? 'is-disabled' : ''}>
+                    {isVerticalHex ? translateLabel('theme.columns.label') : translateLabel('theme.rows.label')}
+                  </label>
+                  <div className="slider-row">
+                    <input
+                      id="grid-rows-input"
+                      type="range"
+                      min={4}
+                      max={64}
+                      step={1}
+                      value={gridOverlayRowOrColCount}
+                      onChange={(e) => setGridOverlayRowOrColCount(Number(e.target.value))}
+                      disabled={!drawGridOverlay || isVoronoi}
+                    />
+                    <span className="slider-value">{gridOverlayRowOrColCount}</span>
+                  </div>
+                </>
+              )
+            })()}
+
+            <label htmlFor="grid-linewidth-input">{translateLabel('theme.lineWidth.label')}</label>
+            <div className="slider-row">
+              <input
+                id="grid-linewidth-input"
+                type="range"
+                min={1}
+                max={10}
+                step={1}
+                value={gridOverlayLineWidth}
+                onChange={(e) => setGridOverlayLineWidth(Number(e.target.value))}
+                disabled={!drawGridOverlay}
+              />
+              <span className="slider-value">{gridOverlayLineWidth}</span>
+            </div>
+
+            {renderColorControl({
+              id: 'grid-color',
+              label: translateLabel('theme.color.label'),
+              hexValue: gridOverlayColorHex,
+              onHexChange: setGridOverlayColorHex,
+              showState: showGridPicker,
+              setShowState: setShowGridPicker,
+              disabled: !drawGridOverlay,
+            })}
+
+            {(() => {
+              const shapeVal = gridOverlayShape || ''
+              const isVoronoi = String(shapeVal).toLowerCase().includes('voronoi')
+              return (
+                <>
+                  <label htmlFor="grid-xoffset-input" className={!drawGridOverlay || isVoronoi ? 'is-disabled' : ''}>{translateLabel('theme.xOffset.label')}</label>
+                  <select id="grid-xoffset-input" value={gatedControlValue(gridOverlayXOffset)} onChange={(e) => setGridOverlayXOffset(e.target.value)} disabled={!drawGridOverlay || isVoronoi}>
+                    {emptyComboOption}
+                    {gridOverlayOffsets.map((item) => (
+                      <option key={item.value} value={item.value}>
+                        {item.label}
+                      </option>
+                    ))}
+                  </select>
+
+                  <label htmlFor="grid-yoffset-input" className={!drawGridOverlay || isVoronoi ? 'is-disabled' : ''}>{translateLabel('theme.yOffset.label')}</label>
+                  <select id="grid-yoffset-input" value={gatedControlValue(gridOverlayYOffset)} onChange={(e) => setGridOverlayYOffset(e.target.value)} disabled={!drawGridOverlay || isVoronoi}>
+                    {emptyComboOption}
+                    {gridOverlayOffsets.map((item) => (
+                      <option key={item.value} value={item.value}>
+                        {item.label}
+                      </option>
+                    ))}
+                  </select>
+                </>
+              )
+            })()}
+
+            <label className={`checkbox-label${(!drawGridOverlay || !String((gridOverlayShape || '')).toLowerCase().includes('voronoi')) ? ' is-disabled' : ''}`}>
+              <input
+                type="checkbox"
+                checked={drawVoronoiGridOverlayOnlyOnLand}
+                onChange={(e) => setDrawVoronoiGridOverlayOnlyOnLand(e.target.checked)}
+                disabled={!drawGridOverlay || !String((gridOverlayShape || '')).toLowerCase().includes('voronoi')}
+              />
+              <span>{translateLabel('theme.onlyOnLand')}</span>
+            </label>
+
+            <label htmlFor="grid-layer-input">{translateLabel('theme.layer.label')}</label>
+            <select id="grid-layer-input" value={gatedControlValue(gridOverlayLayer)} onChange={(e) => setGridOverlayLayer(e.target.value)} disabled={!drawGridOverlay}>
+              {emptyComboOption}
+              {gridOverlayLayers.map((item) => (
+                <option key={item.value} value={item.value}>
+                  {item.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div
             className="background-preview-panel background-preview-panel--full-row"
             role="img"
-                aria-label={translateLabel('ui.preview.background.aria')}
+                aria-label={translateLabel('theme.background.label')}
           >
             {backgroundPreviewUrl ? (
               <img
                 className="background-preview-canvas"
                 src={backgroundPreviewUrl}
-                alt={translateLabel('ui.preview.background.alt')}
+                alt={translateLabel('theme.background.label')}
               />
             ) : (
               <div className="background-preview-canvas background-preview-canvas--empty" />
@@ -777,7 +1181,7 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
               disabled={!drawBorder}
             >
             {emptyComboOption}
-            <option value="">{translateLabel('ui.border.keepCurrent')}</option>
+            <option value="">{translateLabel('theme.borderColor.title')}</option>
             {borderTypes.map((borderType) => {
               const ref = `${borderType.artPack}|${borderType.name}`
               return (
@@ -789,18 +1193,21 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
           </select>
 
           <label htmlFor="border-width-input" className={!drawBorder ? 'is-disabled' : ''}>
-            {translateLabel('theme.borderWidth.label')}: {Math.round(borderWidth)}
+            {translateLabel('theme.borderWidth.label')}
           </label>
-          <input
-            id="border-width-input"
-            type="range"
-            min={0}
-            max={600}
-            step={1}
-            value={borderWidth}
-            onChange={(e) => setBorderWidth(Number(e.target.value))}
-            disabled={!drawBorder}
-          />
+          <div className="slider-row">
+            <input
+              id="border-width-input"
+              type="range"
+              min={0}
+              max={600}
+              step={1}
+              value={borderWidth}
+              onChange={(e) => setBorderWidth(Number(e.target.value))}
+              disabled={!drawBorder}
+            />
+            <span className="slider-value">{Math.round(borderWidth)}</span>
+          </div>
 
           <label htmlFor="border-position-input" className={!drawBorder ? 'is-disabled' : ''}>{translateLabel('theme.borderPosition.label')}</label>
           <select
@@ -832,22 +1239,19 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
             ))}
           </select>
 
-            {borderColorOption === 'Choose_color' && (
-              <>
-                <label htmlFor="border-color-input">{translateLabel('theme.borderColor.title')}</label>
-                <input
-                  id="border-color-input"
-                  type="color"
-                  value={borderColorHex}
-                  onChange={(e) => setBorderColorHex(e.target.value)}
-                  disabled={!drawBorder}
-                />
-              </>
-            )}
+            {renderColorControl({
+              id: 'border-color',
+              label: translateLabel('theme.borderColor.title'),
+              hexValue: borderColorHex,
+              onHexChange: setBorderColorHex,
+              showState: showBorderColorPicker,
+              setShowState: setShowBorderColorPicker,
+              disabled: !drawBorder || borderColorOption !== 'Choose_color',
+            })}
             </div>
           </div>
 
-          <div className="fields-column" style={debugMode ? debugOutlineStyle : undefined}>
+          <div className="fields-column">
           <label className="checkbox-label">
             <input
               type="checkbox"
@@ -862,32 +1266,38 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
             style={!frayedBorder ? { opacity: 0.5, pointerEvents: 'none' } : undefined}
           >
             <label htmlFor="frayed-border-blur-input">
-              {translateLabel('theme.shadingWidth.label')}: {Math.round(frayedBorderBlurLevel)}
+              {translateLabel('theme.shadingWidth.label')}
             </label>
-            <input
-              id="frayed-border-blur-input"
-              type="range"
-              min={0}
-              max={500}
-              step={1}
-              value={frayedBorderBlurLevel}
-              onChange={(e) => setFrayedBorderBlurLevel(Number(e.target.value))}
-              disabled={!frayedBorder}
-            />
+            <div className="slider-row">
+              <input
+                id="frayed-border-blur-input"
+                type="range"
+                min={0}
+                max={500}
+                step={1}
+                value={frayedBorderBlurLevel}
+                onChange={(e) => setFrayedBorderBlurLevel(Number(e.target.value))}
+                disabled={!frayedBorder}
+              />
+              <span className="slider-value">{Math.round(frayedBorderBlurLevel)}</span>
+            </div>
 
             <label htmlFor="frayed-border-size-input">
-              {translateLabel('theme.fraySize.label')}: {Math.round(frayedBorderSize)}
+              {translateLabel('theme.fraySize.label')}
             </label>
-            <input
-              id="frayed-border-size-input"
-              type="range"
-              min={1}
-              max={15}
-              step={1}
-              value={frayedBorderSize}
-              onChange={(e) => setFrayedBorderSize(Number(e.target.value))}
-              disabled={!frayedBorder}
-            />
+            <div className="slider-row">
+              <input
+                id="frayed-border-size-input"
+                type="range"
+                min={1}
+                max={15}
+                step={1}
+                value={frayedBorderSize}
+                onChange={(e) => setFrayedBorderSize(Number(e.target.value))}
+                disabled={!frayedBorder}
+              />
+              <span className="slider-value">{Math.round(frayedBorderSize)}</span>
+            </div>
 
             <label htmlFor="frayed-border-seed-input">{translateLabel('theme.randomSeed.label')}</label>
             <input
@@ -914,27 +1324,31 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
             style={!drawGrunge ? { opacity: 0.5, pointerEvents: 'none' } : undefined}
           >
             <label htmlFor="grunge-width-input">
-              {translateLabel('theme.grungeWidth.help')}: {Math.round(grungeWidth)}
+              {translateLabel('theme.grungeWidth.help')}
             </label>
-            <input
-              id="grunge-width-input"
-              type="range"
-              min={0}
-              max={2000}
-              step={1}
-              value={grungeWidth}
-              onChange={(e) => setGrungeWidth(Number(e.target.value))}
-              disabled={!drawGrunge}
-            />
+            <div className="slider-row">
+              <input
+                id="grunge-width-input"
+                type="range"
+                min={0}
+                max={2000}
+                step={1}
+                value={grungeWidth}
+                onChange={(e) => setGrungeWidth(Number(e.target.value))}
+                disabled={!drawGrunge}
+              />
+              <span className="slider-value">{Math.round(grungeWidth)}</span>
+            </div>
 
-            <label htmlFor="frayed-border-color-input">{translateLabel('theme.grungeColor.label')}</label>
-            <input
-              id="frayed-border-color-input"
-              type="color"
-              value={frayedBorderColorHex}
-              onChange={(e) => setFrayedBorderColorHex(e.target.value)}
-              disabled={!drawGrunge}
-            />
+            {renderColorControl({
+              id: 'frayed-border-color',
+              label: translateLabel('theme.grungeColor.label'),
+              hexValue: frayedBorderColorHex,
+              onHexChange: setFrayedBorderColorHex,
+              showState: showFrayedBorderPicker,
+              setShowState: setShowFrayedBorderPicker,
+              disabled: !drawGrunge,
+            })}
           </div>
         </div>
       </div>
@@ -960,47 +1374,52 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
           </select>
 
           <label htmlFor="coastline-width-input">
-            {translateLabel('theme.coastlineWidth.label')}: {coastlineWidth.toFixed(1)}
+            {translateLabel('theme.coastlineWidth.label')}
           </label>
-          <input
-            id="coastline-width-input"
-            type="range"
-            min={0}
-            max={10}
-            step={0.1}
-            value={coastlineWidth}
-            onChange={(e) => setCoastlineWidth(Number(e.target.value))}
-          />
+          <div className="slider-row">
+            <input
+              id="coastline-width-input"
+              type="range"
+              min={0}
+              max={10}
+              step={0.1}
+              value={coastlineWidth}
+              onChange={(e) => setCoastlineWidth(Number(e.target.value))}
+            />
+            <span className="slider-value">{coastlineWidth.toFixed(1)}</span>
+          </div>
 
-          <label htmlFor="coastline-color-input">
-            {translateLabel('theme.coastlineColor.label')}
-          </label>
-          <input
-            id="coastline-color-input"
-            type="color"
-            value={coastlineColorHex}
-            onChange={(e) => setCoastlineColorHex(e.target.value)}
-          />
+          {renderColorControl({
+            id: 'coastline-color',
+            label: translateLabel('theme.coastlineColor.label'),
+            hexValue: coastlineColorHex,
+            onHexChange: setCoastlineColorHex,
+            showState: showCoastlinePicker,
+            setShowState: setShowCoastlinePicker,
+            disabled: false,
+          })}
 
           <label htmlFor="coast-shading-level-input">
-            {translateLabel('theme.coastShadingWidth.label')}: {Math.round(coastShadingLevel)}
+            {translateLabel('theme.coastShadingWidth.label')}
           </label>
-          <input
-            id="coast-shading-level-input"
-            type="range"
-            min={0}
-            max={100}
-            step={1}
-            value={coastShadingLevel}
-            onChange={(e) => setCoastShadingLevel(Number(e.target.value))}
-          />
+          <div className="slider-row">
+            <input
+              id="coast-shading-level-input"
+              type="range"
+              min={0}
+              max={100}
+              step={1}
+              value={coastShadingLevel}
+              onChange={(e) => setCoastShadingLevel(Number(e.target.value))}
+            />
+            <span className="slider-value">{Math.round(coastShadingLevel)}</span>
+          </div>
 
-          {finalLandColoringMethod !== 'SingleColor' && (
-            <>
-              <label htmlFor="coast-shading-alpha-input">
-                {translateLabel('theme.coastShadingTransparency.label')}:{' '}
-                {Math.round(coastShadingAlpha)}
-              </label>
+          <>
+            <label htmlFor="coast-shading-alpha-input">
+              {translateLabel('theme.coastShadingTransparency.label')}
+            </label>
+            <div className="slider-row">
               <input
                 id="coast-shading-alpha-input"
                 type="range"
@@ -1009,132 +1428,50 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
                 step={1}
                 value={coastShadingAlpha}
                 onChange={(e) => setCoastShadingAlpha(Number(e.target.value))}
+                disabled={finalLandColoringMethod === 'SingleColor'}
               />
-            </>
-          )}
+              <span className="slider-value">{Math.round(coastShadingAlpha)}</span>
+            </div>
+          </>
 
           <label htmlFor="coast-shading-color-input">
             {translateLabel('theme.coastShadingColor.label')}
           </label>
-          {finalLandColoringMethod === 'ColorPoliticalRegions' ? (
-            <div className="disabled-note" aria-live="polite">
-              {sanitizeTranslation(
-                translateLabelWithArgs(
-                  'theme.coastShadingColor.disabled',
-                  landColoringMethods.find((m) => m && m.value === finalLandColoringMethod)?.label || finalLandColoringMethod
-                )
-              )}
-            </div>
-          ) : (
-            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-              <div
-                role="button"
-                aria-label="Open coast shading color picker"
-                onClick={() => setShowCoastPicker(true)}
-                style={{
-                  width: 36,
-                  height: 24,
-                  background: coastShadingColorHex || '#000000',
-                  border: '1px solid #bbb',
-                  cursor: 'pointer',
-                }}
-              />
-              <input
-                id="coast-shading-color-input"
-                type="text"
-                value={coastShadingColorHex}
-                onChange={(e) => setCoastShadingColorHex(e.target.value)}
-              />
-
-              {showCoastPicker && (
-                <div style={modalBackdropStyle} onClick={() => setShowCoastPicker(false)}>
-                  <div style={modalContentStyle} onClick={(e) => e.stopPropagation()}>
-                    <ChromePicker
-                      color={hexToRgba(coastShadingColorHex, coastShadingAlpha)}
-                      onChange={(col) => {
-                        const hex = rgbaToHex(col.rgb)
-                        setCoastShadingColorHex(hex)
-                        setCoastShadingAlpha(Math.round((1 - (col.rgb.a ?? 1)) * 100))
-                      }}
-                    />
-                    <div style={{ marginTop: 8, display: 'flex', justifyContent: 'flex-end' }}>
-                      <button type="button" onClick={() => setShowCoastPicker(false)}>
-                        Close
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          <label htmlFor="ocean-shading-level-input">
-            {translateLabel('theme.oceanShadingWidth.label')}: {Math.round(oceanShadingLevel)}
-          </label>
-          <input
-            id="ocean-shading-level-input"
-            type="range"
-            min={0}
-            max={100}
-            step={1}
-            value={oceanShadingLevel}
-            onChange={(e) => setOceanShadingLevel(Number(e.target.value))}
-          />
-
-          {finalLandColoringMethod !== 'SingleColor' && (
-            <>
-              <label htmlFor="ocean-shading-alpha-input">
-                {translateLabel('theme.oceanShadingTransparency.label')}:{' '}
-                {Math.round(oceanShadingAlpha)}
-              </label>
-              <input
-                id="ocean-shading-alpha-input"
-                type="range"
-                min={0}
-                max={100}
-                step={1}
-                value={oceanShadingAlpha}
-                onChange={(e) => setOceanShadingAlpha(Number(e.target.value))}
-              />
-            </>
-          )}
-
-          <label htmlFor="ocean-shading-color-input">
-            {translateLabel('theme.oceanShadingColor.label')}
-          </label>
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
             <div
               role="button"
-              aria-label="Open ocean shading color picker"
-              onClick={() => setShowOceanPicker(true)}
+              aria-label="Open coast shading color picker"
+              onClick={() => setShowCoastPicker(true)}
               style={{
                 width: 36,
                 height: 24,
-                background: oceanShadingColorHex || '#000000',
+                background: coastShadingColorHex || '#000000',
                 border: '1px solid #bbb',
-                cursor: 'pointer',
+                cursor: finalLandColoringMethod === 'ColorPoliticalRegions' ? 'default' : 'pointer',
+                opacity: finalLandColoringMethod === 'ColorPoliticalRegions' ? 0.5 : 1,
               }}
             />
             <input
-              id="ocean-shading-color-input"
+              id="coast-shading-color-input"
               type="text"
-              value={oceanShadingColorHex}
-              onChange={(e) => setOceanShadingColorHex(e.target.value)}
+              value={coastShadingColorHex}
+              onChange={(e) => setCoastShadingColorHex(e.target.value)}
+              disabled={finalLandColoringMethod === 'ColorPoliticalRegions'}
             />
 
-            {showOceanPicker && (
-              <div style={modalBackdropStyle} onClick={() => setShowOceanPicker(false)}>
+            {showCoastPicker && (
+              <div style={modalBackdropStyle} onClick={() => setShowCoastPicker(false)}>
                 <div style={modalContentStyle} onClick={(e) => e.stopPropagation()}>
-                  <ChromePicker
-                    color={hexToRgba(oceanShadingColorHex, oceanShadingAlpha)}
+                  <RgbaColorPicker
+                    color={hexToRgba(coastShadingColorHex, coastShadingAlpha)}
                     onChange={(col) => {
-                      const hex = rgbaToHex(col.rgb)
-                      setOceanShadingColorHex(hex)
-                      setOceanShadingAlpha(Math.round((1 - (col.rgb.a ?? 1)) * 100))
+                      const hex = rgbaToHex(col)
+                      setCoastShadingColorHex(hex)
+                      setCoastShadingAlpha(Math.round((1 - (col.a ?? 1)) * 100))
                     }}
                   />
                   <div style={{ marginTop: 8, display: 'flex', justifyContent: 'flex-end' }}>
-                    <button type="button" onClick={() => setShowOceanPicker(false)}>
+                    <button type="button" onClick={() => setShowCoastPicker(false)}>
                       Close
                     </button>
                   </div>
@@ -1142,6 +1479,34 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
               </div>
             )}
           </div>
+
+          <label htmlFor="ocean-shading-level-input">
+            {translateLabel('theme.oceanShadingWidth.label')}
+          </label>
+          <div className="slider-row">
+            <input
+              id="ocean-shading-level-input"
+              type="range"
+              min={0}
+              max={100}
+              step={1}
+              value={oceanShadingLevel}
+              onChange={(e) => setOceanShadingLevel(Number(e.target.value))}
+            />
+            <span className="slider-value">{Math.round(oceanShadingLevel)}</span>
+          </div>
+
+          {renderColorControl({
+            id: 'ocean-shading-color',
+            label: translateLabel('theme.oceanShadingColor.label'),
+            hexValue: oceanShadingColorHex,
+            onHexChange: setOceanShadingColorHex,
+            alphaValue: oceanShadingAlpha,
+            onAlphaChange: setOceanShadingAlpha,
+            showState: showOceanPicker,
+            setShowState: setShowOceanPicker,
+            disabled: false,
+          })}
         </div>
 
         <div className="fields-column">
@@ -1160,11 +1525,11 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
           </select>
 
           {/* Hide wave size when concentric waves are selected (concentric uses its own count/size) */}
-          {oceanWavesType !== concentricWaveValue && (
-            <>
-              <label htmlFor="ocean-waves-level-input">
-                {translateLabel('theme.waveWidth.label')}: {Math.round(oceanWavesLevel)}
-              </label>
+          <>
+            <label htmlFor="ocean-waves-level-input">
+              {translateLabel('theme.waveWidth.label')}
+            </label>
+            <div className="slider-row">
               <input
                 id="ocean-waves-level-input"
                 type="range"
@@ -1173,27 +1538,31 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
                 step={1}
                 value={oceanWavesLevel}
                 onChange={(e) => setOceanWavesLevel(Number(e.target.value))}
+                disabled={oceanWavesType === concentricWaveValue}
               />
-            </>
-          )}
+              <span className="slider-value">{Math.round(oceanWavesLevel)}</span>
+            </div>
+          </>
 
           {/* Do not show wave color when 'None' wave type is selected */}
-          {oceanWavesType !== noneWaveValue && (
-            <>
-              <label htmlFor="ocean-waves-color-input">{translateLabel('theme.waveColor.label')}</label>
-              <input
-                id="ocean-waves-color-input"
-                type="color"
-                value={oceanWavesColorHex}
-                onChange={(e) => setOceanWavesColorHex(e.target.value)}
-              />
-            </>
-          )}
+          {
+            renderColorControl({
+              id: 'ocean-waves-color',
+              label: translateLabel('theme.waveColor.label'),
+              hexValue: oceanWavesColorHex,
+              onHexChange: setOceanWavesColorHex,
+              alphaValue: oceanWavesAlpha,
+              onAlphaChange: setOceanWavesAlpha,
+              showState: showOceanWavesPicker,
+              setShowState: setShowOceanWavesPicker,
+              disabled: oceanWavesType === noneWaveValue,
+            })
+          }
 
           {/* Conditionally show concentric-specific controls when concentric waves selected */}
-          {oceanWavesType === concentricWaveValue && (
-            <div className="concentric-options">
-              <label htmlFor="concentric-wave-count">{translateLabel('theme.waveCount.label')}: {concentricWaveCount}</label>
+          <>
+            <label htmlFor="concentric-wave-count">{translateLabel('theme.waveCount.label')}</label>
+            <div className="slider-row">
               <input
                 id="concentric-wave-count"
                 type="range"
@@ -1202,24 +1571,26 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
                 step={1}
                 value={concentricWaveCount}
                 onChange={(e) => setConcentricWaveCount(Number(e.target.value))}
+                disabled={oceanWavesType !== concentricWaveValue}
               />
-
-              <label className="checkbox-label">
-                <input type="checkbox" checked={fadeConcentricWaves} onChange={(e) => setFadeConcentricWaves(e.target.checked)} />
-                <span>{translateLabel('theme.fadeOuterWaves.label')}</span>
-              </label>
-
-              <label className="checkbox-label">
-                <input type="checkbox" checked={jitterToConcentricWaves} onChange={(e) => setJitterToConcentricWaves(e.target.checked)} />
-                <span>{translateLabel('theme.jitter.label')}</span>
-              </label>
-
-              <label className="checkbox-label">
-                <input type="checkbox" checked={brokenLinesForConcentricWaves} onChange={(e) => setBrokenLinesForConcentricWaves(e.target.checked)} />
-                <span>{translateLabel('theme.brokenLines.label')}</span>
-              </label>
+              <span className="slider-value">{concentricWaveCount}</span>
             </div>
-          )}
+
+            <label className="checkbox-label">
+              <input type="checkbox" checked={fadeConcentricWaves} onChange={(e) => setFadeConcentricWaves(e.target.checked)} disabled={oceanWavesType !== concentricWaveValue} />
+              <span>{translateLabel('theme.fadeOuterWaves.label')}</span>
+            </label>
+
+            <label className="checkbox-label">
+              <input type="checkbox" checked={jitterToConcentricWaves} onChange={(e) => setJitterToConcentricWaves(e.target.checked)} disabled={oceanWavesType !== concentricWaveValue} />
+              <span>{translateLabel('theme.jitter.label')}</span>
+            </label>
+
+            <label className="checkbox-label">
+              <input type="checkbox" checked={brokenLinesForConcentricWaves} onChange={(e) => setBrokenLinesForConcentricWaves(e.target.checked)} disabled={oceanWavesType !== concentricWaveValue} />
+              <span>{translateLabel('theme.brokenLines.label')}</span>
+            </label>
+          </>
 
           <label className="checkbox-label">
             <input
@@ -1230,13 +1601,15 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
             <span>{translateLabel('theme.drawOceanEffectsInLakes')}</span>
           </label>
 
-          <label htmlFor="river-color-input">{translateLabel('theme.riverColor.label')}</label>
-          <input
-            id="river-color-input"
-            type="color"
-            value={riverColorHex}
-            onChange={(e) => setRiverColorHex(e.target.value)}
-          />
+              {renderColorControl({
+                id: 'river-color',
+                label: translateLabel('theme.riverColor.label'),
+                hexValue: riverColorHex,
+                onHexChange: setRiverColorHex,
+                showState: showRiverPicker,
+                setShowState: setShowRiverPicker,
+                disabled: false,
+              })}
 
           <label className="checkbox-label">
             <input
@@ -1251,7 +1624,7 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
             className={`control-group${!drawRoads ? ' is-disabled' : ''}`}
             style={!drawRoads ? { opacity: 0.5, pointerEvents: 'none' } : undefined}
           >
-            <label htmlFor="road-style-input">{translateLabel('theme.roadStyle.label') || 'Style:'}</label>
+            <label htmlFor="road-style-input">{translateLabel('theme.roadStyle.label')}</label>
             <select
               id="road-style-input"
               value={gatedControlValue(roadStyle)}
@@ -1268,84 +1641,103 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
                 : emptyComboOption}
             </select>
 
-            <label htmlFor="road-width-input">{translateLabel('theme.roadWidth.label') || 'Width:'} {Number(roadWidth).toFixed(1)}</label>
-            <input
-              id="road-width-input"
-              type="range"
-              min={0}
-              max={10}
-              step={0.1}
-              value={roadWidth}
-              onChange={(e) => setRoadWidth(Number(e.target.value))}
-              disabled={!drawRoads}
-            />
+            <label htmlFor="road-width-input">{translateLabel('theme.roadWidth.label')}</label>
+            <div className="slider-row">
+              <input
+                id="road-width-input"
+                type="range"
+                min={0}
+                max={10}
+                step={0.1}
+                value={roadWidth}
+                onChange={(e) => setRoadWidth(Number(e.target.value))}
+                disabled={!drawRoads}
+              />
+              <span className="slider-value">{Number(roadWidth).toFixed(1)}</span>
+            </div>
 
-            <label htmlFor="road-color-input">{translateLabel('theme.roadColor.label') || 'Color:'}</label>
-            <input
-              id="road-color-input"
-              type="color"
-              value={roadColorHex}
-              onChange={(e) => setRoadColorHex(e.target.value)}
-              disabled={!drawRoads}
-            />
+            {renderColorControl({
+              id: 'road-color',
+              label: translateLabel('theme.roadColor.label'),
+              hexValue: roadColorHex,
+              onHexChange: setRoadColorHex,
+              showState: showRoadPicker,
+              setShowState: setShowRoadPicker,
+              disabled: !drawRoads,
+            })}
           </div>
 
           {/* Additional parameter controls (always enabled regardless of Draw roads) */}
           <div className="control-group parameters-group" style={{ marginTop: 8 }}>
-            <label htmlFor="mountain-size-input">{translateLabel('theme.mountainSize.label') || 'Mountain size:'} {mountainSize}</label>
-            <input
-              id="mountain-size-input"
-              type="range"
-              min={1}
-              max={15}
-              step={1}
-              value={mountainSize}
-              onChange={(e) => setMountainSize(Number(e.target.value))}
-            />
+            <label htmlFor="mountain-size-input">{translateLabel('theme.mountainSize.label')}</label>
+            <div className="slider-row">
+              <input
+                id="mountain-size-input"
+                type="range"
+                min={1}
+                max={15}
+                step={1}
+                value={mountainSize}
+                onChange={(e) => setMountainSize(Number(e.target.value))}
+              />
+              <span className="slider-value">{mountainSize}</span>
+            </div>
 
-            <label htmlFor="hill-size-input">{translateLabel('theme.hillSize.label') || 'Hill size:'} {hillSize}</label>
-            <input
-              id="hill-size-input"
-              type="range"
-              min={1}
-              max={15}
-              step={1}
-              value={hillSize}
-              onChange={(e) => setHillSize(Number(e.target.value))}
-            />
+            <label htmlFor="hill-size-input">{translateLabel('theme.hillSize.label')}</label>
+            <div className="slider-row">
+              <input
+                id="hill-size-input"
+                type="range"
+                min={1}
+                max={15}
+                step={1}
+                value={hillSize}
+                onChange={(e) => setHillSize(Number(e.target.value))}
+              />
+              <span className="slider-value">{hillSize}</span>
+            </div>
 
-            <label htmlFor="dune-size-input">{translateLabel('theme.duneSize.label') || 'Dune size:'} {duneSize}</label>
-            <input
-              id="dune-size-input"
-              type="range"
-              min={1}
-              max={15}
-              step={1}
-              value={duneSize}
-              onChange={(e) => setDuneSize(Number(e.target.value))}
-            />
+            <label htmlFor="dune-size-input">{translateLabel('theme.duneSize.label')}</label>
+            <div className="slider-row">
+              <input
+                id="dune-size-input"
+                type="range"
+                min={1}
+                max={15}
+                step={1}
+                value={duneSize}
+                onChange={(e) => setDuneSize(Number(e.target.value))}
+              />
+              <span className="slider-value">{duneSize}</span>
+            </div>
 
-            <label htmlFor="tree-height-input">{translateLabel('theme.treeHeight.label') || 'Tree height:'} {treeHeight}</label>
-            <input
-              id="tree-height-input"
-              type="range"
-              min={1}
-              max={15}
-              step={1}
-              value={treeHeight}
-              onChange={(e) => setTreeHeight(Number(e.target.value))}
-            />
+            <label htmlFor="tree-height-input">{translateLabel('theme.treeHeight.label')}</label>
+            <div className="slider-row">
+              <input
+                id="tree-height-input"
+                type="range"
+                min={1}
+                max={15}
+                step={1}
+                value={treeHeight}
+                onChange={(e) => setTreeHeight(Number(e.target.value))}
+              />
+              <span className="slider-value">{treeHeight}</span>
+            </div>
 
-            <label htmlFor="city-size-input">{translateLabel('theme.citySize.label') || 'City size:'} {citySize}</label>
-            <input
-              id="city-size-input"
-              type="range"
-              min={1}
-              max={15}
-              step={1}
-              value={citySize}
-              onChange={(e) => setCitySize(Number(e.target.value))}
-            />
+            <label htmlFor="city-size-input">{translateLabel('theme.citySize.label')}</label>
+            <div className="slider-row">
+              <input
+                id="city-size-input"
+                type="range"
+                min={1}
+                max={15}
+                step={1}
+                value={citySize}
+                onChange={(e) => setCitySize(Number(e.target.value))}
+              />
+              <span className="slider-value">{citySize}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -1365,86 +1757,90 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
         </label>
         <div className={`control-group${!drawText ? ' is-disabled' : ''}`}>
           <div className="customize-font-grid">
-            {fontFields.map((field) => (
-              <React.Fragment key={field.id}>
-                <label htmlFor={field.id}>{field.label}</label>
-                <div className="font-combo" id={field.id}>
-                  <button
-                    type="button"
-                    className="font-combo-trigger"
-                    onClick={() => setOpenFontComboId(openFontComboId === field.id ? null : field.id)}
-                    style={{ fontFamily: field.value || 'serif' }}
-                    aria-haspopup="listbox"
-                    aria-expanded={openFontComboId === field.id}
-                    disabled={!drawText}
-                  >
-                    {field.value || translateLabel('ui.font.keepCurrent')}
-                  </button>
-                  {openFontComboId === field.id && (
-                    <div className="font-combo-menu">
+            <div className="fonts-grid two-col-layout" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', columnGap: 24, rowGap: 8, alignItems: 'start' }}>
+              <div className="fields-column">
+                {fontFields.map((field) => (
+                  <React.Fragment key={field.id}>
+                    <label htmlFor={field.id}>{field.label}</label>
+                    <div className="font-combo" id={field.id}>
                       <button
                         type="button"
-                        className={`font-combo-option${field.value === '' ? ' is-selected' : ''}`}
-                        data-field-id={field.id}
-                        data-family=""
-                        onClick={handleFontOptionClick}
-                        style={{ fontFamily: 'serif' }}
+                        className="font-combo-trigger"
+                        onClick={() => setOpenFontComboId(openFontComboId === field.id ? null : field.id)}
+                        style={{ fontFamily: field.value || 'serif' }}
+                        aria-haspopup="listbox"
+                        aria-expanded={openFontComboId === field.id}
                         disabled={!drawText}
                       >
-                        {translateLabel('ui.font.keepCurrent')}
+                        {field.value || translateLabel('ui.font.keepCurrent')}
                       </button>
-                      {availableFontFamilies.map((family) => (
-                        <button
-                          key={family}
-                          type="button"
-                          className={`font-combo-option${field.value === family ? ' is-selected' : ''}`}
-                          data-field-id={field.id}
-                          data-family={family}
-                          onClick={handleFontOptionClick}
-                          style={{ fontFamily: family }}
-                          disabled={!drawText}
-                        >
-                          {family}
-                        </button>
-                      ))}
+                      {openFontComboId === field.id && (
+                        <div className="font-combo-menu">
+                          <button
+                            type="button"
+                            className={`font-combo-option${field.value === '' ? ' is-selected' : ''}`}
+                            data-field-id={field.id}
+                            data-family=""
+                            onClick={handleFontOptionClick}
+                            style={{ fontFamily: 'serif' }}
+                            disabled={!drawText}
+                          >
+                            {translateLabel('ui.font.keepCurrent')}
+                          </button>
+                          {availableFontFamilies.map((family) => (
+                            <button
+                              key={family}
+                              type="button"
+                              className={`font-combo-option${field.value === family ? ' is-selected' : ''}`}
+                              data-field-id={field.id}
+                              data-family={family}
+                              onClick={handleFontOptionClick}
+                              style={{ fontFamily: family }}
+                              disabled={!drawText}
+                            >
+                              {family}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-              </React.Fragment>
-            ))}
+                  </React.Fragment>
+                ))}
+              </div>
+              <div className="fields-column">
+                {renderColorControl({
+                  id: 'text-color',
+                  label: translateLabel('theme.textColor.label'),
+                  hexValue: textColorHex,
+                  onHexChange: setTextColorHex,
+                  showState: showTextColorPicker,
+                  setShowState: setShowTextColorPicker,
+                  disabled: !drawText,
+                  swatchStyle: { flex: '0 0 180px', minWidth: 120 },
+                })}
 
-            <label htmlFor="text-color-input">{translateLabel('theme.textColor.label')}</label>
-            <input
-              id="text-color-input"
-              type="color"
-              value={textColorHex}
-              onChange={(e) => setTextColorHex(e.target.value)}
-              disabled={!drawText}
-            />
+                <label className="checkbox-label" style={{ marginTop: 12 }}>
+                  <input
+                    type="checkbox"
+                    checked={drawBoldBackground}
+                    onChange={(e) => setDrawBoldBackground(e.target.checked)}
+                    disabled={!drawText}
+                  />
+                  <span style={{ marginLeft: 8 }}>{translateLabel('theme.boldBackground')}</span>
+                </label>
 
-            <label className="checkbox-label">
-              <input
-                type="checkbox"
-                checked={drawBoldBackground}
-                onChange={(e) => setDrawBoldBackground(e.target.checked)}
-                disabled={!drawText}
-              />
-              <span>
-                {translateLabel('theme.boldBackground')}
-              </span>
-            </label>
-            <div />
-
-            <label htmlFor="bold-background-color-input">
-              {translateLabel('theme.boldBackgroundColor.label')}
-            </label>
-            <input
-              id="bold-background-color-input"
-              type="color"
-              value={boldBackgroundColorHex}
-              onChange={(e) => setBoldBackgroundColorHex(e.target.value)}
-              disabled={!drawText || !drawBoldBackground}
-            />
+                {renderColorControl({
+                  id: 'bold-background-color',
+                  label: translateLabel('theme.boldBackgroundColor.label'),
+                  hexValue: boldBackgroundColorHex,
+                  onHexChange: setBoldBackgroundColorHex,
+                  showState: showBoldBackgroundPicker,
+                  setShowState: setShowBoldBackgroundPicker,
+                  disabled: !drawText || !drawBoldBackground,
+                  swatchStyle: { flex: '1 1 auto', minWidth: 48, marginTop: 8 },
+                })}
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -1457,14 +1853,6 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
         <h3 style={{ margin: 0 }}>{translateLabel('ui.title.customize')}</h3>
-        <label className="checkbox-label" style={{ marginLeft: 8, fontSize: '0.9rem' }}>
-          <input
-            type="checkbox"
-            checked={debugMode}
-            onChange={(e) => setDebugMode(e.target.checked)}
-          />
-          <span>Debug UI</span>
-        </label>
       </div>
       <p className="section-hint">
         {translateLabel('ui.subtitle.customize')}
@@ -1477,6 +1865,8 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
       <form
         className={`section-fields${hasCustomizationSource ? '' : ' section-fields--disabled'}`}
         onSubmit={handleGenerateFromSettings}
+        onChange={notifyManualChange}
+        onInput={notifyManualChange}
       >
         <div className="settings-preview-row">
           <div className="settings-inline-preview-slot">
@@ -1529,7 +1919,7 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
             <button
               type="button"
               className="secondary"
-              disabled={!canSubmit}
+              disabled={!canDownloadSettings}
               onClick={handleGenerateAndSaveNort}
             >
               {translateLabel('ui.button.downloadSettings')}
@@ -1537,7 +1927,7 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
             <button
               type="button"
               className="secondary"
-              disabled={loading || !preview?.url}
+              disabled={!canDownloadMap}
               onClick={handleDownloadMap}
             >
               {translateLabel('ui.button.downloadMap')}

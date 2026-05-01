@@ -51,7 +51,7 @@ public class MapGeneratorCLI
 		String outPath = "out.png";
 		Integer width;
 		Integer height;
-		Long seed;
+		Long randomSeed;
 	}
 
 	private static Config parseArgs(String[] args)
@@ -83,7 +83,7 @@ public class MapGeneratorCLI
 		handlers.put("--seed", it2 ->
 		{
 			if (it2.hasNext())
-				cfg.seed = Long.parseLong(it2.next());
+				cfg.randomSeed = Long.parseLong(it2.next());
 		});
 		handlers.put("--help", it2 -> cfg.showHelp = true);
 		handlers.put("-h", it2 -> cfg.showHelp = true);
@@ -108,9 +108,9 @@ public class MapGeneratorCLI
 
 		MapSettings settings = (cfg.nortFile != null) ? loadSettings(cfg.nortFile) : generateSettings();
 
-		if (cfg.seed != null)
+		if (cfg.randomSeed != null)
 		{
-			settings.randomSeed = cfg.seed;
+			settings.randomSeed = cfg.randomSeed;
 		}
 
 		Dimension dims = computeDimensions(cfg, settings);

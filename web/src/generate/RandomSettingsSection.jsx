@@ -51,7 +51,14 @@ export default function RandomSettingsSection({ values, handlers, options, ui })
 
   const labels = i18n?.labels || {}
   const backendOptions = i18n?.options || {}
-  const translateLabel = (key) => labels[key] || key
+  const translateLabel = (key) => {
+    const v = labels[key] || key
+    if (typeof v === 'string' && /<br\s*\/?\>/i.test(v)) {
+      const parts = v.split(/<br\s*\/?\>/i)
+      return parts.flatMap((p, i) => (i === parts.length - 1 ? [p] : [p, React.createElement('br', { key: i })]))
+    }
+    return v
+  }
   const randomOption = { value: '', label: translateLabel('ui.select.random') }
   const dimensions = backendOptions.dimensions
     ? [randomOption, ...backendOptions.dimensions]
@@ -87,40 +94,44 @@ export default function RandomSettingsSection({ values, handlers, options, ui })
               ))}
             </select>
 
-            {allBooks.length > 0 && (
-              <fieldset className="books-widget">
-                <legend>{translateLabel('ui.books.legend')}</legend>
-                <div className="books-actions">
-                  <button type="button" onClick={() => setSelectedBooks(new Set(allBooks))}>
-                    {translateLabel('ui.books.checkAll')}
-                  </button>
-                  <button type="button" onClick={() => setSelectedBooks(new Set())}>
-                    {translateLabel('ui.books.uncheckAll')}
-                  </button>
-                </div>
-                <div className="books-list">
-                  {allBooks.map((book) => (
-                    <label key={book} className="book-item">
-                      <input
-                        type="checkbox"
-                        checked={selectedBooks.has(book)}
-                        onChange={(e) => {
-                          const next = new Set(selectedBooks)
-                          if (e.target.checked) next.add(book)
-                          else next.delete(book)
-                          setSelectedBooks(next)
-                        }}
-                      />
-                      <span className="book-title">{book}</span>
-                    </label>
-                  ))}
-                </div>
-              </fieldset>
-            )}
+            <fieldset className="books-widget">
+              <legend>{translateLabel('textTool.booksForText.label')}</legend>
+              {allBooks.length === 0 ? (
+                <div className="disabled-note">{translateLabel('textTool.booksForText.none')}</div>
+              ) : (
+                <>
+                  <div className="books-actions">
+                    <button type="button" onClick={() => setSelectedBooks(new Set(allBooks))}>
+                      {translateLabel('books.checkAll')}
+                    </button>
+                    <button type="button" onClick={() => setSelectedBooks(new Set())}>
+                      {translateLabel('books.uncheckAll')}
+                    </button>
+                  </div>
+                  <div className="books-list">
+                    {allBooks.map((book) => (
+                      <label key={book} className="book-item">
+                        <input
+                          type="checkbox"
+                          checked={selectedBooks.has(book)}
+                          onChange={(e) => {
+                            const next = new Set(selectedBooks)
+                            if (e.target.checked) next.add(book)
+                            else next.delete(book)
+                            setSelectedBooks(next)
+                          }}
+                        />
+                        <span className="book-title">{book}</span>
+                      </label>
+                    ))}
+                  </div>
+                </>
+              )}
+            </fieldset>
           </div>
 
           <div className="fields-column">
-            <label htmlFor="dimension-input">{translateLabel('ui.dimension')}</label>
+            <label htmlFor="dimension-input">{translateLabel('newSettingsDialog.dimensions.label')}</label>
             <select
               id="dimension-input"
               value={dimension}
@@ -134,19 +145,22 @@ export default function RandomSettingsSection({ values, handlers, options, ui })
             </select>
 
             <label htmlFor="world-size-input">
-              {translateLabel('ui.worldSize')}: {worldSize.toLocaleString()}
+              {translateLabel('newSettingsDialog.worldSize.label')}
             </label>
-            <input
-              id="world-size-input"
-              type="range"
-              min={2000}
-              max={32000}
-              step={1000}
-              value={worldSize}
-              onChange={(e) => setWorldSize(Number(e.target.value))}
-            />
+            <div className="slider-row">
+              <input
+                id="world-size-input"
+                type="range"
+                min={2000}
+                max={32000}
+                step={1000}
+                value={worldSize}
+                onChange={(e) => setWorldSize(Number(e.target.value))}
+              />
+              <span className="slider-value">{worldSize.toLocaleString()}</span>
+            </div>
 
-            <label htmlFor="land-shape-input">{translateLabel('ui.landShape')}</label>
+            <label htmlFor="land-shape-input">{translateLabel('newSettingsDialog.landShape.label')}</label>
             <select
               id="land-shape-input"
               value={landShape}
@@ -160,17 +174,20 @@ export default function RandomSettingsSection({ values, handlers, options, ui })
             </select>
 
             <label htmlFor="region-count-input">
-              {translateLabel('ui.regionCount')}: {regionCount}
+              {translateLabel('newSettingsDialog.regionCount.label')}
             </label>
-            <input
-              id="region-count-input"
-              type="range"
-              min={2}
-              max={20}
-              step={1}
-              value={regionCount}
-              onChange={(e) => setRegionCount(Number(e.target.value))}
-            />
+            <div className="slider-row">
+              <input
+                id="region-count-input"
+                type="range"
+                min={2}
+                max={20}
+                step={1}
+                value={regionCount}
+                onChange={(e) => setRegionCount(Number(e.target.value))}
+              />
+              <span className="slider-value">{regionCount}</span>
+            </div>
 
             <label htmlFor="land-coloring-input">
               {translateLabel('theme.landColoringMethod.label')}{' '}
@@ -187,56 +204,51 @@ export default function RandomSettingsSection({ values, handlers, options, ui })
               ))}
             </select>
 
-            {artPacks.length > 0 && (
-              <>
-                <label htmlFor="art-pack-input">{translateLabel('ui.artPack')}</label>
-                <select
-                  id="art-pack-input"
-                  value={artPack}
-                  onChange={(e) => setArtPack(e.target.value)}
-                >
-                  <option value="">{translateLabel('ui.select.random')}</option>
-                  {artPacks.map((item) => (
-                    <option key={item} value={item}>
-                      {item}
-                    </option>
-                  ))}
-                </select>
-              </>
-            )}
+            <label htmlFor="art-pack-input" className={artPacks.length === 0 ? 'is-disabled' : ''}>{translateLabel('newSettingsDialog.artPack.label')}</label>
+            <select
+              id="art-pack-input"
+              value={artPack}
+              onChange={(e) => setArtPack(e.target.value)}
+              disabled={artPacks.length === 0}
+            >
+              <option value="">{translateLabel('ui.select.random')}</option>
+              {artPacks.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </select>
 
-            {cityIconTypes.length > 0 && (
-              <>
-                  <label htmlFor="city-icon-type-input">
-                  {translateLabel('ui.cityIconType')}
-                </label>
-                <select
-                  id="city-icon-type-input"
-                  value={cityIconType}
-                  onChange={(e) => setCityIconType(e.target.value)}
-                >
-                  <option value="">{translateLabel('ui.select.random')}</option>
-                  {cityIconTypes.map((item) => (
-                    <option key={item} value={item}>
-                      {item}
-                    </option>
-                  ))}
-                </select>
-              </>
-            )}
+            <label htmlFor="city-icon-type-input" className={cityIconTypes.length === 0 ? 'is-disabled' : ''}>{translateLabel('newSettingsDialog.cityIconType.label')}</label>
+            <select
+              id="city-icon-type-input"
+              value={cityIconType}
+              onChange={(e) => setCityIconType(e.target.value)}
+              disabled={cityIconTypes.length === 0}
+            >
+              <option value="">{translateLabel('ui.select.random')}</option>
+              {cityIconTypes.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </select>
 
             <label htmlFor="city-frequency-input">
-              {translateLabel('ui.cityFrequency')}: {cityFrequency}%
+              {translateLabel('newSettingsDialog.cityFrequency.label')}
             </label>
-            <input
-              id="city-frequency-input"
-              type="range"
-              min={0}
-              max={100}
-              step={1}
-              value={cityFrequency}
-              onChange={(e) => setCityFrequency(Number(e.target.value))}
-            />
+            <div className="slider-row">
+              <input
+                id="city-frequency-input"
+                type="range"
+                min={0}
+                max={100}
+                step={1}
+                value={cityFrequency}
+                onChange={(e) => setCityFrequency(Number(e.target.value))}
+              />
+              <span className="slider-value">{cityFrequency}%</span>
+            </div>
 
             <label htmlFor="random-seed-input">{translateLabel('theme.randomSeed.label')}</label>
             <input
@@ -266,7 +278,7 @@ export default function RandomSettingsSection({ values, handlers, options, ui })
             onFileSelect={(file) => handleFileInput({ target: { files: [file] } })}
             onDrop={onDrop}
             ariaLabel={translateLabel('ui.upload.aria')}
-            chooseLabel={translateLabel('ui.upload.chooseFile')}
+            chooseLabel={translateLabel('common.choose')}
             fileName={fileName}
             loadedPrefix={translateLabel('ui.upload.loadedPrefix')}
             uploadHint={translateLabel('ui.upload.hint')}

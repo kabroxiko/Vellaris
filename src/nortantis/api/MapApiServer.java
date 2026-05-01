@@ -13,9 +13,10 @@ import nortantis.NamedResource;
 import nortantis.SettingsGenerator;
 import nortantis.Stroke;
 import nortantis.StrokeType;
+import nortantis.GridOverlayShape;
+import nortantis.GridOverlayOffset;
 import nortantis.TextureSource;
 import nortantis.editor.UserPreferences;
-import nortantis.swing.ThemePanel.LandColoringMethod;
 import nortantis.swing.translation.Translation;
 import nortantis.util.Assets;
 import nortantis.platform.Color;
@@ -114,18 +115,6 @@ public class MapApiServer
 			res.type(CONTENT_TYPE_JSON);
 			return gson.toJson(SettingsGenerator.getAllBooks());
 		});
-
-		get("/api/city-icon-types", (req, res) ->
-		{
-			res.type(CONTENT_TYPE_JSON);
-			String artPack = req.queryParams(ART_PACK);
-			if (artPack == null || artPack.isEmpty())
-				artPack = Assets.installedArtPack;
-			PlatformFactory.setInstance(new AwtFactory());
-			List<String> types = ImageCache.getInstance(artPack, null).getIconGroupNames(IconType.cities);
-			return gson.toJson(types);
-		});
-
 		get("/api/textures", (req, res) ->
 		{
 			res.type(CONTENT_TYPE_JSON);
@@ -164,7 +153,56 @@ public class MapApiServer
 			applyRequestLanguage(requestedLanguage);
 			try
 			{
-				return gson.toJson(buildWebUiOptions());
+				// Build the standard UI options/labels
+				Map<String, Object> ui = buildWebUiOptions();
+
+				// Also include resource lists so the frontend can fetch a single
+				// endpoint for all initial UI state (art packs, books, textures,
+				// border types, and city icon groups per art pack).
+				try {
+					List<String> artPacks = Assets.listArtPacks(false);
+					ui.put("artPacks", artPacks);
+
+					ui.put("books", SettingsGenerator.getAllBooks());
+
+					List<NamedResource> textures = Assets.listBackgroundTexturesForAllArtPacks(null);
+					List<Map<String,String>> texturesResult = new java.util.ArrayList<>();
+					for (NamedResource t : textures) {
+						Map<String,String> entry = new LinkedHashMap<>();
+						entry.put("artPack", t.artPack);
+						entry.put("name", t.name);
+						texturesResult.add(entry);
+					}
+					ui.put("textures", texturesResult);
+
+					List<NamedResource> borderTypes = Assets.listAllBorderTypes(null);
+					List<Map<String,String>> borderResult = new java.util.ArrayList<>();
+					for (NamedResource b : borderTypes) {
+						Map<String,String> entry = new LinkedHashMap<>();
+						entry.put("artPack", b.artPack);
+						entry.put("name", b.name);
+						borderResult.add(entry);
+					}
+					ui.put("borderTypes", borderResult);
+
+					// City icon groups per art pack (may be empty for some packs)
+					Map<String, List<String>> cityIconTypesByPack = new LinkedHashMap<>();
+					PlatformFactory.setInstance(new AwtFactory());
+					for (String pack : artPacks) {
+						try {
+							List<String> types = ImageCache.getInstance(pack, null).getIconGroupNames(IconType.cities);
+							cityIconTypesByPack.put(pack, types);
+						} catch (Exception e) {
+							cityIconTypesByPack.put(pack, java.util.Collections.emptyList());
+						}
+					}
+					ui.put("cityIconTypesByPack", cityIconTypesByPack);
+				} catch (Exception e) {
+					// If resource enumeration fails, still return UI options.
+					Logger.println("Failed to enumerate UI resources: " + e.getMessage());
+				}
+
+				return gson.toJson(ui);
 			}
 			finally
 			{
@@ -173,7 +211,6 @@ public class MapApiServer
 		});
 
 		post("/api/generate", MapApiServer::handleGenerate);
-		post("/api/resolve-random-settings", MapApiServer::handleResolveRandomSettings);
 		post("/api/background-preview", MapApiServer::handleBackgroundPreview);
 
 		exception(Exception.class, (exception, req, res) ->
@@ -227,142 +264,30 @@ public class MapApiServer
 				return gson.toJson(new ApiResponse(false, MSG_FAILED_TO_LOAD_SETTINGS, null, null));
 			}
 
-			GenerationResult generation = generateMap(ctx.settings, cfg);
-				if (generation.image == null)
-				{
-					res.status(500);
-					return gson.toJson(new ApiResponse(false, generation.errorMessage, null, null));
-				}
-				Image img = generation.image;
-				// Always return image bytes for /generate requests.
-				return returnImageResponse(req, img, ctx.settings, ctx.tempNortPath, cfg, res);
-		}
-		finally
-		{
-			restorePreviousLanguage(previousLanguage);
-		}
-	}
-
-	private static Object handleResolveRandomSettings(Request req, Response res)
-	{
-		res.type(CONTENT_TYPE_JSON);
-		logHeaders(req);
-
-		Config cfg = parseConfig(req, res);
-		if (cfg == null)
-		{
-			return gson.toJson(new ApiResponse(false, MSG_FAILED_TO_PARSE_CONFIG, null, null));
-		}
-
-		PlatformFactory.setInstance(new AwtFactory());
-		String previousLanguage = UserPreferences.getInstance().language;
-		applyRequestLanguage(resolveGenerationLanguage(cfg));
-
-		try
-		{
-			GenerationContext ctx = loadSettings(cfg, res);
-			if (ctx == null)
-			{
-				return gson.toJson(new ApiResponse(false, MSG_FAILED_TO_LOAD_SETTINGS, null, null));
-			}
-
-			return resolveRandomOnlyResponse(ctx, res);
-		}
-		finally
-		{
-			restorePreviousLanguage(previousLanguage);
-		}
-	}
-
-	private static Object resolveRandomOnlyResponse(GenerationContext ctx, Response res)
-	{
-		try
-		{
-			String nortContent = ctx.settings.toJsonString();
-			@SuppressWarnings("unchecked")
-			Map<String, Object> settings = gson.fromJson(nortContent, Map.class);
-			// Build a small map of UI-friendly default values (hex colors, numeric scales, booleans)
-			Map<String, Object> uiDefaults = new LinkedHashMap<>();
-			// Color fields: provide hex strings (omit alpha if fully opaque)
-			if (ctx.settings.oceanShadingColor != null)
-			{
-				String hex = colorToHex(ctx.settings.oceanShadingColor);
-				uiDefaults.put("oceanShadingColor", hex);
-				uiDefaults.put("oceanShadingColorHex", hex);
-				// expose transparency percent for the UI (100 = fully transparent)
-				int oceanAlpha = ctx.settings.oceanShadingColor.getAlpha();
-				int oceanOpacityPercent = Math.round((oceanAlpha / 255.0f) * 100.0f);
-				uiDefaults.put("oceanShadingAlpha", 100 - oceanOpacityPercent);
-			}
-			if (ctx.settings.coastShadingColor != null)
-			{
-				String hex = colorToHex(ctx.settings.coastShadingColor);
-				uiDefaults.put("coastShadingColor", hex);
-				uiDefaults.put("coastShadingColorHex", hex);
-				int coastAlpha = ctx.settings.coastShadingColor.getAlpha();
-				int coastOpacityPercent = Math.round((coastAlpha / 255.0f) * 100.0f);
-				uiDefaults.put("coastShadingAlpha", 100 - coastOpacityPercent);
-			}
-
-			// Focused API debug: log derived hex + transparency for coast/ocean shading
-			if (API_DEBUG) {
-				try {
-					String oHex = ctx.settings.oceanShadingColor != null ? colorToHex(ctx.settings.oceanShadingColor) : "<none>";
-					String cHex = ctx.settings.coastShadingColor != null ? colorToHex(ctx.settings.coastShadingColor) : "<none>";
-					int oAlpha = ctx.settings.oceanShadingColor != null ? ctx.settings.oceanShadingColor.getAlpha() : -1;
-					int cAlpha = ctx.settings.coastShadingColor != null ? ctx.settings.coastShadingColor.getAlpha() : -1;
-					Logger.println("Resolved UI defaults - oceanShadingColorHex=" + oHex + " oceanAlpha=" + oAlpha
-						+ " coastShadingColorHex=" + cHex + " coastAlpha=" + cAlpha);
-				} catch (Exception ignore) {}
-			}
-
-			// Concentric waves / effects flags
-			uiDefaults.put("fadeConcentricWaves", ctx.settings.fadeConcentricWaves);
-			uiDefaults.put("brokenLinesForConcentricWaves", ctx.settings.brokenLinesForConcentricWaves);
-
-			// Scale fields
-			uiDefaults.put("hillScale", ctx.settings.hillScale);
-			uiDefaults.put("treeHeightScale", ctx.settings.treeHeightScale);
-			uiDefaults.put("cityScale", ctx.settings.cityScale);
-			uiDefaults.put("mountainScale", ctx.settings.mountainScale);
-			uiDefaults.put("duneScale", ctx.settings.duneScale);
-			// Attempt to run a lightweight generation to populate MapEdits (text/icons/region/edge edits).
-			// This is expensive but ensures the `.nort` returned after resolving random settings
-			// contains the generated `edits` structure rather than empty arrays.
+				GenerationResult generation = generateMap(ctx.settings, cfg);
+					if (generation.image == null)
+					{
+						res.status(500);
+						return gson.toJson(new ApiResponse(false, generation.errorMessage, null, null));
+					}
+					Image img = generation.image;
+			// Always return JSON containing the image (base64) and the
+			// merged .nort settings so clients can retrieve edits.
 			try {
-				GenerationResult gen = generateMap(ctx.settings, new Config());
-				if (gen != null && gen.image != null) {
-					try { gen.image.close(); } catch (Exception ignore) {}
-					// Re-serialize settings now that edits have been populated by generation
-					nortContent = ctx.settings.toJsonString();
-				}
-			} catch (Exception genEx) {
-				Logger.println("resolveRandomOnlyResponse generation failed: " + genEx);
-				// Fall back to returning the serialized settings without edits populated
+				BufferedImage buf = nortantis.platform.awt.AwtFactory.unwrap(img);
+				return returnJsonResponse(buf, ctx.settings, cfg, res);
+			} catch (Exception e) {
+				Logger.println("returnJsonResponse failed: " + e);
+				res.status(500);
+				return gson.toJson(new ApiResponse(false, "Failed to produce JSON response: " + e.getClass().getSimpleName() + (e.getMessage() != null ? (" - " + e.getMessage()) : ""), null, null));
+			} finally {
+				img.close();
+				cleanupTempNortPath(ctx.tempNortPath, cfg);
 			}
-
-			res.type(CONTENT_TYPE_JSON);
-			res.status(200);
-			return nortContent;
-		}
-		catch (Exception e)
-		{
-			res.status(500);
-			return gson.toJson(new ApiResponse(false, "Failed to serialize settings: " + e.getMessage(), null, null));
 		}
 		finally
 		{
-			if (ctx.tempNortPath != null)
-			{
-				try
-				{
-					Files.deleteIfExists(ctx.tempNortPath);
-				}
-				catch (Exception ignore)
-				{
-					// Ignore cleanup errors; temporary file will be cleaned up by system
-				}
-			}
+			restorePreviousLanguage(previousLanguage);
 		}
 	}
 
@@ -428,78 +353,103 @@ public class MapApiServer
 		options.put("oceanWaveTypes", List.of(option("ConcentricWaves", tr("theme.waveType.concentricWaves", "Concentric waves")), option("Ripples", tr("theme.waveType.ripples", "Ripples")),
 				option("None", tr("theme.waveType.none", "None"))));
 
+		options.put("gridOverlayShapes", List.of(option("Horizontal_hexes", tr("GridOverlayShape.Horizontal_hexes", "Horizontal hexes")), option("Vertical_hexes", tr("GridOverlayShape.Vertical_hexes", "Vertical hexes")), option("Squares", tr("GridOverlayShape.Squares", "Squares")), option("Voronoi_polygons", tr("GridOverlayShape.Voronoi_polygons", "Voronoi polygons"))));
+		options.put("gridOverlayOffsets", List.of(option("zero", tr("GridOverlayOffset.zero", "0")), option("quarter", tr("GridOverlayOffset.quarter", "1/4")), option("half", tr("GridOverlayOffset.half", "1/2")), option("threeQuarters", tr("GridOverlayOffset.threeQuarters", "3/4"))));
+		options.put("gridOverlayLayers", List.of(option("Under_icons", tr("GridOverlayLayer.Under_icons", "Under icons")), option("Over_icons", tr("GridOverlayLayer.Over_icons", "Over icons"))));
+
 		// Build a labels map only for keys that are translated by the backend (no fallbacks).
 		Map<String, String> labels = new LinkedHashMap<>();
 		String[] backendLabelKeys = new String[] {
-				// Added keys used by web UI but previously missing from the returned labels
-				"theme.landColoringMethod.label",
-				"theme.randomSeed.label",
-				"theme.tab.background",
-				"theme.tab.border",
-				"theme.tab.effects",
-				"theme.tab.fonts",
-				"theme.style.label",
-				"theme.borderPosition.label",
-				"theme.borderColor.label",
-				"theme.drawBorder",
-				"theme.drawGrid",
-				"theme.drawRegionBoundaries",
-				"theme.colorLand",
-				"theme.colorOcean",
-				"theme.background.label",
-				"theme.texture.label",
-				"theme.borderType.label",
-				"theme.width.label",
-				"theme.rows.label",
-				"theme.landColor.label",
-				"theme.oceanColor.label",
-				"theme.regionBoundaryColor.title",
-				"theme.regionBoundaryWidth.help",
-				"theme.borderWidth.label",
-				"theme.borderColor.title",
-				"theme.frayEdges",
-				"theme.grungeWidth.help",
-				"theme.shadingWidth.label",
-				"theme.fraySize.label",
-				"theme.drawGrunge",
-				"theme.grungeColor.label",
-				"theme.lineStyle.label",
-				"theme.coastlineWidth.label",
-				"theme.coastlineColor.label",
-				"theme.coastShadingWidth.label",
-				"theme.coastShadingTransparency.label",
-				"theme.coastShadingColor.label",
-	                "theme.coastShadingColor.disabled",
-				"theme.oceanShadingWidth.label",
-				"theme.oceanShadingColor.label",
-				"theme.waveType.label",
-                "theme.waveWidth.label",
-                "theme.waveCount.label",
-                "theme.fadeOuterWaves",
-                "theme.jitter",
-                "theme.brokenLines",
-				"theme.waveColor.label",
-				"theme.drawOceanEffectsInLakes",
-				"theme.riverColor.label",
-				"theme.drawRoads",
-				"theme.roadStyle.label",
-				"theme.roadWidth.label",
-				"theme.roadColor.label",
-				"theme.mountainSize.label",
-				"theme.hillSize.label",
-				"theme.duneSize.label",
-				"theme.treeHeight.label",
-				"theme.citySize.label",
-				"theme.enableText",
-				"theme.textColor.label",
-				"theme.boldBackground",
-				"theme.boldBackgroundColor.label",
-				"theme.titleFont.label",
-				"theme.regionFont.label",
-				"theme.mountainRangeFont.label",
-				"theme.otherMountainsFont.label",
-				"theme.citiesFont.label",
-				"theme.riverLakeFont.label"
+			// UI labels the frontend expects for grid overlay controls
+			"theme.shape.label",
+			"theme.lineWidth.label",
+			"theme.color.label",
+			"theme.xOffset.label",
+			"theme.yOffset.label",
+			"theme.layer.label",
+
+			// Added keys used by web UI but previously missing from the returned labels
+			"theme.landColoringMethod.label",
+			"theme.randomSeed.label",
+			"theme.tab.background",
+			"theme.tab.border",
+			"theme.tab.effects",
+			"theme.tab.fonts",
+			"theme.style.label",
+			"theme.borderPosition.label",
+			"theme.borderColor.label",
+			"theme.drawBorder",
+			"theme.drawGrid",
+			"theme.onlyOnLand",
+			"theme.drawRegionBoundaries",
+			"theme.colorLand",
+			"theme.colorOcean",
+			"theme.background.label",
+			"theme.texture.label",
+			"theme.borderType.label",
+			"theme.width.label",
+			"theme.rows.label",
+			"theme.columns.label",
+			"theme.landColor.label",
+			"theme.oceanColor.label",
+			"theme.regionBoundaryColor.title",
+			"theme.regionBoundaryWidth.help",
+			"theme.borderWidth.label",
+			"theme.borderColor.title",
+			"theme.frayEdges",
+			"theme.grungeWidth.help",
+			"theme.shadingWidth.label",
+			"theme.fraySize.label",
+			"theme.drawGrunge",
+			"theme.grungeColor.label",
+			"theme.lineStyle.label",
+			"theme.coastlineWidth.label",
+			"theme.coastlineColor.label",
+			"theme.coastShadingWidth.label",
+			"theme.coastShadingTransparency.label",
+			"theme.coastShadingColor.label",
+			"theme.coastShadingColor.disabled",
+			"theme.oceanShadingWidth.label",
+			"theme.oceanShadingColor.label",
+			"theme.waveType.label",
+			"theme.waveWidth.label",
+			"theme.waveCount.label",
+			"theme.fadeOuterWaves",
+			"theme.jitter",
+			"theme.brokenLines",
+			"theme.waveColor.label",
+			"theme.drawOceanEffectsInLakes",
+			"theme.riverColor.label",
+			"theme.drawRoads",
+			"theme.roadStyle.label",
+			"theme.roadWidth.label",
+			"theme.roadColor.label",
+			"theme.mountainSize.label",
+			"theme.hillSize.label",
+			"theme.duneSize.label",
+			"theme.treeHeight.label",
+			"theme.citySize.label",
+			"theme.enableText",
+			"theme.textColor.label",
+			"theme.boldBackground",
+			"theme.boldBackgroundColor.label",
+			"theme.titleFont.label",
+			"theme.regionFont.label",
+			"theme.mountainRangeFont.label",
+			"theme.otherMountainsFont.label",
+			"theme.citiesFont.label",
+			"theme.riverLakeFont.label",
+			"newSettingsDialog.dimensions.label",
+			"newSettingsDialog.worldSize.label",
+			"newSettingsDialog.landShape.label",
+			"newSettingsDialog.regionCount.label",
+			"newSettingsDialog.artPack.label",
+			"newSettingsDialog.cityIconType.label",
+			"newSettingsDialog.cityFrequency.label",
+			"books.checkAll",
+			"books.uncheckAll",
+			"common.choose",
+			"textTool.booksForText.label",
 		};
 
 		for (String k : backendLabelKeys)
@@ -507,8 +457,10 @@ public class MapApiServer
 			String v = Translation.get(k);
 			if (v != null && !v.equals(k))
 			{
-				// Normalize label punctuation: remove trailing colons (normal and fullwidth)
-				String normalized = stripTrailingColon(v);
+				// Do not alter HTML line-break tags here; return the raw
+				// translation (trimmed). The frontend will normalize <br>
+				// into LF when presenting multi-line labels.
+				String normalized = v == null ? null : v.trim();
 				labels.put(k, normalized);
 			}
 		}
@@ -518,6 +470,28 @@ public class MapApiServer
 		if (!labels.isEmpty())
 		{
 			result.put("labels", labels);
+		}
+
+		// Provide canonical backend defaults so frontends can initialize
+		// controls to the same values the server will use when generating.
+		try {
+			MapSettings defaults = SettingsGenerator.generate(new java.util.Random(0), Assets.installedArtPack, null);
+			String defJson = defaults.toJsonString();
+			@SuppressWarnings("unchecked")
+			Map<String, Object> defMap = gson.fromJson(defJson, Map.class);
+			// Ensure seed fields are returned as integer (Long) values to avoid
+			// JSON numeric formatting as exponential (scientific) notation.
+			try {
+				defMap.put("randomSeed", defaults.randomSeed);
+				defMap.put("backgroundRandomSeed", defaults.backgroundRandomSeed);
+				defMap.put("frayedBorderSeed", defaults.frayedBorderSeed);
+				defMap.put("regionsRandomSeed", defaults.regionsRandomSeed);
+				defMap.put("textRandomSeed", defaults.textRandomSeed);
+			} catch (Exception ignored) {}
+			result.put("defaults", defMap);
+		} catch (Exception e) {
+			// If defaults cannot be produced, omit the field (best-effort)
+			if (API_DEBUG) Logger.println("Failed to produce UI defaults: " + e.getMessage());
 		}
 
 		return result;
@@ -537,27 +511,7 @@ public class MapApiServer
 		return translated.equals(key) ? fallback : translated;
 	}
 
-	private static String stripTrailingColon(String s)
-	{
-		if (s == null)
-		{
-			return null;
-		}
-		int end = s.length();
-		while (end > 0)
-		{
-			char c = s.charAt(end - 1);
-			if (c == ':' || c == '：' || Character.isWhitespace(c))
-			{
-				end--;
-			}
-			else
-			{
-				break;
-			}
-		}
-		return s.substring(0, end);
-	}
+	// NOTE: `stripTrailingColon` removed — labels are returned trimmed without altering punctuation.
 
 	private static Object handleBackgroundPreview(Request req, Response res)
 	{
@@ -738,7 +692,7 @@ public class MapApiServer
             cfg.nortFile = temp.toAbsolutePath().toString();
 		}
 
-		// Extract basic control fields (width/height/seed/saveNort/return flags).
+		// Extract basic control fields (generatedWidth/generatedHeight/seed/saveNort/return flags).
 		// Theme-specific form fields are intentionally NOT extracted for
 		// multipart uploads: customization must be embedded into the uploaded
 		// .nort JSON. This preserves backward compatibility for clients that
@@ -749,24 +703,30 @@ public class MapApiServer
 
 	private static void extractFormFields(Request req, Config cfg)
 	{
-		String widthStr = param(req, "width");
-		String heightStr = param(req, "height");
-		String seedStr = param(req, "seed");
+		String genWidthStr = param(req, "generatedWidth");
+		String genHeightStr = param(req, "generatedHeight");
+		String seedStr = param(req, "randomSeed");
 		String saveNortStr = param(req, "saveNort");
 
-		if (widthStr != null)
-			cfg.width = Integer.valueOf(widthStr);
-		if (heightStr != null)
-			cfg.height = Integer.valueOf(heightStr);
+		if (genWidthStr != null)
+			cfg.generatedWidth = Integer.valueOf(genWidthStr);
+		if (genHeightStr != null)
+			cfg.generatedHeight = Integer.valueOf(genHeightStr);
 		if (seedStr != null)
-			cfg.seed = Long.valueOf(seedStr);
+			cfg.randomSeed = Long.valueOf(seedStr);
 		cfg.language = param(req, "language");
 		cfg.mapLanguage = param(req, "mapLanguage");
 		if (saveNortStr != null)
 			cfg.saveNort = Boolean.valueOf(saveNortStr);
-		// The merged-settings return flag is no longer supported. The server
-		// always returns image bytes for generate requests; clients should
-		// not request merged .nort content from /generate.
+		// `returnSettings` is deprecated - server always returns settings
+		// alongside the image. Parse but ignore for backward compatibility.
+		String returnSettingsStr = param(req, "returnSettings");
+		if (returnSettingsStr != null) {
+			try { cfg.returnSettings = Boolean.valueOf(returnSettingsStr); } catch (Exception ignored) {}
+		}
+		// The server always returns a JSON payload containing both the
+		// image (base64) and the merged .nort settings so clients can
+		// retrieve edited settings alongside the generated map image.
 	}
 
 	private static String param(Request req, String name)
@@ -794,9 +754,6 @@ public class MapApiServer
 		cfg.oceanColorHex = param(req, "oceanColorHex");
 		cfg.landColorHex = param(req, "landColorHex");
 		cfg.regionBoundaryStyle = param(req, "regionBoundaryStyle");
-		String regionBoundaryWidth = param(req, "regionBoundaryWidth");
-		if (regionBoundaryWidth != null)
-			cfg.regionBoundaryWidth = Float.valueOf(regionBoundaryWidth);
 		cfg.regionBoundaryColorHex = param(req, "regionBoundaryColorHex");
 		String dBorder = param(req, "drawBorder");
 		if (dBorder != null)
@@ -804,6 +761,22 @@ public class MapApiServer
 		String dGrid = param(req, "drawGridOverlay");
 		if (dGrid != null)
 			cfg.drawGridOverlay = Boolean.valueOf(dGrid);
+		String gridShape = param(req, "gridOverlayShape");
+		if (gridShape != null) cfg.gridOverlayShape = gridShape;
+		String gridCount = param(req, "gridOverlayRowOrColCount");
+		if (gridCount != null) cfg.gridOverlayRowOrColCount = Integer.valueOf(gridCount);
+		String gridColor = param(req, "gridOverlayColorHex");
+		if (gridColor != null) cfg.gridOverlayColorHex = gridColor;
+		String gridX = param(req, "gridOverlayXOffset");
+		if (gridX != null) cfg.gridOverlayXOffset = gridX;
+		String gridY = param(req, "gridOverlayYOffset");
+		if (gridY != null) cfg.gridOverlayYOffset = gridY;
+		String gridLine = param(req, "gridOverlayLineWidth");
+		if (gridLine != null) cfg.gridOverlayLineWidth = Integer.valueOf(gridLine);
+		String gridLayer = param(req, "gridOverlayLayer");
+		if (gridLayer != null) cfg.gridOverlayLayer = gridLayer;
+		String voronoiOnly = param(req, "drawVoronoiGridOverlayOnlyOnLand");
+		if (voronoiOnly != null) cfg.drawVoronoiGridOverlayOnlyOnLand = Boolean.valueOf(voronoiOnly);
 
 		String fBorder = param(req, "frayedBorder");
 		if (fBorder != null)
@@ -838,9 +811,6 @@ public class MapApiServer
 		String coastAlpha = param(req, "coastShadingAlpha");
 		if (coastAlpha != null)
 			cfg.coastShadingAlpha = Integer.valueOf(coastAlpha);
-		String oceanAlpha = param(req, "oceanShadingAlpha");
-		if (oceanAlpha != null)
-			cfg.oceanShadingAlpha = Integer.valueOf(oceanAlpha);
 
 		String oceanShade = param(req, "oceanShadingLevel");
 		if (oceanShade != null)
@@ -903,7 +873,9 @@ public class MapApiServer
 		if (dBold != null)
 			cfg.drawBoldBackground = Boolean.valueOf(dBold);
 		cfg.boldBackgroundColorHex = param(req, "boldBackgroundColorHex");
-		cfg.landColoringMethod = param(req, "landColoringMethod");
+		String drawRegionsStr = param(req, "drawRegionColors");
+		if (drawRegionsStr != null)
+			cfg.drawRegionColors = Boolean.valueOf(drawRegionsStr);
 		cfg.titleFontFamily = param(req, "titleFontFamily");
 		cfg.regionFontFamily = param(req, "regionFontFamily");
 		cfg.mountainRangeFontFamily = param(req, "mountainRangeFontFamily");
@@ -982,7 +954,7 @@ public class MapApiServer
 
 	private static MapSettings generateRandomMapSettings(Config cfg)
 	{
-		Random rand = cfg.seed != null ? new Random(cfg.seed) : new Random();
+		Random rand = cfg.randomSeed != null ? new Random(cfg.randomSeed) : new Random();
 		String artPack = (cfg.artPack != null && !cfg.artPack.isEmpty()) ? cfg.artPack : Assets.installedArtPack;
 		MapSettings settings = SettingsGenerator.generate(rand, artPack, null);
 		applyRandomMapConfigOverrides(cfg, settings);
@@ -995,7 +967,6 @@ public class MapApiServer
 		applyLandShape(cfg, settings);
 		applyRegionCount(cfg, settings);
 		applyCityFrequency(cfg, settings);
-		applyCityIconType(cfg, settings);
 		applyBooks(cfg, settings);
 		applyDimension(cfg, settings);
 	}
@@ -1039,14 +1010,6 @@ public class MapApiServer
 		}
 	}
 
-	private static void applyCityIconType(Config cfg, MapSettings settings)
-	{
-		if (cfg.cityIconType != null && !cfg.cityIconType.isEmpty())
-		{
-			settings.cityIconTypeName = cfg.cityIconType;
-		}
-	}
-
 	private static void applyBooks(Config cfg, MapSettings settings)
 	{
 		if (cfg.books != null && !cfg.books.isEmpty())
@@ -1078,20 +1041,26 @@ public class MapApiServer
 	private static void applyCommonSettings(Config cfg, MapSettings settings)
 	{
 		// Apply user-provided seed if present, overriding auto-generated value from SettingsGenerator
-		if (cfg.seed != null)
+			if (cfg.randomSeed != null)
 		{
-			settings.randomSeed = cfg.seed;
-			// Also set background-related seeds to match for deterministic background rendering
-			settings.backgroundRandomSeed = cfg.seed;
-			settings.regionsRandomSeed = cfg.seed;
-			settings.textRandomSeed = cfg.seed;
-			settings.frayedBorderSeed = cfg.seed;
+				settings.randomSeed = cfg.randomSeed;
+				// Also set background-related seeds to match for deterministic background rendering
+				settings.backgroundRandomSeed = cfg.randomSeed;
+				settings.regionsRandomSeed = cfg.randomSeed;
+				settings.textRandomSeed = cfg.randomSeed;
+				settings.frayedBorderSeed = cfg.randomSeed;
 		}
 	}
 
 	private static GenerationResult generateMap(MapSettings settings, Config cfg)
 	{
-		Dimension dims = computeRenderDimensions(settings, cfg);
+		// Only pass explicit render dimensions to the map creator when the
+		// caller provided `generatedWidth` or `generatedHeight`. The desktop
+		// generator (CLI/UI) passes `null` when no explicit output size is
+		// requested which influences resolution calculations; matching that
+		// behavior here ensures generated worlds are consistent given the
+		// same settings and seed.
+		Dimension dims = (cfg.generatedWidth != null || cfg.generatedHeight != null) ? computeRenderDimensions(settings, cfg) : null;
 
 		try
 		{
@@ -1106,14 +1075,13 @@ public class MapApiServer
 
 	private static Dimension computeRenderDimensions(MapSettings settings, Config cfg)
 	{
-		if (cfg.width == null && cfg.height == null)
-		{
-			return null;
-		}
+		// If the caller did not provide explicit width/height, prefer the
+		// `generatedWidth`/`generatedHeight` from the loaded `.nort` settings
+		// so maps loaded from files render at their intended resolution.
 		int defaultWidth = settings.generatedWidth > 0 ? settings.generatedWidth : 2000;
-		int w = (cfg.width != null) ? cfg.width : defaultWidth;
 		int defaultHeight = settings.generatedHeight > 0 ? settings.generatedHeight : 1200;
-		int h = (cfg.height != null) ? cfg.height : defaultHeight;
+		int w = (cfg.generatedWidth != null) ? cfg.generatedWidth : defaultWidth;
+		int h = (cfg.generatedHeight != null) ? cfg.generatedHeight : defaultHeight;
 		return new Dimension(w, h);
 	}
 
@@ -1279,27 +1247,36 @@ public class MapApiServer
 
 	private static String resolveBestNortContent(Config cfg, MapSettings settings)
 	{
-		try
-		{
-			return settings.toJsonString();
+		// Ensure edits arrays are populated so clients receive usable editor
+		// state in the returned .nort. If edits are not initialized, create a
+		// temporary graph and initialize center/edge/region edits from it.
+		try {
+			if (settings.edits == null || !settings.edits.isInitialized()) {
+				try {
+					nortantis.WorldGraph graph = MapCreator.createGraphForUnitTests(settings);
+					try {
+						if (settings.edits == null) settings.edits = new nortantis.swing.MapEdits();
+						settings.edits.initializeCenterEdits(graph.centers);
+						settings.edits.initializeEdgeEdits(graph.edges);
+						settings.edits.initializeRegionEdits(graph.regions.values());
+					} finally {
+						// no explicit close needed for WorldGraph
+					}
+				} catch (Exception e) {
+					// If graph creation fails, fall back to serializing settings as-is
+					Logger.println("Failed to initialize edits for export: " + e);
+				}
+			}
+		} catch (Throwable t) {
+			// Best-effort only; avoid failing the whole request for this step.
+			Logger.println("Unexpected error while preparing nort content: " + t);
 		}
-		catch (Exception ignored)
-		{
-			return fallbackNortContent(cfg);
-		}
+
+		// Return the canonical JSON serialization of settings.
+		return settings.toJsonString();
 	}
 
-	private static String fallbackNortContent(Config cfg)
-	{
-		// Fallback to original source content if serialization fails for legacy settings.
-		String settingsJson = serializeSettingsJson(cfg);
-		if (settingsJson != null)
-		{
-			return settingsJson;
-		}
-
-		return readNortFileContent(cfg);
-	}
+	// Removed fallbackNortContent: server will not attempt to fall back to alternate nort content.
 
 	private static String serializeSettingsJson(Config cfg)
 	{
@@ -1312,10 +1289,11 @@ public class MapApiServer
 		{
 			return gson.toJson(cfg.settings);
 		}
-		catch (Exception ignored)
+		catch (Exception e)
 		{
 			return null;
 		}
+
 	}
 
 	private static String readNortFileContent(Config cfg)
@@ -1465,23 +1443,23 @@ public class MapApiServer
 	{
 		String nortFile;
 		Map<String, Object> settings;
-		Integer width;
-		Integer height;
-		Long seed;
+		Integer generatedWidth;
+		Integer generatedHeight;
+		Long randomSeed;
 		String language;
 		String mapLanguage;
 		String out;
 		Boolean saveNort;
+		Boolean returnSettings;
 		// Random map generation parameters
 		String artPack;
 		Integer worldSize;
 		String landShape;
 		Integer regionCount;
 		Integer cityFrequency;
-		String cityIconType;
 		List<String> books;
 		String dimension;
-		String landColoringMethod;
+		Boolean drawRegionColors;
 		// Final map / theme override parameters
 		String backgroundType;
 		String textureRef;
@@ -1492,10 +1470,18 @@ public class MapApiServer
 		String oceanColorHex;
 		String landColorHex;
 		String regionBoundaryStyle;
-		Float regionBoundaryWidth;
 		String regionBoundaryColorHex;
 		Boolean drawBorder;
 		Boolean drawGridOverlay;
+		// Grid overlay parameters
+		String gridOverlayShape;
+		Integer gridOverlayRowOrColCount;
+		String gridOverlayColorHex;
+		String gridOverlayXOffset;
+		String gridOverlayYOffset;
+		Integer gridOverlayLineWidth;
+		String gridOverlayLayer;
+		Boolean drawVoronoiGridOverlayOnlyOnLand;
 		Boolean frayedBorder;
 		Integer frayedBorderBlurLevel;
 		Integer frayedBorderSize;
@@ -1511,7 +1497,6 @@ public class MapApiServer
 		Integer coastShadingAlpha;
 		Integer oceanShadingLevel;
 		String oceanShadingColorHex;
-		Integer oceanShadingAlpha;
 		String oceanWavesType;
 		Integer oceanWavesLevel;
 		String oceanWavesColorHex;
@@ -1588,6 +1573,7 @@ public class MapApiServer
 		applyColorSettings(cfg, settings);
 		applyRegionBoundarySettings(cfg, settings);
 		applyBorderSettings(cfg, settings);
+		applyGridOverlaySettings(cfg, settings);
 		applyLandColoringMethod(cfg, settings);
 		applyFontFamilies(cfg, settings);
 		applyEffectsAndVisualOverrides(cfg, settings);
@@ -1667,17 +1653,14 @@ public class MapApiServer
 			try
 			{
 				StrokeType strokeType = StrokeType.valueOf(cfg.regionBoundaryStyle);
-				float width = cfg.regionBoundaryWidth != null ? cfg.regionBoundaryWidth : settings.regionBoundaryStyle.width;
+				// Width must be supplied via the settings JSON (regionBoundaryStyle.width).
+				float width = settings.regionBoundaryStyle.width;
 				settings.regionBoundaryStyle = new Stroke(strokeType, width);
 			}
 			catch (IllegalArgumentException ignored)
 			{
 				// If the stroke type is invalid, keep the existing region boundary style
 			}
-		}
-		else if (cfg.regionBoundaryWidth != null)
-		{
-			settings.regionBoundaryStyle = new Stroke(settings.regionBoundaryStyle.type, cfg.regionBoundaryWidth);
 		}
 	}
 
@@ -1693,19 +1676,55 @@ public class MapApiServer
 		}
 	}
 
-	private static void applyLandColoringMethod(Config cfg, MapSettings settings)
+	private static void applyGridOverlaySettings(Config cfg, MapSettings settings)
 	{
-		if (cfg.landColoringMethod != null && !cfg.landColoringMethod.isEmpty())
+		if (cfg.gridOverlayShape != null && !cfg.gridOverlayShape.isEmpty())
 		{
 			try
 			{
-				LandColoringMethod method = LandColoringMethod.valueOf(cfg.landColoringMethod);
-				settings.drawRegionColors = (method == LandColoringMethod.ColorPoliticalRegions);
+				settings.gridOverlayShape = Enum.valueOf(GridOverlayShape.class, cfg.gridOverlayShape);
 			}
-			catch (IllegalArgumentException ignored)
+			catch (IllegalArgumentException ignored) {}
+		}
+		if (cfg.gridOverlayRowOrColCount != null)
+		{
+			settings.gridOverlayRowOrColCount = cfg.gridOverlayRowOrColCount;
+		}
+		if (cfg.gridOverlayColorHex != null && !cfg.gridOverlayColorHex.isEmpty())
+		{
+			settings.gridOverlayColor = hexToColor(cfg.gridOverlayColorHex);
+		}
+		if (cfg.gridOverlayXOffset != null && !cfg.gridOverlayXOffset.isEmpty())
+		{
+			try { settings.gridOverlayXOffset = GridOverlayOffset.parse(cfg.gridOverlayXOffset); } catch (Exception ignored) {}
+		}
+		if (cfg.gridOverlayYOffset != null && !cfg.gridOverlayYOffset.isEmpty())
+		{
+			try { settings.gridOverlayYOffset = GridOverlayOffset.parse(cfg.gridOverlayYOffset); } catch (Exception ignored) {}
+		}
+		if (cfg.gridOverlayLineWidth != null)
+		{
+			settings.gridOverlayLineWidth = cfg.gridOverlayLineWidth;
+		}
+		if (cfg.gridOverlayLayer != null && !cfg.gridOverlayLayer.isEmpty())
+		{
+			try
 			{
-				// If the coloring method is invalid, keep the existing drawing settings
+				settings.gridOverlayLayer = Enum.valueOf(MapSettings.GridOverlayLayer.class, cfg.gridOverlayLayer);
 			}
+			catch (IllegalArgumentException ignored) {}
+		}
+		if (cfg.drawVoronoiGridOverlayOnlyOnLand != null)
+		{
+			settings.drawVoronoiGridOverlayOnlyOnLand = cfg.drawVoronoiGridOverlayOnlyOnLand;
+		}
+	}
+
+	private static void applyLandColoringMethod(Config cfg, MapSettings settings)
+	{
+		if (cfg.drawRegionColors != null)
+		{
+			settings.drawRegionColors = cfg.drawRegionColors;
 		}
 	}
 
@@ -1796,19 +1815,8 @@ public class MapApiServer
 		}
 		if (cfg.oceanShadingColorHex != null && !cfg.oceanShadingColorHex.isEmpty())
 		{
-			if (cfg.oceanShadingAlpha != null)
-			{
-				String h = cfg.oceanShadingColorHex.startsWith("#") ? cfg.oceanShadingColorHex.substring(1) : cfg.oceanShadingColorHex;
-				int r = Integer.parseInt(h.substring(0, 2), 16);
-				int g = Integer.parseInt(h.substring(2, 4), 16);
-				int b = Integer.parseInt(h.substring(4, 6), 16);
-				int alpha = (int) ((1.0 - cfg.oceanShadingAlpha / 100.0) * 255);
-				settings.oceanShadingColor = Color.create(r, g, b, alpha);
-			}
-			else
-			{
-				settings.oceanShadingColor = hexToColor(cfg.oceanShadingColorHex);
-			}
+			// The UI now encodes transparency into the color token itself.
+			settings.oceanShadingColor = hexToColor(cfg.oceanShadingColorHex);
 		}
 
 		if (cfg.oceanWavesType != null && !cfg.oceanWavesType.isEmpty())

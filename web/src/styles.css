@@ -263,6 +263,13 @@ header {
   word-break: break-word;
 }
 
+/* Disabled label state when a single control is disabled */
+.fields-column label.is-disabled,
+.fields-grid label.is-disabled {
+  opacity: 0.5;
+  color: rgba(43, 31, 21, 0.5);
+}
+
 /* Wrapper used to group related controls without breaking the fields grid layout. */
 .control-group {
   /* Participate in parent layout as if the wrapper didn't exist */
@@ -280,7 +287,6 @@ header {
 }
 .fields-column input[type='number'],
 .fields-column input[type='text'],
-.fields-column input[type='range'],
 .fields-column select {
   padding: 5px 8px;
   border-radius: 5px;
@@ -289,6 +295,15 @@ header {
   color: #2b1f15;
   font-size: 13px;
   width: 100%;
+}
+.fields-column input[type='range'] {
+  padding: 0;
+  cursor: pointer;
+  /* Make sliders narrower to leave space for the numeric value on the right.
+     Use calc against the available control column width so labels remain aligned. */
+  width: calc(100% - 88px);
+  max-width: 420px;
+  min-width: 160px;
 }
 
 /* Limit the width of combo/select controls so they don't push into adjacent labels */
@@ -305,9 +320,39 @@ header {
   border: 1px solid rgba(107, 86, 63, 0.2);
   background: rgba(255, 255, 255, 0.9);
 }
-.fields-column input[type='range'] {
-  padding: 0;
-  cursor: pointer;
+.slider-value {
+  margin-left: 8px;
+  min-width: 44px;
+  display: inline-block;
+  font-size: 13px;
+  color: rgba(43, 31, 21, 0.9);
+}
+
+/* Layout helper to keep slider and its numeric value on the same row */
+.slider-row {
+  display: flex;
+  align-items: center;
+  gap: 0px;
+  justify-content: flex-end; /* push slider+value to right side of control column */
+}
+.slider-row input[type='range'] {
+  /* Let the slider take remaining space but limit it so value stays visible */
+  flex: 1 1 auto;
+  width: auto;
+  max-width: calc(100% - 48px);
+  min-width: 160px;
+}
+.slider-row .slider-value {
+  flex: 0 0 48px;
+  text-align: center;
+  padding-left: 0;
+  margin-left: 0;
+}
+
+/* If controls are in a narrow column, ensure the slider/value stay grouped and right-aligned */
+.concentric-options .slider-row,
+.fields-column .slider-row {
+  width: 100%;
 }
 .background-preview-panel {
   display: flex;

@@ -70,10 +70,7 @@ export function formatColorString(hex, alphaPercent = 100) {
   if (!channels) return null
 
   const alpha = clampColorChannel(Math.round((Number(alphaPercent) / 100) * 255))
-  if (alpha >= 255) {
-    return `${channels.r},${channels.g},${channels.b}`
-  }
-
+  // Always include alpha channel to produce a stable `r,g,b,a` export
   return `${channels.r},${channels.g},${channels.b},${alpha}`
 }
 

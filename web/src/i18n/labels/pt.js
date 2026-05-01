@@ -4,25 +4,16 @@ const ptLabels = {
   'ui.mapLanguage': 'Idioma do mapa',
   'ui.title': 'Criar ou carregar configurações',
   'ui.subtitle': 'Comece com configurações aleatórias ou carregue um arquivo de configuração.',
-  'ui.dimension': 'Proporção de aspecto',
-  'ui.worldSize': 'Tamanho do mundo',
-  'ui.landShape': 'Forma da terra',
-  'ui.regionCount': 'Número de regiões',
-  'ui.artPack': 'Pacote de arte',
-  'ui.cityIconType': 'Tipo de ícone de cidade',
-  'ui.cityFrequency': 'Frequência de cidades',
-  'ui.books.legend': 'Livros para gerar texto',
-  'ui.books.checkAll': 'Marcar tudo',
-  'ui.books.uncheckAll': 'Desmarcar tudo',
   'ui.seed': 'Semente (opcional)',
   'ui.seed.placeholder': 'ex. 12345',
   'ui.upload.aria': 'Carregar ou soltar arquivo de configuração',
-  'ui.upload.chooseFile': 'Escolher arquivo',
+  
   'ui.upload.loadedPrefix': 'Carregado',
   'ui.upload.hint': 'Arraste um arquivo de configuração aqui',
-  'ui.select.random': 'Aleatório',
+  
   'ui.section.or': 'ou',
   'ui.section.then': 'então',
+  'ui.preview.empty': 'Nenhuma pré-visualização disponível',
   'ui.title.customize': 'Personalizar mapa',
   'ui.subtitle.customize': 'Personalize as configurações atuais e gere um mapa atualizado.',
   'ui.noSource': 'Defina primeiro .nort ou gere um mapa',
@@ -34,14 +25,6 @@ const ptLabels = {
   'ui.font.keepCurrent': 'Manter fonte atual',
   'ui.texture.keepCurrent': 'Manter textura atual',
   'ui.texture.noneAvailable': 'Nenhuma textura disponível',
-  
-  'ui.width.override': 'Substituir largura',
-  'ui.height.override': 'Substituir altura',
-  'ui.preview.open': 'Abrir visualização do mapa',
-  'ui.preview.empty': 'A visualização do mapa aparecerá aqui',
-  'ui.preview.background.aria': 'Visualização do fundo',
-  'ui.preview.background.alt': 'Visualização do fundo',
-  'ui.border.keepCurrent': 'Manter borda atual',
 }
 
 export default ptLabels

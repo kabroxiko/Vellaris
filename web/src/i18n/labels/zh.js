@@ -4,25 +4,16 @@ const zhLabels = {
   'ui.mapLanguage': '地图语言',
   'ui.title': '创建或加载设置',
   'ui.subtitle': '从随机设置开始，或加载设置文件。',
-  'ui.dimension': '宽高比',
-  'ui.worldSize': '世界大小',
-  'ui.landShape': '陆地形状',
-  'ui.regionCount': '区域数',
-  'ui.artPack': '美术资源包',
-  'ui.cityIconType': '城市图标类型',
-  'ui.cityFrequency': '城市频率',
-  'ui.books.legend': '用于生成文本的书籍',
-  'ui.books.checkAll': '全选',
-  'ui.books.uncheckAll': '取消全选',
   'ui.seed': '种子（可选）',
   'ui.seed.placeholder': '例如 12345',
   'ui.upload.aria': '上传或拖放设置文件',
-  'ui.upload.chooseFile': '选择文件',
+  
   'ui.upload.loadedPrefix': '已加载',
   'ui.upload.hint': '将设置文件拖放到此处',
-  'ui.select.random': '随机',
+  
   'ui.section.or': '或',
   'ui.section.then': '然后',
+  'ui.preview.empty': '暂无预览',
   'ui.title.customize': '自定义地图',
   'ui.subtitle.customize': '自定义当前设置并生成更新的地图。',
   'ui.noSource': '首先设置 .nort 或生成地图',
@@ -33,14 +24,6 @@ const zhLabels = {
   'ui.font.keepCurrent': '保持当前',
   'ui.texture.keepCurrent': '保持当前纹理',
   'ui.texture.noneAvailable': '没有可用的纹理',
-  
-  'ui.width.override': '覆盖宽度',
-  'ui.height.override': '覆盖高度',
-  'ui.preview.open': '打开地图预览',
-  'ui.preview.empty': '地图预览将显示在此处',
-  'ui.preview.background.aria': '背景预览',
-  'ui.preview.background.alt': '背景预览',
-  'ui.border.keepCurrent': '保持当前边框',
 }
 
 export default zhLabels

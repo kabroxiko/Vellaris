@@ -18,6 +18,10 @@ export default function FileUploadButton({
     const file = event.target.files?.[0]
     if (file) {
       onFileSelect(file)
+      // Clear the input value so selecting the same file again fires change
+      try {
+        if (fileInputRef.current) fileInputRef.current.value = ''
+      } catch (e) {}
     }
   }
 
@@ -56,7 +60,7 @@ export default function FileUploadButton({
       >
         <span className="file-choose-btn">{chooseLabel}</span>
         <span className="dropzone-hint">
-          {fileName ? `${loadedPrefix}: ${fileName}` : uploadHint}
+          {fileName ? `${loadedPrefix} ${fileName}` : uploadHint}
         </span>
       </button>
     </>
