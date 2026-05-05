@@ -22,8 +22,6 @@ const ruLabels = {
   'ui.button.regenerate': 'Перестроить',
   'ui.button.downloadSettings': 'Загрузить настройки',
   'ui.button.downloadMap': 'Загрузить карту',
-  'ui.font.keepCurrent': 'Сохранить текущий',
-  'ui.texture.keepCurrent': 'Сохранить текущую текстуру',
   'ui.texture.noneAvailable': 'Текстуры недоступны',
 }
 

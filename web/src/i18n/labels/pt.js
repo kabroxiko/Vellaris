@@ -22,8 +22,6 @@ const ptLabels = {
   'ui.button.regenerate': 'Regenerar',
   'ui.button.downloadSettings': 'Baixar configurações',
   'ui.button.downloadMap': 'Baixar mapa',
-  'ui.font.keepCurrent': 'Manter fonte atual',
-  'ui.texture.keepCurrent': 'Manter textura atual',
   'ui.texture.noneAvailable': 'Nenhuma textura disponível',
 }
 

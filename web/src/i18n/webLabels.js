@@ -1,26 +1,19 @@
 import enLabels from './labels/en'
-import esLabels from './labels/es'
-import ruLabels from './labels/ru'
-import deLabels from './labels/de'
-import frLabels from './labels/fr'
-import ptLabels from './labels/pt'
-import zhLabels from './labels/zh'
 
-const WEB_LABELS = {
-  en: enLabels,
-  es: esLabels,
-  ru: ruLabels,
-  de: deLabels,
-  fr: frLabels,
-  pt: ptLabels,
-  zh: zhLabels,
-}
-
-export function getFrontendLabels(language) {
+// Lazy-load other language bundles to avoid bundling all translations
+// into the initial frontend payload. Always include English as the
+// baseline so untranslated keys still resolve locally.
+export async function getFrontendLabels(language) {
   const code = (language || 'en').slice(0, 2).toLowerCase()
-  const localized = WEB_LABELS[code] || {}
-  return {
-    ...WEB_LABELS.en,
-    ...localized,
+  if (code === 'en') return { ...enLabels }
+
+  try {
+    const module = await import(/* @vite-ignore */ `./labels/${code}.js`)
+    const localized = module && module.default ? module.default : {}
+    return { ...enLabels, ...localized }
+  } catch (e) {
+    // If dynamic import fails (unsupported language or missing file),
+    // fall back to English labels only.
+    return { ...enLabels }
   }
 }

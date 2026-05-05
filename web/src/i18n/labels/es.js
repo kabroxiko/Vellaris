@@ -23,9 +23,8 @@ const esLabels = {
   'ui.button.regenerate': 'Regenerar',
   'ui.button.downloadSettings': 'Descargar configuracion',
   'ui.button.downloadMap': 'Descargar mapa',
-  'ui.font.keepCurrent': 'Mantener actual',
-  'ui.texture.keepCurrent': 'Mantener textura actual',
   'ui.texture.noneAvailable': 'No hay texturas disponibles',
+  'theme.styleOptions.label': 'Opciones de estilo:',
 }
 
 export default esLabels

@@ -20,10 +20,9 @@ const enLabels = {
   'ui.button.regenerate': 'Regenerate',
   'ui.button.downloadSettings': 'Download Settings',
   'ui.button.downloadMap': 'Download Map',
-  'ui.font.keepCurrent': 'Keep current',
-  'ui.texture.keepCurrent': 'Keep current texture',
   'ui.texture.noneAvailable': 'No textures available',
   'ui.mapLanguage': 'Map language',
+  'theme.styleOptions.label': 'Style options:',
   
 }
 

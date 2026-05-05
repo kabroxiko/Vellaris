@@ -24,8 +24,6 @@ const deLabels = {
   'ui.button.regenerate': 'Neu generieren',
   'ui.button.downloadSettings': 'Einstellungen herunterladen',
   'ui.button.downloadMap': 'Karte herunterladen',
-  'ui.font.keepCurrent': 'Aktuell behalten',
-  'ui.texture.keepCurrent': 'Aktuelle Textur behalten',
   'ui.texture.noneAvailable': 'Keine Texturen verfügbar',
 }
 

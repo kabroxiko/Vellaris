@@ -22,8 +22,6 @@ const frLabels = {
   'ui.button.regenerate': 'Régénérer',
   'ui.button.downloadSettings': 'Télécharger les paramètres',
   'ui.button.downloadMap': 'Télécharger la carte',
-  'ui.font.keepCurrent': 'Conserver la police actuelle',
-  'ui.texture.keepCurrent': 'Conserver la texture actuelle',
   'ui.texture.noneAvailable': 'Aucune texture disponible',
 }
 

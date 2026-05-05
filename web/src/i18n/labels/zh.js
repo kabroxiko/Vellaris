@@ -21,8 +21,6 @@ const zhLabels = {
   'ui.button.regenerate': '重新生成',
   'ui.button.downloadSettings': '下载设置',
   'ui.button.downloadMap': '下载地图',
-  'ui.font.keepCurrent': '保持当前',
-  'ui.texture.keepCurrent': '保持当前纹理',
   'ui.texture.noneAvailable': '没有可用的纹理',
 }
 

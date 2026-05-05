@@ -281,6 +281,23 @@ header {
   opacity: 0.5;
   pointer-events: none;
 }
+
+/* Ensure labels inside a disabled control-group match the explicit disabled label style
+   (some labels get the 'is-disabled' class directly while others rely on the wrapper). */
+.control-group.is-disabled label,
+.control-group.is-disabled .checkbox-label {
+  color: rgba(43, 31, 21, 0.5);
+}
+
+/* Replacement text shown where a color swatch would be when the control is disabled by policy */
+.disabled-color-replacement {
+  padding: 6px 10px;
+  border-radius: 5px;
+  background: rgba(255,255,255,0.92);
+  color: rgba(43,31,21,0.6);
+  border: 1px solid rgba(107,86,63,0.18);
+  font-size: 13px;
+}
 .fields-grid.two-col-layout .fields-column > label {
   width: 220px;
   min-width: 220px;

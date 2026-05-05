@@ -3,7 +3,7 @@ import PropTypes from 'prop-types'
 import CustomizeSettingsSection from './generate/CustomizeSettingsSection'
 import RandomSettingsSection from './generate/RandomSettingsSection'
 import { base64ToBlob, formatColorString, colorToHex, colorToAlphaPercent } from './generate/utils'
-import { selectCityIconType, fetchJson, handleResponseError } from './generate/helpers'
+import { selectCityIconType, fetchJson, handleResponseError, appendIfSet } from './generate/helpers'
 import { downloadNortContent } from './generate/responseHandlers'
 import { createSettingsAppliers } from './generate/settingsAppliers'
 import { getFrontendLabels } from './i18n/webLabels'
@@ -11,6 +11,76 @@ const API_BASE = import.meta.env.VITE_API_BASE || '/api'
 const RANDOM_OVERRIDES_STORAGE_KEY = 'vellaris-random-manual-overrides'
 const CUSTOMIZE_OVERRIDES_STORAGE_KEY = 'vellaris-customize-overrides'
 const cityIconTypesRequestByPack = new Map()
+const uiOptionsCache = new Map()
+
+function serializeNortObject(obj) {
+  function sortRec(v) {
+    if (v && typeof v === 'object') {
+      if (Array.isArray(v)) return v.map(sortRec)
+      const keys = Object.keys(v).sort()
+      const out = {}
+      for (const k of keys) out[k] = sortRec(v[k])
+      return out
+    }
+    return v
+  }
+  try {
+    return JSON.stringify(sortRec(obj), null, 2)
+  } catch (e) {
+    return JSON.stringify(obj)
+  }
+}
+
+function deriveNortFilenameFromContent(nortContent) {
+  try {
+    let parsed = null
+    if (typeof nortContent === 'string') parsed = JSON.parse(nortContent)
+    else parsed = nortContent
+    if (!parsed || !parsed.edits) return null
+    const textList = Array.isArray(parsed.edits.textEdits)
+      ? parsed.edits.textEdits
+      : Array.isArray(parsed.edits.text)
+      ? parsed.edits.text
+      : null
+    if (!Array.isArray(textList)) return null
+    for (const t of textList) {
+      const tType = t && (t.type || t.typeName || t.Type)
+      const tText = t && (t.text || t.value || t.Text)
+      if (tType === 'Title' && typeof tText === 'string' && tText.trim()) return tText.trim()
+    }
+  } catch (e) {
+    // ignore parse errors
+  }
+  return null
+}
+
+function sanitizeFilenameBase(name, fallback) {
+  try {
+    let s = String(name || '')
+    s = s.trim()
+    s = s.replace(/[\\/:*?"<>|]+/g, '-')
+    s = s.replace(/\s+/g, '-')
+    if (s) return s
+  } catch (e) {}
+  return fallback || 'vellaris-map'
+}
+
+async function loadUiOptions(lang) {
+  const key = String(lang || 'default')
+  if (uiOptionsCache.has(key)) return uiOptionsCache.get(key)
+  const p = (async () => {
+    try {
+      const url = `${API_BASE}/ui-options?language=${encodeURIComponent(lang || 'en')}`
+      const j = await fetchJson(url)
+      return j
+    } catch (e) {
+      console.error('Failed to load UI options', e)
+      return null
+    }
+  })()
+  uiOptionsCache.set(key, p)
+  return p
+}
 function loadRandomOverrides() {
   try {
     const raw = localStorage.getItem(RANDOM_OVERRIDES_STORAGE_KEY)
@@ -44,110 +114,6 @@ function loadCityIconTypes(pack) {
   }
   return cityIconTypesRequestByPack.get(pack)
 }
-
-const uiOptionsRequestByLang = new Map()
-function loadUiOptions(language = 'en') {
-  const key = language || 'en'
-  if (!uiOptionsRequestByLang.has(key)) {
-    uiOptionsRequestByLang.set(key, fetchJson(`${API_BASE}/ui-options?language=${encodeURIComponent(language)}`))
-  }
-  return uiOptionsRequestByLang.get(key)
-}
-
-// Log resolved-setting-applier results after React applies state updates.
-// We rely on a timestamp marker `lastApplierRunRef` to avoid spurious logs.
-function usePostApplierLogger(lastApplierRunRef, deps) {
-  const marker = lastApplierRunRef?.current
-  useEffect(() => {
-    if (!marker) return
-    // Defer to next macrotask to ensure state is stable in concurrent mode.
-    const id = setTimeout(() => {
-      // suppressed verbose debug output in production
-      // clear marker
-      if (lastApplierRunRef) lastApplierRunRef.current = 0
-    }, 0)
-    return () => clearTimeout(id)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [marker, ...deps])
-
-}
-
-function deriveNortFilenameFromContent(nortContent) {
-  try {
-    const parsed = typeof nortContent === 'string' ? JSON.parse(nortContent) : nortContent
-    if (parsed && parsed.edits) {
-      const textList = Array.isArray(parsed.edits.textEdits)
-        ? parsed.edits.textEdits
-        : Array.isArray(parsed.edits.text)
-        ? parsed.edits.text
-        : null
-      if (Array.isArray(textList)) {
-        for (const t of textList) {
-          const tType = t && (t.type || t.typeName || t.Type)
-          const tText = t && (t.text || t.value || t.Text)
-          if (tType === 'Title' && typeof tText === 'string' && tText.trim()) {
-            return String(tText.trim()).replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, '-')
-          }
-        }
-      }
-    }
-  } catch (e) {}
-  return null
-}
-
-function appendIfSet(fd, key, value) {
-  if (value !== null && value !== undefined && value !== '') fd.append(key, String(value))
-}
-
-// Serialize .nort JSON consistently for backend compatibility:
-// - replace `null` values with empty string `""`
-// - format integer numeric literals as floats (e.g. `1` -> `1.0`) so outputs
-//   resemble desktop exports (cosmetic, valid JSON numbers)
-function serializeNortObject(obj) {
-  // Replace nulls with empty strings and produce a stable JSON with
-  // alphabetically sorted object keys for reproducible .nort output.
-  function normalizeAndSort(value, keyPath = []) {
-    if (value === null) {
-      // Preserve explicit null for specific export-path keys so downloaded
-      // .nort files keep null instead of being converted to empty string.
-      const lastKey = keyPath.length > 0 ? keyPath[keyPath.length - 1] : null
-      if (lastKey === 'heightmapExportPath' || lastKey === 'imageExportPath') return null
-      return ""
-    }
-    if (Array.isArray(value)) {
-      // Preserve original array ordering. Previously arrays were
-      // alphabetically sorted which changed user-provided ordering.
-      // Avoid passing Array.map's index/array as the `keyPath` arg to
-      // `normalizeAndSort` (see keyPath bug fix above).
-      const mapped = value.map((v) => normalizeAndSort(v, keyPath))
-      return mapped
-    }
-    if (typeof value === 'object' && value !== null) {
-      const out = {}
-      const keys = Object.keys(value).sort()
-      for (const k of keys) {
-        out[k] = normalizeAndSort(value[k], keyPath.concat(k))
-      }
-      return out
-    }
-    return value
-  }
-
-  try {
-    const normalized = normalizeAndSort(obj)
-    let json = JSON.stringify(normalized, null, 2)
-    // Ensure exported density integer literals include a decimal (1 => 1.0)
-    // Replace only numeric integer values for the property name "density".
-    // Replace integer density values (e.g. 1) with float format (1.0).
-    // This should be deterministic and not silently fall back.
-    json = json.replace(/("density"\s*:\s*)(-?\d+)(\s*[,}\n])/g, (m, p1, p2, p3) => `${p1}${p2}.0${p3}`)
-    return json
-  } catch (e) {
-    // Do not fall back silently — propagate the error so callers handle it.
-    throw e
-  }
-}
-
 async function readResponseBytesWithProgress(res, onDownloadingStarted) {
   const reader = res.body?.getReader?.()
   onDownloadingStarted?.()
@@ -201,6 +167,22 @@ function makeProgressToastController() {
     }
   }
   return { show, hide }
+}
+
+// Small debug hook: logs selected UI values when appliers have run.
+function usePostApplierLogger(lastApplierRunRef, deps = []) {
+  useEffect(() => {
+    try {
+      if (!lastApplierRunRef || typeof lastApplierRunRef.current !== 'number') return
+      if (lastApplierRunRef.current > 0) {
+        // Keep this lightweight and opt-in for developer consoles.
+        console.debug('post-applier run', lastApplierRunRef.current, deps)
+      }
+    } catch (e) {
+      // swallow logging errors
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastApplierRunRef && lastApplierRunRef.current, ...(Array.isArray(deps) ? deps : [])])
 }
 
 function GenerateForm({ language = 'en' }) {
@@ -547,12 +529,14 @@ function GenerateForm({ language = 'en' }) {
   useEffect(() => {
     (async () => {
       try {
+        // Request ui-options (seed parameter support removed on server).
         const uiOpts = await loadUiOptions(requestLanguage)
         if (uiOpts) {
           setArtPacks(uiOpts.artPacks || [])
           setAllBooks(uiOpts.books || [])
           setTextures(uiOpts.textures || [])
           setBorderTypes(uiOpts.borderTypes || [])
+          const defs = uiOpts.defaults || {}
           try {
             const byPack = uiOpts.cityIconTypesByPack || {}
             for (const pack of Object.keys(byPack)) {
@@ -576,10 +560,14 @@ function GenerateForm({ language = 'en' }) {
             const firstArtPack = Array.isArray(uiOpts.artPacks) && uiOpts.artPacks.length > 0 ? uiOpts.artPacks[0] : null
             if (!artPack && firstArtPack) setArtPack(firstArtPack)
 
-            // Prefetch city icon types for the selected/default art pack
+            // Prefetch city icon types for the selected/default art pack.
+            // Pass the backend-provided city icon default (if any) so the
+            // selection prefers the server canonical value even though
+            // React state updates are asynchronous.
             const packToLoad = artPack || firstArtPack || 'nortantis'
+            const preferredCityType = defs && defs.cityIconType ? String(defs.cityIconType) : cityIconType
             loadCityIconTypes(packToLoad)
-              .then((types) => handleCityIconTypesLoaded(types, cityIconType))
+              .then((types) => handleCityIconTypesLoaded(types, preferredCityType))
               .catch(() => {})
           } catch (e) {
             // ignore
@@ -589,13 +577,12 @@ function GenerateForm({ language = 'en' }) {
           // keys still resolve to readable text where possible. Do not
           // alter backend label text here; return it verbatim and let
           // renderers handle any HTML formatting if needed.
-          const frontendLabels = getFrontendLabels(requestLanguage)
+          const frontendLabels = await getFrontendLabels(requestLanguage)
           const backendLabels = uiOpts.labels || {}
           setUiI18n({ labels: { ...frontendLabels, ...backendLabels }, options: uiOpts.options || {} })
 
           // Always apply server option defaults and backend `defaults` so
           // the UI resets to canonical backend values on every load.
-          try {
             const opts = uiOpts.options || {}
             if (!backgroundType && Array.isArray(opts.backgroundTypes) && opts.backgroundTypes.length > 0) {
               setBackgroundType(opts.backgroundTypes[0].value)
@@ -607,7 +594,6 @@ function GenerateForm({ language = 'en' }) {
               setRegionBoundaryStyle(opts.lineStyles[0].value)
             }
             try {
-              const defs = uiOpts.defaults || {}
               if (defs) {
                 const setHex = (setter, value) => {
                   if (value) setter(colorToHex(value) || '')
@@ -624,7 +610,9 @@ function GenerateForm({ language = 'en' }) {
 
                 setNumber(setWorldSize, defs.worldSize)
                 setNumber(setRegionCount, defs.regionCount)
-                setNumber(setCityFrequency, defs.cityFrequency)
+                if (defs.cityProbability !== undefined && opts.maxCityProbability !== undefined) {
+                  setNumber(setCityFrequency, (Number(defs.cityProbability) / Number(opts.maxCityProbability)) * 100)
+                }
                 setNumber(setFinalWidth, defs.generatedWidth)
                 setNumber(setFinalHeight, defs.generatedHeight)
                 setString(setMapLanguage, defs.mapLanguage)
@@ -653,6 +641,12 @@ function GenerateForm({ language = 'en' }) {
                 setString(setGridOverlayLayer, defs.gridOverlayLayer)
                 setBoolean(setDrawVoronoiGridOverlayOnlyOnLand, defs.drawVoronoiGridOverlayOnlyOnLand)
                 setString(setFinalLandColoringMethod, defs.finalLandColoringMethod)
+                // Reset land coloring method to backend canonical default on page load.
+                if (typeof defs.drawRegionColors === 'boolean') {
+                  const method = defs.drawRegionColors ? 'ColorPoliticalRegions' : 'SingleColor'
+                  setString(setLandColoringMethod, method)
+                  setString(setFinalLandColoringMethod, method)
+                }
                 setString(setBorderRef, defs.borderRef)
                 setNumber(setBorderWidth, defs.borderWidth)
                 setString(setBorderPosition, defs.borderPosition)
@@ -703,14 +697,25 @@ function GenerateForm({ language = 'en' }) {
                 setHex(setTextColorHex, defs.textColor)
                 setBoolean(setDrawBoldBackground, defs.drawBoldBackground)
                 setHex(setBoldBackgroundColorHex, defs.boldBackgroundColor)
+                // If backend provides a canonical default font family or
+                // a curated `fonts` list, initialize the font fields to
+                // those values when no explicit defaults are provided.
+                const backendDefaultFont = (opts && opts.defaultFontFamily) || (Array.isArray(opts.fonts) && opts.fonts.length > 0 ? opts.fonts[0] : null)
+                if (!titleFontFamily && backendDefaultFont) setTitleFontFamily(backendDefaultFont)
+                if (!regionFontFamily && backendDefaultFont) setRegionFontFamily(backendDefaultFont)
+                if (!mountainRangeFontFamily && backendDefaultFont) setMountainRangeFontFamily(backendDefaultFont)
+                if (!otherMountainsFontFamily && backendDefaultFont) setOtherMountainsFontFamily(backendDefaultFont)
+                if (!citiesFontFamily && backendDefaultFont) setCitiesFontFamily(backendDefaultFont)
+                if (!riverFontFamily && backendDefaultFont) setRiverFontFamily(backendDefaultFont)
                 if (Array.isArray(defs.books)) setSelectedBooks(new Set(defs.books))
               }
-            } catch (e) {
-              // ignore default application failures
-            }
           } catch (e) {
             // ignore
           }
+
+          // Persist the raw backend defaults so we can later force-apply
+          // them to the UI once the settings appliers are available.
+          lastUiDefaultsRef.current = uiOpts.defaults || null
         }
       } catch (e) {
         // ignore startup option load failures
@@ -792,6 +797,66 @@ function GenerateForm({ language = 'en' }) {
       updateRandomOverride('randomSeed', value)
     },
     [updateRandomOverride]
+  )
+
+  // When the user manually changes the random seed, re-request the
+  // server-provided UI options (seeded) so defaults like art packs,
+  // textures and city icon lists update to the requested seed.
+  const handleRandomSeedChangeAndRefreshUi = useCallback(
+    (value) => {
+      handleRandomSeedChange(value)
+      ;(async () => {
+        try {
+          // Re-fetch ui-options (no seed support) so lists reflect any
+          // backend-generated defaults—server will ignore any seed.
+          const uiOpts = await loadUiOptions(requestLanguage)
+          if (!uiOpts) return
+          setArtPacks(uiOpts.artPacks || [])
+          setAllBooks(uiOpts.books || [])
+          setTextures(uiOpts.textures || [])
+          setBorderTypes(uiOpts.borderTypes || [])
+          const defs = uiOpts.defaults || {}
+          try {
+            const byPack = uiOpts.cityIconTypesByPack || {}
+            for (const pack of Object.keys(byPack)) {
+              cityIconTypesRequestByPack.set(pack, Promise.resolve(byPack[pack]))
+            }
+          } catch (e) {}
+
+          // Merge backend i18n labels with frontend labels
+          const frontendLabels = await getFrontendLabels(requestLanguage)
+          const backendLabels = uiOpts.labels || {}
+          setUiI18n({ labels: { ...frontendLabels, ...backendLabels }, options: uiOpts.options || {} })
+
+          // Persist the raw backend defaults so appliers can apply them
+          lastUiDefaultsRef.current = defs || null
+
+          
+          // update to the newly-seeded canonical values returned by the
+          // server. Use the same appliers as initial-load so behaviour is
+          // consistent.
+          try {
+            const ap = appliersRef.current
+            if (ap) {
+              ap.applyMapSizeAndSeedSettings(defs)
+              ap.applyBackgroundTypeSettings(defs)
+              ap.applyColorAndBoundarySettings(defs)
+              ap.applyBorderSettings(defs)
+              ap.applyFrayedBorderSettings(defs)
+              ap.applyCoastlineSettings(defs)
+              ap.applyOceanSettings(defs)
+              ap.applyRoadAndScaleSettings(defs)
+              ap.applyTextSettings(defs)
+            }
+          } catch (e) {
+            // swallow errors; UI remains interactive
+          }
+        } catch (e) {
+          // ignore
+        }
+      })()
+    },
+    [handleRandomSeedChange, requestLanguage]
   )
 
   const handleWorldSizeChange = useCallback(
@@ -1063,6 +1128,54 @@ function GenerateForm({ language = 'en' }) {
     appliersRef.current = appliers
   }, [appliers])
 
+  // If backend defaults were captured during UI load, apply them now
+  // using the canonical settings appliers so every control resets to
+  // the server-provided default values on page load.
+  useEffect(() => {
+    const defs = lastUiDefaultsRef.current
+    if (!defs) return
+    const ap = appliersRef.current
+    if (!ap) return
+    ap.applyMapSizeAndSeedSettings(defs)
+    ap.applyBackgroundTypeSettings(defs)
+    ap.applyColorAndBoundarySettings(defs)
+    ap.applyBorderSettings(defs)
+    ap.applyFrayedBorderSettings(defs)
+    ap.applyCoastlineSettings(defs)
+    ap.applyOceanSettings(defs)
+    ap.applyRoadAndScaleSettings(defs)
+    ap.applyTextSettings(defs)
+
+    // Ensure the Random Seed input starts empty on initial load per UX rules.
+    // The backend may provide a canonical `randomSeed` for reproducible
+    // generation, but the UI should present an empty seed so users opt-in
+    // to supplying a manual seed. Clear the state and remove any stored
+    // override for `randomSeed`.
+    try {
+      // Fill the Random Seed input with the backend-provided canonical
+      // seed when present so the UI reflects the generated preset.
+      const seedVal = defs && defs.randomSeed !== undefined && defs.randomSeed !== null ? String(defs.randomSeed) : ''
+      setRandomSeed(seedVal)
+      updateRandomOverride('randomSeed', seedVal || null)
+    } catch (e) {}
+
+    // Ensure font family controls are initialized to backend canonical
+    // default if available.
+    const opts = uiI18n.options || {}
+    const backendDefaultFont = (opts && opts.defaultFontFamily) || (Array.isArray(opts.fonts) && opts.fonts.length > 0 ? opts.fonts[0] : null)
+    if (backendDefaultFont) {
+      setTitleFontFamily(backendDefaultFont)
+      setRegionFontFamily(backendDefaultFont)
+      setMountainRangeFontFamily(backendDefaultFont)
+      setOtherMountainsFontFamily(backendDefaultFont)
+      setCitiesFontFamily(backendDefaultFont)
+      setRiverFontFamily(backendDefaultFont)
+    }
+
+    // Clear stored defaults after applying once.
+    lastUiDefaultsRef.current = null
+  }, [uiI18n])
+
   useEffect(() => {
     return () => {
       if (preview?.url) {
@@ -1197,7 +1310,14 @@ function GenerateForm({ language = 'en' }) {
       if (previous?.url) {
         URL.revokeObjectURL(previous.url)
       }
-      const filename = baseName ? `${baseName}.png` : 'vellaris-map.png'
+      let filenameBase = baseName
+      try {
+        if (nortContent) {
+          const derived = deriveNortFilenameFromContent(nortContent)
+          if (derived) filenameBase = derived
+        }
+      } catch (e) {}
+      const filename = `${sanitizeFilenameBase(filenameBase, 'vellaris-map')}.png`
       return {
         url,
         filename,
@@ -2062,7 +2182,7 @@ function GenerateForm({ language = 'en' }) {
           setCityIconType: handleCityIconTypeChange,
           setCityFrequency: handleCityFrequencyChange,
           setSelectedBooks: handleSelectedBooksChange,
-          setRandomSeed: handleRandomSeedChange,
+          setRandomSeed: handleRandomSeedChangeAndRefreshUi,
           setMapLanguage: handleMapLanguageChange,
           handleRandomMap,
           handleFileInput,

@@ -59,16 +59,11 @@ export default function RandomSettingsSection({ values, handlers, options, ui })
     }
     return v
   }
-  const randomOption = { value: '', label: translateLabel('ui.select.random') }
   const dimensions = backendOptions.dimensions
-    ? [randomOption, ...backendOptions.dimensions]
+    ? backendOptions.dimensions
     : DIMENSIONS
-  const landShapes = backendOptions.landShapes
-    ? [randomOption, ...backendOptions.landShapes]
-    : [randomOption]
-  const landColoringMethods = backendOptions.landColoringMethods
-    ? [randomOption, ...backendOptions.landColoringMethods]
-    : [randomOption]
+  const landShapes = backendOptions.landShapes || []
+  const landColoringMethods = backendOptions.landColoringMethods || []
 
   return (
     <section className="generator-section">
@@ -211,7 +206,6 @@ export default function RandomSettingsSection({ values, handlers, options, ui })
               onChange={(e) => setArtPack(e.target.value)}
               disabled={artPacks.length === 0}
             >
-              <option value="">{translateLabel('ui.select.random')}</option>
               {artPacks.map((item) => (
                 <option key={item} value={item}>
                   {item}
@@ -226,7 +220,6 @@ export default function RandomSettingsSection({ values, handlers, options, ui })
               onChange={(e) => setCityIconType(e.target.value)}
               disabled={cityIconTypes.length === 0}
             >
-              <option value="">{translateLabel('ui.select.random')}</option>
               {cityIconTypes.map((item) => (
                 <option key={item} value={item}>
                   {item}
@@ -250,14 +243,7 @@ export default function RandomSettingsSection({ values, handlers, options, ui })
               <span className="slider-value">{cityFrequency}%</span>
             </div>
 
-            <label htmlFor="random-seed-input">{translateLabel('theme.randomSeed.label')}</label>
-            <input
-              id="random-seed-input"
-              type="text"
-              value={randomSeed}
-              onChange={(e) => setRandomSeed(e.target.value)}
-              placeholder={translateLabel('ui.seed.placeholder')}
-            />
+            {/* Random seed input removed from Random panel; seed is handled in Customize */}
           </div>
         </div>
 

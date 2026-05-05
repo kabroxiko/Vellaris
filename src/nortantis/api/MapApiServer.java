@@ -46,12 +46,14 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.LinkedHashMap;
 import java.util.Locale;
+import java.util.ResourceBundle;
 import javax.imageio.ImageIO;
 import javax.imageio.IIOImage;
 import javax.imageio.ImageWriteParam;
 import javax.imageio.ImageWriter;
 import javax.imageio.stream.ImageOutputStream;
 import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.nio.charset.StandardCharsets;
@@ -151,9 +153,15 @@ public class MapApiServer
 			String requestedLanguage = req.queryParams("language");
 			String previousLanguage = UserPreferences.getInstance().language;
 			applyRequestLanguage(requestedLanguage);
+
+			// Ensure a platform implementation is available before any classes
+			// that depend on PlatformFactory (e.g. Color) are initialized.
+			PlatformFactory.setInstance(new AwtFactory());
+
 			try
 			{
-				// Build the standard UI options/labels
+				// Build the standard UI options/labels. Deterministic seed
+				// support removed — defaults are always generated fresh.
 				Map<String, Object> ui = buildWebUiOptions();
 
 				// Also include resource lists so the frontend can fetch a single
@@ -212,6 +220,7 @@ public class MapApiServer
 
 		post("/api/generate", MapApiServer::handleGenerate);
 		post("/api/background-preview", MapApiServer::handleBackgroundPreview);
+		post("/api/background-base", MapApiServer::handleBackgroundBase);
 
 		exception(Exception.class, (exception, req, res) ->
 		{
@@ -333,136 +342,99 @@ public class MapApiServer
 	private static Map<String, Object> buildWebUiOptions()
 	{
 		Map<String, Object> options = new LinkedHashMap<>();
-		options.put("tabs", List.of(option("background", tr("theme.tab.background", "Background")), option("border", tr("theme.tab.border", "Border")),
-				option("effects", tr("theme.tab.effects", "Effects")), option("fonts", tr("theme.tab.fonts", "Fonts"))));
-		options.put("dimensions", List.of(option("Square", tr("GeneratedDimension.Square", "Square")), option("Sixteen_by_9", tr("GeneratedDimension.Sixteen_by_9", "16 by 9")),
-				option("Golden_Ratio", tr("GeneratedDimension.Golden_Ratio", "Golden Ratio"))));
-		options.put("landShapes", List.of(option("Continents", tr("LandShape.Continents", "Continents")), option("Inland_Sea", tr("LandShape.Inland_Sea", "Inland Sea")),
-				option("Scattered", tr("LandShape.Scattered", "Scattered"))));
-		options.put("landColoringMethods", List.of(option("SingleColor", tr("LandColoringMethod.SingleColor", "Single color")),
-				option("ColorPoliticalRegions", tr("LandColoringMethod.ColorPoliticalRegions", "Color political regions"))));
-		options.put("backgroundTypes", List.of(option("FractalNoise", tr("theme.background.fractalNoise", "Fractal noise")),
-				option("GeneratedFromTexture", tr("theme.background.generatedFromTexture", "Generated from texture")), option("SolidColor", tr("theme.background.solidColor", "Solid color"))));
-		options.put("strokeTypes", List.of(option("Solid", tr("StrokeType.Solid", "Solid")), option("Dashes", tr("StrokeType.Dashes", "Dashes")),
-				option("Rounded_Dashes", tr("StrokeType.Rounded_Dashes", "Rounded dashes")), option("Dots", tr("StrokeType.Dots", "Dots"))));
-		options.put("borderPositions", List.of(option("Outside_map", tr("BorderPosition.Outside_map", "Outside map")), option("Over_map", tr("BorderPosition.Over_map", "Over map"))));
+		options.put("tabs", List.of(option("background", tr("theme.tab.background")), option("border", tr("theme.tab.border")),
+				option("effects", tr("theme.tab.effects")), option("fonts", tr("theme.tab.fonts"))));
+		options.put("dimensions", List.of(option("Square", tr("GeneratedDimension.Square")), option("Sixteen_by_9", tr("GeneratedDimension.Sixteen_by_9")),
+				option("Golden_Ratio", tr("GeneratedDimension.Golden_Ratio"))));
+		options.put("landShapes", List.of(option("Continents", tr("LandShape.Continents")), option("Inland_Sea", tr("LandShape.Inland_Sea")),
+				option("Scattered", tr("LandShape.Scattered"))));
+		options.put("landColoringMethods", List.of(option("SingleColor", tr("LandColoringMethod.SingleColor")),
+				option("ColorPoliticalRegions", tr("LandColoringMethod.ColorPoliticalRegions"))));
+		options.put("backgroundTypes", List.of(option("FractalNoise", tr("theme.background.fractalNoise")),
+				option("GeneratedFromTexture", tr("theme.background.generatedFromTexture")), option("SolidColor", tr("theme.background.solidColor"))));
+		options.put("strokeTypes", List.of(option("Solid", tr("StrokeType.Solid")), option("Dashes", tr("StrokeType.Dashes")),
+				option("Rounded_Dashes", tr("StrokeType.Rounded_Dashes")), option("Dots", tr("StrokeType.Dots"))));
+		options.put("borderPositions", List.of(option("Outside_map", tr("BorderPosition.Outside_map")), option("Over_map", tr("BorderPosition.Over_map"))));
 		options.put("borderColorOptions",
-				List.of(option("Ocean_color", tr("BorderColorOption.Ocean_color", "Ocean color")), option("Choose_color", tr("BorderColorOption.Choose_color", "Choose color"))));
-		options.put("lineStyles", List.of(option("Jagged", tr("theme.lineStyle.jagged", "Jagged")), option("Splines", tr("theme.lineStyle.splines", "Splines")),
-				option("SplinesWithSmoothedCoastlines", tr("theme.lineStyle.splinesSmoothed", "Splines with smoothed coastlines"))));
-		options.put("oceanWaveTypes", List.of(option("ConcentricWaves", tr("theme.waveType.concentricWaves", "Concentric waves")), option("Ripples", tr("theme.waveType.ripples", "Ripples")),
-				option("None", tr("theme.waveType.none", "None"))));
+				List.of(option("Ocean_color", tr("BorderColorOption.Ocean_color")), option("Choose_color", tr("BorderColorOption.Choose_color"))));
+		options.put("lineStyles", List.of(option("Jagged", tr("theme.lineStyle.jagged")), option("Splines", tr("theme.lineStyle.splines")),
+				option("SplinesWithSmoothedCoastlines", tr("theme.lineStyle.splinesSmoothed"))));
+		options.put("oceanWaveTypes", List.of(option("ConcentricWaves", tr("theme.waveType.concentricWaves")), option("Ripples", tr("theme.waveType.ripples")),
+				option("None", tr("theme.waveType.none"))));
 
-		options.put("gridOverlayShapes", List.of(option("Horizontal_hexes", tr("GridOverlayShape.Horizontal_hexes", "Horizontal hexes")), option("Vertical_hexes", tr("GridOverlayShape.Vertical_hexes", "Vertical hexes")), option("Squares", tr("GridOverlayShape.Squares", "Squares")), option("Voronoi_polygons", tr("GridOverlayShape.Voronoi_polygons", "Voronoi polygons"))));
-		options.put("gridOverlayOffsets", List.of(option("zero", tr("GridOverlayOffset.zero", "0")), option("quarter", tr("GridOverlayOffset.quarter", "1/4")), option("half", tr("GridOverlayOffset.half", "1/2")), option("threeQuarters", tr("GridOverlayOffset.threeQuarters", "3/4"))));
-		options.put("gridOverlayLayers", List.of(option("Under_icons", tr("GridOverlayLayer.Under_icons", "Under icons")), option("Over_icons", tr("GridOverlayLayer.Over_icons", "Over icons"))));
+		// Provide a curated, hard-coded list of fonts suitable for fantasy
+		// map text per operating system. Do NOT rely on ad-hoc keyword
+		// matching — return only the canonical families the server ships
+		// as recommended choices (intersected with installed families).
+		try {
+			java.awt.GraphicsEnvironment ge = java.awt.GraphicsEnvironment.getLocalGraphicsEnvironment();
+			String[] families = ge.getAvailableFontFamilyNames();
+			java.util.List<String> installed = java.util.Arrays.asList(families);
 
-		// Build a labels map only for keys that are translated by the backend (no fallbacks).
-		Map<String, String> labels = new LinkedHashMap<>();
-		String[] backendLabelKeys = new String[] {
-			// UI labels the frontend expects for grid overlay controls
-			"theme.shape.label",
-			"theme.lineWidth.label",
-			"theme.color.label",
-			"theme.xOffset.label",
-			"theme.yOffset.label",
-			"theme.layer.label",
-
-			// Added keys used by web UI but previously missing from the returned labels
-			"theme.landColoringMethod.label",
-			"theme.randomSeed.label",
-			"theme.tab.background",
-			"theme.tab.border",
-			"theme.tab.effects",
-			"theme.tab.fonts",
-			"theme.style.label",
-			"theme.borderPosition.label",
-			"theme.borderColor.label",
-			"theme.drawBorder",
-			"theme.drawGrid",
-			"theme.onlyOnLand",
-			"theme.drawRegionBoundaries",
-			"theme.colorLand",
-			"theme.colorOcean",
-			"theme.background.label",
-			"theme.texture.label",
-			"theme.borderType.label",
-			"theme.width.label",
-			"theme.rows.label",
-			"theme.columns.label",
-			"theme.landColor.label",
-			"theme.oceanColor.label",
-			"theme.regionBoundaryColor.title",
-			"theme.regionBoundaryWidth.help",
-			"theme.borderWidth.label",
-			"theme.borderColor.title",
-			"theme.frayEdges",
-			"theme.grungeWidth.help",
-			"theme.shadingWidth.label",
-			"theme.fraySize.label",
-			"theme.drawGrunge",
-			"theme.grungeColor.label",
-			"theme.lineStyle.label",
-			"theme.coastlineWidth.label",
-			"theme.coastlineColor.label",
-			"theme.coastShadingWidth.label",
-			"theme.coastShadingTransparency.label",
-			"theme.coastShadingColor.label",
-			"theme.coastShadingColor.disabled",
-			"theme.oceanShadingWidth.label",
-			"theme.oceanShadingColor.label",
-			"theme.waveType.label",
-			"theme.waveWidth.label",
-			"theme.waveCount.label",
-			"theme.fadeOuterWaves",
-			"theme.jitter",
-			"theme.brokenLines",
-			"theme.waveColor.label",
-			"theme.drawOceanEffectsInLakes",
-			"theme.riverColor.label",
-			"theme.drawRoads",
-			"theme.roadStyle.label",
-			"theme.roadWidth.label",
-			"theme.roadColor.label",
-			"theme.mountainSize.label",
-			"theme.hillSize.label",
-			"theme.duneSize.label",
-			"theme.treeHeight.label",
-			"theme.citySize.label",
-			"theme.enableText",
-			"theme.textColor.label",
-			"theme.boldBackground",
-			"theme.boldBackgroundColor.label",
-			"theme.titleFont.label",
-			"theme.regionFont.label",
-			"theme.mountainRangeFont.label",
-			"theme.otherMountainsFont.label",
-			"theme.citiesFont.label",
-			"theme.riverLakeFont.label",
-			"newSettingsDialog.dimensions.label",
-			"newSettingsDialog.worldSize.label",
-			"newSettingsDialog.landShape.label",
-			"newSettingsDialog.regionCount.label",
-			"newSettingsDialog.artPack.label",
-			"newSettingsDialog.cityIconType.label",
-			"newSettingsDialog.cityFrequency.label",
-			"books.checkAll",
-			"books.uncheckAll",
-			"common.choose",
-			"textTool.booksForText.label",
-		};
-
-		for (String k : backendLabelKeys)
-		{
-			String v = Translation.get(k);
-			if (v != null && !v.equals(k))
-			{
-				// Do not alter HTML line-break tags here; return the raw
-				// translation (trimmed). The frontend will normalize <br>
-				// into LF when presenting multi-line labels.
-				String normalized = v == null ? null : v.trim();
-				labels.put(k, normalized);
+			java.util.List<String> hardcoded = new java.util.ArrayList<>();
+			String osName = System.getProperty("os.name", "").toLowerCase();
+			if (osName.contains("mac")) {
+				// macOS: common system and display faces found on Macs
+				java.util.Collections.addAll(hardcoded,
+					"Apple Chancery", "Trajan Pro", "Optima", "Palatino", "Hoefler Text",
+					"Garamond", "Times New Roman", "Georgia", "Baskerville"
+				);
+			} else if (osName.contains("win")) {
+				// Windows: common Windows faces suitable for map typography
+				java.util.Collections.addAll(hardcoded,
+					"Trajan Pro", "Garamond", "Times New Roman", "Palatino Linotype",
+					"Book Antiqua", "Georgia", "Century Schoolbook"
+				);
+			} else {
+				// Linux / Other: common open-source serif and display faces
+				java.util.Collections.addAll(hardcoded,
+					"EB Garamond", "Libre Baskerville", "Gentium", "DejaVu Serif",
+					"Cardo", "Cinzel", "Cormorant Garamond", "FreeSerif"
+				);
 			}
+
+			java.util.List<String> filtered = new java.util.ArrayList<>();
+			for (String desired : hardcoded) {
+				for (String inst : families) {
+					if (inst.equalsIgnoreCase(desired)) {
+						filtered.add(inst);
+						break;
+					}
+				}
+			}
+
+			// Return only the filtered list (may be empty if none match).
+			options.put("fonts", filtered);
+			if (!filtered.isEmpty()) {
+				options.put("defaultFontFamily", filtered.get(0));
+			}
+		} catch (Exception e) {
+			if (API_DEBUG) Logger.println("Failed to enumerate system fonts: " + e.getMessage());
+		}
+
+		// Publish the backend's maximum per-center city probability so
+		// frontends can convert internal `cityProbability` to a user
+		// percentage for the `cityFrequency` slider.
+		options.put("maxCityProbability", SettingsGenerator.maxCityProbability);
+
+		options.put("gridOverlayShapes", List.of(option("Horizontal_hexes", tr("GridOverlayShape.Horizontal_hexes")), option("Vertical_hexes", tr("GridOverlayShape.Vertical_hexes")), option("Squares", tr("GridOverlayShape.Squares")), option("Voronoi_polygons", tr("GridOverlayShape.Voronoi_polygons"))));
+		options.put("gridOverlayOffsets", List.of(option("zero", tr("GridOverlayOffset.zero")), option("quarter", tr("GridOverlayOffset.quarter")), option("half", tr("GridOverlayOffset.half")), option("threeQuarters", tr("GridOverlayOffset.threeQuarters"))));
+		options.put("gridOverlayLayers", List.of(option("Under_icons", tr("GridOverlayLayer.Under_icons")), option("Over_icons", tr("GridOverlayLayer.Over_icons"))));
+
+		// Return the entire translation bundle so the frontend receives the
+		// complete i18n dictionary for the effective locale. The bundle is
+		// intentionally small and easier to maintain than a manual key list.
+		Map<String, String> labels = new LinkedHashMap<>();
+		try {
+			ResourceBundle bundle = ResourceBundle.getBundle("nortantis.swing.translation.messages", Translation.getEffectiveLocale());
+			for (String k : bundle.keySet()) {
+				String v = bundle.getString(k);
+				if (v != null) {
+					labels.put(k, v.trim());
+				}
+			}
+		} catch (Exception e) {
+			if (API_DEBUG) Logger.println("Failed to load translation bundle: " + e.getMessage());
 		}
 
 		Map<String, Object> result = new LinkedHashMap<>();
@@ -472,23 +444,29 @@ public class MapApiServer
 			result.put("labels", labels);
 		}
 
-		// Provide canonical backend defaults so frontends can initialize
-		// controls to the same values the server will use when generating.
+		// Provide backend defaults so frontends can initialize controls.
+		// To match desktop behavior, generate a randomized default preset
+		// using the same generator used by the desktop application. This
+		// starts from the bundled properties defaults and then mutates
+		// values randomly (world size, colors, border, etc.).
 		try {
-			MapSettings defaults = SettingsGenerator.generate(new java.util.Random(0), Assets.installedArtPack, null);
-			String defJson = defaults.toJsonString();
+			// Select a reasonable art pack to pass to the generator.
+			List<String> artPacks = Assets.listArtPacks(false);
+			String artPack = (artPacks != null && !artPacks.isEmpty()) ? artPacks.get(0) : Assets.installedArtPack;
+
+			// Generate a fresh randomized default preset (no external seed).
+			Random rand = new Random();
+			MapSettings generated = SettingsGenerator.generate(rand, artPack, null);
+			String defJson = generated.toJsonString();
 			@SuppressWarnings("unchecked")
 			Map<String, Object> defMap = gson.fromJson(defJson, Map.class);
-			// Ensure seed fields are returned as integer (Long) values to avoid
-			// JSON numeric formatting as exponential (scientific) notation.
-			try {
-				defMap.put("randomSeed", defaults.randomSeed);
-				defMap.put("backgroundRandomSeed", defaults.backgroundRandomSeed);
-				defMap.put("frayedBorderSeed", defaults.frayedBorderSeed);
-				defMap.put("regionsRandomSeed", defaults.regionsRandomSeed);
-				defMap.put("textRandomSeed", defaults.textRandomSeed);
-			} catch (Exception ignored) {}
-			result.put("defaults", defMap);
+
+			// Return the full generated defaults map so frontends receive the
+			// complete generated `MapSettings` values (no filtering).
+			// Normalize numeric types to avoid scientific notation in JSON
+			@SuppressWarnings("unchecked")
+			Map<String,Object> normalized = (Map<String,Object>) normalizeNumbersInObject(defMap);
+			result.put("defaults", normalized);
 		} catch (Exception e) {
 			// If defaults cannot be produced, omit the field (best-effort)
 			if (API_DEBUG) Logger.println("Failed to produce UI defaults: " + e.getMessage());
@@ -496,6 +474,55 @@ public class MapApiServer
 
 		return result;
 	}
+
+		// Ensure numeric values that are whole numbers are represented as
+		// integer types to avoid exponential/scientific notation when
+		// serialized to JSON. This walks Maps and Lists recursively.
+		private static Object normalizeNumbersInObject(Object o) {
+			if (o == null) return null;
+			if (o instanceof Map) {
+				Map<?,?> m = (Map<?,?>) o;
+				Map<Object,Object> out = new LinkedHashMap<>();
+				for (Map.Entry<?,?> e : m.entrySet()) {
+					Object k = e.getKey();
+					Object v = e.getValue();
+					out.put(k, normalizeNumbersInObject(v));
+				}
+				return out;
+			}
+			if (o instanceof List) {
+				List<?> l = (List<?>) o;
+				List<Object> out = new java.util.ArrayList<>(l.size());
+				for (Object v : l) out.add(normalizeNumbersInObject(v));
+				return out;
+			}
+			if (o instanceof Number) {
+				Number n = (Number) o;
+				// Handle BigDecimal specially if present
+				if (n instanceof java.math.BigDecimal) {
+					java.math.BigDecimal bd = (java.math.BigDecimal) n;
+					try {
+						long lv = bd.longValueExact();
+						if (lv >= Integer.MIN_VALUE && lv <= Integer.MAX_VALUE) return Integer.valueOf((int) lv);
+						return Long.valueOf(lv);
+					} catch (ArithmeticException ae) {
+						return bd.doubleValue();
+					}
+				}
+				if (n instanceof Double || n instanceof Float) {
+					double d = n.doubleValue();
+					if (Double.isFinite(d) && Math.floor(d) == d) {
+						long lv = (long) d;
+						if (lv >= Integer.MIN_VALUE && lv <= Integer.MAX_VALUE) return Integer.valueOf((int) lv);
+						return Long.valueOf(lv);
+					}
+					return Double.valueOf(d);
+				}
+				// For integral numeric types, return as-is
+				return n;
+			}
+			return o;
+		}
 
 	private static Map<String, String> option(String value, String label)
 	{
@@ -505,13 +532,10 @@ public class MapApiServer
 		return entry;
 	}
 
-	private static String tr(String key, String fallback)
+	private static String tr(String key)
 	{
-		String translated = Translation.get(key);
-		return translated.equals(key) ? fallback : translated;
+		return Translation.get(key);
 	}
-
-	// NOTE: `stripTrailingColon` removed — labels are returned trimmed without altering punctuation.
 
 	private static Object handleBackgroundPreview(Request req, Response res)
 	{
@@ -630,6 +654,125 @@ public class MapApiServer
 		}
 
 		return backgroundPreview;
+	}
+
+	private static Object handleBackgroundBase(Request req, Response res)
+	{
+		Config cfg = parseConfig(req, res);
+		if (cfg == null)
+		{
+			res.type(CONTENT_TYPE_JSON);
+			return gson.toJson(new ApiResponse(false, MSG_FAILED_TO_PARSE_CONFIG, null, null));
+		}
+
+		PlatformFactory.setInstance(new AwtFactory());
+
+		GenerationContext ctx = loadSettings(cfg, res);
+		if (ctx == null)
+		{
+			res.type(CONTENT_TYPE_JSON);
+			return gson.toJson(new ApiResponse(false, MSG_FAILED_TO_LOAD_SETTINGS, null, null));
+		}
+
+		Image baseImage = null;
+		try
+		{
+			baseImage = generateBackgroundBaseImage(ctx.settings, cfg);
+			BufferedImage buffered = nortantis.platform.awt.AwtFactory.unwrap(baseImage);
+			res.type(CONTENT_TYPE_PNG);
+			res.status(200);
+			writeCompressedPng(buffered, res.raw().getOutputStream());
+			res.raw().getOutputStream().flush();
+			return res.raw();
+		}
+		catch (Exception e)
+		{
+			Logger.println("handleBackgroundBase failed: " + e);
+			res.type(CONTENT_TYPE_JSON);
+			res.status(500);
+			return gson.toJson(new ApiResponse(false, "Failed to generate background base: " + e.getClass().getSimpleName() + (e.getMessage() != null ? (" - " + e.getMessage()) : ""), null, null));
+		}
+		finally
+		{
+			if (baseImage != null)
+			{
+				baseImage.close();
+			}
+			if (ctx.tempNortPath != null)
+			{
+				try
+				{
+					Files.deleteIfExists(ctx.tempNortPath);
+				}
+				catch (Exception ignore)
+				{
+					// Ignore cleanup errors
+				}
+			}
+		}
+	}
+
+	private static Image generateBackgroundBaseImage(MapSettings settings, Config cfg)
+	{
+		int width = cfg.previewWidth != null && cfg.previewWidth > 0 ? cfg.previewWidth : DEFAULT_BACKGROUND_PREVIEW_WIDTH;
+		int height = cfg.previewHeight != null && cfg.previewHeight > 0 ? cfg.previewHeight : DEFAULT_BACKGROUND_PREVIEW_HEIGHT;
+
+		Image backgroundBase;
+
+		if (settings.generateBackground)
+		{
+			Image fractal = FractalBGGenerator.generate(new Random(settings.backgroundRandomSeed), 1.3f, width, height, 0.75f);
+			try
+			{
+				backgroundBase = fractal.deepCopy();
+			}
+			finally
+			{
+				fractal.close();
+			}
+		}
+		else if (settings.generateBackgroundFromTexture)
+		{
+			Tuple2<Path, String> tuple = settings.getBackgroundImagePath();
+			Path texturePath = tuple.getFirst();
+
+			Image texture = ImageCache.getInstance(settings.backgroundTextureResource.artPack, settings.customImagesPath).getImageFromFile(texturePath);
+			try
+			{
+				Image textureForOcean = ImageHelper.getInstance().convertToGrayscale(texture);
+				Image oceanBase = BackgroundGenerator.generateUsingWhiteNoiseConvolution(new Random(settings.backgroundRandomSeed), textureForOcean, height, width);
+				try
+				{
+					backgroundBase = oceanBase.deepCopy();
+				}
+				finally
+				{
+					oceanBase.close();
+					if (textureForOcean != texture)
+					{
+						textureForOcean.close();
+					}
+				}
+			}
+			finally
+			{
+				texture.close();
+			}
+		}
+		else
+		{
+			Image solid = Image.create(width, height, ImageType.Grayscale8Bit);
+			try
+			{
+				backgroundBase = ImageHelper.getInstance().colorize(solid, nortantis.platform.Color.create(255,255,255), ImageHelper.ColorizeAlgorithm.solidColor);
+			}
+			finally
+			{
+				solid.close();
+			}
+		}
+
+		return backgroundBase;
 	}
 
 	private static void logHeaders(Request req)
@@ -918,7 +1061,6 @@ public class MapApiServer
 					if (settings.edits.centerEdits != null) centerEditsCount = settings.edits.centerEdits.size();
 					hasIconEdits = settings.edits.hasIconEdits;
 				}
-				Logger.println(String.format("Settings edits: hasIconEdits=%s, freeIcons=%d, centerEdits=%d", hasIconEdits, freeIconsCount, centerEditsCount));
 			} catch (Exception ignore) {
 				// best-effort diagnostics; ignore failures
 			}

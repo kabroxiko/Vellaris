@@ -1,22 +1,10 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState, useRef } from 'react'
 import { RgbaColorPicker } from 'react-colorful'
 import PropTypes from 'prop-types'
+import backgroundBaseCache from './backgroundBaseCache'
+  
 
 const API_BASE = import.meta.env.VITE_API_BASE || '/api'
-
-const FONT_FAMILY_OPTIONS = [
-  'Apple Chancery',
-  'Gabriola',
-  'Z003',
-  'Cinzel',
-  'Merriweather',
-  'Times New Roman',
-  'Georgia',
-  'Garamond',
-  'Palatino Linotype',
-  'Book Antiqua',
-  'Serif',
-]
 
 export default function CustomizeSettingsSection({ values, handlers, options, ui }) {
 
@@ -24,6 +12,7 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
   const [openFontComboId, setOpenFontComboId] = useState(null)
   const [backgroundPreviewUrl, setBackgroundPreviewUrl] = useState(null)
   const [previewRefreshNonce, setPreviewRefreshNonce] = useState(0)
+  const lastBaseBlobRef = useRef(null)
 
   // Testing override: set to true to force the Customize panel enabled
   // regardless of having an uploaded .nort source. Remove or set to false
@@ -31,13 +20,7 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
   const FORCE_ENABLE_CUSTOMIZE = true
 
   useEffect(() => {
-    try {
-      console.log('background-preview effect start', {
-        previewTriggerKey,
-        currentSource,
-        previewFieldsPreviewSample: Object.keys(previewFields).slice(0, 8),
-      })
-    } catch (e) {}
+    
     const onDocumentMouseDown = (event) => {
       const target = event.target
       if (!(target instanceof Element)) return
@@ -147,7 +130,6 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
       colorizeOcean,
       landColorHex,
       oceanColorHex,
-      drawRegionBoundaries,
       drawBorder,
       drawGridOverlay,
       gridOverlayShape,
@@ -218,7 +200,6 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     colorizeOcean,
     landColorHex,
     oceanColorHex,
-    drawRegionBoundaries,
     drawBorder,
     drawGridOverlay,
     gridOverlayShape,
@@ -279,14 +260,294 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     boldBackgroundColorHex,
   ])
 
-  // Use previewFields as the serialized key so any change triggers the effect
+  // Compose a mini island preview from a neutral base Blob. Exported at
+  // component scope so color controls can trigger a local recomposition
+  // without initiating a new network fetch.
+  async function composeMiniIslandFromBlob(sourceBlob, opts = {}) {
+    try {
+      const imgBitmap = await createImageBitmap(sourceBlob)
+      const w = imgBitmap.width
+      const h = imgBitmap.height
+      const canvas = document.createElement('canvas')
+      canvas.width = w
+      canvas.height = h
+      const ctx = canvas.getContext('2d')
+
+      const boxW = Math.round(w * 0.45)
+      const boxH = Math.round(h * 0.45)
+      const x = Math.round((w - boxW) / 2)
+      const y = Math.round((h - boxH) / 2)
+
+      const seed = Number(previewFields.backgroundSeed) || Date.now()
+      function mulberry32(a) {
+        return function() {
+          let t = (a += 0x6d2b79f5)
+          t = Math.imul(t ^ (t >>> 15), t | 1)
+          t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
+          return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+        }
+      }
+      const rng = mulberry32(seed & 0xffffffff)
+      // Choose whether to colorize the ocean based on opts override
+      const useColorizeOcean = (typeof opts.colorizeOcean === 'boolean') ? opts.colorizeOcean : colorizeOcean
+      const useOceanColorHex = opts.oceanColorHex || oceanColorHex
+
+      // Helper: convert hex -> HSB and HSB -> RGB (used by server math)
+      function hexToHSB(hex) {
+        const hh = hex.replace(/^#/, '')
+        const r = parseInt(hh.substring(0,2),16)/255
+        const g = parseInt(hh.substring(2,4),16)/255
+        const b = parseInt(hh.substring(4,6),16)/255
+        const max = Math.max(r,g,b)
+        const min = Math.min(r,g,b)
+        const delta = max - min
+        let hue = 0
+        if (delta !== 0) {
+          if (max === r) hue = ((g - b) / delta) % 6
+          else if (max === g) hue = ((b - r) / delta) + 2
+          else hue = ((r - g) / delta) + 4
+          hue = hue * 60
+          if (hue < 0) hue += 360
+        }
+        const sat = max === 0 ? 0 : delta / max
+        const bri = max
+        return [hue/360, sat, bri]
+      }
+      function hsbToRgb(h, s, v) {
+        const hh = (h * 360)
+        const c = v * s
+        const x = c * (1 - Math.abs(((hh/60) % 2) - 1))
+        const m = v - c
+        let r1=0,g1=0,b1=0
+        if (hh >= 0 && hh < 60) { r1=c; g1=x; b1=0 }
+        else if (hh < 120) { r1=x; g1=c; b1=0 }
+        else if (hh < 180) { r1=0; g1=c; b1=x }
+        else if (hh < 240) { r1=0; g1=x; b1=c }
+        else if (hh < 300) { r1=x; g1=0; b1=c }
+        else { r1=c; g1=0; b1=x }
+        const R = Math.round((r1 + m) * 255)
+        const G = Math.round((g1 + m) * 255)
+        const B = Math.round((b1 + m) * 255)
+        return [R,G,B]
+      }
+
+      // Centralized per-pixel colorize helper. Returns an ImageBitmap.
+      async function colorizeBitmap(sourceBitmap, colorHex) {
+        const alg = (previewFields && String(previewFields.backgroundType || '').toLowerCase().includes('fractal')) ? 'algorithm2' : 'algorithm3'
+        const hsb = hexToHSB(colorHex)
+        const tmp = document.createElement('canvas')
+        tmp.width = w
+        tmp.height = h
+        const tctx = tmp.getContext('2d')
+        tctx.drawImage(sourceBitmap, 0, 0, w, h)
+        const imd = tctx.getImageData(0, 0, w, h)
+        const data = imd.data
+        const preserveTexture = (typeof opts.preserveTexture === 'number') ? Math.max(0, Math.min(1, opts.preserveTexture)) : 0.02
+        for (let i = 0; i < data.length; i += 4) {
+          const r0 = data[i]
+          const g0 = data[i+1]
+          const b0 = data[i+2]
+          const level = (0.299 * r0 + 0.587 * g0 + 0.114 * b0) / 255
+          let resultLevel
+          if (alg === 'algorithm2') {
+            const I = hsb[2] * 255
+            const overlay = ((I / 255) * (I + (2 * level) * (255 - I))) / 255
+            resultLevel = overlay
+          } else {
+            if (hsb[2] < 0.5) resultLevel = level * (hsb[2] * 2)
+            else {
+              const range = (1 - hsb[2]) * 2
+              resultLevel = range * level + (1 - range)
+            }
+          }
+          const [rC, gC, bC] = hsbToRgb(hsb[0], hsb[1], resultLevel)
+          data[i] = Math.round((1 - preserveTexture) * rC + preserveTexture * r0)
+          data[i+1] = Math.round((1 - preserveTexture) * gC + preserveTexture * g0)
+          data[i+2] = Math.round((1 - preserveTexture) * bC + preserveTexture * b0)
+        }
+        tctx.putImageData(imd, 0, 0)
+        try { return await createImageBitmap(tmp) } catch (e) { return sourceBitmap }
+      }
+
+      // Draw background (colorized if requested). To match backend
+      // behavior exactly we colorize the grayscale neutral base per-pixel
+      // using the same algorithms the server uses (algorithm2 for
+      // fractal, algorithm3 for textures) so contrast and detail are
+      // preserved while tinting.
+      let displayBitmap = imgBitmap
+      if (useColorizeOcean && useOceanColorHex) {
+        try { displayBitmap = await colorizeBitmap(imgBitmap, useOceanColorHex) } catch (e) { displayBitmap = imgBitmap }
+      }
+
+      // Also prepare a land-colorized bitmap using the centralized helper
+      let landBitmap = imgBitmap
+      const _useColorizeLandLocal = (typeof opts.colorizeLand === 'boolean') ? opts.colorizeLand : colorizeLand
+      const _useLandColorHexLocal = opts.landColorHex || landColorHex
+      if (_useColorizeLandLocal && _useLandColorHexLocal) {
+        try { landBitmap = await colorizeBitmap(imgBitmap, _useLandColorHexLocal) } catch (e) { landBitmap = imgBitmap }
+      }
+
+      // Draw the (possibly colorized) background full-size so the ocean
+      // tint blends with the texture across the entire preview.
+      ctx.save()
+      
+      ctx.drawImage(displayBitmap, 0, 0, w, h)
+      // subtle inset overlay for the box area
+      ctx.fillStyle = 'rgba(255,255,255,0.04)'
+      ctx.fillRect(x - 2, y - 2, boxW + 4, boxH + 4)
+      ctx.restore()
+
+      const cx = x + Math.round(boxW * 0.5)
+      const cy = y + Math.round(boxH * 0.5)
+      // Make the island wider by using an elliptical radius: wider X than Y.
+      const baseRadius = Math.round(Math.min(boxW, boxH) * 0.48)
+      const xRadius = Math.round(baseRadius * 1.45)
+      const yRadius = baseRadius
+      const points = 32
+      const jitterX = Math.max(6, Math.round(xRadius * 0.18))
+      const jitterY = Math.max(6, Math.round(yRadius * 0.18))
+      ctx.beginPath()
+      for (let i = 0; i < points; i++) {
+        const a = (i / points) * Math.PI * 2
+        const rx = xRadius + (rng() - 0.5) * jitterX
+        const ry = yRadius + (rng() - 0.5) * jitterY
+        const px = cx + Math.round(Math.cos(a) * rx)
+        const py = cy + Math.round(Math.sin(a) * ry)
+        if (i === 0) ctx.moveTo(px, py)
+        else ctx.lineTo(px, py)
+      }
+      ctx.closePath()
+
+      // displayBitmap already includes the ocean colorization when
+      // `useColorizeOcean` is enabled, so no additional overlay is needed.
+
+      const useColorizeLand = (typeof opts.colorizeLand === 'boolean') ? opts.colorizeLand : colorizeLand
+      const useLandColorHex = opts.landColorHex || landColorHex
+      const landColor = (useColorizeLand && useLandColorHex) ? useLandColorHex : '#c2b891'
+
+      try {
+        // Use the landBitmap (colorized same as ocean when enabled) as the
+        // pattern source so land and ocean share identical color math.
+        const pattern = ctx.createPattern(landBitmap || displayBitmap || imgBitmap, 'repeat')
+        if (pattern) {
+          ctx.save()
+          ctx.clip()
+          ctx.fillStyle = pattern
+          ctx.fillRect(x, y, boxW, boxH)
+
+          // Add subtle inner shore shading to make the land read as an island.
+          // Multiply a radial gradient that darkens toward the coastline.
+          try {
+            ctx.globalCompositeOperation = 'multiply'
+            const gOuter = Math.max(1, radius)
+            const grad = ctx.createRadialGradient(cx, cy, Math.round(radius * 0.3), cx, cy, Math.round(radius * 1.05))
+            grad.addColorStop(0, 'rgba(0,0,0,0.0)')
+            grad.addColorStop(0.6, 'rgba(0,0,0,0.08)')
+            grad.addColorStop(1, 'rgba(0,0,0,0.28)')
+            ctx.fillStyle = grad
+            ctx.fillRect(x, y, boxW, boxH)
+            // Add a light rim (beach) near the coast for contrast
+            ctx.globalCompositeOperation = 'source-over'
+            ctx.strokeStyle = 'rgba(255,255,240,0.55)'
+            ctx.lineWidth = Math.max(1, Math.round(radius * 0.03))
+            ctx.lineJoin = 'round'
+            ctx.stroke()
+          } catch (e) {}
+
+          ctx.restore()
+        } else {
+          ctx.fillStyle = landColor
+          ctx.fill()
+        }
+      } catch (e) {
+        ctx.fillStyle = landColor
+        ctx.fill()
+      }
+
+      try { ctx.strokeStyle = 'rgba(0,0,0,0.9)' } catch (e) { ctx.strokeStyle = '#000' }
+      ctx.lineWidth = 1
+      ctx.stroke()
+
+      return await new Promise((resolve) => canvas.toBlob(resolve))
+    } catch (e) {
+      return sourceBlob
+    }
+  }
+
+  async function onSubmitGenerate(e) {
+    try {
+      if (e && typeof e.preventDefault === 'function') e.preventDefault()
+      if (typeof handleGenerateFromSettings === 'function') {
+        // Await parent handler in case it updates preview state
+        await handleGenerateFromSettings(e)
+      }
+    } catch (err) {
+      // ignore handler errors here; still trigger preview refresh
+    } finally {
+      // Ensure background preview updates to match the latest map settings
+      try { triggerPreviewRefresh() } catch (e) {}
+    }
+  }
+
+  async function recomposeUsingLastBase(opts = {}) {
+    if (!lastBaseBlobRef.current) return
+    try {
+      const processed = await composeMiniIslandFromBlob(lastBaseBlobRef.current, opts)
+      const url = URL.createObjectURL(processed || lastBaseBlobRef.current)
+      setBackgroundPreviewUrl((previous) => {
+        if (previous) URL.revokeObjectURL(previous)
+        return url
+      })
+    } catch (e) {}
+  }
+
+ 
+  // Use a filtered preview key so color toggles/values DO NOT trigger
+  // the background preview. We only want texture/background changes
+  // (and other visual parameters) to trigger backend fetches.
   const previewTriggerKey = useMemo(() => {
     try {
-      return JSON.stringify(previewFields)
+      const { colorizeLand, colorizeOcean, landColorHex, oceanColorHex, ...rest } = previewFields || {}
+      return JSON.stringify(rest)
     } catch (e) {
       return ''
     }
-  }, [previewFields])
+  }, [
+    // include the specific previewFields members we care about so React
+    // invalidation still works but color state changes are ignored.
+    previewFields?.backgroundType,
+    previewFields?.textureRef,
+    previewFields?.backgroundSeed,
+    previewFields?.randomSeed,
+    previewFields?.finalWidth,
+    previewFields?.finalHeight,
+    previewFields?.drawBorder,
+    previewFields?.drawGridOverlay,
+    previewFields?.gridOverlayShape,
+    previewFields?.gridOverlayRowOrColCount,
+    previewFields?.gridOverlayColorHex,
+    previewFields?.gridOverlayXOffset,
+    previewFields?.gridOverlayYOffset,
+    previewFields?.gridOverlayLineWidth,
+    previewFields?.borderRef,
+    previewFields?.borderWidth,
+    previewFields?.borderPosition,
+    previewFields?.borderColorOption,
+    previewFields?.borderColorHex,
+    previewFields?.frayedBorder,
+    previewFields?.frayedBorderBlurLevel,
+    previewFields?.frayedBorderSize,
+    previewFields?.frayedBorderSeed,
+    previewFields?.frayedBorderColorHex,
+    previewFields?.roadStyle,
+    previewFields?.roadWidth,
+    previewFields?.roadColorHex,
+    previewFields?.mountainSize,
+    previewFields?.hillSize,
+    previewFields?.duneSize,
+    previewFields?.treeHeight,
+    previewFields?.citySize,
+  ])
 
   const {
     setBackgroundType,
@@ -375,7 +636,14 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
   // Debug logging removed to avoid console noise in the web UI.
   const labels = i18n?.labels || {}
   const backendOptions = i18n?.options || {}
-  const tabs = (backendOptions.tabs || TABS).map((tab) => ({
+  const DEFAULT_TABS = [
+    { id: 'background', label: 'Background' },
+    { id: 'border', label: 'Border' },
+    { id: 'effects', label: 'Effects' },
+    { id: 'fonts', label: 'Fonts' },
+  ]
+
+  const tabs = (backendOptions.tabs || DEFAULT_TABS).map((tab) => ({
     id: tab.id || tab.value,
     label: tab.label,
   }))
@@ -384,6 +652,33 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
   const gridOverlayOffsets = backendOptions.gridOverlayOffsets || []
   const gridOverlayLayers = backendOptions.gridOverlayLayers || []
   const backgroundTypes = backendOptions.backgroundTypes || []
+
+  // Fonts are provided by the backend via `i18n.options.fonts`.
+  // Per project policy: do not introduce client-side fallbacks — if the
+  // server does not provide fonts, the list will be empty.
+  const availableFontFamilies = useMemo(() => {
+    return Array.isArray(backendOptions?.fonts) ? backendOptions.fonts : []
+  }, [backendOptions?.fonts])
+
+  // Preload the first few texture bases and a fractal base so the UI
+  // doesn't hit the backend on first open. Uses `backgroundBaseCache.preload`.
+  useEffect(() => {
+    try {
+      const candidates = []
+      if (Array.isArray(textures) && textures.length > 0) {
+        textures.slice(0, 5).forEach((t) => {
+          candidates.push({ previewWidth: 520, previewHeight: 170, background: 'GeneratedFromTexture', Texture: `${t.artPack}|${t.name}` })
+        })
+      }
+      const fractal = Array.isArray(backgroundTypes) ? backgroundTypes.find((b) => b && b.value && String(b.value).toLowerCase().includes('fractal')) : null
+      if (fractal) candidates.push({ previewWidth: 520, previewHeight: 170, background: fractal.value })
+      else candidates.push({ previewWidth: 520, previewHeight: 170, background: 'Fractal' })
+
+      candidates.forEach((p) => {
+        try { backgroundBaseCache.preload(p) } catch (e) {}
+      })
+    } catch (e) {}
+  }, [textures, backgroundTypes])
   const strokeTypes = backendOptions.strokeTypes || []
   const borderPositions = backendOptions.borderPositions || []
   const borderColorOptions = backendOptions.borderColorOptions || []
@@ -416,6 +711,19 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
       out = out.replace(new RegExp(`\\{${i}\\}`, 'g'), String(a))
     })
     return out
+  }
+
+  // Ensure seed input fields do not display the literal label as their
+  // value on initial load. If the value equals the translated label,
+  // treat it as empty so the input appears blank.
+  const seedLabelFallback = translateLabel('theme.randomSeed.label')
+  const sanitizeSeedValue = (v) => {
+    try {
+      if (!v) return ''
+      if (typeof v === 'string' && v.trim() === '') return ''
+      if (v === seedLabelFallback) return ''
+    } catch (e) {}
+    return v
   }
 
   const sanitizeTranslation = (s) => {
@@ -587,13 +895,9 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     ]
   )
 
-  const availableFontFamilies = useMemo(() => {
-    const loadedFonts = fontFields
-      .map((field) => field.value?.trim())
-      .filter((value) => value && value.length > 0)
-
-    return Array.from(new Set([...FONT_FAMILY_OPTIONS, ...loadedFonts]))
-  }, [fontFields])
+  // `availableFontFamilies` is provided by the backend via `i18n.options.fonts`.
+  // A server-provided list is attached later in the component after
+  // `backendOptions` is derived.
 
   const fontFieldSetters = useMemo(() => {
     return Object.fromEntries(fontFields.map((field) => [field.id, field.onChange]))
@@ -610,7 +914,6 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     // waiting for the normal fetch cycle.
     try {
       if (typeof window !== 'undefined' && window.__prefetchedBackgroundPreviewBlob) {
-        try { console.log('using __prefetchedBackgroundPreviewBlob') } catch (e) {}
         const blob = window.__prefetchedBackgroundPreviewBlob
         try { delete window.__prefetchedBackgroundPreviewBlob } catch (e) {}
         const url = URL.createObjectURL(blob)
@@ -628,7 +931,6 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     // `nortContent` source. Use `hasCustomizationSource` which respects the
     // `FORCE_ENABLE_CUSTOMIZE` override.
     if (!hasCustomizationSource && !hasRandomPayloadSource) {
-      try { console.log('background-preview: no source present, clearing previewUrl and returning', { hasCustomizationSource, hasRandomPayloadSource }) } catch (e) {}
       setBackgroundPreviewUrl((previous) => {
         if (previous) URL.revokeObjectURL(previous)
         return null
@@ -660,30 +962,46 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
         // background preview (as shown in the screenshot): draw region
         // boundaries, color land flag and land color, color ocean flag and
         // ocean color. Keep preview dimensions.
-        const allowedPreviewKeys = [
-          'drawRegionBoundaries',
-          'colorizeLand',
-          'landColorHex',
-          'colorizeOcean',
-          'oceanColorHex',
-        ]
-
+        // We don't send the `colorizeLand` boolean flag to the preview API.
+        // Only include `landColorHex` when land coloring is enabled.
+        // We intentionally avoid sending color overrides to the backend
+        // — the client will apply land/ocean tinting locally to the neutral
+        // base image to reduce API calls and server load.
         const normalizedPreviewFields = {}
-        allowedPreviewKeys.forEach((k) => {
-          const v = previewFields[k]
-          normalizedPreviewFields[k] = v === undefined ? null : v
-        })
 
         const payload = Object.assign({ previewWidth: 520, previewHeight: 170 }, normalizedPreviewFields)
+
+        // Include a `background` key (server expects this name). When the
+        // background is a texture-based generation, also include the
+        // `Texture` field so the server can resolve the texture reference.
+        try {
+          payload.background = previewFields.backgroundType === undefined ? null : previewFields.backgroundType
+          const bg = payload.background
+          if (
+            bg === 'GeneratedFromTexture' ||
+            (typeof bg === 'string' && bg.toLowerCase().includes('texture'))
+          ) {
+            // If the user hasn't explicitly selected a texture yet, prefer
+            // the first available texture from the server-provided list so
+            // enabling texture immediately produces a sensible preview.
+            const rawRef = previewFields.textureRef
+            const isEmpty = rawRef === undefined || rawRef === null || String(rawRef).trim() === ''
+            if (isEmpty && Array.isArray(textures) && textures.length > 0) {
+              const t = textures[0]
+              payload.Texture = `${t.artPack}|${t.name}`
+            } else {
+              payload.Texture = isEmpty ? null : rawRef
+            }
+          }
+        } catch (e) {}
 
         if (hasRandomPayloadSource) {
           Object.assign(payload, currentSource.payload)
         }
 
-        // Dev log: show the exact payload sent to the background-preview
-        try {
-          console.log('background-preview payload', payload)
-        } catch (e) {}
+        
+
+        // background-preview payload logging removed
 
         // Retry fetch a few times to handle transient network changes (ERR_NETWORK_CHANGED)
         async function doFetchWithRetries(url, opts, attempts = 3, delayMs = 300) {
@@ -701,15 +1019,55 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
           }
         }
 
-        const response = await doFetchWithRetries(`${API_BASE}/background-preview`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-          signal: controller.signal,
-        }, 3, 300)
+        let blob = null
+        // Use the background base cache to preload and fetch small neutral
+        // background images for client-side tinting. Falls back to
+        // `/background-preview` if the base endpoint isn't available.
+        try {
+          // kick off a background preload (non-blocking)
+          try { backgroundBaseCache.preload(payload) } catch (e) {}
+          // await cached or in-flight fetch
+          blob = await backgroundBaseCache.get(payload, controller.signal)
+        } catch (e) {
+          // Fallback to legacy preview if base not available
+          const response = await doFetchWithRetries(`${API_BASE}/background-preview`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+            signal: controller.signal,
+          }, 3, 300)
+          blob = await response.blob()
+        }
 
-        const blob = await response.blob()
-        const url = URL.createObjectURL(blob)
+        // store last fetched neutral base so color-only changes can recompose locally
+        try { lastBaseBlobRef.current = blob } catch (e) {}
+
+        
+
+        // Helper to darken/lighten hex color
+        function shadeColor(hex, percent) {
+          const h = hex.replace(/^#/, '')
+          const num = parseInt(h, 16)
+          let r = (num >> 16) + percent
+          let g = ((num >> 8) & 0x00ff) + percent
+          let b = (num & 0x0000ff) + percent
+          r = Math.max(0, Math.min(255, r))
+          g = Math.max(0, Math.min(255, g))
+          b = Math.max(0, Math.min(255, b))
+          return '#' + (r << 16 | g << 8 | b).toString(16).padStart(6, '0')
+        }
+
+        function hexWithAlpha(hex, alpha) {
+          const h = hex.replace(/^#/, '')
+          if (!/^[0-9a-fA-F]{6}$/.test(h)) return `rgba(194,184,145,${alpha})`
+          const r = parseInt(h.substring(0, 2), 16)
+          const g = parseInt(h.substring(2, 4), 16)
+          const b = parseInt(h.substring(4, 6), 16)
+          return `rgba(${r},${g},${b},${alpha})`
+        }
+
+        const processedBlob = await composeMiniIslandFromBlob(blob)
+        const url = URL.createObjectURL(processedBlob || blob)
         setBackgroundPreviewUrl((previous) => {
           if (previous) URL.revokeObjectURL(previous)
           return url
@@ -718,7 +1076,6 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
         if (controller.signal.aborted) {
           return
         }
-        console.error('Failed to load background preview:', error)
         setBackgroundPreviewUrl((previous) => {
           if (previous) URL.revokeObjectURL(previous)
           return null
@@ -740,36 +1097,44 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     previewRefreshNonce,
   ])
 
-    function renderColorControl({ id, label, hexValue, onHexChange, alphaValue, onAlphaChange, disabled, showState, setShowState, swatchStyle }) {
+    function renderColorControl({ id, label, hexValue, onHexChange, alphaValue, onAlphaChange, disabled, showState, setShowState, swatchStyle, onClose, swatchReplacement }) {
       const openerClick = (e) => { if (!disabled) setShowState(true) }
       const openerKey = (e) => { if ((e.key === 'Enter' || e.key === ' ') && !disabled) { e.preventDefault(); setShowState(true) } }
+      const closePicker = () => {
+        try { setShowState(false) } catch (e) {}
+        try { if (typeof onClose === 'function') onClose() } catch (e) {}
+      }
       return (
         <>
           <label htmlFor={`${id}`} className={disabled ? 'is-disabled' : ''}>{label}</label>
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-            <div
-              role="button"
-              tabIndex={disabled ? -1 : 0}
-              aria-label={`Open ${label} color picker`}
-              aria-disabled={disabled ? 'true' : 'false'}
-              onClick={openerClick}
-              onKeyDown={openerKey}
-                style={{
-                flex: '1 1 auto',
-                minWidth: 48,
-                height: 28,
-                background: hexValue || '#000000',
-                border: '1px solid #bbb',
-                cursor: disabled ? 'default' : 'pointer',
-                opacity: disabled ? 0.5 : 1,
-                pointerEvents: disabled ? 'none' : undefined,
-                ...(swatchStyle || {}),
-              }}
-            />
+            {swatchReplacement ? (
+              <div className="disabled-color-replacement">{swatchReplacement}</div>
+            ) : (
+              <div
+                role="button"
+                tabIndex={disabled ? -1 : 0}
+                aria-label={`Open ${label} color picker`}
+                aria-disabled={disabled ? 'true' : 'false'}
+                onClick={openerClick}
+                onKeyDown={openerKey}
+                  style={{
+                  flex: '1 1 auto',
+                  minWidth: 48,
+                  height: 28,
+                  background: hexValue || '#000000',
+                  border: '1px solid #bbb',
+                  cursor: disabled ? 'default' : 'pointer',
+                  opacity: disabled ? 0.5 : 1,
+                  pointerEvents: disabled ? 'none' : undefined,
+                  ...(swatchStyle || {}),
+                }}
+              />
+            )}
           </div>
           {showState && (
-            <div style={modalBackdropStyle} onClick={() => setShowState(false)}>
-              <div style={modalContentStyle} onClick={(e) => e.stopPropagation()}>
+            <div style={modalBackdropStyle} onClick={closePicker}>
+                <div style={modalContentStyle} onClick={(e) => e.stopPropagation()}>
                 <RgbaColorPicker
                   color={hexToRgba(hexValue, alphaValue || 0)}
                   onChange={(col) => {
@@ -781,7 +1146,7 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
                   }}
                 />
                 <div style={{ marginTop: 8, display: 'flex', justifyContent: 'flex-end' }}>
-                  <button type="button" onClick={() => setShowState(false)}>
+                    <button type="button" onClick={closePicker}>
                     Close
                   </button>
                 </div>
@@ -838,9 +1203,6 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
               disabled={!showTextureOptions || !hasTextures}
             >
               {emptyComboOption}
-              <option value="">
-                {translateLabel('ui.texture.keepCurrent')}
-              </option>
               {!hasTextures && (
                 <option value="" disabled>
                   {translateLabel('ui.texture.noneAvailable')}
@@ -954,10 +1316,11 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
               id: 'land-color',
               label: translateLabel('theme.landColor.label'),
               hexValue: landColorHex,
-              onHexChange: setLandColorHex,
+              onHexChange: (hex) => { setLandColorHex(hex); notifyManualChange(); },
               showState: showLandPicker,
               setShowState: setShowLandPicker,
               disabled: !colorizeLand || finalLandColoringMethod === 'ColorPoliticalRegions',
+              onClose: () => { try { recomposeUsingLastBase({ landColorHex: landColorHex }) } catch (err) {} },
             })}
           </div>
 
@@ -970,7 +1333,8 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
                 const v = e.target.checked
                 setColorizeOcean(v)
                 notifyManualChange()
-                triggerPreviewRefresh()
+                // Recompose locally from cached base instead of forcing a network fetch
+                try { recomposeUsingLastBase({ colorizeOcean: v }) } catch (err) {}
               }}
             />
             <span>{translateLabel('theme.colorOcean')}</span>
@@ -984,10 +1348,11 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
               id: 'ocean-color',
               label: translateLabel('theme.oceanColor.label'),
               hexValue: oceanColorHex,
-              onHexChange: (hex) => { setOceanColorHex(hex); notifyManualChange(); triggerPreviewRefresh() },
+              onHexChange: (hex) => { setOceanColorHex(hex); notifyManualChange(); },
               showState: showOceanPicker,
               setShowState: setShowOceanPicker,
               disabled: !colorizeOcean,
+              onClose: () => { try { recomposeUsingLastBase({ oceanColorHex: oceanColorHex }) } catch (err) {} },
             })}
           </div>
         </div>
@@ -997,13 +1362,9 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
           <input
             id="bg-seed-input"
             type="text"
-            value={gatedControlValue(backgroundSeed)}
+            value={gatedControlValue(sanitizeSeedValue(backgroundSeed))}
             onChange={(e) => setBackgroundSeed(e.target.value)}
-            placeholder={
-              hasCustomizationSource
-                ? translateLabel('theme.randomSeed.label')
-                : ''
-            }
+            placeholder={''}
           />
 
 
@@ -1303,9 +1664,9 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
             <input
               id="frayed-border-seed-input"
               type="text"
-              value={gatedControlValue(frayedBorderSeed)}
+              value={gatedControlValue(sanitizeSeedValue(frayedBorderSeed))}
               onChange={(e) => setFrayedBorderSeed(e.target.value)}
-              placeholder={hasCustomizationSource ? 'Matches world seed when empty' : ''}
+              placeholder={''}
               disabled={!frayedBorder}
             />
           </div>
@@ -1434,51 +1795,7 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
             </div>
           </>
 
-          <label htmlFor="coast-shading-color-input">
-            {translateLabel('theme.coastShadingColor.label')}
-          </label>
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-            <div
-              role="button"
-              aria-label="Open coast shading color picker"
-              onClick={() => setShowCoastPicker(true)}
-              style={{
-                width: 36,
-                height: 24,
-                background: coastShadingColorHex || '#000000',
-                border: '1px solid #bbb',
-                cursor: finalLandColoringMethod === 'ColorPoliticalRegions' ? 'default' : 'pointer',
-                opacity: finalLandColoringMethod === 'ColorPoliticalRegions' ? 0.5 : 1,
-              }}
-            />
-            <input
-              id="coast-shading-color-input"
-              type="text"
-              value={coastShadingColorHex}
-              onChange={(e) => setCoastShadingColorHex(e.target.value)}
-              disabled={finalLandColoringMethod === 'ColorPoliticalRegions'}
-            />
-
-            {showCoastPicker && (
-              <div style={modalBackdropStyle} onClick={() => setShowCoastPicker(false)}>
-                <div style={modalContentStyle} onClick={(e) => e.stopPropagation()}>
-                  <RgbaColorPicker
-                    color={hexToRgba(coastShadingColorHex, coastShadingAlpha)}
-                    onChange={(col) => {
-                      const hex = rgbaToHex(col)
-                      setCoastShadingColorHex(hex)
-                      setCoastShadingAlpha(Math.round((1 - (col.a ?? 1)) * 100))
-                    }}
-                  />
-                  <div style={{ marginTop: 8, display: 'flex', justifyContent: 'flex-end' }}>
-                    <button type="button" onClick={() => setShowCoastPicker(false)}>
-                      Close
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
+          {/* Coast shading color input removed per UI preference */}
 
           <label htmlFor="ocean-shading-level-input">
             {translateLabel('theme.oceanShadingWidth.label')}
@@ -1496,17 +1813,37 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
             <span className="slider-value">{Math.round(oceanShadingLevel)}</span>
           </div>
 
-          {renderColorControl({
-            id: 'ocean-shading-color',
-            label: translateLabel('theme.oceanShadingColor.label'),
-            hexValue: oceanShadingColorHex,
-            onHexChange: setOceanShadingColorHex,
-            alphaValue: oceanShadingAlpha,
-            onAlphaChange: setOceanShadingAlpha,
-            showState: showOceanPicker,
-            setShowState: setShowOceanPicker,
-            disabled: false,
-          })}
+            {(() => {
+              const shouldReplace = finalLandColoringMethod === 'ColorPoliticalRegions'
+              let swatchReplacement = undefined
+              if (shouldReplace) {
+                try {
+                  let txt = translateLabel('theme.coastShadingColor.disabled')
+                  // If the translation contains HTML tags (e.g. <html>...)</>, strip them for this small inline replacement
+                  if (typeof txt === 'string') {
+                    txt = txt.replace(/<[^>]*>/g, '')
+                    // MessageFormat uses doubled single-quotes to escape; convert to a single quote for display
+                    txt = txt.replace(/''/g, "'")
+                  }
+                  // Replace placeholder {0} with a human-friendly name for the method
+                  const methodLabel = translateLabel(`LandColoringMethod.${finalLandColoringMethod}`)
+                  if (typeof txt === 'string' && txt.indexOf('{0}') >= 0) txt = txt.replace('{0}', methodLabel)
+                  swatchReplacement = txt
+                } catch (e) { swatchReplacement = ('' + translateLabel('theme.coastShadingColor.disabled')).replace(/<[^>]*>/g, '').replace(/''/g, "'") }
+              }
+              return renderColorControl({
+                id: 'ocean-shading-color',
+                label: translateLabel('theme.oceanShadingColor.label'),
+                hexValue: oceanShadingColorHex,
+                onHexChange: setOceanShadingColorHex,
+                alphaValue: oceanShadingAlpha,
+                onAlphaChange: setOceanShadingAlpha,
+                showState: showOceanPicker,
+                setShowState: setShowOceanPicker,
+                disabled: shouldReplace,
+                swatchReplacement,
+              })
+            })()}
         </div>
 
         <div className="fields-column">
@@ -1526,7 +1863,7 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
 
           {/* Hide wave size when concentric waves are selected (concentric uses its own count/size) */}
           <>
-            <label htmlFor="ocean-waves-level-input">
+            <label htmlFor="ocean-waves-level-input" className={oceanWavesType === concentricWaveValue ? 'is-disabled' : ''}>
               {translateLabel('theme.waveWidth.label')}
             </label>
             <div className="slider-row">
@@ -1561,7 +1898,7 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
 
           {/* Conditionally show concentric-specific controls when concentric waves selected */}
           <>
-            <label htmlFor="concentric-wave-count">{translateLabel('theme.waveCount.label')}</label>
+            <label htmlFor="concentric-wave-count" className={oceanWavesType === concentricWaveValue ? '' : 'is-disabled'}>{translateLabel('theme.waveCount.label')}</label>
             <div className="slider-row">
               <input
                 id="concentric-wave-count"
@@ -1576,20 +1913,24 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
               <span className="slider-value">{concentricWaveCount}</span>
             </div>
 
-            <label className="checkbox-label">
-              <input type="checkbox" checked={fadeConcentricWaves} onChange={(e) => setFadeConcentricWaves(e.target.checked)} disabled={oceanWavesType !== concentricWaveValue} />
-              <span>{translateLabel('theme.fadeOuterWaves.label')}</span>
-            </label>
+            <label className={`section-subheading ${oceanWavesType === concentricWaveValue ? '' : 'is-disabled'}`} style={{ marginTop: '0.5rem' }}>Style options:</label>
 
-            <label className="checkbox-label">
-              <input type="checkbox" checked={jitterToConcentricWaves} onChange={(e) => setJitterToConcentricWaves(e.target.checked)} disabled={oceanWavesType !== concentricWaveValue} />
-              <span>{translateLabel('theme.jitter.label')}</span>
-            </label>
+            <div className="style-options">
+              <label className={`checkbox-label ${oceanWavesType === concentricWaveValue ? '' : 'is-disabled'}`}>
+                <input type="checkbox" checked={fadeConcentricWaves} onChange={(e) => setFadeConcentricWaves(e.target.checked)} disabled={oceanWavesType !== concentricWaveValue} />
+                <span>{translateLabel('theme.fadeOuterWaves.label')}</span>
+              </label>
 
-            <label className="checkbox-label">
-              <input type="checkbox" checked={brokenLinesForConcentricWaves} onChange={(e) => setBrokenLinesForConcentricWaves(e.target.checked)} disabled={oceanWavesType !== concentricWaveValue} />
-              <span>{translateLabel('theme.brokenLines.label')}</span>
-            </label>
+              <label className={`checkbox-label ${oceanWavesType === concentricWaveValue ? '' : 'is-disabled'}`}>
+                <input type="checkbox" checked={jitterToConcentricWaves} onChange={(e) => setJitterToConcentricWaves(e.target.checked)} disabled={oceanWavesType !== concentricWaveValue} />
+                <span>{translateLabel('theme.jitter.label')}</span>
+              </label>
+
+              <label className={`checkbox-label ${oceanWavesType === concentricWaveValue ? '' : 'is-disabled'}`}>
+                <input type="checkbox" checked={brokenLinesForConcentricWaves} onChange={(e) => setBrokenLinesForConcentricWaves(e.target.checked)} disabled={oceanWavesType !== concentricWaveValue} />
+                <span>{translateLabel('theme.brokenLines.label')}</span>
+              </label>
+            </div>
           </>
 
           <label className="checkbox-label">
@@ -1763,7 +2104,7 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
                   <React.Fragment key={field.id}>
                     <label htmlFor={field.id}>{field.label}</label>
                     <div className="font-combo" id={field.id}>
-                      <button
+                        <button
                         type="button"
                         className="font-combo-trigger"
                         onClick={() => setOpenFontComboId(openFontComboId === field.id ? null : field.id)}
@@ -1772,21 +2113,10 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
                         aria-expanded={openFontComboId === field.id}
                         disabled={!drawText}
                       >
-                        {field.value || translateLabel('ui.font.keepCurrent')}
+                        {field.value || translateLabel('common.choose')}
                       </button>
                       {openFontComboId === field.id && (
                         <div className="font-combo-menu">
-                          <button
-                            type="button"
-                            className={`font-combo-option${field.value === '' ? ' is-selected' : ''}`}
-                            data-field-id={field.id}
-                            data-family=""
-                            onClick={handleFontOptionClick}
-                            style={{ fontFamily: 'serif' }}
-                            disabled={!drawText}
-                          >
-                            {translateLabel('ui.font.keepCurrent')}
-                          </button>
                           {availableFontFamilies.map((family) => (
                             <button
                               key={family}
@@ -1864,7 +2194,7 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
       )}
       <form
         className={`section-fields${hasCustomizationSource ? '' : ' section-fields--disabled'}`}
-        onSubmit={handleGenerateFromSettings}
+        onSubmit={onSubmitGenerate}
         onChange={notifyManualChange}
         onInput={notifyManualChange}
       >
