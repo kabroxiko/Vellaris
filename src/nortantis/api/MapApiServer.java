@@ -33,11 +33,8 @@ import spark.Request;
 import spark.Response;
 
 import java.io.ByteArrayOutputStream;
-import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.util.zip.GZIPOutputStream;
-import java.time.Instant;
 import java.awt.image.BufferedImage;
 import java.util.Base64;
 import java.util.List;
@@ -53,7 +50,6 @@ import javax.imageio.ImageWriteParam;
 import javax.imageio.ImageWriter;
 import javax.imageio.stream.ImageOutputStream;
 import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.nio.charset.StandardCharsets;
@@ -87,136 +83,13 @@ public class MapApiServer
 	public static void main(String[] args)
 	{
 		port(8080);
-		// Basic CORS
-		options("/*", (request, response) ->
-		{
-			String accessControlRequestHeaders = request.headers("Access-Control-Request-Headers");
-			if (accessControlRequestHeaders != null)
-			{
-				response.header("Access-Control-Allow-Headers", accessControlRequestHeaders);
-			}
-			String accessControlRequestMethod = request.headers("Access-Control-Request-Method");
-			if (accessControlRequestMethod != null)
-			{
-				response.header("Access-Control-Allow-Methods", accessControlRequestMethod);
-			}
-			return "OK";
-		});
-		before((req, res) -> res.header("Access-Control-Allow-Origin", "*"));
-
+		setupCors();
 		get("/api/health", (req, res) -> "ok");
 
-		get("/api/art-packs", (req, res) ->
-		{
-			res.type(CONTENT_TYPE_JSON);
-			return gson.toJson(Assets.listArtPacks(false));
-		});
+		// Simple resource list endpoints
+		registerSimpleLists();
 
-		get("/api/books", (req, res) ->
-		{
-			res.type(CONTENT_TYPE_JSON);
-			return gson.toJson(SettingsGenerator.getAllBooks());
-		});
-		get("/api/textures", (req, res) ->
-		{
-			res.type(CONTENT_TYPE_JSON);
-			List<NamedResource> textures = Assets.listBackgroundTexturesForAllArtPacks(null);
-			List<Map<String, String>> result = new java.util.ArrayList<>();
-			for (NamedResource t : textures)
-			{
-				Map<String, String> entry = new LinkedHashMap<>();
-				entry.put(ART_PACK, t.artPack);
-				entry.put("name", t.name);
-				result.add(entry);
-			}
-			return gson.toJson(result);
-		});
-
-		get("/api/border-types", (req, res) ->
-		{
-			res.type(CONTENT_TYPE_JSON);
-			List<NamedResource> borderTypes = Assets.listAllBorderTypes(null);
-			List<Map<String, String>> result = new java.util.ArrayList<>();
-			for (NamedResource borderType : borderTypes)
-			{
-				Map<String, String> entry = new LinkedHashMap<>();
-				entry.put(ART_PACK, borderType.artPack);
-				entry.put("name", borderType.name);
-				result.add(entry);
-			}
-			return gson.toJson(result);
-		});
-
-		get("/api/ui-options", (req, res) ->
-		{
-			res.type(CONTENT_TYPE_JSON);
-			String requestedLanguage = req.queryParams("language");
-			String previousLanguage = UserPreferences.getInstance().language;
-			applyRequestLanguage(requestedLanguage);
-
-			// Ensure a platform implementation is available before any classes
-			// that depend on PlatformFactory (e.g. Color) are initialized.
-			PlatformFactory.setInstance(new AwtFactory());
-
-			try
-			{
-				// Build the standard UI options/labels. Deterministic seed
-				// support removed — defaults are always generated fresh.
-				Map<String, Object> ui = buildWebUiOptions();
-
-				// Also include resource lists so the frontend can fetch a single
-				// endpoint for all initial UI state (art packs, books, textures,
-				// border types, and city icon groups per art pack).
-				try {
-					List<String> artPacks = Assets.listArtPacks(false);
-					ui.put("artPacks", artPacks);
-
-					ui.put("books", SettingsGenerator.getAllBooks());
-
-					List<NamedResource> textures = Assets.listBackgroundTexturesForAllArtPacks(null);
-					List<Map<String,String>> texturesResult = new java.util.ArrayList<>();
-					for (NamedResource t : textures) {
-						Map<String,String> entry = new LinkedHashMap<>();
-						entry.put("artPack", t.artPack);
-						entry.put("name", t.name);
-						texturesResult.add(entry);
-					}
-					ui.put("textures", texturesResult);
-
-					List<NamedResource> borderTypes = Assets.listAllBorderTypes(null);
-					List<Map<String,String>> borderResult = new java.util.ArrayList<>();
-					for (NamedResource b : borderTypes) {
-						Map<String,String> entry = new LinkedHashMap<>();
-						entry.put("artPack", b.artPack);
-						entry.put("name", b.name);
-						borderResult.add(entry);
-					}
-					ui.put("borderTypes", borderResult);
-
-					// City icon groups per art pack (may be empty for some packs)
-					Map<String, List<String>> cityIconTypesByPack = new LinkedHashMap<>();
-					PlatformFactory.setInstance(new AwtFactory());
-					for (String pack : artPacks) {
-						try {
-							List<String> types = ImageCache.getInstance(pack, null).getIconGroupNames(IconType.cities);
-							cityIconTypesByPack.put(pack, types);
-						} catch (Exception e) {
-							cityIconTypesByPack.put(pack, java.util.Collections.emptyList());
-						}
-					}
-					ui.put("cityIconTypesByPack", cityIconTypesByPack);
-				} catch (Exception e) {
-					// If resource enumeration fails, still return UI options.
-					Logger.println("Failed to enumerate UI resources: " + e.getMessage());
-				}
-
-				return gson.toJson(ui);
-			}
-			finally
-			{
-				restorePreviousLanguage(previousLanguage);
-			}
-		});
+		get("/api/ui-options", MapApiServer::handleUiOptions);
 
 		post("/api/generate", MapApiServer::handleGenerate);
 		post("/api/background-preview", MapApiServer::handleBackgroundPreview);
@@ -342,6 +215,33 @@ public class MapApiServer
 	private static Map<String, Object> buildWebUiOptions()
 	{
 		Map<String, Object> options = new LinkedHashMap<>();
+		populateStandardOptions(options);
+
+		try {
+			enumerateFonts(options);
+		} catch (Exception e) {
+			if (API_DEBUG) Logger.println("Failed to enumerate system fonts: " + e.getMessage());
+		}
+
+		options.put("maxCityProbability", SettingsGenerator.maxCityProbability);
+		populateGridOptions(options);
+
+		Map<String, String> labels = loadLabels();
+
+		Map<String, Object> result = new LinkedHashMap<>();
+		result.put("options", options);
+		if (!labels.isEmpty()) result.put("labels", labels);
+
+		try {
+			addDefaults(result);
+		} catch (Exception e) {
+			if (API_DEBUG) Logger.println("Failed to produce UI defaults: " + e.getMessage());
+		}
+
+		return result;
+	}
+
+	private static void populateStandardOptions(Map<String, Object> options) {
 		options.put("tabs", List.of(option("background", tr("theme.tab.background")), option("border", tr("theme.tab.border")),
 				option("effects", tr("theme.tab.effects")), option("fonts", tr("theme.tab.fonts"))));
 		options.put("dimensions", List.of(option("Square", tr("GeneratedDimension.Square")), option("Sixteen_by_9", tr("GeneratedDimension.Sixteen_by_9")),
@@ -355,173 +255,268 @@ public class MapApiServer
 		options.put("strokeTypes", List.of(option("Solid", tr("StrokeType.Solid")), option("Dashes", tr("StrokeType.Dashes")),
 				option("Rounded_Dashes", tr("StrokeType.Rounded_Dashes")), option("Dots", tr("StrokeType.Dots"))));
 		options.put("borderPositions", List.of(option("Outside_map", tr("BorderPosition.Outside_map")), option("Over_map", tr("BorderPosition.Over_map"))));
-		options.put("borderColorOptions",
-				List.of(option("Ocean_color", tr("BorderColorOption.Ocean_color")), option("Choose_color", tr("BorderColorOption.Choose_color"))));
+		options.put("borderColorOptions", List.of(option("Ocean_color", tr("BorderColorOption.Ocean_color")), option("Choose_color", tr("BorderColorOption.Choose_color"))));
 		options.put("lineStyles", List.of(option("Jagged", tr("theme.lineStyle.jagged")), option("Splines", tr("theme.lineStyle.splines")),
 				option("SplinesWithSmoothedCoastlines", tr("theme.lineStyle.splinesSmoothed"))));
 		options.put("oceanWaveTypes", List.of(option("ConcentricWaves", tr("theme.waveType.concentricWaves")), option("Ripples", tr("theme.waveType.ripples")),
 				option("None", tr("theme.waveType.none"))));
+	}
 
-		// Provide a curated, hard-coded list of fonts suitable for fantasy
-		// map text per operating system. Do NOT rely on ad-hoc keyword
-		// matching — return only the canonical families the server ships
-		// as recommended choices (intersected with installed families).
-		try {
-			java.awt.GraphicsEnvironment ge = java.awt.GraphicsEnvironment.getLocalGraphicsEnvironment();
-			String[] families = ge.getAvailableFontFamilyNames();
-			java.util.List<String> installed = java.util.Arrays.asList(families);
-
-			java.util.List<String> hardcoded = new java.util.ArrayList<>();
-			String osName = System.getProperty("os.name", "").toLowerCase();
-			if (osName.contains("mac")) {
-				// macOS: common system and display faces found on Macs
-				java.util.Collections.addAll(hardcoded,
-					"Apple Chancery", "Trajan Pro", "Optima", "Palatino", "Hoefler Text",
-					"Garamond", "Times New Roman", "Georgia", "Baskerville"
-				);
-			} else if (osName.contains("win")) {
-				// Windows: common Windows faces suitable for map typography
-				java.util.Collections.addAll(hardcoded,
-					"Trajan Pro", "Garamond", "Times New Roman", "Palatino Linotype",
-					"Book Antiqua", "Georgia", "Century Schoolbook"
-				);
-			} else {
-				// Linux / Other: common open-source serif and display faces
-				java.util.Collections.addAll(hardcoded,
-					"EB Garamond", "Libre Baskerville", "Gentium", "DejaVu Serif",
-					"Cardo", "Cinzel", "Cormorant Garamond", "FreeSerif"
-				);
-			}
-
-			java.util.List<String> filtered = new java.util.ArrayList<>();
-			for (String desired : hardcoded) {
-				for (String inst : families) {
-					if (inst.equalsIgnoreCase(desired)) {
-						filtered.add(inst);
-						break;
-					}
-				}
-			}
-
-			// Return only the filtered list (may be empty if none match).
-			options.put("fonts", filtered);
-			if (!filtered.isEmpty()) {
-				options.put("defaultFontFamily", filtered.get(0));
-			}
-		} catch (Exception e) {
-			if (API_DEBUG) Logger.println("Failed to enumerate system fonts: " + e.getMessage());
-		}
-
-		// Publish the backend's maximum per-center city probability so
-		// frontends can convert internal `cityProbability` to a user
-		// percentage for the `cityFrequency` slider.
-		options.put("maxCityProbability", SettingsGenerator.maxCityProbability);
-
+	private static void populateGridOptions(Map<String, Object> options) {
 		options.put("gridOverlayShapes", List.of(option("Horizontal_hexes", tr("GridOverlayShape.Horizontal_hexes")), option("Vertical_hexes", tr("GridOverlayShape.Vertical_hexes")), option("Squares", tr("GridOverlayShape.Squares")), option("Voronoi_polygons", tr("GridOverlayShape.Voronoi_polygons"))));
 		options.put("gridOverlayOffsets", List.of(option("zero", tr("GridOverlayOffset.zero")), option("quarter", tr("GridOverlayOffset.quarter")), option("half", tr("GridOverlayOffset.half")), option("threeQuarters", tr("GridOverlayOffset.threeQuarters"))));
 		options.put("gridOverlayLayers", List.of(option("Under_icons", tr("GridOverlayLayer.Under_icons")), option("Over_icons", tr("GridOverlayLayer.Over_icons"))));
+	}
 
-		// Return the entire translation bundle so the frontend receives the
-		// complete i18n dictionary for the effective locale. The bundle is
-		// intentionally small and easier to maintain than a manual key list.
+	private static void enumerateFonts(Map<String, Object> options) {
+		java.awt.GraphicsEnvironment ge = java.awt.GraphicsEnvironment.getLocalGraphicsEnvironment();
+		String[] families = ge.getAvailableFontFamilyNames();
+
+		java.util.List<String> hardcoded = new java.util.ArrayList<>();
+		String osName = System.getProperty("os.name", "").toLowerCase();
+		if (osName.contains("mac")) {
+			java.util.Collections.addAll(hardcoded, "Apple Chancery", "Trajan Pro", "Optima", "Palatino", "Hoefler Text", "Garamond", "Times New Roman", "Georgia", "Baskerville");
+		} else if (osName.contains("win")) {
+			java.util.Collections.addAll(hardcoded, "Trajan Pro", "Garamond", "Times New Roman", "Palatino Linotype", "Book Antiqua", "Georgia", "Century Schoolbook");
+		} else {
+			java.util.Collections.addAll(hardcoded, "EB Garamond", "Libre Baskerville", "Gentium", "DejaVu Serif", "Cardo", "Cinzel", "Cormorant Garamond", "FreeSerif");
+		}
+
+		java.util.List<String> filtered = new java.util.ArrayList<>();
+		for (String desired : hardcoded) {
+			for (String inst : families) {
+				if (inst.equalsIgnoreCase(desired)) {
+					filtered.add(inst);
+					break;
+				}
+			}
+		}
+
+		options.put("fonts", filtered);
+		if (!filtered.isEmpty()) options.put("defaultFontFamily", filtered.get(0));
+	}
+
+	private static Map<String, String> loadLabels() {
 		Map<String, String> labels = new LinkedHashMap<>();
 		try {
 			ResourceBundle bundle = ResourceBundle.getBundle("nortantis.swing.translation.messages", Translation.getEffectiveLocale());
 			for (String k : bundle.keySet()) {
 				String v = bundle.getString(k);
-				if (v != null) {
-					labels.put(k, v.trim());
-				}
+				if (v != null) labels.put(k, v.trim());
 			}
 		} catch (Exception e) {
 			if (API_DEBUG) Logger.println("Failed to load translation bundle: " + e.getMessage());
 		}
-
-		Map<String, Object> result = new LinkedHashMap<>();
-		result.put("options", options);
-		if (!labels.isEmpty())
-		{
-			result.put("labels", labels);
-		}
-
-		// Provide backend defaults so frontends can initialize controls.
-		// To match desktop behavior, generate a randomized default preset
-		// using the same generator used by the desktop application. This
-		// starts from the bundled properties defaults and then mutates
-		// values randomly (world size, colors, border, etc.).
-		try {
-			// Select a reasonable art pack to pass to the generator.
-			List<String> artPacks = Assets.listArtPacks(false);
-			String artPack = (artPacks != null && !artPacks.isEmpty()) ? artPacks.get(0) : Assets.installedArtPack;
-
-			// Generate a fresh randomized default preset (no external seed).
-			Random rand = new Random();
-			MapSettings generated = SettingsGenerator.generate(rand, artPack, null);
-			String defJson = generated.toJsonString();
-			@SuppressWarnings("unchecked")
-			Map<String, Object> defMap = gson.fromJson(defJson, Map.class);
-
-			// Return the full generated defaults map so frontends receive the
-			// complete generated `MapSettings` values (no filtering).
-			// Normalize numeric types to avoid scientific notation in JSON
-			@SuppressWarnings("unchecked")
-			Map<String,Object> normalized = (Map<String,Object>) normalizeNumbersInObject(defMap);
-			result.put("defaults", normalized);
-		} catch (Exception e) {
-			// If defaults cannot be produced, omit the field (best-effort)
-			if (API_DEBUG) Logger.println("Failed to produce UI defaults: " + e.getMessage());
-		}
-
-		return result;
+		return labels;
 	}
+
+	private static void addDefaults(Map<String, Object> result) throws Exception {
+		List<String> artPacks = Assets.listArtPacks(false);
+		String artPack = (artPacks != null && !artPacks.isEmpty()) ? artPacks.get(0) : Assets.installedArtPack;
+
+		Random rand = new Random();
+		MapSettings generated = SettingsGenerator.generate(rand, artPack, null);
+		String defJson = generated.toJsonString();
+		@SuppressWarnings("unchecked")
+		Map<String, Object> defMap = gson.fromJson(defJson, Map.class);
+		@SuppressWarnings("unchecked")
+		Map<String, Object> normalized = (Map<String, Object>) normalizeNumbersInObject(defMap);
+		result.put("defaults", normalized);
+	}
+
+	private static List<String> getCityIconTypesForPack(String pack) {
+		try {
+			return ImageCache.getInstance(pack, null).getIconGroupNames(IconType.cities);
+		} catch (Exception e) {
+			return java.util.Collections.emptyList();
+		}
+	}
+
+// Extracted helpers to keep `main` small and focused.
+private static void setupCors()
+{
+	// Basic CORS
+	options("/*", (request, response) ->
+	{
+		String accessControlRequestHeaders = request.headers("Access-Control-Request-Headers");
+		if (accessControlRequestHeaders != null)
+		{
+			response.header("Access-Control-Allow-Headers", accessControlRequestHeaders);
+		}
+		String accessControlRequestMethod = request.headers("Access-Control-Request-Method");
+		if (accessControlRequestMethod != null)
+		{
+			response.header("Access-Control-Allow-Methods", accessControlRequestMethod);
+		}
+		return "OK";
+	});
+	before((req, res) -> res.header("Access-Control-Allow-Origin", "*"));
+}
+
+private static void registerSimpleLists()
+{
+	get("/api/art-packs", MapApiServer::handleArtPacks);
+	get("/api/books", MapApiServer::handleBooks);
+	get("/api/textures", MapApiServer::handleTextures);
+	get("/api/border-types", MapApiServer::handleBorderTypes);
+}
+
+private static Object handleArtPacks(Request req, Response res)
+{
+	res.type(CONTENT_TYPE_JSON);
+	return gson.toJson(Assets.listArtPacks(false));
+}
+
+private static Object handleBooks(Request req, Response res)
+{
+	res.type(CONTENT_TYPE_JSON);
+	return gson.toJson(SettingsGenerator.getAllBooks());
+}
+
+private static Object handleTextures(Request req, Response res)
+{
+	res.type(CONTENT_TYPE_JSON);
+	List<NamedResource> textures = Assets.listBackgroundTexturesForAllArtPacks(null);
+	List<Map<String, String>> result = new java.util.ArrayList<>();
+	for (NamedResource t : textures)
+	{
+		Map<String, String> entry = new LinkedHashMap<>();
+		entry.put(ART_PACK, t.artPack);
+		entry.put("name", t.name);
+		result.add(entry);
+	}
+	return gson.toJson(result);
+}
+
+private static Object handleBorderTypes(Request req, Response res)
+{
+	res.type(CONTENT_TYPE_JSON);
+	List<NamedResource> borderTypes = Assets.listAllBorderTypes(null);
+	List<Map<String, String>> result = new java.util.ArrayList<>();
+	for (NamedResource borderType : borderTypes)
+	{
+		Map<String, String> entry = new LinkedHashMap<>();
+		entry.put(ART_PACK, borderType.artPack);
+		entry.put("name", borderType.name);
+		result.add(entry);
+	}
+	return gson.toJson(result);
+}
+
+private static Object handleUiOptions(Request req, Response res)
+{
+	res.type(CONTENT_TYPE_JSON);
+	String requestedLanguage = req.queryParams("language");
+	String previousLanguage = UserPreferences.getInstance().language;
+	applyRequestLanguage(requestedLanguage);
+
+	// Ensure a platform implementation is available before any classes
+	// that depend on PlatformFactory (e.g. Color) are initialized.
+	PlatformFactory.setInstance(new AwtFactory());
+
+	try
+	{
+		// Build the standard UI options/labels. Deterministic seed
+		// support removed — defaults are always generated fresh.
+		Map<String, Object> ui = buildWebUiOptions();
+
+		// Also include resource lists so the frontend can fetch a single
+		// endpoint for all initial UI state (art packs, books, textures,
+		// border types, and city icon groups per art pack).
+		try {
+			List<String> artPacks = Assets.listArtPacks(false);
+			ui.put("artPacks", artPacks);
+
+			ui.put("books", SettingsGenerator.getAllBooks());
+
+			List<NamedResource> textures = Assets.listBackgroundTexturesForAllArtPacks(null);
+			List<Map<String,String>> texturesResult = new java.util.ArrayList<>();
+			for (NamedResource t : textures) {
+				Map<String,String> entry = new LinkedHashMap<>();
+				entry.put("artPack", t.artPack);
+				entry.put("name", t.name);
+				texturesResult.add(entry);
+			}
+			ui.put("textures", texturesResult);
+
+			List<NamedResource> borderTypes = Assets.listAllBorderTypes(null);
+			List<Map<String,String>> borderResult = new java.util.ArrayList<>();
+			for (NamedResource b : borderTypes) {
+				Map<String,String> entry = new LinkedHashMap<>();
+				entry.put("artPack", b.artPack);
+				entry.put("name", b.name);
+				borderResult.add(entry);
+			}
+			ui.put("borderTypes", borderResult);
+
+			// City icon groups per art pack (may be empty for some packs)
+			Map<String, List<String>> cityIconTypesByPack = new LinkedHashMap<>();
+			PlatformFactory.setInstance(new AwtFactory());
+			for (String pack : artPacks) {
+				cityIconTypesByPack.put(pack, getCityIconTypesForPack(pack));
+			}
+			ui.put("cityIconTypesByPack", cityIconTypesByPack);
+		} catch (Exception e) {
+			// If resource enumeration fails, still return UI options.
+			Logger.println("Failed to enumerate UI resources: " + e.getMessage());
+		}
+
+		return gson.toJson(ui);
+	}
+	finally
+	{
+		restorePreviousLanguage(previousLanguage);
+	}
+}
 
 		// Ensure numeric values that are whole numbers are represented as
 		// integer types to avoid exponential/scientific notation when
 		// serialized to JSON. This walks Maps and Lists recursively.
 		private static Object normalizeNumbersInObject(Object o) {
 			if (o == null) return null;
-			if (o instanceof Map) {
-				Map<?,?> m = (Map<?,?>) o;
-				Map<Object,Object> out = new LinkedHashMap<>();
-				for (Map.Entry<?,?> e : m.entrySet()) {
-					Object k = e.getKey();
-					Object v = e.getValue();
-					out.put(k, normalizeNumbersInObject(v));
-				}
-				return out;
-			}
-			if (o instanceof List) {
-				List<?> l = (List<?>) o;
-				List<Object> out = new java.util.ArrayList<>(l.size());
-				for (Object v : l) out.add(normalizeNumbersInObject(v));
-				return out;
-			}
-			if (o instanceof Number) {
-				Number n = (Number) o;
-				// Handle BigDecimal specially if present
-				if (n instanceof java.math.BigDecimal) {
-					java.math.BigDecimal bd = (java.math.BigDecimal) n;
-					try {
-						long lv = bd.longValueExact();
-						if (lv >= Integer.MIN_VALUE && lv <= Integer.MAX_VALUE) return Integer.valueOf((int) lv);
-						return Long.valueOf(lv);
-					} catch (ArithmeticException ae) {
-						return bd.doubleValue();
-					}
-				}
-				if (n instanceof Double || n instanceof Float) {
-					double d = n.doubleValue();
-					if (Double.isFinite(d) && Math.floor(d) == d) {
-						long lv = (long) d;
-						if (lv >= Integer.MIN_VALUE && lv <= Integer.MAX_VALUE) return Integer.valueOf((int) lv);
-						return Long.valueOf(lv);
-					}
-					return Double.valueOf(d);
-				}
-				// For integral numeric types, return as-is
-				return n;
-			}
+			if (o instanceof Map) return normalizeMap((Map<?,?>) o);
+			if (o instanceof List) return normalizeList((List<?>) o);
+			if (o instanceof Number) return normalizeNumber((Number) o);
 			return o;
+		}
+
+		private static Map<Object,Object> normalizeMap(Map<?,?> m) {
+			Map<Object,Object> out = new LinkedHashMap<>();
+			for (Map.Entry<?,?> e : m.entrySet()) {
+				Object k = e.getKey();
+				Object v = e.getValue();
+				out.put(k, normalizeNumbersInObject(v));
+			}
+			return out;
+		}
+
+		private static List<Object> normalizeList(List<?> l) {
+			List<Object> out = new java.util.ArrayList<>(l.size());	
+			for (Object v : l) out.add(normalizeNumbersInObject(v));
+			return out;
+		}
+
+		private static Object normalizeNumber(Number n) {
+			if (n instanceof java.math.BigDecimal) {
+				java.math.BigDecimal bd = (java.math.BigDecimal) n;
+				try {
+					long lv = bd.longValueExact();
+					if (lv >= Integer.MIN_VALUE && lv <= Integer.MAX_VALUE) return Integer.valueOf((int) lv);
+					return Long.valueOf(lv);
+				} catch (ArithmeticException ae) {
+					return bd.doubleValue();
+				}
+			}
+			if (n instanceof Double || n instanceof Float) {
+				double d = n.doubleValue();
+				if (Double.isFinite(d) && Math.floor(d) == d) {
+					long lv = (long) d;
+					if (lv >= Integer.MIN_VALUE && lv <= Integer.MAX_VALUE) return Integer.valueOf((int) lv);
+					return Long.valueOf(lv);
+				}
+				return Double.valueOf(d);
+			}
+			return n;
 		}
 
 	private static Map<String, String> option(String value, String label)
@@ -861,170 +856,12 @@ public class MapApiServer
 		cfg.mapLanguage = param(req, "mapLanguage");
 		if (saveNortStr != null)
 			cfg.saveNort = Boolean.valueOf(saveNortStr);
-		// `returnSettings` is deprecated - server always returns settings
-		// alongside the image. Parse but ignore for backward compatibility.
-		String returnSettingsStr = param(req, "returnSettings");
-		if (returnSettingsStr != null) {
-			try { cfg.returnSettings = Boolean.valueOf(returnSettingsStr); } catch (Exception ignored) {}
-		}
-		// The server always returns a JSON payload containing both the
-		// image (base64) and the merged .nort settings so clients can
-		// retrieve edited settings alongside the generated map image.
 	}
 
 	private static String param(Request req, String name)
 	{
 		String v = req.raw().getParameter(name);
 		return (v != null && !v.isEmpty()) ? v : null;
-	}
-
-	private static void extractThemeFormFields(Request req, Config cfg)
-	{
-		cfg.backgroundType = param(req, "backgroundType");
-		cfg.textureRef = param(req, "textureRef");
-		String bgSeed = param(req, "backgroundSeed");
-		if (bgSeed != null)
-			cfg.backgroundSeed = Long.valueOf(bgSeed);
-		String drawReg = param(req, "drawRegionBoundaries");
-		if (drawReg != null)
-			cfg.drawRegionBoundaries = Boolean.valueOf(drawReg);
-		String colLand = param(req, "colorizeLand");
-		if (colLand != null)
-			cfg.colorizeLand = Boolean.valueOf(colLand);
-		String colOcean = param(req, "colorizeOcean");
-		if (colOcean != null)
-			cfg.colorizeOcean = Boolean.valueOf(colOcean);
-		cfg.oceanColorHex = param(req, "oceanColorHex");
-		cfg.landColorHex = param(req, "landColorHex");
-		cfg.regionBoundaryStyle = param(req, "regionBoundaryStyle");
-		cfg.regionBoundaryColorHex = param(req, "regionBoundaryColorHex");
-		String dBorder = param(req, "drawBorder");
-		if (dBorder != null)
-			cfg.drawBorder = Boolean.valueOf(dBorder);
-		String dGrid = param(req, "drawGridOverlay");
-		if (dGrid != null)
-			cfg.drawGridOverlay = Boolean.valueOf(dGrid);
-		String gridShape = param(req, "gridOverlayShape");
-		if (gridShape != null) cfg.gridOverlayShape = gridShape;
-		String gridCount = param(req, "gridOverlayRowOrColCount");
-		if (gridCount != null) cfg.gridOverlayRowOrColCount = Integer.valueOf(gridCount);
-		String gridColor = param(req, "gridOverlayColorHex");
-		if (gridColor != null) cfg.gridOverlayColorHex = gridColor;
-		String gridX = param(req, "gridOverlayXOffset");
-		if (gridX != null) cfg.gridOverlayXOffset = gridX;
-		String gridY = param(req, "gridOverlayYOffset");
-		if (gridY != null) cfg.gridOverlayYOffset = gridY;
-		String gridLine = param(req, "gridOverlayLineWidth");
-		if (gridLine != null) cfg.gridOverlayLineWidth = Integer.valueOf(gridLine);
-		String gridLayer = param(req, "gridOverlayLayer");
-		if (gridLayer != null) cfg.gridOverlayLayer = gridLayer;
-		String voronoiOnly = param(req, "drawVoronoiGridOverlayOnlyOnLand");
-		if (voronoiOnly != null) cfg.drawVoronoiGridOverlayOnlyOnLand = Boolean.valueOf(voronoiOnly);
-
-		String fBorder = param(req, "frayedBorder");
-		if (fBorder != null)
-			cfg.frayedBorder = Boolean.valueOf(fBorder);
-		String fBlur = param(req, "frayedBorderBlurLevel");
-		if (fBlur != null)
-			cfg.frayedBorderBlurLevel = Integer.valueOf(fBlur);
-		String fSize = param(req, "frayedBorderSize");
-		if (fSize != null)
-			cfg.frayedBorderSize = Integer.valueOf(fSize);
-		String fSeed = param(req, "frayedBorderSeed");
-		if (fSeed != null)
-			cfg.frayedBorderSeed = Long.valueOf(fSeed);
-		cfg.frayedBorderColorHex = param(req, "frayedBorderColorHex");
-
-		String gDraw = param(req, "drawGrunge");
-		if (gDraw != null)
-			cfg.drawGrunge = Boolean.valueOf(gDraw);
-		String gWidth = param(req, "grungeWidth");
-		if (gWidth != null)
-			cfg.grungeWidth = Integer.valueOf(gWidth);
-
-		cfg.lineStyle = param(req, "lineStyle");
-		String cWidth = param(req, "coastlineWidth");
-		if (cWidth != null)
-			cfg.coastlineWidth = Double.valueOf(cWidth);
-		cfg.coastlineColorHex = param(req, "coastlineColorHex");
-		String coastShade = param(req, "coastShadingLevel");
-		if (coastShade != null)
-			cfg.coastShadingLevel = Integer.valueOf(coastShade);
-		cfg.coastShadingColorHex = param(req, "coastShadingColorHex");
-		String coastAlpha = param(req, "coastShadingAlpha");
-		if (coastAlpha != null)
-			cfg.coastShadingAlpha = Integer.valueOf(coastAlpha);
-
-		String oceanShade = param(req, "oceanShadingLevel");
-		if (oceanShade != null)
-			cfg.oceanShadingLevel = Integer.valueOf(oceanShade);
-		cfg.oceanShadingColorHex = param(req, "oceanShadingColorHex");
-		cfg.oceanWavesType = param(req, "oceanWavesType");
-		String oceanWaveLevel = param(req, "oceanWavesLevel");
-		if (oceanWaveLevel != null)
-			cfg.oceanWavesLevel = Integer.valueOf(oceanWaveLevel);
-		cfg.oceanWavesColorHex = param(req, "oceanWavesColorHex");
-		String drawOceanLakes = param(req, "drawOceanEffectsInLakes");
-		if (drawOceanLakes != null)
-			cfg.drawOceanEffectsInLakes = Boolean.valueOf(drawOceanLakes);
-
-		String concentricCount = param(req, "concentricWaveCount");
-		if (concentricCount != null)
-			cfg.concentricWaveCount = Integer.valueOf(concentricCount);
-		String fadeConcentric = param(req, "fadeConcentricWaves");
-		if (fadeConcentric != null)
-			cfg.fadeConcentricWaves = Boolean.valueOf(fadeConcentric);
-		String jitterConcentric = param(req, "jitterToConcentricWaves");
-		if (jitterConcentric != null)
-			cfg.jitterToConcentricWaves = Boolean.valueOf(jitterConcentric);
-		String brokenConcentric = param(req, "brokenLinesForConcentricWaves");
-		if (brokenConcentric != null)
-			cfg.brokenLinesForConcentricWaves = Boolean.valueOf(brokenConcentric);
-
-		cfg.riverColorHex = param(req, "riverColorHex");
-
-		String dRoads = param(req, "drawRoads");
-		if (dRoads != null)
-			cfg.drawRoads = Boolean.valueOf(dRoads);
-		cfg.roadStyle = param(req, "roadStyle");
-		String rWidth = param(req, "roadWidth");
-		if (rWidth != null)
-			cfg.roadWidth = Double.valueOf(rWidth);
-		cfg.roadColorHex = param(req, "roadColorHex");
-
-		String mSize = param(req, "mountainSize");
-		if (mSize != null)
-			cfg.mountainSize = Double.valueOf(mSize);
-		String hSize = param(req, "hillSize");
-		if (hSize != null)
-			cfg.hillSize = Double.valueOf(hSize);
-		String dSize = param(req, "duneSize");
-		if (dSize != null)
-			cfg.duneSize = Double.valueOf(dSize);
-		String tHeight = param(req, "treeHeight");
-		if (tHeight != null)
-			cfg.treeHeight = Double.valueOf(tHeight);
-		String cSize = param(req, "citySize");
-		if (cSize != null)
-			cfg.citySize = Double.valueOf(cSize);
-
-		String dText = param(req, "drawText");
-		if (dText != null)
-			cfg.drawText = Boolean.valueOf(dText);
-		cfg.textColorHex = param(req, "textColorHex");
-		String dBold = param(req, "drawBoldBackground");
-		if (dBold != null)
-			cfg.drawBoldBackground = Boolean.valueOf(dBold);
-		cfg.boldBackgroundColorHex = param(req, "boldBackgroundColorHex");
-		String drawRegionsStr = param(req, "drawRegionColors");
-		if (drawRegionsStr != null)
-			cfg.drawRegionColors = Boolean.valueOf(drawRegionsStr);
-		cfg.titleFontFamily = param(req, "titleFontFamily");
-		cfg.regionFontFamily = param(req, "regionFontFamily");
-		cfg.mountainRangeFontFamily = param(req, "mountainRangeFontFamily");
-		cfg.otherMountainsFontFamily = param(req, "otherMountainsFontFamily");
-		cfg.citiesFontFamily = param(req, "citiesFontFamily");
-		cfg.riverFontFamily = param(req, "riverFontFamily");
 	}
 
 	private static GenerationContext loadSettings(Config cfg, Response res)
@@ -1051,19 +888,6 @@ public class MapApiServer
 				settings = generateRandomMapSettings(cfg);
 			}
 
-			// Concise diagnostics: log only counts and flags (avoid printing full .nort JSON)
-			try {
-				int freeIconsCount = 0;
-				int centerEditsCount = 0;
-				boolean hasIconEdits = false;
-				if (settings.edits != null) {
-					if (settings.edits.freeIcons != null) freeIconsCount = settings.edits.freeIcons.calcSize();
-					if (settings.edits.centerEdits != null) centerEditsCount = settings.edits.centerEdits.size();
-					hasIconEdits = settings.edits.hasIconEdits;
-				}
-			} catch (Exception ignore) {
-				// best-effort diagnostics; ignore failures
-			}
 			applyCommonSettings(cfg, settings);
 			// Safety: if the provided settings JSON contains icon edits (freeIcons or centerEdits),
 			// ensure the hasIconEdits flag is set so MapCreator does not generate icons again.
@@ -1303,51 +1127,7 @@ public class MapApiServer
 				+ firstError.getClass().getSimpleName() + (firstError.getMessage() != null ? (" - " + firstError.getMessage()) : "") + ")";
 	}
 
-	private static String determineOutputPath(Config cfg, Response res, Image img)
-	{
-		String outPath = cfg.out;
-		if (outPath == null || outPath.isEmpty())
-		{
-			try
-			{
-				File tmp = File.createTempFile("nortantis-map-" + Instant.now().toEpochMilli(), ".png");
-				outPath = tmp.getAbsolutePath();
-			}
-			catch (IOException e)
-			{
-				img.close();
-				res.status(500);
-				return null;
-			}
-		}
-		return outPath;
-	}
-
 	private static final int MAX_BASE64_PREVIEW_DIMENSION = 1920;
-
-	private static Object returnImageResponse(Request req, Image img, MapSettings settings, Path tempNortPath, Config cfg, Response res)
-	{
-		try
-		{
-			BufferedImage buf = nortantis.platform.awt.AwtFactory.unwrap(img);
-
-			// The server always returns PNG image bytes for preview/generate
-			// requests. If the client indicates support for gzip, compress
-			// the HTTP response body to reduce transfer size.
-			return returnPngResponse(req, res, buf);
-		}
-		catch (Exception e)
-		{
-			Logger.println("returnImageResponse failed: " + e);
-			res.status(500);
-			return gson.toJson(new ApiResponse(false, "Failed to produce image response: " + e.getClass().getSimpleName() + (e.getMessage() != null ? (" - " + e.getMessage()) : ""), null, null));
-		}
-		finally
-		{
-			img.close();
-			cleanupTempNortPath(tempNortPath, cfg);
-		}
-	}
 
 	private static Object returnJsonResponse(BufferedImage buf, MapSettings settings, Config cfg, Response res) throws IOException
 	{
@@ -1418,74 +1198,6 @@ public class MapApiServer
 		return settings.toJsonString();
 	}
 
-	// Removed fallbackNortContent: server will not attempt to fall back to alternate nort content.
-
-	private static String serializeSettingsJson(Config cfg)
-	{
-		if (cfg.settings == null || cfg.settings.isEmpty())
-		{
-			return null;
-		}
-
-		try
-		{
-			return gson.toJson(cfg.settings);
-		}
-		catch (Exception e)
-		{
-			return null;
-		}
-
-	}
-
-	private static String readNortFileContent(Config cfg)
-	{
-		if (cfg.nortFile == null || cfg.nortFile.isEmpty())
-		{
-			return null;
-		}
-
-		try
-		{
-			return Files.readString(Path.of(cfg.nortFile), StandardCharsets.UTF_8);
-		}
-		catch (Exception ignored)
-		{
-			return null;
-		}
-	}
-
-	private static Object returnPngResponse(Request req, Response res, BufferedImage buf) throws IOException
-	{
-		res.type(CONTENT_TYPE_PNG);
-		res.status(200);
-
-		String acceptEnc = req.headers("Accept-Encoding");
-		if (API_DEBUG) Logger.println("Accept-Encoding: " + acceptEnc);
-		// Echo the header for easier client-side debugging
-		res.header("X-Debug-Accept-Encoding", acceptEnc == null ? "" : acceptEnc);
-		boolean useGzip = acceptEnc != null && acceptEnc.toLowerCase().contains("gzip");
-
-		OutputStream out = res.raw().getOutputStream();
-		if (useGzip) {
-			// Indicate to the client that the payload is gzipped
-			res.header("Content-Encoding", "gzip");
-			GZIPOutputStream gos = new GZIPOutputStream(out, true);
-			try {
-				writeCompressedPng(buf, gos);
-				gos.finish();
-				gos.flush();
-			} finally {
-				// Do not close the underlying servlet output stream directly
-				// (finish above writes gzip footer). Let the container manage it.
-			}
-		} else {
-			writeCompressedPng(buf, out);
-		}
-		out.flush();
-		return res.raw();
-	}
-
 	private static void cleanupTempNortPath(Path tempNortPath, Config cfg)
 	{
 		if (tempNortPath != null && !cfg.saveNort)
@@ -1528,59 +1240,6 @@ public class MapApiServer
 		}
 	}
 
-	private static boolean writeImageToFile(Image img, String outPath, Response res)
-	{
-		try
-		{
-			img.write(outPath);
-			return true;
-		}
-		catch (Exception e)
-		{
-			res.status(500);
-			return false;
-		}
-		finally
-		{
-			img.close();
-		}
-	}
-
-	private static String saveNortIfRequested(MapSettings settings, String outPath, boolean providedNortContent, Config cfg, Path tempNortPath, Response res)
-	{
-		String nortSavedPath = null;
-		try
-		{
-			if (cfg.saveNort != null && cfg.saveNort && providedNortContent)
-			{
-				String base = outPath;
-				int dot = base.lastIndexOf('.');
-				String nortPath = (dot > 0 ? base.substring(0, dot) : base) + NORT_EXTENSION;
-				settings.writeToFile(nortPath);
-				nortSavedPath = nortPath;
-			}
-		}
-		catch (Exception e)
-		{
-			res.status(200);
-		}
-		finally
-		{
-			if (tempNortPath != null && !(cfg.saveNort != null && cfg.saveNort))
-			{
-				try
-				{
-					Files.deleteIfExists(tempNortPath);
-				}
-				catch (Exception ignore)
-				{
-					// Ignore cleanup errors; temporary file will be cleaned up by system
-				}
-			}
-		}
-		return nortSavedPath;
-	}
-
 	private static class Config
 	{
 		String nortFile;
@@ -1590,9 +1249,7 @@ public class MapApiServer
 		Long randomSeed;
 		String language;
 		String mapLanguage;
-		String out;
 		Boolean saveNort;
-		Boolean returnSettings;
 		// Random map generation parameters
 		String artPack;
 		Integer worldSize;
@@ -1675,13 +1332,11 @@ public class MapApiServer
 	{
 		MapSettings settings;
 		Path tempNortPath;
-		boolean providedNortContent;
 
 		GenerationContext(MapSettings settings, Path tempNortPath, boolean providedNortContent)
 		{
 			this.settings = settings;
 			this.tempNortPath = tempNortPath;
-			this.providedNortContent = providedNortContent;
 		}
 	}
 
@@ -2125,16 +1780,6 @@ public class MapApiServer
 			this.uiDefaults = uiDefaults;
 			this.nortContent = nortContent;
 		}
-	}
-
-	private static String colorToHex(nortantis.platform.Color c)
-	{
-		if (c == null)
-			return null;
-		int r = c.getRed();
-		int g = c.getGreen();
-		int b = c.getBlue();
-		return String.format("#%02X%02X%02X", r, g, b);
 	}
 
 }
