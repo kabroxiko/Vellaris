@@ -1272,19 +1272,19 @@ function GenerateForm({ uiLanguage = 'en' }) {
               // changing numeric types (integers -> floats). Use the raw
               // uploaded content so the server receives exactly what the
               // user provided in the .nort file.
-              const settingsBlob = new Blob([text], {
-                type: 'application/json',
-              })
-              const payload = new FormData()
-              payload.append('nortFile', settingsBlob, f.name || 'uploaded-settings.nort')
-          await runGenerate(
-            {
-              method: 'POST',
-                  body: payload,
-            },
-            f.name.replace(/\.[^.]+$/, ''),
-            source
-          )
+              // Send the uploaded .nort content as JSON in the request body
+              // under the `settings` field (server expects Config JSON).
+              const parsed = parsedSettings
+              const body = { settings: parsed }
+              await runGenerate(
+                {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(body),
+                },
+                f.name.replace(/\.[^.]+$/, ''),
+                source
+              )
         })
         .catch(() => {
           // Ignore read errors; upload path still works through FormData.
@@ -1524,11 +1524,9 @@ function GenerateForm({ uiLanguage = 'en' }) {
       if (parsedReturned && isManual('mapLanguage') && mapLanguage) {
         parsedReturned.language = mapLanguage
       }
-      const uploadContent = parsedReturned ? JSON.stringify(parsedReturned) : nortContent
-      const fd = new FormData()
-      fd.append('nortFile', new Blob([uploadContent], { type: 'application/json' }), 'generated-settings.nort')
-
-      await runGenerate({ method: 'POST', body: fd }, 'random-map', { type: 'random', name: 'Random Map', nortContent }, 'preview', toast)
+      // Wrap settings under `settings` for the server Config parsing.
+      const bodyObj = { settings: parsedReturned || JSON.parse(nortContent) }
+      await runGenerate({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(bodyObj) }, 'random-map', { type: 'random', name: 'Random Map', nortContent }, 'preview', toast)
     } catch (err) {
       setError(err.message)
       try {
@@ -1972,22 +1970,14 @@ function GenerateForm({ uiLanguage = 'en' }) {
     // If UI provides a language override, ensure it's stored in the settings JSON
     if (mapLanguage) parsedSettings.language = mapLanguage
     const settingsText = serializeNortObject(parsedSettings)
-    const settingsBlob = new Blob([settingsText], {
-      type: 'application/json',
-    })
-    const payload = new FormData()
-    payload.append('nortFile', settingsBlob, 'generated-settings.nort')
-    // Send explicit `language` param for uploaded/generated settings when a
-    // user override is present so server can use it as needed. Prefer
-    // embedding into the .nort content when possible; this param is a
-    // fallback for file uploads where content cannot be rewritten.
-    appendIfSet(payload, 'language', mapLanguage)
-    if (forceSaveNort) payload.append('saveNort', 'true')
-    // Server always returns image bytes; no flag required.
+    // Build JSON body matching server `Config` shape: embed settings under `settings`.
+    const bodyObj = { settings: parsedSettings }
+    if (forceSaveNort) bodyObj.saveNort = true
     return {
       requestOptions: {
         method: 'POST',
-        body: payload,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(bodyObj),
       },
       baseName: (preview?.filename || 'generated-map.png').replace(/\.png$/, ''),
       source: {
@@ -1999,104 +1989,12 @@ function GenerateForm({ uiLanguage = 'en' }) {
   }
 
   function buildFileRequest({ forceSaveNort = false } = {}) {
-    const fd = new FormData()
-    fd.append('nortFile', fileObj, fileObj.name)
-    // Use generatedWidth/generatedHeight instead of legacy width/height
-    if (finalWidth) fd.append('generatedWidth', String(finalWidth))
-    if (finalHeight) fd.append('generatedHeight', String(finalHeight))
-    if (finalSeed) fd.append('randomSeed', String(finalSeed))
-    appendIfSet(fd, 'language', mapLanguage)
-    if (forceSaveNort) fd.append('saveNort', 'true')
-    appendIfSet(fd, 'backgroundType', backgroundType)
-    appendIfSet(fd, 'textureRef', textureRef)
-    appendIfSet(fd, 'backgroundSeed', backgroundSeed)
-    fd.append('drawRegionBoundaries', String(drawRegionBoundaries))
-    fd.append('colorizeLand', String(colorizeLand))
-    fd.append('colorizeOcean', String(colorizeOcean))
-    appendIfSet(fd, 'oceanColorHex', oceanColorHex)
-    appendIfSet(fd, 'landColorHex', landColorHex)
-    appendIfSet(fd, 'regionBoundaryStyle', regionBoundaryStyle)
-    appendIfSet(fd, 'regionBoundaryColorHex', regionBoundaryColorHex)
-    fd.append('drawBorder', String(drawBorder))
-    fd.append('drawGridOverlay', String(drawGridOverlay))
-    appendIfSet(fd, 'gridOverlayShape', gridOverlayShape)
-    if (Number.isFinite(Number(gridOverlayRowOrColCount))) fd.append('gridOverlayRowOrColCount', String(gridOverlayRowOrColCount))
-    appendIfSet(fd, 'gridOverlayColorHex', gridOverlayColorHex)
-    appendIfSet(fd, 'gridOverlayXOffset', gridOverlayXOffset)
-    appendIfSet(fd, 'gridOverlayYOffset', gridOverlayYOffset)
-    if (Number.isFinite(Number(gridOverlayLineWidth))) fd.append('gridOverlayLineWidth', String(gridOverlayLineWidth))
-    appendIfSet(fd, 'gridOverlayLayer', gridOverlayLayer)
-    fd.append('drawVoronoiGridOverlayOnlyOnLand', String(drawVoronoiGridOverlayOnlyOnLand))
-    fd.append('drawGrunge', String(drawGrunge))
-    appendIfSet(fd, 'grungeWidth', grungeWidth)
-    appendIfSet(fd, 'lineStyle', lineStyle)
-    appendIfSet(fd, 'coastlineWidth', coastlineWidth)
-    appendIfSet(fd, 'coastlineColorHex', coastlineColorHex)
-    appendIfSet(fd, 'coastShadingLevel', coastShadingLevel)
-    appendIfSet(fd, 'coastShadingColorHex', coastShadingColorHex)
-    // Do not send oceanShadingAlpha as a separate field; embed alpha into oceanShadingColor
-    appendIfSet(fd, 'oceanShadingLevel', oceanShadingLevel)
-    appendIfSet(fd, 'oceanShadingColorHex', oceanShadingColorHex)
-    appendIfSet(fd, 'oceanEffect', oceanWavesType)
-    appendIfSet(fd, 'oceanWavesLevel', oceanWavesLevel)
-    appendIfSet(fd, 'oceanWavesColorHex', oceanWavesColorHex)
-    if (Number.isFinite(Number(concentricWaveCount))) fd.append('concentricWaveCount', String(concentricWaveCount))
-    fd.append('fadeConcentricWaves', String(fadeConcentricWaves))
-    fd.append('jitterToConcentricWaves', String(jitterToConcentricWaves))
-    fd.append('brokenLinesForConcentricWaves', String(brokenLinesForConcentricWaves))
-    fd.append('drawOceanEffectsInLakes', String(drawOceanEffectsInLakes))
-    appendIfSet(fd, 'riverColorHex', riverColorHex)
-    fd.append('drawRoads', String(drawRoads))
-    appendIfSet(fd, 'roadStyle', roadStyle)
-    appendIfSet(fd, 'roadWidth', roadWidth)
-    appendIfSet(fd, 'roadColorHex', roadColorHex)
-    // Convert slider values to server-expected scales
-    const sliderValueFor1Scale = 5
-    const scaleMax = 3.0
-    const scaleMin = 0.5
-    const minScaleSliderValue = 1
-    const maxScaleSliderValue = 15
-    function getScaleForSliderValue(sliderValue) {
-      const v = Number(sliderValue)
-      if (!Number.isFinite(v)) return undefined
-      if (v <= sliderValueFor1Scale) {
-        const slope = (sliderValueFor1Scale - minScaleSliderValue) / (1.0 - scaleMin)
-        const yIntercept = sliderValueFor1Scale - slope
-        return (v - yIntercept) / slope
-      } else {
-        const slope = (maxScaleSliderValue - sliderValueFor1Scale) / (scaleMax - 1.0)
-        const yIntercept = sliderValueFor1Scale - slope * 1.0
-        return (v - yIntercept) / slope
-      }
-    }
-    function getTreeHeightScaleFromSlider(sliderValue) {
-      const v = Number(sliderValue)
-      if (!Number.isFinite(v)) return undefined
-      return 0.1 + v * 0.05
-    }
-
-    appendIfSet(fd, 'mountainSize', getScaleForSliderValue(mountainSize))
-    appendIfSet(fd, 'hillSize', getScaleForSliderValue(hillSize))
-    appendIfSet(fd, 'duneSize', getScaleForSliderValue(duneSize))
-    appendIfSet(fd, 'treeHeight', getTreeHeightScaleFromSlider(treeHeight))
-    appendIfSet(fd, 'citySize', getScaleForSliderValue(citySize))
-    fd.append('drawText', String(drawText))
-    appendIfSet(fd, 'textColorHex', textColorHex)
-    fd.append('drawBoldBackground', String(drawBoldBackground))
-    appendIfSet(fd, 'boldBackgroundColorHex', boldBackgroundColorHex)
-    appendIfSet(fd, 'drawRegionColors', String(resolveLandColoringMethod(undefined) === 'ColorPoliticalRegions'))
-    appendIfSet(fd, 'titleFontFamily', titleFontFamily)
-    appendIfSet(fd, 'regionFontFamily', regionFontFamily)
-    appendIfSet(fd, 'mountainRangeFontFamily', mountainRangeFontFamily)
-    appendIfSet(fd, 'otherMountainsFontFamily', otherMountainsFontFamily)
-    appendIfSet(fd, 'citiesFontFamily', citiesFontFamily)
-    appendIfSet(fd, 'riverFontFamily', riverFontFamily)
-    // Server always returns image bytes; no flag required.
-    return {
-      requestOptions: { method: 'POST', body: fd },
-      baseName: fileName ? fileName.replace(/\.[^.]+$/, '') : undefined,
-      source: { type: 'nort', name: fileName || 'Uploaded settings' },
-    }
+    // For uploaded files we prefer to read the file text and POST JSON.
+    // This helper builds a JSON body matching server `Config` shape when
+    // the caller already has the parsed settings available.
+    // If the caller requires raw file handling, they should use the
+    // file-read path that converts file content to JSON first.
+    throw new Error('buildFileRequest is deprecated: send JSON body using buildNortContentRequest instead.')
   }
 
   async function handleGenerateFromSettings(evt) {
@@ -2109,11 +2007,29 @@ function GenerateForm({ uiLanguage = 'en' }) {
     // Build merged settings from current UI state and download that
     try {
       const result = buildNortContentRequest({ forceSaveNort: true })
-      const fd = result.requestOptions && result.requestOptions.body
-      if (!fd || typeof fd.get !== 'function') throw new Error('Failed to build merged settings for download.')
-      const nf = fd.get('nortFile')
-      if (!nf || typeof nf.text !== 'function') throw new Error('Merged settings not available for download.')
-      const serialized = await nf.text()
+      const body = result.requestOptions && result.requestOptions.body
+      if (!body) throw new Error('Failed to build merged settings for download.')
+
+      // We now send JSON bodies. Parse the JSON and extract the `settings` object.
+      let serialized
+      if (typeof body === 'string') {
+        const parsed = JSON.parse(body)
+        const settingsObj = parsed && parsed.settings ? parsed.settings : null
+        if (!settingsObj) throw new Error('Merged settings not available for download.')
+        serialized = serializeNortObject(settingsObj)
+      } else if (typeof body === 'object') {
+        // Fallback: if callers supply a FormData-like object, attempt to read nortFile
+        if (typeof body.get === 'function') {
+          const nf = body.get('nortFile')
+          if (!nf || typeof nf.text !== 'function') throw new Error('Merged settings not available for download.')
+          serialized = await nf.text()
+        } else {
+          throw new Error('Merged settings not available for download.')
+        }
+      } else {
+        throw new Error('Merged settings not available for download.')
+      }
+
       const derived = deriveNortFilenameFromContent(serialized)
       const baseName = derived || (currentSource?.name || 'generated-settings')
       downloadNortContent(serialized, baseName)
@@ -2132,11 +2048,13 @@ function GenerateForm({ uiLanguage = 'en' }) {
       // into that content. This avoids stale `currentSource.nortContent` and
       // ensures the sent .nort contains the latest control values.
       if (fileObj) {
+        // Always read the uploaded file as text and send JSON body; do not
+        // fall back to multipart form uploads.
         try {
           const text = await fileObj.text()
           result = buildNortContentRequest({ ...effectiveRequestBehavior, explicitNortContent: text })
         } catch (e) {
-          result = buildFileRequest(effectiveRequestBehavior)
+          throw new Error('Failed to read uploaded .nort file as text; cannot POST as JSON.')
         }
       } else if (currentSource?.nortContent) {
         result = buildNortContentRequest(effectiveRequestBehavior)

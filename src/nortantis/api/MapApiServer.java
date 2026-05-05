@@ -925,7 +925,6 @@ private static Object handleUiOptions(Request req, Response res)
 		String genWidthStr = param(req, "generatedWidth");
 		String genHeightStr = param(req, "generatedHeight");
 		String seedStr = param(req, "randomSeed");
-		String saveNortStr = param(req, "saveNort");
 
 		if (genWidthStr != null)
 			cfg.generatedWidth = Integer.valueOf(genWidthStr);
@@ -940,8 +939,8 @@ private static Object handleUiOptions(Request req, Response res)
 		if (cfg.mapLanguage == null) {
 			cfg.mapLanguage = param(req, "language");
 		}
-		if (saveNortStr != null)
-			cfg.saveNort = Boolean.valueOf(saveNortStr);
+		// `saveNort` is always true (server persists .nort); do not accept as client parameter.
+		cfg.saveNort = Boolean.TRUE;
 	}
 
 	private static String param(Request req, String name)
@@ -1322,6 +1321,10 @@ private static Object handleUiOptions(Request req, Response res)
 		String uiLanguage;
 		String mapLanguage;
 		Boolean saveNort;
+		// Always default to true; server persists .nort files by design.
+		{
+			saveNort = Boolean.TRUE;
+		}
 		// Random map generation parameters
 		String artPack;
 		Integer worldSize;

@@ -47,10 +47,10 @@ public class HSBColor implements Serializable, Comparable<HSBColor>
 
 	public static HSBColor fromJson(JSONObject json)
 	{
-		int hue = ((Long) json.get("filterHue")).intValue();
-		int saturation = ((Long) json.get("filterSaturation")).intValue();
-		int brightness = ((Long) json.get("filterBrightness")).intValue();
-		int transparency = ((Long) json.get("filterTransparency")).intValue();
+		int hue = ((Number) json.get("filterHue")).intValue();
+		int saturation = ((Number) json.get("filterSaturation")).intValue();
+		int brightness = ((Number) json.get("filterBrightness")).intValue();
+		int transparency = ((Number) json.get("filterTransparency")).intValue();
 		return new HSBColor(hue, saturation, brightness, transparency);
 	}
 

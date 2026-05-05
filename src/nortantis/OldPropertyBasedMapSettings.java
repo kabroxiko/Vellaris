@@ -337,8 +337,8 @@ public class OldPropertyBasedMapSettings implements Serializable
 			{
 				JSONObject jsonObj = (JSONObject) obj;
 				String text = (String) jsonObj.get("text");
-				Point location = new Point((Double) jsonObj.get("locationX"), (Double) jsonObj.get("locationY"));
-				double angle = (Double) jsonObj.get("angle");
+				Point location = new Point(((Number) jsonObj.get("locationX")).doubleValue(), ((Number) jsonObj.get("locationY")).doubleValue());
+				double angle = ((Number) jsonObj.get("angle")).doubleValue();
 				TextType type = Enum.valueOf(TextType.class, ((String) jsonObj.get("type")).replace(" ", "_"));
 				MapText mp = new MapText(text, location, angle, type, LineBreak.Auto, null, null, 0.0, 0, null, MapText.defaultBackgroundFade);
 				result.add(mp);
@@ -365,7 +365,7 @@ public class OldPropertyBasedMapSettings implements Serializable
 				{
 					isLake = isLakeObject;
 				}
-				Integer regionId = jsonObj.get("regionId") == null ? null : ((Long) jsonObj.get("regionId")).intValue();
+				Integer regionId = jsonObj.get("regionId") == null ? null : toInt(jsonObj.get("regionId"));
 
 				CenterIcon icon = null;
 				{
@@ -373,7 +373,7 @@ public class OldPropertyBasedMapSettings implements Serializable
 					if (iconObj != null)
 					{
 						String iconGroupId = (String) iconObj.get("iconGroupId");
-						int iconIndex = (int) (long) iconObj.get("iconIndex");
+						int iconIndex = toInt(iconObj.get("iconIndex"));
 						String iconName = (String) iconObj.get("iconName");
 						CenterIconType iconType = CenterIconType.valueOf((String) iconObj.get("iconType"));
 						icon = new CenterIcon(iconType, Assets.installedArtPack, iconGroupId, iconIndex);
@@ -394,8 +394,8 @@ public class OldPropertyBasedMapSettings implements Serializable
 					if (treesObj != null)
 					{
 						String treeType = (String) treesObj.get("treeType");
-						double density = (Double) treesObj.get("density");
-						long randomSeed = (Long) treesObj.get("randomSeed");
+						double density = toDouble(treesObj.get("density"));
+						long randomSeed = toLong(treesObj.get("randomSeed"));
 						trees = new CenterTrees(Assets.installedArtPack, treeType, density, randomSeed);
 					}
 				}
@@ -418,7 +418,7 @@ public class OldPropertyBasedMapSettings implements Serializable
 			{
 				JSONObject jsonObj = (JSONObject) obj;
 				Color color = parseColor((String) jsonObj.get("color"));
-				int regionId = (int) (long) jsonObj.get("regionId");
+				int regionId = toInt(jsonObj.get("regionId"));
 				result.put(regionId, new RegionEdit(regionId, color));
 			}
 
@@ -435,8 +435,8 @@ public class OldPropertyBasedMapSettings implements Serializable
 			for (Object obj : array)
 			{
 				JSONObject jsonObj = (JSONObject) obj;
-				int riverLevel = (int) (long) jsonObj.get("riverLevel");
-				int index = (int) (long) jsonObj.get("index");
+				int riverLevel = toInt(jsonObj.get("riverLevel"));
+				int index = toInt(jsonObj.get("index"));
 				result.put(index, new EdgeEdit(index, riverLevel));
 			}
 
@@ -475,6 +475,30 @@ public class OldPropertyBasedMapSettings implements Serializable
 			return Color.create(Integer.parseInt(parts[0]), Integer.parseInt(parts[1]), Integer.parseInt(parts[2]), Integer.parseInt(parts[3]));
 		}
 		throw new IllegalArgumentException("Unable to parse color from string: " + str);
+	}
+
+	private static int toInt(Object value)
+	{
+		if (value == null) return 0;
+		if (value instanceof Number) return ((Number) value).intValue();
+		if (value instanceof String) return Integer.parseInt((String) value);
+		throw new IllegalArgumentException("Cannot convert value to int: " + value.getClass());
+	}
+
+	private static long toLong(Object value)
+	{
+		if (value == null) return 0L;
+		if (value instanceof Number) return ((Number) value).longValue();
+		if (value instanceof String) return Long.parseLong((String) value);
+		throw new IllegalArgumentException("Cannot convert value to long: " + value.getClass());
+	}
+
+	private static double toDouble(Object value)
+	{
+		if (value == null) return 0.0;
+		if (value instanceof Number) return ((Number) value).doubleValue();
+		if (value instanceof String) return Double.parseDouble((String) value);
+		throw new IllegalArgumentException("Cannot convert value to double: " + value.getClass());
 	}
 
 	private static <T> T getProperty(String propName, Supplier<T> getter)
