@@ -304,6 +304,11 @@ public class SettingsGenerator
 			settings.roadStyle = new Stroke(ProbabilityHelper.sampleUniform(rand, Arrays.asList(StrokeType.Dashes, StrokeType.Rounded_Dashes, StrokeType.Dots)), settings.roadStyle.width);
 		}
 
+		// Ensure a default language is present for generated settings
+		if (settings.language == null || settings.language.isEmpty()) {
+			settings.language = "en";
+		}
+
 		return settings;
 	}
 

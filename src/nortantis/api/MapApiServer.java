@@ -91,8 +91,8 @@ public class MapApiServer
 
 		get("/api/ui-options", MapApiServer::handleUiOptions);
 
+		post("/api/generate-settings", MapApiServer::handleGenerateSettings);
 		post("/api/generate", MapApiServer::handleGenerate);
-		post("/api/background-preview", MapApiServer::handleBackgroundPreview);
 		post("/api/background-base", MapApiServer::handleBackgroundBase);
 
 		exception(Exception.class, (exception, req, res) ->
@@ -105,6 +105,77 @@ public class MapApiServer
 
 		init();
 		if (API_DEBUG) Logger.println("Map API server started on port 8080");
+	}
+
+	private static Object handleGenerateSettings(Request req, Response res)
+	{
+		res.type(CONTENT_TYPE_JSON);
+		logHeaders(req);
+
+		Config cfg = parseConfig(req, res);
+		RandomMapParameters params = parseRandomMapParameters(req, res);
+		if (cfg == null && params == null)
+		{
+			res.status(400);
+			return gson.toJson(new ApiResponse(false, MSG_FAILED_TO_PARSE_CONFIG, null, null));
+		}
+
+		PlatformFactory.setInstance(new AwtFactory());
+		String previousLanguage = UserPreferences.getInstance().language;
+			String generationLanguage = (cfg != null) ? resolveGenerationLanguage(cfg) : null;
+		if ((generationLanguage == null || generationLanguage.isEmpty()) && params != null)
+		{
+				generationLanguage = (params.mapLanguage != null && !params.mapLanguage.isEmpty()) ? params.mapLanguage : params.uiLanguage;
+		}
+		applyRequestLanguage(generationLanguage);
+
+		try
+		{
+			MapSettings settings;
+			if (params != null && (cfg == null || (cfg.settings == null && (cfg.nortFile == null || cfg.nortFile.isEmpty()))))
+			{
+				settings = generateRandomMapSettings(params);
+				applyCommonSettings(cfg != null ? cfg : new Config(), settings);
+				applyThemeOverrides(cfg != null ? cfg : new Config(), settings);
+			}
+			else
+			{
+				GenerationContext ctx = loadSettings(cfg, res);
+				if (ctx == null)
+				{
+					res.status(400);
+					return gson.toJson(new ApiResponse(false, MSG_FAILED_TO_LOAD_SETTINGS, null, null));
+				}
+				settings = ctx.settings;
+			}
+
+			// Ensure returned settings include the resolved generation language
+			if (generationLanguage != null && !generationLanguage.isEmpty()) {
+				settings.language = generationLanguage;
+			}
+
+			// Produce normalized settings map and canonical JSON to return to frontend.
+			String rawJson = settings.toJsonString();
+			@SuppressWarnings("unchecked")
+			Map<String, Object> settingsMap = gson.fromJson(rawJson, Map.class);
+			@SuppressWarnings("unchecked")
+			Map<String, Object> normalized = (Map<String, Object>) normalizeNumbersInObject(settingsMap);
+
+			// Ensure `books` arrays are sorted for deterministic output,
+			// then sort keys recursively to produce a deterministic canonical JSON
+			sortBooksInObject(normalized);
+			Object sorted = sortKeysInObject(normalized);
+			String normalizedJson = gson.toJson(sorted);
+
+			// Return the canonical normalized .nort JSON directly as the response body
+			// (clients expect raw .nort content, not a wrapper object).
+			res.type(CONTENT_TYPE_JSON);
+			return normalizedJson;
+		}
+		finally
+		{
+			restorePreviousLanguage(previousLanguage);
+		}
 	}
 
 	private static String formatExceptionMessage(Exception exception)
@@ -129,24 +200,58 @@ public class MapApiServer
 		logHeaders(req);
 
 		Config cfg = parseConfig(req, res);
-		if (cfg == null)
+		RandomMapParameters params = parseRandomMapParameters(req, res);
+		if (cfg == null && params == null)
 		{
 			return gson.toJson(new ApiResponse(false, MSG_FAILED_TO_PARSE_CONFIG, null, null));
 		}
 
 		PlatformFactory.setInstance(new AwtFactory());
 		String previousLanguage = UserPreferences.getInstance().language;
-		applyRequestLanguage(resolveGenerationLanguage(cfg));
+		// Prefer explicit language from Config; fall back to RandomMapParameters when present
+		String generationLanguage = (cfg != null) ? resolveGenerationLanguage(cfg) : null;
+		if ((generationLanguage == null || generationLanguage.isEmpty()) && params != null)
+		{
+				generationLanguage = (params.mapLanguage != null && !params.mapLanguage.isEmpty()) ? params.mapLanguage : params.uiLanguage;
+		}
+		applyRequestLanguage(generationLanguage);
 
 		try
 		{
-			GenerationContext ctx = loadSettings(cfg, res);
+			GenerationContext ctx;
+			Config effectiveCfg = (cfg != null) ? cfg : new Config();
+
+			// Require pregenerated settings (returned by /api/generate-settings)
+			// or an uploaded .nort file / full settings JSON. Do not generate
+			// new random settings here; callers should call /api/generate-settings
+			// first and then POST the returned normalized .nort as `cfg.settings`.
+			if (cfg == null || (cfg.settings == null && (cfg.nortFile == null || cfg.nortFile.isEmpty())))
+			{
+				res.status(400);
+				return gson.toJson(new ApiResponse(false, "Missing settings: POST the normalized .nort (from /api/generate-settings) or upload a .nort file", null, null));
+			}
+
+			ctx = loadSettings(cfg, res);
 			if (ctx == null)
 			{
 				return gson.toJson(new ApiResponse(false, MSG_FAILED_TO_LOAD_SETTINGS, null, null));
 			}
 
-				GenerationResult generation = generateMap(ctx.settings, cfg);
+			// Ensure the settings object records the resolved generation language
+			// so downstream components that read settings.language can observe it.
+			if (generationLanguage != null && !generationLanguage.isEmpty()) {
+				ctx.settings.language = generationLanguage;
+			}
+
+			// If the loaded settings contain a language, apply it to the
+			// runtime so Translation/NameCreator use the requested locale.
+			if (ctx.settings.language != null && !ctx.settings.language.isEmpty()) {
+				applyRequestLanguage(ctx.settings.language);
+			}
+
+			// Debug logging to help trace language propagation during generation
+			if (API_DEBUG) Logger.println("Generation language resolved: " + generationLanguage + ", settings.language: " + ctx.settings.language + ", effective applied language: " + UserPreferences.getInstance().language);
+				GenerationResult generation = generateMap(ctx.settings, effectiveCfg);
 					if (generation.image == null)
 					{
 						res.status(500);
@@ -155,17 +260,17 @@ public class MapApiServer
 					Image img = generation.image;
 			// Always return JSON containing the image (base64) and the
 			// merged .nort settings so clients can retrieve edits.
-			try {
-				BufferedImage buf = nortantis.platform.awt.AwtFactory.unwrap(img);
-				return returnJsonResponse(buf, ctx.settings, cfg, res);
-			} catch (Exception e) {
-				Logger.println("returnJsonResponse failed: " + e);
-				res.status(500);
-				return gson.toJson(new ApiResponse(false, "Failed to produce JSON response: " + e.getClass().getSimpleName() + (e.getMessage() != null ? (" - " + e.getMessage()) : ""), null, null));
-			} finally {
-				img.close();
-				cleanupTempNortPath(ctx.tempNortPath, cfg);
-			}
+				try {
+					BufferedImage buf = nortantis.platform.awt.AwtFactory.unwrap(img);
+					return returnJsonResponse(buf, ctx.settings, effectiveCfg, res);
+				} catch (Exception e) {
+					Logger.println("returnJsonResponse failed: " + e);
+					res.status(500);
+					return gson.toJson(new ApiResponse(false, "Failed to produce JSON response: " + e.getClass().getSimpleName() + (e.getMessage() != null ? (" - " + e.getMessage()) : ""), null, null));
+				} finally {
+					img.close();
+					cleanupTempNortPath(ctx.tempNortPath, effectiveCfg);
+				}
 		}
 		finally
 		{
@@ -173,21 +278,21 @@ public class MapApiServer
 		}
 	}
 
-	private static void applyRequestLanguage(String language)
+	private static void applyRequestLanguage(String uiLanguage)
 	{
-		if (language == null || language.isEmpty())
+		if (uiLanguage == null || uiLanguage.isEmpty())
 		{
 			return;
 		}
 
 		for (Locale locale : Translation.getSupportedLocales())
 		{
-			if (locale.getLanguage().equals(language))
-			{
-				UserPreferences.getInstance().language = language;
-				Translation.initialize();
-				return;
-			}
+				if (locale.getLanguage().equals(uiLanguage))
+				{
+					UserPreferences.getInstance().language = uiLanguage;
+					Translation.initialize();
+					return;
+				}
 		}
 	}
 
@@ -198,12 +303,19 @@ public class MapApiServer
 			return null;
 		}
 
+		// Prefer an explicit `language` included inside provided settings JSON
+		if (cfg.settings != null && cfg.settings.containsKey("language")) {
+			Object lang = cfg.settings.get("language");
+			if (lang instanceof String && !((String) lang).isEmpty()) return (String) lang;
+		}
+
+		// Fall back to the legacy mapLanguage query/form parameter if provided
 		if (cfg.mapLanguage != null && !cfg.mapLanguage.isEmpty())
 		{
 			return cfg.mapLanguage;
 		}
 
-		return cfg.language;
+		return cfg.uiLanguage;
 	}
 
 	private static void restorePreviousLanguage(String previousLanguage)
@@ -406,7 +518,7 @@ private static Object handleBorderTypes(Request req, Response res)
 private static Object handleUiOptions(Request req, Response res)
 {
 	res.type(CONTENT_TYPE_JSON);
-	String requestedLanguage = req.queryParams("language");
+	String requestedLanguage = req.queryParams("uiLanguage");
 	String previousLanguage = UserPreferences.getInstance().language;
 	applyRequestLanguage(requestedLanguage);
 
@@ -469,6 +581,60 @@ private static Object handleUiOptions(Request req, Response res)
 	}
 }
 
+	// Recursively sort Map keys (lexicographically) so JSON serialization
+	// produces deterministic canonical ordering. Lists are preserved and
+	// non-container values are returned as-is.
+	private static Object sortKeysInObject(Object o) {
+		if (o == null) return null;
+		if (o instanceof Map) return sortMap((Map<?,?>) o);
+		if (o instanceof List) return sortList((List<?>) o);
+		return o;
+	}
+
+	private static Map<String,Object> sortMap(Map<?,?> m) {
+		java.util.TreeMap<String,Object> out = new java.util.TreeMap<>();
+		for (Map.Entry<?,?> e : m.entrySet()) {
+			String k = String.valueOf(e.getKey());
+			out.put(k, sortKeysInObject(e.getValue()));
+		}
+		return out;
+	}
+
+	private static List<Object> sortList(List<?> l) {
+		List<Object> out = new java.util.ArrayList<>(l.size());
+		for (Object v : l) out.add(sortKeysInObject(v));
+		return out;
+	}
+
+	// Recursively find any Map entries with key "books" whose value is a List
+	// and sort that list lexicographically (by string value). This enforces a
+	// deterministic ordering for the books array in returned .nort content.
+	private static void sortBooksInObject(Object o) {
+		if (o == null) return;
+		if (o instanceof Map) {
+			Map<?,?> m = (Map<?,?>) o;
+			for (Map.Entry<?,?> e : m.entrySet()) {
+				String k = String.valueOf(e.getKey());
+				Object v = e.getValue();
+				if ("books".equals(k) && v instanceof List) {
+					try {
+						@SuppressWarnings("unchecked")
+						List<Object> lst = new java.util.ArrayList<>((List<Object>) v);
+						lst.sort((a,b) -> String.valueOf(a).compareTo(String.valueOf(b)));
+						// Replace in-place using a parameterized Map to avoid raw type put()
+						@SuppressWarnings("unchecked")
+						Map<String,Object> mm = (Map<String,Object>) m;
+						mm.put(k, lst);
+					} catch (Exception ignore) {}
+				} else {
+					sortBooksInObject(v);
+				}
+			}
+		} else if (o instanceof List) {
+			for (Object v : (List<?>) o) sortBooksInObject(v);
+		}
+	}
+
 		// Ensure numeric values that are whole numbers are represented as
 		// integer types to avoid exponential/scientific notation when
 		// serialized to JSON. This walks Maps and Lists recursively.
@@ -530,125 +696,6 @@ private static Object handleUiOptions(Request req, Response res)
 	private static String tr(String key)
 	{
 		return Translation.get(key);
-	}
-
-	private static Object handleBackgroundPreview(Request req, Response res)
-	{
-		Config cfg = parseConfig(req, res);
-		if (cfg == null)
-		{
-			res.type(CONTENT_TYPE_JSON);
-			return gson.toJson(new ApiResponse(false, MSG_FAILED_TO_PARSE_CONFIG, null, null));
-		}
-
-		PlatformFactory.setInstance(new AwtFactory());
-
-		GenerationContext ctx = loadSettings(cfg, res);
-		if (ctx == null)
-		{
-			res.type(CONTENT_TYPE_JSON);
-			return gson.toJson(new ApiResponse(false, MSG_FAILED_TO_LOAD_SETTINGS, null, null));
-		}
-
-		Image previewImage = null;
-		try
-		{
-			previewImage = generateBackgroundPreviewImage(ctx.settings, cfg);
-			BufferedImage buffered = nortantis.platform.awt.AwtFactory.unwrap(previewImage);
-			res.type(CONTENT_TYPE_PNG);
-			res.status(200);
-			writeCompressedPng(buffered, res.raw().getOutputStream());
-			res.raw().getOutputStream().flush();
-			return res.raw();
-		}
-		catch (Exception e)
-		{
-			Logger.println("handleBackgroundPreview failed: " + e);
-			res.type(CONTENT_TYPE_JSON);
-			res.status(500);
-			return gson.toJson(new ApiResponse(false, "Failed to generate background preview: " + e.getClass().getSimpleName() + (e.getMessage() != null ? (" - " + e.getMessage()) : ""), null, null));
-		}
-		finally
-		{
-			if (previewImage != null)
-			{
-				previewImage.close();
-			}
-			if (ctx.tempNortPath != null)
-			{
-				try
-				{
-					Files.deleteIfExists(ctx.tempNortPath);
-				}
-				catch (Exception ignore)
-				{
-					// Ignore cleanup errors; temporary file will be cleaned up by system
-				}
-			}
-		}
-	}
-
-	private static Image generateBackgroundPreviewImage(MapSettings settings, Config cfg)
-	{
-		int width = cfg.previewWidth != null && cfg.previewWidth > 0 ? cfg.previewWidth : DEFAULT_BACKGROUND_PREVIEW_WIDTH;
-		int height = cfg.previewHeight != null && cfg.previewHeight > 0 ? cfg.previewHeight : DEFAULT_BACKGROUND_PREVIEW_HEIGHT;
-
-		Image backgroundPreview;
-
-		if (settings.generateBackground)
-		{
-			Image fractal = FractalBGGenerator.generate(new Random(settings.backgroundRandomSeed), 1.3f, width, height, 0.75f);
-			try
-			{
-				backgroundPreview = ImageHelper.getInstance().colorize(fractal, settings.oceanColor, ImageHelper.ColorizeAlgorithm.algorithm2);
-			}
-			finally
-			{
-				fractal.close();
-			}
-		}
-		else if (settings.generateBackgroundFromTexture)
-		{
-			Tuple2<Path, String> tuple = settings.getBackgroundImagePath();
-			Path texturePath = tuple.getFirst();
-
-			Image texture = ImageCache.getInstance(settings.backgroundTextureResource.artPack, settings.customImagesPath).getImageFromFile(texturePath);
-			try
-			{
-				Image textureForOcean = settings.colorizeOcean ? ImageHelper.getInstance().convertToGrayscale(texture) : texture;
-				Image oceanBase = BackgroundGenerator.generateUsingWhiteNoiseConvolution(new Random(settings.backgroundRandomSeed), textureForOcean, height, width);
-				try
-				{
-					backgroundPreview = settings.colorizeOcean ? ImageHelper.getInstance().colorize(oceanBase, settings.oceanColor, ImageHelper.ColorizeAlgorithm.algorithm3) : oceanBase.deepCopy();
-				}
-				finally
-				{
-					oceanBase.close();
-					if (textureForOcean != texture)
-					{
-						textureForOcean.close();
-					}
-				}
-			}
-			finally
-			{
-				texture.close();
-			}
-		}
-		else
-		{
-			Image solid = Image.create(width, height, ImageType.Grayscale8Bit);
-			try
-			{
-				backgroundPreview = ImageHelper.getInstance().colorize(solid, settings.oceanColor, ImageHelper.ColorizeAlgorithm.solidColor);
-			}
-			finally
-			{
-				solid.close();
-			}
-		}
-
-		return backgroundPreview;
 	}
 
 	private static Object handleBackgroundBase(Request req, Response res)
@@ -809,6 +856,40 @@ private static Object handleUiOptions(Request req, Response res)
 		}
 	}
 
+	/**
+	 * Parse a request body (JSON or multipart form) into RandomMapParameters.
+	 * Returns null and sets response status 400 on parse errors.
+	 */
+	private static RandomMapParameters parseRandomMapParameters(Request req, Response res)
+	{
+		try
+		{
+			String contentType = req.contentType();
+			if (contentType != null && contentType.toLowerCase().startsWith("multipart/form-data"))
+			{
+				try
+				{
+					Config cfg = parseMultipartConfig(req);
+					return RandomMapParameters.fromConfig(cfg);
+				}
+				catch (Exception e)
+				{
+					res.status(400);
+					return null;
+				}
+			}
+			else
+			{
+				return gson.fromJson(req.body(), RandomMapParameters.class);
+			}
+		}
+		catch (Exception e)
+		{
+			res.status(400);
+			return null;
+		}
+	}
+
 	private static Config parseMultipartConfig(Request req) throws IOException, javax.servlet.ServletException
 	{
 		MultipartConfigElement multipartConfigElement = new MultipartConfigElement(System.getProperty("java.io.tmpdir"));
@@ -852,8 +933,13 @@ private static Object handleUiOptions(Request req, Response res)
 			cfg.generatedHeight = Integer.valueOf(genHeightStr);
 		if (seedStr != null)
 			cfg.randomSeed = Long.valueOf(seedStr);
-		cfg.language = param(req, "language");
+		cfg.uiLanguage = param(req, "uiLanguage");
 		cfg.mapLanguage = param(req, "mapLanguage");
+		// Accept the newer `language` form parameter as a fallback for clients
+		// that send it instead of the legacy mapLanguage parameter.
+		if (cfg.mapLanguage == null) {
+			cfg.mapLanguage = param(req, "language");
+		}
 		if (saveNortStr != null)
 			cfg.saveNort = Boolean.valueOf(saveNortStr);
 	}
@@ -920,87 +1006,67 @@ private static Object handleUiOptions(Request req, Response res)
 
 	private static MapSettings generateRandomMapSettings(Config cfg)
 	{
-		Random rand = cfg.randomSeed != null ? new Random(cfg.randomSeed) : new Random();
-		String artPack = (cfg.artPack != null && !cfg.artPack.isEmpty()) ? cfg.artPack : Assets.installedArtPack;
+		RandomMapParameters params = RandomMapParameters.fromConfig(cfg);
+		return generateRandomMapSettings(params);
+	}
+
+	private static MapSettings generateRandomMapSettings(RandomMapParameters params)
+	{
+		Random rand = params.randomSeed != null ? new Random(params.randomSeed) : new Random();
+		String artPack = (params.artPack != null && !params.artPack.isEmpty()) ? params.artPack : Assets.installedArtPack;
 		MapSettings settings = SettingsGenerator.generate(rand, artPack, null);
-		applyRandomMapConfigOverrides(cfg, settings);
+		applyRandomMapParameterOverrides(params, settings);
 		return settings;
 	}
 
-	private static void applyRandomMapConfigOverrides(Config cfg, MapSettings settings)
+	private static void applyRandomMapParameterOverrides(RandomMapParameters p, MapSettings settings)
 	{
-		applyWorldSize(cfg, settings);
-		applyLandShape(cfg, settings);
-		applyRegionCount(cfg, settings);
-		applyCityFrequency(cfg, settings);
-		applyBooks(cfg, settings);
-		applyDimension(cfg, settings);
-	}
-
-	private static void applyWorldSize(Config cfg, MapSettings settings)
-	{
-		if (cfg.worldSize != null)
-		{
-			settings.worldSize = cfg.worldSize;
+		if (p.worldSize != null) settings.worldSize = p.worldSize;
+		if (p.landShape != null && !p.landShape.isEmpty()) {
+			try { settings.landShape = LandShape.valueOf(p.landShape); } catch (IllegalArgumentException ignored) {}
 		}
-	}
-
-	private static void applyLandShape(Config cfg, MapSettings settings)
-	{
-		if (cfg.landShape != null && !cfg.landShape.isEmpty())
-		{
-			try
-			{
-				settings.landShape = LandShape.valueOf(cfg.landShape);
-			}
-			catch (IllegalArgumentException ignored)
-			{
-				// Keep randomly generated land shape if the value is invalid
-			}
-		}
-	}
-
-	private static void applyRegionCount(Config cfg, MapSettings settings)
-	{
-		if (cfg.regionCount != null)
-		{
-			settings.regionCount = cfg.regionCount;
-		}
-	}
-
-	private static void applyCityFrequency(Config cfg, MapSettings settings)
-	{
-		if (cfg.cityFrequency != null)
-		{
-			settings.cityProbability = cfg.cityFrequency / 100.0 * SettingsGenerator.maxCityProbability;
-		}
-	}
-
-	private static void applyBooks(Config cfg, MapSettings settings)
-	{
-		if (cfg.books != null && !cfg.books.isEmpty())
-		{
-			settings.books = new HashSet<>(cfg.books);
-		}
-	}
-
-	private static void applyDimension(Config cfg, MapSettings settings)
-	{
-		if (cfg.dimension != null && !cfg.dimension.isEmpty())
-		{
-			try
-			{
-				GeneratedDimension dim = GeneratedDimension.valueOf(cfg.dimension);
-				if (dim != GeneratedDimension.Custom)
-				{
+		if (p.regionCount != null) settings.regionCount = p.regionCount;
+		if (p.cityFrequency != null) settings.cityProbability = p.cityFrequency / 100.0 * SettingsGenerator.maxCityProbability;
+		if (p.books != null && !p.books.isEmpty()) settings.books = new HashSet<>(p.books);
+		if (p.dimension != null && !p.dimension.isEmpty()) {
+			try {
+				GeneratedDimension dim = GeneratedDimension.valueOf(p.dimension);
+				if (dim != GeneratedDimension.Custom) {
 					settings.generatedWidth = dim.width;
 					settings.generatedHeight = dim.height;
 				}
-			}
-			catch (IllegalArgumentException ignored)
-			{
-				// Keep randomly generated dimension if the value is invalid
-			}
+			} catch (IllegalArgumentException ignored) {}
+		}
+			if (p.drawRegionColors != null) settings.drawRegionColors = p.drawRegionColors;
+	}
+
+	private static class RandomMapParameters {
+		String uiLanguage;
+		String mapLanguage;
+		Long randomSeed;
+		String dimension;
+		Integer worldSize;
+		String landShape;
+		Integer regionCount;
+		Boolean drawRegionColors;
+		Integer cityFrequency;
+		List<String> books;
+		String artPack;
+
+		static RandomMapParameters fromConfig(Config c) {
+			RandomMapParameters p = new RandomMapParameters();
+			p.uiLanguage = c.uiLanguage;
+			p.mapLanguage = c.mapLanguage;
+			p.randomSeed = c.randomSeed;
+			p.dimension = c.dimension;
+			p.worldSize = c.worldSize;
+			p.landShape = c.landShape;
+			p.regionCount = c.regionCount;
+			p.drawRegionColors = c.drawRegionColors;
+			p.cityFrequency = c.cityFrequency;
+			p.books = c.books;
+			p.artPack = c.artPack;
+			return p;
 		}
 	}
 
@@ -1135,9 +1201,15 @@ private static Object handleUiOptions(Request req, Response res)
 		byte[] bytes = serializeImageToBytes(buf);
 		String nortContent = resolveBestNortContent(cfg, settings);
 
+		// Parse canonical settings into a map, attach imageBase64, and return
+		@SuppressWarnings("unchecked")
+		Map<String, Object> settingsMap = gson.fromJson(nortContent, Map.class);
+		if (settingsMap == null) settingsMap = new LinkedHashMap<>();
+		settingsMap.put("imageBase64", Base64.getEncoder().encodeToString(bytes));
+
 		res.type(CONTENT_TYPE_JSON);
 		res.status(200);
-		return gson.toJson(new ImageAndSettingsResponse(Base64.getEncoder().encodeToString(bytes), nortContent));
+		return gson.toJson(settingsMap);
 	}
 
 	private static BufferedImage scaleImageIfNeeded(BufferedImage buf)
@@ -1247,7 +1319,7 @@ private static Object handleUiOptions(Request req, Response res)
 		Integer generatedWidth;
 		Integer generatedHeight;
 		Long randomSeed;
-		String language;
+		String uiLanguage;
 		String mapLanguage;
 		Boolean saveNort;
 		// Random map generation parameters

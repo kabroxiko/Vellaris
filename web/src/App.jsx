@@ -73,9 +73,9 @@ function getInitialLanguage() {
 
 export default function App() {
   const [modal, setModal] = useState(null)
-  const [language, setLanguage] = useState(getInitialLanguage)
+  const [uiLanguage, setUiLanguage] = useState(getInitialLanguage)
 
-  const text = TEXT[language] || TEXT.en
+  const text = TEXT[uiLanguage] || TEXT.en
 
   useEffect(() => {
     globalThis.openModal = (url, filename) => setModal({ url, filename })
@@ -87,9 +87,9 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    localStorage.setItem('vellaris-language', language)
-    document.documentElement.lang = language
-  }, [language])
+    localStorage.setItem('vellaris-language', uiLanguage)
+    document.documentElement.lang = uiLanguage
+  }, [uiLanguage])
 
   return (
     <div className="app-root">
@@ -102,8 +102,8 @@ export default function App() {
             <span>{text.languageLabel}</span>
             <select
               id="language-selector"
-              value={language}
-              onChange={(e) => setLanguage(e.target.value)}
+              value={uiLanguage}
+              onChange={(e) => setUiLanguage(e.target.value)}
             >
               {LANGUAGE_OPTIONS.map((option) => (
                 <option key={option.code} value={option.code}>
@@ -117,7 +117,7 @@ export default function App() {
       </header>
       <main>
         <div className="content-card">
-          <GenerateForm language={language} />
+          <GenerateForm uiLanguage={uiLanguage} />
         </div>
       </main>
       <footer />

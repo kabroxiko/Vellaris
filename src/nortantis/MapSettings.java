@@ -128,6 +128,8 @@ public class MapSettings implements Serializable
 	public Color textColor;
 	public MapEdits edits;
 	public boolean drawBoldBackground;
+	// Map language for generated text/labels. Use ISO two-letter codes like 'en'.
+	public String language;
 	public boolean drawRegionBoundaries;
 	public Stroke regionBoundaryStyle;
 	public Color regionBoundaryColor;
@@ -342,6 +344,7 @@ public class MapSettings implements Serializable
 
 		root.put("version", version);
 		root.put("randomSeed", randomSeed);
+		if (language != null) root.put("language", language);
 		root.put("resolution", resolution);
 		root.put("coastShadingLevel", coastShadingLevel);
 		root.put("oceanWavesLevel", oceanWavesLevel);
@@ -801,6 +804,9 @@ public class MapSettings implements Serializable
 		coastShadingLevel = asInt(root.get("coastShadingLevel"));
 
 		concentricWaveCount = asInt(root.get("concentricWaveCount"));
+		if (root.containsKey("language")) {
+			language = (String) root.get("language");
+		}
 		if (root.containsKey("fadeConcentricWaves"))
 		{
 			fadeConcentricWaves = (boolean) root.get("fadeConcentricWaves");

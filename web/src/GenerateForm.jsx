@@ -2,7 +2,7 @@ import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import PropTypes from 'prop-types'
 import CustomizeSettingsSection from './generate/CustomizeSettingsSection'
 import RandomSettingsSection from './generate/RandomSettingsSection'
-import { base64ToBlob, formatColorString, colorToHex, colorToAlphaPercent } from './generate/utils'
+import { base64ToBlob, formatColorString, colorToHex, colorToAlphaPercent, parseColorChannels } from './generate/utils'
 import { selectCityIconType, fetchJson, handleResponseError, appendIfSet } from './generate/helpers'
 import { downloadNortContent } from './generate/responseHandlers'
 import { createSettingsAppliers } from './generate/settingsAppliers'
@@ -70,7 +70,7 @@ async function loadUiOptions(lang) {
   if (uiOptionsCache.has(key)) return uiOptionsCache.get(key)
   const p = (async () => {
     try {
-      const url = `${API_BASE}/ui-options?language=${encodeURIComponent(lang || 'en')}`
+      const url = `${API_BASE}/ui-options?uiLanguage=${encodeURIComponent(lang || 'en')}`
       const j = await fetchJson(url)
       return j
     } catch (e) {
@@ -185,13 +185,13 @@ function usePostApplierLogger(lastApplierRunRef, deps = []) {
   }, [lastApplierRunRef && lastApplierRunRef.current, ...(Array.isArray(deps) ? deps : [])])
 }
 
-function GenerateForm({ language = 'en' }) {
+function GenerateForm({ uiLanguage = 'en' }) {
   const initialRandomOverrides = useMemo(() => loadRandomOverrides(), [])
   // Always start with empty customize overrides so UI resets to backend defaults on load
   const initialCustomize = useMemo(() => ({}), [])
   const [preview, setPreview] = useState(null)
   const [currentSource, setCurrentSource] = useState(null)
-  const requestLanguage = language
+  const requestLanguage = uiLanguage
 
   // --- Random Map state ---
   const [artPacks, setArtPacks] = useState([])
@@ -210,7 +210,7 @@ function GenerateForm({ language = 'en' }) {
   const [selectedBooks, setSelectedBooks] = useState(new Set())
   const [randomSeed, setRandomSeed] = useState('')
   const [mapLanguage, setMapLanguage] = useState(
-    initialRandomOverrides.mapLanguage || language
+    initialRandomOverrides.mapLanguage || uiLanguage
   )
 
   // --- Generate from Settings state ---
@@ -1277,7 +1277,6 @@ function GenerateForm({ language = 'en' }) {
               })
               const payload = new FormData()
               payload.append('nortFile', settingsBlob, f.name || 'uploaded-settings.nort')
-              appendIfSet(payload, 'language', requestLanguage)
           await runGenerate(
             {
               method: 'POST',
@@ -1380,20 +1379,28 @@ function GenerateForm({ language = 'en' }) {
     }
     const data = JSON.parse(new TextDecoder('utf-8').decode(bytes))
     if (outputMode !== 'nort-only') {
-      handleSuccess(base64ToBlob(data.imageBase64, 'image/png'), baseName, source, data.nortContent)
+      const imageBase64 = data.imageBase64
+      // Build nortContent by serializing the returned settings object without imageBase64
+      const copy = { ...data }
+      delete copy.imageBase64
+      const nortContent = serializeNortObject(copy)
+      handleSuccess(base64ToBlob(imageBase64, 'image/png'), baseName, source, nortContent)
       return
     }
-    if (!data.nortContent) throw new Error('Server did not return settings content for download.')
+    // nort-only: server still returns merged settings object with imageBase64; extract nort JSON
+    const copy = { ...data }
+    delete copy.imageBase64
+    const nortContent = serializeNortObject(copy)
     try {
-      mergedSettingsRef.current = JSON.parse(data.nortContent)
+      mergedSettingsRef.current = JSON.parse(nortContent)
     } catch (e) {
       // ignore parse failures
     }
-    downloadNortContent(data.nortContent, baseName)
+    downloadNortContent(nortContent, baseName)
     setCurrentSource({
       type: 'nort-content',
       name: source?.name || fileName || 'Generated settings',
-      nortContent: data.nortContent,
+      nortContent,
       originType: source?.type,
     })
     globalThis.showToast?.('Settings file downloaded', { type: 'success', duration: 3000 })
@@ -1434,47 +1441,6 @@ function GenerateForm({ language = 'en' }) {
           // suppressed verbose FormData debug
         }
       } catch (dbg) { console.warn('FormData debug failed', dbg) }
-      // Attempt to build a fresh merged nort payload from current UI state
-      // at the moment of POST and replace the outgoing `nortFile` with it.
-      try {
-        const body = requestOptions.body
-        // If the caller provided an explicit source that came from an
-        // uploaded/loaded `.nort` file, do NOT replace the outgoing
-        // `nortFile` with a UI-merged copy here. Replacing immediately
-        // can overwrite file-origin values (e.g. `worldSize`) because
-        // React state updates from the appliers may not have committed
-        // yet. Only perform the merge-replace for generated/resolved
-        // sources where overwriting with the current UI state is desired.
-        const sourceType = source && source.type ? source.type : null
-        const preserveNort = requestOptions && requestOptions.preserveNort === true
-        const skipReplaceForSource = preserveNort || sourceType === 'nort' || sourceType === 'nort-content' || sourceType === 'file' || sourceType === 'uploaded'
-        if (body && typeof FormData !== 'undefined' && body instanceof FormData && !skipReplaceForSource) {
-          try {
-            // Build merged content using the current UI state
-            const mergedResult = buildNortContentRequest()
-            const mergedFd = mergedResult.requestOptions && mergedResult.requestOptions.body
-            if (mergedFd && typeof mergedFd.get === 'function') {
-              const nf = mergedFd.get('nortFile')
-              if (nf && typeof nf.text === 'function') {
-                const mergedText = await nf.text()
-                const blob = new Blob([mergedText], { type: 'application/json' })
-                if (typeof body.delete === 'function') body.delete('nortFile')
-                body.append('nortFile', blob, 'merged-settings.nort')
-              }
-            }
-          } catch (e) {
-            // fallback: try using lastMergedParsedSettings if available
-            if (window.__lastMergedParsedSettings) {
-              try {
-                const mergedJson = JSON.stringify(window.__lastMergedParsedSettings)
-                const blob = new Blob([mergedJson], { type: 'application/json' })
-                if (typeof body.delete === 'function') body.delete('nortFile')
-                body.append('nortFile', blob, 'merged-settings.nort')
-              } catch (e2) {}
-            }
-          }
-        }
-      } catch (dbg) { console.warn('runGenerate merge-replace failed', dbg) }
 
       // If caller requested `nort-only`, ask server to return merged
       // settings alongside the image as JSON.
@@ -1513,10 +1479,9 @@ function GenerateForm({ language = 'en' }) {
 
     try {
       // Build a compact random-block payload and POST directly to /api/generate
-      toast.show('Generating random map...')
+      toast.show('Preparing map settings...')
       const isManual = (k) => Object.prototype.hasOwnProperty.call(randomOverrides, k)
       const cfg = {
-        language: requestLanguage,
         mapLanguage: isManual('mapLanguage') ? mapLanguage || undefined : undefined,
         randomSeed: isManual('randomSeed') ? (randomSeed ? Number(randomSeed) : undefined) : undefined,
         artPack: isManual('artPack') ? artPack || undefined : undefined,
@@ -1525,32 +1490,45 @@ function GenerateForm({ language = 'en' }) {
         landShape: isManual('landShape') ? landShape || undefined : undefined,
         regionCount: isManual('regionCount') ? regionCount : undefined,
         drawRegionColors: isManual('landColoringMethod') ? (landColoringMethod ? (landColoringMethod === 'ColorPoliticalRegions') : undefined) : undefined,
-        cityIconType: isManual('cityIconType') ? cityIconType || undefined : undefined,
         cityFrequency: isManual('cityFrequency') ? cityFrequency : undefined,
         books: isManual('selectedBooks') ? (selectedBooks.size > 0 ? Array.from(selectedBooks) : undefined) : undefined,
       }
 
-      const genRes = await fetch(`${API_BASE}/generate`, {
+      // First request: resolved settings (no image)
+      const settingsRes = await fetch(`${API_BASE}/generate-settings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(cfg),
       })
-      if (!genRes.ok) await handleResponseError(genRes)
-      const data = await genRes.json()
-      if (!data || !data.imageBase64) throw new Error('Server did not return image data.')
+      if (!settingsRes.ok) await handleResponseError(settingsRes)
+      // Server now returns the normalized .nort JSON directly as the body.
+      const nortContent = await settingsRes.text()
+      if (!nortContent) throw new Error('Server did not return settings content.')
 
-      // Use returned image + settings (nortContent) to update UI state
-      const blob = base64ToBlob(data.imageBase64, 'image/png')
+      // Apply returned settings to UI so controls reflect generated values
+      let parsedReturned = null
       try {
-        if (data.nortContent) {
-          try { mergedSettingsRef.current = JSON.parse(data.nortContent) } catch (e) {}
-          // Apply a subset of appliers so UI reflects generated values
-          try { appliersRef.current.applyMapSizeAndSeedSettings(mergedSettingsRef.current) } catch (e) {}
-          try { appliersRef.current.applyBackgroundTypeSettings(mergedSettingsRef.current) } catch (e) {}
-        }
-      } catch (e) {}
+        parsedReturned = JSON.parse(nortContent)
+        mergedSettingsRef.current = parsedReturned
+      } catch (e) {
+        // ignore parse failures
+      }
+      try { appliersRef.current.applyMapSizeAndSeedSettings(mergedSettingsRef.current) } catch (e) {}
+      try { appliersRef.current.applyBackgroundTypeSettings(mergedSettingsRef.current) } catch (e) {}
 
-      handleSuccess(blob, 'random-map', { type: 'random', name: 'Random Map' }, data.nortContent)
+      // Now request final image by POSTing the returned .nort as FormData
+      toast.show('Generating random map...')
+      // If the UI specified a map language override, embed it into the
+      // returned settings JSON under the `language` field so the server
+      // consumes it from the .nort content rather than a separate form param.
+      if (parsedReturned && isManual('mapLanguage') && mapLanguage) {
+        parsedReturned.language = mapLanguage
+      }
+      const uploadContent = parsedReturned ? JSON.stringify(parsedReturned) : nortContent
+      const fd = new FormData()
+      fd.append('nortFile', new Blob([uploadContent], { type: 'application/json' }), 'generated-settings.nort')
+
+      await runGenerate({ method: 'POST', body: fd }, 'random-map', { type: 'random', name: 'Random Map', nortContent }, 'preview', toast)
     } catch (err) {
       setError(err.message)
       try {
@@ -1683,7 +1661,20 @@ function GenerateForm({ language = 'en' }) {
           const gr = parseInt(gh.substring(0, 2), 16)
           const gg = parseInt(gh.substring(2, 4), 16)
           const gb = parseInt(gh.substring(4, 6), 16)
-          parsedSettings.gridOverlayColor = `${gr},${gg},${gb},255`
+          // Preserve original alpha from merged settings when the user
+          // hasn't changed the color hex (frontend only exposes hex).
+          let alpha = 255
+            try {
+              const orig = mergedSettingsRef && mergedSettingsRef.current && mergedSettingsRef.current.gridOverlayColor
+              const origHex = orig ? colorToHex(orig) : null
+              if (origHex && origHex.toLowerCase() === gridOverlayColorHex.toLowerCase()) {
+                const ch = parseColorChannels(orig)
+                if (ch && Number.isFinite(Number(ch.a))) {
+                  alpha = Number(ch.a)
+                }
+              }
+            } catch (e) {}
+          parsedSettings.gridOverlayColor = `${gr},${gg},${gb},${alpha}`
         } else {
           parsedSettings.gridOverlayColor = gridOverlayColorHex
         }
@@ -1793,10 +1784,42 @@ function GenerateForm({ language = 'en' }) {
       }
       if (oceanWavesType) parsedSettings.oceanEffect = oceanWavesType
       if (Number.isFinite(Number(oceanWavesLevel))) parsedSettings.oceanWavesLevel = Number(oceanWavesLevel)
-      if (Number.isFinite(Number(concentricWaveCount))) parsedSettings.concentricWaveCount = Number(concentricWaveCount)
+      try {
+        const origCount = mergedSettingsRef && mergedSettingsRef.current && mergedSettingsRef.current.concentricWaveCount
+        const uiCountNum = Number(concentricWaveCount)
+        if (typeof origCount === 'number' && (!Number.isFinite(uiCountNum) || uiCountNum === 0)) {
+          parsedSettings.concentricWaveCount = origCount
+        } else if (Number.isFinite(uiCountNum)) {
+          parsedSettings.concentricWaveCount = uiCountNum
+        }
+      } catch (e) {
+        if (Number.isFinite(Number(concentricWaveCount))) parsedSettings.concentricWaveCount = Number(concentricWaveCount)
+      }
       parsedSettings.fadeConcentricWaves = Boolean(fadeConcentricWaves)
-      parsedSettings.jitterToConcentricWaves = Boolean(jitterToConcentricWaves)
-      parsedSettings.brokenLinesForConcentricWaves = Boolean(brokenLinesForConcentricWaves)
+      // Preserve server-provided jitter value when the UI still has the
+      // initial default (user didn't change the control). This avoids
+      // unintentionally overwriting a `.nort`'s `jitterToConcentricWaves`
+      // when the frontend only exposes a checkbox defaulting to `false`.
+      try {
+        const orig = mergedSettingsRef && mergedSettingsRef.current && mergedSettingsRef.current.jitterToConcentricWaves
+        if (typeof orig === 'boolean' && jitterToConcentricWaves === false && orig !== jitterToConcentricWaves) {
+          parsedSettings.jitterToConcentricWaves = Boolean(orig)
+        } else {
+          parsedSettings.jitterToConcentricWaves = Boolean(jitterToConcentricWaves)
+        }
+      } catch (e) {
+        parsedSettings.jitterToConcentricWaves = Boolean(jitterToConcentricWaves)
+      }
+      try {
+        const origBroken = mergedSettingsRef && mergedSettingsRef.current && mergedSettingsRef.current.brokenLinesForConcentricWaves
+        if (typeof origBroken === 'boolean' && brokenLinesForConcentricWaves === false && origBroken !== brokenLinesForConcentricWaves) {
+          parsedSettings.brokenLinesForConcentricWaves = Boolean(origBroken)
+        } else {
+          parsedSettings.brokenLinesForConcentricWaves = Boolean(brokenLinesForConcentricWaves)
+        }
+      } catch (e) {
+        parsedSettings.brokenLinesForConcentricWaves = Boolean(brokenLinesForConcentricWaves)
+      }
       if (oceanWavesColorHex) {
         try {
           const opacityPercent = 100 - Number(oceanWavesAlpha || 0)
@@ -1923,13 +1946,7 @@ function GenerateForm({ language = 'en' }) {
       }
     } catch (e) {
       throw new Error('Current settings are not valid JSON.')
-    }
-
-    // Merge current UI border/fringe settings into the parsed settings so
-    // regenerated maps reflect changes made in the Customize panel.
-    // Centralized into mergeUiIntoParsed() to keep behavior consistent.
-    mergeUiIntoParsed(parsedSettings)
-      
+    }      
 
     // Ensure map size/seed are stored inside the settings JSON so server only
     // needs to read the uploaded nort content to apply customization.
@@ -1952,14 +1969,19 @@ function GenerateForm({ language = 'en' }) {
       }
     } catch (dbg) {}
 
+    // If UI provides a language override, ensure it's stored in the settings JSON
+    if (mapLanguage) parsedSettings.language = mapLanguage
     const settingsText = serializeNortObject(parsedSettings)
     const settingsBlob = new Blob([settingsText], {
       type: 'application/json',
     })
     const payload = new FormData()
     payload.append('nortFile', settingsBlob, 'generated-settings.nort')
-    appendIfSet(payload, 'language', requestLanguage)
-    appendIfSet(payload, 'mapLanguage', mapLanguage)
+    // Send explicit `language` param for uploaded/generated settings when a
+    // user override is present so server can use it as needed. Prefer
+    // embedding into the .nort content when possible; this param is a
+    // fallback for file uploads where content cannot be rewritten.
+    appendIfSet(payload, 'language', mapLanguage)
     if (forceSaveNort) payload.append('saveNort', 'true')
     // Server always returns image bytes; no flag required.
     return {
@@ -1983,8 +2005,7 @@ function GenerateForm({ language = 'en' }) {
     if (finalWidth) fd.append('generatedWidth', String(finalWidth))
     if (finalHeight) fd.append('generatedHeight', String(finalHeight))
     if (finalSeed) fd.append('randomSeed', String(finalSeed))
-    appendIfSet(fd, 'language', requestLanguage)
-    appendIfSet(fd, 'mapLanguage', mapLanguage)
+    appendIfSet(fd, 'language', mapLanguage)
     if (forceSaveNort) fd.append('saveNort', 'true')
     appendIfSet(fd, 'backgroundType', backgroundType)
     appendIfSet(fd, 'textureRef', textureRef)
@@ -2390,5 +2411,5 @@ function GenerateForm({ language = 'en' }) {
 export default GenerateForm
 
 GenerateForm.propTypes = {
-  language: PropTypes.string,
+  uiLanguage: PropTypes.string,
 }
