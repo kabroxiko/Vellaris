@@ -11,16 +11,10 @@ import nortantis.MapCreator;
 import nortantis.MapSettings;
 import nortantis.NamedResource;
 import nortantis.SettingsGenerator;
-import nortantis.Stroke;
-import nortantis.StrokeType;
-import nortantis.GridOverlayShape;
-import nortantis.GridOverlayOffset;
 import nortantis.TextureSource;
 import nortantis.editor.UserPreferences;
 import nortantis.swing.translation.Translation;
 import nortantis.util.Assets;
-import nortantis.platform.Color;
-import nortantis.platform.Font;
 import nortantis.geom.Dimension;
 import nortantis.platform.Image;
 import nortantis.platform.ImageHelper;
@@ -69,13 +63,13 @@ public class MapApiServer
 
 	private static final Gson gson = new Gson();
 	private static final boolean API_DEBUG = true;
+	private static final Random SHARED_RANDOM = new Random();
 	private static final String CONTENT_TYPE_JSON = "application/json";
 	private static final String CONTENT_TYPE_PNG = "image/png";
 	private static final String PNG_FORMAT_NAME = "png";
 	private static final String ART_PACK = "artPack";
 	private static final String NORT_EXTENSION = ".nort";
 	private static final String MSG_FAILED_TO_PARSE_CONFIG = "Failed to parse config";
-	private static final String MSG_FAILED_TO_LOAD_SETTINGS = "Failed to load settings";
 	private static final float PNG_COMPRESSION_QUALITY = 0.95f;
 	private static final int DEFAULT_BACKGROUND_PREVIEW_WIDTH = 320;
 	private static final int DEFAULT_BACKGROUND_PREVIEW_HEIGHT = 110;
@@ -105,6 +99,39 @@ public class MapApiServer
 
 		init();
 		if (API_DEBUG) Logger.println("Map API server started on port 8080");
+	}
+
+	// Extracted helper to reduce cognitive complexity in handleBackgroundBase.
+	// Builds params, generates the background image and writes the PNG to the
+	// response output stream. Returns the generated Image for the caller to
+	// close/cleanup when appropriate.
+	private static Image processBackgroundBaseAndWriteResponse(BackgroundBaseRequest br, Path uploadedTemp, Response res) throws java.io.IOException {
+		int width = (br != null && br.previewWidth != null && br.previewWidth > 0) ? br.previewWidth : DEFAULT_BACKGROUND_PREVIEW_WIDTH;
+		int height = (br != null && br.previewHeight != null && br.previewHeight > 0) ? br.previewHeight : DEFAULT_BACKGROUND_PREVIEW_HEIGHT;
+		boolean generateBackground = br != null && Boolean.TRUE.equals(br.generateBackground);
+		boolean generateFromTexture = br != null && Boolean.TRUE.equals(br.generateBackgroundFromTexture);
+		Long seed = br != null ? br.backgroundRandomSeed : null;
+
+		Tuple2<Path, String> backgroundImagePath = determineBackgroundImagePath(br, uploadedTemp);
+		String backgroundTextureArtPack = determineBackgroundTextureArtPack(br, uploadedTemp);
+
+		BackgroundBaseParams bp = new BackgroundBaseParams.Builder()
+			.width(width)
+			.height(height)
+			.generateBackground(generateBackground)
+			.generateFromTexture(generateFromTexture)
+			.backgroundRandomSeed(seed)
+			.backgroundImagePath(backgroundImagePath)
+			.backgroundTextureArtPack(backgroundTextureArtPack)
+			.customImagesPath(br != null ? br.customImagesPath : null)
+			.build();
+		Image baseImage = generateBackgroundBaseImage(bp);
+		BufferedImage buffered = nortantis.platform.awt.AwtFactory.unwrap(baseImage);
+		res.type(CONTENT_TYPE_PNG);
+		res.status(200);
+		writeCompressedPng(buffered, res.raw().getOutputStream());
+		res.raw().getOutputStream().flush();
+		return baseImage;
 	}
 
 	private static Object handleGenerateSettings(Request req, Response res)
@@ -176,49 +203,49 @@ public class MapApiServer
 			return gson.toJson(new ApiResponse(false, MSG_FAILED_TO_PARSE_CONFIG, null, null));
 		}
 
-		try
-		{
-			GenerationContext ctx = grc.ctx;
-			Config effectiveCfg = grc.effectiveCfg;
-
-			// Ensure the settings object records the resolved generation language
-			// so downstream components that read settings.language can observe it.
-			if (grc.generationLanguage != null && !grc.generationLanguage.isEmpty()) {
-				ctx.settings.language = grc.generationLanguage;
-			}
-
-			// If the loaded settings contain a language, apply it to the
-			// runtime so Translation/NameCreator use the requested locale.
-			if (ctx.settings.language != null && !ctx.settings.language.isEmpty()) {
-				applyRequestLanguage(ctx.settings.language);
-			}
-
-			// Debug logging to help trace language propagation during generation
-			if (API_DEBUG) Logger.println("Generation language resolved: " + grc.generationLanguage + ", settings.language: " + ctx.settings.language + ", effective applied language: " + UserPreferences.getInstance().language);
-			GenerationResult generation = generateMap(ctx.settings, effectiveCfg.generatedWidth, effectiveCfg.generatedHeight);
-			if (generation.image == null)
-			{
-				res.status(500);
-				return gson.toJson(new ApiResponse(false, generation.errorMessage, null, null));
-			}
-			Image img = generation.image;
-			// Always return JSON containing the image (base64) and the
-			// merged .nort settings so clients can retrieve edits.
-				try {
-					BufferedImage buf = nortantis.platform.awt.AwtFactory.unwrap(img);
-					return returnJsonResponse(buf, ctx.settings, res);
-				} catch (Exception e) {
-				Logger.println("returnJsonResponse failed: " + e);
-				res.status(500);
-				return gson.toJson(new ApiResponse(false, "Failed to produce JSON response: " + e.getClass().getSimpleName() + (e.getMessage() != null ? (" - " + e.getMessage()) : ""), null, null));
-			} finally {
-				img.close();
-				cleanupTempNortPath(ctx.tempNortPath);
-			}
-		}
-		finally
-		{
+		try {
+			return executeGenerationAndReturn(grc, res);
+		} finally {
 			restorePreviousLanguage(grc.previousLanguage);
+		}
+	}
+
+	private static Object executeGenerationAndReturn(GenerationRequestContext grc, Response res) {
+		GenerationContext ctx = grc.ctx;
+		Config effectiveCfg = grc.effectiveCfg;
+
+		if (grc.generationLanguage != null && !grc.generationLanguage.isEmpty()) {
+			ctx.settings.language = grc.generationLanguage;
+		}
+
+		if (ctx.settings.language != null && !ctx.settings.language.isEmpty()) {
+			applyRequestLanguage(ctx.settings.language);
+		}
+
+		if (API_DEBUG) Logger.println("Generation language resolved: " + grc.generationLanguage + ", settings.language: " + ctx.settings.language + ", effective applied language: " + UserPreferences.getInstance().language);
+		Integer gw = (effectiveCfg.generatedWidth > 0) ? Integer.valueOf(effectiveCfg.generatedWidth) : null;
+		Integer gh = (effectiveCfg.generatedHeight > 0) ? Integer.valueOf(effectiveCfg.generatedHeight) : null;
+		GenerationResult generation = generateMap(ctx.settings, gw, gh);
+		if (generation.image == null) {
+			res.status(500);
+			return gson.toJson(new ApiResponse(false, generation.errorMessage, null, null));
+		}
+
+		Image img = generation.image;
+		try {
+			BufferedImage buf = nortantis.platform.awt.AwtFactory.unwrap(img);
+			return returnJsonResponse(buf, ctx.settings, res);
+		} catch (java.io.IOException ioe) {
+			Logger.println("returnJsonResponse I/O failed: " + ioe);
+			res.status(500);
+			return gson.toJson(new ApiResponse(false, "Failed to produce JSON response: " + ioe.getClass().getSimpleName() + (ioe.getMessage() != null ? (" - " + ioe.getMessage()) : ""), null, null));
+		} catch (RuntimeException re) {
+			Logger.println("returnJsonResponse failed: " + re);
+			res.status(500);
+			return gson.toJson(new ApiResponse(false, "Failed to produce JSON response: " + re.getClass().getSimpleName() + (re.getMessage() != null ? (" - " + re.getMessage()) : ""), null, null));
+		} finally {
+			img.close();
+			cleanupTempNortPath(ctx.tempNortPath);
 		}
 	}
 
@@ -255,7 +282,7 @@ public class MapApiServer
 
 		try {
 			enumerateFonts(options);
-		} catch (Exception e) {
+		} catch (java.awt.HeadlessException | SecurityException e) {
 			if (API_DEBUG) Logger.println("Failed to enumerate system fonts: " + e.getMessage());
 		}
 
@@ -268,11 +295,7 @@ public class MapApiServer
 		result.put("options", options);
 		if (!labels.isEmpty()) result.put("labels", labels);
 
-		try {
-			addDefaults(result);
-		} catch (Exception e) {
-			if (API_DEBUG) Logger.println("Failed to produce UI defaults: " + e.getMessage());
-		}
+		addDefaults(result);
 
 		return result;
 	}
@@ -340,18 +363,17 @@ public class MapApiServer
 				String v = bundle.getString(k);
 				if (v != null) labels.put(k, v.trim());
 			}
-		} catch (Exception e) {
+		} catch (java.util.MissingResourceException e) {
 			if (API_DEBUG) Logger.println("Failed to load translation bundle: " + e.getMessage());
 		}
 		return labels;
 	}
 
-	private static void addDefaults(Map<String, Object> result) throws Exception {
+	private static void addDefaults(Map<String, Object> result) {
 		List<String> artPacks = Assets.listArtPacks(false);
 		String artPack = (artPacks != null && !artPacks.isEmpty()) ? artPacks.get(0) : Assets.installedArtPack;
 
-		Random rand = new Random();
-		MapSettings generated = SettingsGenerator.generate(rand, artPack, null);
+		MapSettings generated = SettingsGenerator.generate(SHARED_RANDOM, artPack, null);
 		String defJson = generated.toJsonString();
 		@SuppressWarnings("unchecked")
 		Map<String, Object> defMap = gson.fromJson(defJson, Map.class);
@@ -363,7 +385,7 @@ public class MapApiServer
 	private static List<String> getCityIconTypesForPack(String pack) {
 		try {
 			return ImageCache.getInstance(pack, null).getIconGroupNames(IconType.cities);
-		} catch (Exception e) {
+		} catch (RuntimeException e) {
 			return java.util.Collections.emptyList();
 		}
 	}
@@ -492,7 +514,7 @@ private static Object handleUiOptions(Request req, Response res)
 				cityIconTypesByPack.put(pack, getCityIconTypesForPack(pack));
 			}
 			ui.put("cityIconTypesByPack", cityIconTypesByPack);
-		} catch (Exception e) {
+		} catch (RuntimeException e) {
 			// If resource enumeration fails, still return UI options.
 			Logger.println("Failed to enumerate UI resources: " + e.getMessage());
 		}
@@ -536,26 +558,34 @@ private static Object handleUiOptions(Request req, Response res)
 	private static void sortBooksInObject(Object o) {
 		if (o == null) return;
 		if (o instanceof Map) {
-			Map<?,?> m = (Map<?,?>) o;
-			for (Map.Entry<?,?> e : m.entrySet()) {
-				String k = String.valueOf(e.getKey());
-				Object v = e.getValue();
-				if ("books".equals(k) && v instanceof List) {
-					try {
-						@SuppressWarnings("unchecked")
-						List<Object> lst = new java.util.ArrayList<>((List<Object>) v);
-						lst.sort((a,b) -> String.valueOf(a).compareTo(String.valueOf(b)));
-						// Replace in-place using a parameterized Map to avoid raw type put()
-						@SuppressWarnings("unchecked")
-						Map<String,Object> mm = (Map<String,Object>) m;
-						mm.put(k, lst);
-					} catch (Exception ignore) {}
-				} else {
-					sortBooksInObject(v);
-				}
-			}
+			processMapForBooks((Map<?,?>) o);
 		} else if (o instanceof List) {
 			for (Object v : (List<?>) o) sortBooksInObject(v);
+		}
+	}
+
+	private static void processMapForBooks(Map<?,?> m) {
+		for (Map.Entry<?,?> e : m.entrySet()) {
+			String k = String.valueOf(e.getKey());
+			Object v = e.getValue();
+			if ("books".equals(k) && v instanceof List) {
+				sortBooksListInMap(m, k, v);
+			} else {
+				sortBooksInObject(v);
+			}
+		}
+	}
+
+	private static void sortBooksListInMap(Map<?,?> m, String key, Object v) {
+		try {
+			@SuppressWarnings("unchecked")
+			List<Object> lst = new java.util.ArrayList<>((List<Object>) v);
+			lst.sort((a,b) -> String.valueOf(a).compareTo(String.valueOf(b)));
+			@SuppressWarnings("unchecked")
+			Map<String,Object> mm = (Map<String,Object>) m;
+			mm.put(key, lst);
+		} catch (ClassCastException | NullPointerException ignore) {
+			// best-effort sorting; ignore malformed entries
 		}
 	}
 
@@ -566,7 +596,7 @@ private static Object handleUiOptions(Request req, Response res)
 			if (o == null) return null;
 			if (o instanceof Map) return normalizeMap((Map<?,?>) o);
 			if (o instanceof List) return normalizeList((List<?>) o);
-			if (o instanceof Number) return normalizeNumber((Number) o);
+			if (o instanceof Number number) return normalizeNumber(number);
 			return o;
 		}
 
@@ -587,8 +617,7 @@ private static Object handleUiOptions(Request req, Response res)
 		}
 
 		private static Object normalizeNumber(Number n) {
-			if (n instanceof java.math.BigDecimal) {
-				java.math.BigDecimal bd = (java.math.BigDecimal) n;
+			if (n instanceof java.math.BigDecimal bd) {
 				try {
 					long lv = bd.longValueExact();
 					if (lv >= Integer.MIN_VALUE && lv <= Integer.MAX_VALUE) return Integer.valueOf((int) lv);
@@ -624,105 +653,159 @@ private static Object handleUiOptions(Request req, Response res)
 
 	private static Object handleBackgroundBase(Request req, Response res)
 	{
-		Config cfg = parseConfig(req, res);
-		if (cfg == null)
-		{
-			res.type(CONTENT_TYPE_JSON);
-			return gson.toJson(new ApiResponse(false, MSG_FAILED_TO_PARSE_CONFIG, null, null));
-		}
-
+		// This endpoint no longer depends on Config/MapSettings. Accept a
+		// small BackgroundBaseRequest JSON or multipart form with an optional
+		// uploaded image part named "backgroundImage".
 		PlatformFactory.setInstance(new AwtFactory());
 
-		GenerationContext ctx = loadSettings(cfg, res);
-		if (ctx == null)
-		{
-			res.type(CONTENT_TYPE_JSON);
-			return gson.toJson(new ApiResponse(false, MSG_FAILED_TO_LOAD_SETTINGS, null, null));
-		}
-
+		BackgroundBaseRequest br = null;
+		Path uploadedTemp = null;
 		Image baseImage = null;
-		try
-		{
-			BackgroundBaseParams bp = new BackgroundBaseParams(
-					cfg.previewWidth != null && cfg.previewWidth > 0 ? cfg.previewWidth : DEFAULT_BACKGROUND_PREVIEW_WIDTH,
-					cfg.previewHeight != null && cfg.previewHeight > 0 ? cfg.previewHeight : DEFAULT_BACKGROUND_PREVIEW_HEIGHT,
-					ctx.settings.generateBackground,
-					ctx.settings.generateBackgroundFromTexture,
-					ctx.settings.backgroundRandomSeed,
-					ctx.settings.getBackgroundImagePath(),
-					ctx.settings.backgroundTextureResource != null ? ctx.settings.backgroundTextureResource.artPack : null,
-					ctx.settings.customImagesPath
-			);
-			baseImage = generateBackgroundBaseImage(bp);
-			BufferedImage buffered = nortantis.platform.awt.AwtFactory.unwrap(baseImage);
-			res.type(CONTENT_TYPE_PNG);
-			res.status(200);
-			writeCompressedPng(buffered, res.raw().getOutputStream());
-			res.raw().getOutputStream().flush();
+		try {
+			BackgroundBaseParseResult parsed = parseBackgroundBaseRequest(req);
+			br = parsed.request;
+			uploadedTemp = parsed.uploadedTemp;
+
+			// Delegate the heavy lifting to a helper to keep this method simple
+			baseImage = processBackgroundBaseAndWriteResponse(br, uploadedTemp, res);
 			return res.raw();
-		}
-		catch (Exception e)
-		{
+		} catch (java.io.IOException | javax.servlet.ServletException | com.google.gson.JsonSyntaxException e) {
 			Logger.println("handleBackgroundBase failed: " + e);
 			res.type(CONTENT_TYPE_JSON);
 			res.status(500);
 			return gson.toJson(new ApiResponse(false, "Failed to generate background base: " + e.getClass().getSimpleName() + (e.getMessage() != null ? (" - " + e.getMessage()) : ""), null, null));
-		}
-		finally
-		{
-			if (baseImage != null)
-			{
-				baseImage.close();
-			}
-			if (ctx.tempNortPath != null)
-			{
-				try
-				{
-					Files.deleteIfExists(ctx.tempNortPath);
-				}
-				catch (Exception ignore)
-				{
-					// Ignore cleanup errors
+		} finally {
+			if (baseImage != null) baseImage.close();
+			if (uploadedTemp != null) {
+				try { Files.deleteIfExists(uploadedTemp); } catch (java.io.IOException ignore) {
+					// Ignore cleanup failures; temporary file will be cleaned up by the OS.
 				}
 			}
 		}
 	}
 
-	private static class BackgroundBaseParams {
-		public final int width;
-		public final int height;
-		public final boolean generateBackground;
-		public final boolean generateBackgroundFromTexture;
-		public final Long backgroundRandomSeed;
-		public final Tuple2<Path, String> backgroundImagePath;
-		public final String backgroundTextureArtPack;
-		public final String customImagesPath;
+	private static class BackgroundBaseParseResult {
+		final BackgroundBaseRequest request;
+		final Path uploadedTemp;
 
-		public BackgroundBaseParams(int width, int height, boolean generateBackground, boolean generateBackgroundFromTexture,
-									Long backgroundRandomSeed, Tuple2<Path, String> backgroundImagePath,
-									String backgroundTextureArtPack, String customImagesPath)
-		{
-			this.width = width;
-			this.height = height;
-			this.generateBackground = generateBackground;
-			this.generateBackgroundFromTexture = generateBackgroundFromTexture;
-			this.backgroundRandomSeed = backgroundRandomSeed;
-			this.backgroundImagePath = backgroundImagePath;
-			this.backgroundTextureArtPack = backgroundTextureArtPack;
-			this.customImagesPath = customImagesPath;
+		BackgroundBaseParseResult(BackgroundBaseRequest request, Path uploadedTemp) {
+			this.request = request;
+			this.uploadedTemp = uploadedTemp;
 		}
+	}
+
+	private static BackgroundBaseParseResult parseBackgroundBaseRequest(Request req) throws java.io.IOException, javax.servlet.ServletException, com.google.gson.JsonSyntaxException {
+		String contentType = req.contentType();
+		if (contentType != null && contentType.toLowerCase().startsWith("multipart/form-data")) {
+			MultipartConfigElement multipartConfigElement = new MultipartConfigElement(System.getProperty("java.io.tmpdir"));
+			req.raw().setAttribute("org.eclipse.jetty.multipartConfig", multipartConfigElement);
+			Part part = req.raw().getPart("backgroundImage");
+			Path uploadedTemp = null;
+			if (part != null) {
+				uploadedTemp = Files.createTempFile("nortantis-bg-upload-", ".img");
+				try (InputStream is = part.getInputStream()) {
+					Files.copy(is, uploadedTemp, StandardCopyOption.REPLACE_EXISTING);
+				}
+			}
+			BackgroundBaseRequest br = new BackgroundBaseRequest();
+			br.previewWidth = param(req, "previewWidth") != null ? Integer.valueOf(param(req, "previewWidth")) : null;
+			br.previewHeight = param(req, "previewHeight") != null ? Integer.valueOf(param(req, "previewHeight")) : null;
+			br.generateBackground = param(req, "generateBackground") != null ? Boolean.valueOf(param(req, "generateBackground")) : null;
+			br.generateBackgroundFromTexture = param(req, "generateBackgroundFromTexture") != null ? Boolean.valueOf(param(req, "generateBackgroundFromTexture")) : null;
+			String seedStr = param(req, "backgroundRandomSeed");
+			br.backgroundRandomSeed = seedStr != null ? Long.valueOf(seedStr) : null;
+			br.backgroundTextureRef = param(req, "backgroundTextureRef");
+			br.customImagesPath = param(req, "customImagesPath");
+			return new BackgroundBaseParseResult(br, uploadedTemp);
+		} else {
+			BackgroundBaseRequest br = gson.fromJson(req.body(), BackgroundBaseRequest.class);
+			return new BackgroundBaseParseResult(br, null);
+		}
+	}
+
+	private static Tuple2<Path, String> determineBackgroundImagePath(BackgroundBaseRequest br, Path uploadedTemp) {
+		if (uploadedTemp != null) {
+			return new Tuple2<>(uploadedTemp, uploadedTemp.getFileName().toString());
+		}
+		if (br != null && br.backgroundTextureRef != null && !br.backgroundTextureRef.isEmpty()) {
+			String[] parts = br.backgroundTextureRef.split("\\|", 2);
+			if (parts.length == 2) {
+				return new Tuple2<>(null, parts[1]);
+			}
+			return new Tuple2<>(null, br.backgroundTextureRef);
+		}
+		return null;
+	}
+
+	private static String determineBackgroundTextureArtPack(BackgroundBaseRequest br, Path uploadedTemp) {
+		if (uploadedTemp != null) return null;
+		if (br != null && br.backgroundTextureRef != null && !br.backgroundTextureRef.isEmpty()) {
+			String[] parts = br.backgroundTextureRef.split("\\|", 2);
+			if (parts.length == 2) return parts[0];
+		}
+		return null;
+	}
+
+	private static class BackgroundBaseParams {
+		private int width;
+		private int height;
+		private boolean generateBackground;
+		private boolean generateBackgroundFromTexture;
+		private Long backgroundRandomSeed;
+		private Tuple2<Path, String> backgroundImagePath;
+		private String backgroundTextureArtPack;
+		private String customImagesPath;
+
+		private BackgroundBaseParams() {
+		}
+
+		// Builder to avoid large constructor parameter lists (Sonar S107)
+		private static class Builder {
+			private final BackgroundBaseParams p = new BackgroundBaseParams();
+
+			Builder width(int w) { p.width = w; return this; }
+			Builder height(int h) { p.height = h; return this; }
+			Builder generateBackground(boolean v) { p.generateBackground = v; return this; }
+			Builder generateFromTexture(boolean v) { p.generateBackgroundFromTexture = v; return this; }
+			Builder backgroundRandomSeed(Long s) { p.backgroundRandomSeed = s; return this; }
+			Builder backgroundImagePath(Tuple2<Path,String> t) { p.backgroundImagePath = t; return this; }
+			Builder backgroundTextureArtPack(String s) { p.backgroundTextureArtPack = s; return this; }
+			Builder customImagesPath(String s) { p.customImagesPath = s; return this; }
+
+			BackgroundBaseParams build() { return p; }
+		}
+
+		// Accessors (fields intentionally non-public to satisfy Sonar S1104)
+		int getWidth() { return width; }
+		int getHeight() { return height; }
+		boolean isGenerateBackground() { return generateBackground; }
+		boolean isGenerateBackgroundFromTexture() { return generateBackgroundFromTexture; }
+		Long getBackgroundRandomSeed() { return backgroundRandomSeed; }
+		Tuple2<Path, String> getBackgroundImagePath() { return backgroundImagePath; }
+		String getBackgroundTextureArtPack() { return backgroundTextureArtPack; }
+		String getCustomImagesPath() { return customImagesPath; }
+	}
+
+	private static class BackgroundBaseRequest {
+		Integer previewWidth;
+		Integer previewHeight;
+		Boolean generateBackground;
+		Boolean generateBackgroundFromTexture;
+		Long backgroundRandomSeed;
+		String backgroundTextureRef; // artPack|name or image token
+		String customImagesPath;
 	}
 
 	private static Image generateBackgroundBaseImage(BackgroundBaseParams p)
 	{
-		int width = p.width;
-		int height = p.height;
+		int width = p.getWidth();
+		int height = p.getHeight();
 
 		Image backgroundBase;
 
-		if (p.generateBackground)
+		if (p.isGenerateBackground())
 		{
-			Random rng = (p.backgroundRandomSeed != null) ? new Random(p.backgroundRandomSeed) : new Random();
+			Random rng = (p.getBackgroundRandomSeed() != null) ? new Random(p.getBackgroundRandomSeed()) : SHARED_RANDOM;
 			Image fractal = FractalBGGenerator.generate(rng, 1.3f, width, height, 0.75f);
 			try
 			{
@@ -735,14 +818,14 @@ private static Object handleUiOptions(Request req, Response res)
 		}
 		else if (p.generateBackgroundFromTexture)
 		{
-			Tuple2<Path, String> tuple = p.backgroundImagePath;
+			Tuple2<Path, String> tuple = p.getBackgroundImagePath();
 			Path texturePath = tuple != null ? tuple.getFirst() : null;
 
-			Image texture = ImageCache.getInstance(p.backgroundTextureArtPack, p.customImagesPath).getImageFromFile(texturePath);
+			Image texture = ImageCache.getInstance(p.getBackgroundTextureArtPack(), p.getCustomImagesPath()).getImageFromFile(texturePath);
 			try
 			{
 				Image textureForOcean = ImageHelper.getInstance().convertToGrayscale(texture);
-				Random rng = (p.backgroundRandomSeed != null) ? new Random(p.backgroundRandomSeed) : new Random();
+				Random rng = (p.getBackgroundRandomSeed() != null) ? new Random(p.getBackgroundRandomSeed()) : SHARED_RANDOM;
 				Image oceanBase = BackgroundGenerator.generateUsingWhiteNoiseConvolution(rng, textureForOcean, height, width);
 				try
 				{
@@ -790,7 +873,7 @@ private static Object handleUiOptions(Request req, Response res)
 				Logger.println("handleGenerate header: " + h + " = " + req.headers(h));
 			}
 		}
-		catch (Exception e)
+		catch (RuntimeException e)
 		{
 			if (API_DEBUG) Logger.println("handleGenerate: failed to log headers: " + e.getMessage());
 		}
@@ -800,17 +883,18 @@ private static Object handleUiOptions(Request req, Response res)
 	{
 		try
 		{
-			String contentType = req.contentType();
-			if (contentType != null && contentType.toLowerCase().startsWith("multipart/form-data"))
-			{
-				return parseMultipartConfig(req);
-			}
-			else
-			{
-				return gson.fromJson(req.body(), Config.class);
-			}
+			// Parse the request body as the full .nort JSON content and store
+			// it in the `settings` map on Config. We avoid creating temp files
+			// here; `loadSettings` will create a temp .nort when needed.
+			String body = req.body();
+			if (body == null) return null;
+			@SuppressWarnings("unchecked")
+			Map<String,Object> parsed = gson.fromJson(body, Map.class);
+			Config cfg = new Config();
+			cfg.settings = parsed;
+			return cfg;
 		}
-		catch (Exception e)
+		catch (com.google.gson.JsonSyntaxException e)
 		{
 			res.status(400);
 			return null;
@@ -825,75 +909,13 @@ private static Object handleUiOptions(Request req, Response res)
 	{
 		try
 		{
-			String contentType = req.contentType();
-			if (contentType != null && contentType.toLowerCase().startsWith("multipart/form-data"))
-			{
-				try
-				{
-					Config cfg = parseMultipartConfig(req);
-					return RandomMapParameters.fromConfig(cfg);
-				}
-				catch (Exception e)
-				{
-					res.status(400);
-					return null;
-				}
-			}
-			else
-			{
-				return gson.fromJson(req.body(), RandomMapParameters.class);
-			}
+			return gson.fromJson(req.body(), RandomMapParameters.class);
 		}
-		catch (Exception e)
+		catch (com.google.gson.JsonSyntaxException e)
 		{
 			res.status(400);
 			return null;
 		}
-	}
-
-	private static Config parseMultipartConfig(Request req) throws IOException, javax.servlet.ServletException
-	{
-		MultipartConfigElement multipartConfigElement = new MultipartConfigElement(System.getProperty("java.io.tmpdir"));
-		req.raw().setAttribute("org.eclipse.jetty.multipartConfig", multipartConfigElement);
-		Part part = req.raw().getPart("nortFile");
-		Config cfg = new Config();
-
-		if (part != null)
-		{
-			Path temp = Files.createTempFile("nortantis-upload-", NORT_EXTENSION);
-			try (InputStream is = part.getInputStream())
-			{
-				Files.copy(is, temp, StandardCopyOption.REPLACE_EXISTING);
-			}
-            // Keep the uploaded file path. Do NOT parse the uploaded JSON here;
-            // preserve the original file contents so downstream JSON parsing
-            // (which expects integer types) isn't affected by intermediate
-            // re-serialization that can turn integers into doubles.
-            cfg.nortFile = temp.toAbsolutePath().toString();
-		}
-
-		// Extract basic control fields (generatedWidth/generatedHeight/seed/return flags).
-		// Theme-specific form fields are intentionally NOT extracted for
-		// multipart uploads: customization must be embedded into the uploaded
-		// .nort JSON. This preserves backward compatibility for clients that
-		// still send individual fields but prefers the JSON content.
-		extractFormFields(req, cfg);
-		return cfg;
-	}
-
-	private static void extractFormFields(Request req, Config cfg)
-	{
-		String generatedWidth = param(req, "generatedWidth");
-		String generatedHeight = param(req, "generatedHeight");
-		String randomSeed = param(req, "randomSeed");
-
-		if (generatedWidth != null)
-			cfg.generatedWidth = Integer.valueOf(generatedWidth);
-		if (generatedHeight != null)
-			cfg.generatedHeight = Integer.valueOf(generatedHeight);
-		if (randomSeed != null)
-			cfg.randomSeed = Long.valueOf(randomSeed);
-		cfg.language = param(req, "language");
 	}
 
 	private static String param(Request req, String name)
@@ -912,14 +934,13 @@ private static Object handleUiOptions(Request req, Response res)
 			MapSettings settings;
 			if (providedSettings)
 			{
+				// Persist provided settings to a temporary .nort file and load
+				// MapSettings from it to preserve numeric types exactly as
+				// serialized by the client.
 				tempNortPath = Files.createTempFile("nortantis-", NORT_EXTENSION);
 				String settingsJson = gson.toJson(cfg.settings);
 				Files.write(tempNortPath, settingsJson.getBytes(StandardCharsets.UTF_8), StandardOpenOption.TRUNCATE_EXISTING);
 				settings = new MapSettings(tempNortPath.toAbsolutePath().toString());
-			}
-			else if (cfg.nortFile != null && !cfg.nortFile.isEmpty())
-			{
-				settings = new MapSettings(cfg.nortFile);
 			}
 			else
 			{
@@ -929,6 +950,20 @@ private static Object handleUiOptions(Request req, Response res)
 			applyCommonSettings(cfg, settings);
 			// Safety: if the provided settings JSON contains icon edits (freeIcons or centerEdits),
 			// ensure the hasIconEdits flag is set so MapCreator does not generate icons again.
+			ensureIconEditsFlag(settings);
+
+			return new GenerationContext(settings, tempNortPath);
+			}
+			catch (IOException ex)
+		{
+			res.status(400);
+			return null;
+		}
+	}
+
+		// Extracted helper to satisfy Sonar S1141: keep nested try logic in a
+		// separate method for clarity and single-responsibility.
+		private static void ensureIconEditsFlag(MapSettings settings) {
 			try {
 				if (settings.edits != null) {
 					// Only mark hasIconEdits true when centerEdits are present (initialized).
@@ -942,19 +977,10 @@ private static Object handleUiOptions(Request req, Response res)
 						settings.edits.hasIconEdits = true;
 					}
 				}
-			} catch (Exception ignore) {
+			} catch (NullPointerException ignore) {
 				// best-effort; if this fails, default behavior remains unchanged
 			}
-			applyThemeOverrides(cfg, settings);
-
-			return new GenerationContext(settings, tempNortPath, providedSettings);
 		}
-		catch (IOException ex)
-		{
-			res.status(400);
-			return null;
-		}
-	}
 
 	private static MapSettings generateRandomMapSettings(Config cfg)
 	{
@@ -964,7 +990,7 @@ private static Object handleUiOptions(Request req, Response res)
 
 	private static MapSettings generateRandomMapSettings(RandomMapParameters params)
 	{
-		Random rand = params.randomSeed != null ? new Random(params.randomSeed) : new Random();
+		Random rand = params.randomSeed != null ? new Random(params.randomSeed) : SHARED_RANDOM;
 		String artPack = (params.artPack != null && !params.artPack.isEmpty()) ? params.artPack : Assets.installedArtPack;
 		MapSettings settings = SettingsGenerator.generate(rand, artPack, null);
 		applyRandomMapParameterOverrides(params, settings);
@@ -975,23 +1001,30 @@ private static Object handleUiOptions(Request req, Response res)
 	{
 		if (p.worldSize != null) settings.worldSize = p.worldSize;
 		if (p.landShape != null && !p.landShape.isEmpty()) {
-			try { settings.landShape = LandShape.valueOf(p.landShape); } catch (IllegalArgumentException ignored) {}
+			try { settings.landShape = LandShape.valueOf(p.landShape); } catch (IllegalArgumentException ignored) {
+				// Invalid landShape provided by client; ignore and keep generated default.
+			}
 		}
 		if (p.regionCount != null) settings.regionCount = p.regionCount;
 		if (p.cityFrequency != null) settings.cityProbability = p.cityFrequency / 100.0 * SettingsGenerator.maxCityProbability;
 		if (p.books != null && !p.books.isEmpty()) settings.books = new HashSet<>(p.books);
-		if (p.dimension != null && !p.dimension.isEmpty()) {
-			try {
-				GeneratedDimension dim = GeneratedDimension.valueOf(p.dimension);
-				if (dim != GeneratedDimension.Custom) {
-					settings.generatedWidth = dim.width;
-					settings.generatedHeight = dim.height;
-				}
-			} catch (IllegalArgumentException ignored) {}
-		}
-			if (p.drawRegionColors != null) settings.drawRegionColors = p.drawRegionColors;
+		applyDimensionOverride(p, settings);
+		if (p.drawRegionColors != null) settings.drawRegionColors = p.drawRegionColors;
 	}
 
+	// Extracted dimension handling to reduce method cognitive complexity (Sonar S3776)
+	private static void applyDimensionOverride(RandomMapParameters p, MapSettings settings) {
+		if (p.dimension == null || p.dimension.isEmpty()) return;
+		try {
+			GeneratedDimension dim = GeneratedDimension.valueOf(p.dimension);
+			if (dim != GeneratedDimension.Custom) {
+				settings.generatedWidth = dim.width;
+				settings.generatedHeight = dim.height;
+			}
+		} catch (IllegalArgumentException ignored) {
+			// Invalid dimension name supplied; ignore and keep generated/default dimensions.
+		}
+	}
 	private static class RandomMapParameters {
 		String language;
 		Long randomSeed;
@@ -1007,16 +1040,41 @@ private static Object handleUiOptions(Request req, Response res)
 		static RandomMapParameters fromConfig(Config c) {
 			RandomMapParameters p = new RandomMapParameters();
 			p.language = c.language;
-			p.randomSeed = c.randomSeed;
-			p.dimension = c.dimension;
-			p.worldSize = c.worldSize;
-			p.landShape = c.landShape;
-			p.regionCount = c.regionCount;
-			p.drawRegionColors = c.drawRegionColors;
-			p.cityFrequency = c.cityFrequency;
-			p.books = c.books;
+			p.randomSeed = (c.randomSeed != 0L) ? Long.valueOf(c.randomSeed) : null;
+			// MapSettings stores enums/typed fields; convert to compact parameter shapes
+			p.dimension = null; // deprecated for direct-from-MapSettings path
+			p.worldSize = c.worldSize > 0 ? Integer.valueOf(c.worldSize) : null;
+			p.landShape = (c.landShape != null) ? c.landShape.name() : null;
+			p.regionCount = c.regionCount > 0 ? Integer.valueOf(c.regionCount) : null;
+			p.drawRegionColors = Boolean.valueOf(c.drawRegionColors);
+			// Convert cityProbability back to UI percentage (approx)
+			if (c.cityProbability > 0.0) {
+				int pct = (int) Math.round((c.cityProbability / SettingsGenerator.maxCityProbability) * 100.0);
+				p.cityFrequency = Integer.valueOf(pct);
+			} else {
+				p.cityFrequency = null;
+			}
+			if (c.books != null) p.books = new java.util.ArrayList<>(c.books);
 			p.artPack = c.artPack;
 			return p;
+		}
+	}
+
+	/**
+	 * Heuristic: determine whether the provided Config.settings map actually
+	 * represents a compact RandomMapParameters payload rather than a full
+	 * MapSettings object. Returns true when the settings map parses to a
+	 * RandomMapParameters instance that contains any generation parameter.
+	 */
+	private static boolean configLooksLikeRandomParameters(Config cfg) {
+		if (cfg == null || cfg.settings == null || cfg.settings.isEmpty()) return false;
+		try {
+			String content = gson.toJson(cfg.settings);
+			RandomMapParameters parsed = gson.fromJson(content, RandomMapParameters.class);
+			if (parsed == null) return false;
+			return parsed.language != null || parsed.randomSeed != null || parsed.dimension != null || parsed.worldSize != null || parsed.landShape != null || parsed.regionCount != null || parsed.cityFrequency != null || (parsed.books != null && !parsed.books.isEmpty());
+		} catch (com.google.gson.JsonSyntaxException ignore) {
+			return false;
 		}
 	}
 
@@ -1043,6 +1101,15 @@ private static Object handleUiOptions(Request req, Response res)
 	{
 		Config cfg = parseConfig(req, res);
 		RandomMapParameters params = parseRandomMapParameters(req, res);
+
+		// Heuristic: when the request body is a small JSON that represents
+		// generation parameters (RandomMapParameters) rather than a full
+		// .nort MapSettings, prefer `params` and discard the provided
+		// `settings` map on Config so generation proceeds from params.
+		if (allowGenerateRandomSettings && params != null && configLooksLikeRandomParameters(cfg)) {
+			cfg.settings = null;
+			cfg = null;
+		}
 		if (cfg == null && params == null)
 		{
 			res.status(400);
@@ -1065,69 +1132,56 @@ private static Object handleUiOptions(Request req, Response res)
 
 		out.effectiveCfg = (cfg != null) ? cfg : new Config();
 
-		try
-		{
-			if (allowGenerateRandomSettings)
-			{
-				if (params != null && (cfg == null || (cfg.settings == null && (cfg.nortFile == null || cfg.nortFile.isEmpty()))))
-				{
-					out.settings = generateRandomMapSettings(params);
-					applyCommonSettings(cfg != null ? cfg : new Config(), out.settings);
-					applyThemeOverrides(cfg != null ? cfg : new Config(), out.settings);
-					return out;
-				}
-				else
-				{
-					// Load settings if provided
-					GenerationContext ctx = loadSettings(cfg, res);
-					if (ctx == null)
-					{
-						res.status(400);
-						return null;
-					}
-					out.ctx = ctx;
-					out.settings = ctx.settings;
-					return out;
-				}
+			if (!populateSettingsIntoOut(out, cfg, params, allowGenerateRandomSettings, res)) {
+				return null;
 			}
-			else
-			{
-				// Caller requires settings to be provided (no random generation here)
-				if (cfg == null || (cfg.settings == null && (cfg.nortFile == null || cfg.nortFile.isEmpty())))
-				{
-					res.status(400);
-					return null;
-				}
-				GenerationContext ctx = loadSettings(cfg, res);
-				if (ctx == null)
-				{
-					res.status(400);
-					return null;
-				}
-				out.ctx = ctx;
-				out.settings = ctx.settings;
-				return out;
+			return out;
+	}
+
+	private static boolean populateSettingsIntoOut(GenerationRequestContext out, Config cfg, RandomMapParameters params, boolean allowGenerateRandomSettings, Response res) {
+		try {
+			if (allowGenerateRandomSettings && params != null && (cfg == null || cfg.settings == null || cfg.settings.isEmpty())) {
+				out.settings = generateRandomMapSettings(params);
+				applyCommonSettings(cfg != null ? cfg : new Config(), out.settings);
+				return true;
 			}
-		}
-		catch (Exception e)
-		{
+
+			if (cfg == null || cfg.settings == null || cfg.settings.isEmpty()) {
+				res.status(400);
+				return false;
+			}
+
+			return loadSettingsIntoOut(out, cfg, res);
+		} catch (RuntimeException e) {
 			res.status(500);
-			return null;
+			return false;
 		}
+	}
+
+	private static boolean loadSettingsIntoOut(GenerationRequestContext out, Config cfg, Response res) {
+		GenerationContext ctx = loadSettings(cfg, res);
+		if (ctx == null) {
+			res.status(400);
+			return false;
+		}
+		out.ctx = ctx;
+		out.settings = ctx.settings;
+		return true;
 	}
 
 	private static void applyCommonSettings(Config cfg, MapSettings settings)
 	{
 		// Apply user-provided seed if present, overriding auto-generated value from SettingsGenerator
-			if (cfg.randomSeed != null)
-		{
+			// Note: Config now inherits MapSettings; treat zero as "not provided".
+			if (cfg.randomSeed != 0L)
+			{
 				settings.randomSeed = cfg.randomSeed;
 				// Also set background-related seeds to match for deterministic background rendering
 				settings.backgroundRandomSeed = cfg.randomSeed;
 				settings.regionsRandomSeed = cfg.randomSeed;
 				settings.textRandomSeed = cfg.randomSeed;
 				settings.frayedBorderSeed = cfg.randomSeed;
-		}
+			}
 	}
 
 	private static GenerationResult generateMap(MapSettings settings, Integer generatedWidth, Integer generatedHeight)
@@ -1144,7 +1198,7 @@ private static Object handleUiOptions(Request req, Response res)
 		{
 			return attemptPrimaryRender(settings, dims);
 		}
-		catch (Exception firstError)
+		catch (RuntimeException firstError)
 		{
 			Logger.println("generateMap primary render failed: " + firstError);
 			return attemptFallbackRender(settings, dims, firstError);
@@ -1179,7 +1233,7 @@ private static Object handleUiOptions(Request req, Response res)
 			Image fallbackImage = creator.createMap(fallback, dims, null);
 			return GenerationResult.success(fallbackImage);
 		}
-		catch (Exception fallbackError)
+		catch (RuntimeException fallbackError)
 		{
 			Logger.println("generateMap fallback render failed: " + fallbackError);
 			String message = buildErrorMessage(firstError, fallbackError);
@@ -1292,28 +1346,32 @@ private static Object handleUiOptions(Request req, Response res)
 		// temporary graph and initialize center/edge/region edits from it.
 		try {
 			if (settings.edits == null || !settings.edits.isInitialized()) {
-				try {
-					nortantis.WorldGraph graph = MapCreator.createGraphForUnitTests(settings);
-					try {
-						if (settings.edits == null) settings.edits = new nortantis.swing.MapEdits();
-						settings.edits.initializeCenterEdits(graph.centers);
-						settings.edits.initializeEdgeEdits(graph.edges);
-						settings.edits.initializeRegionEdits(graph.regions.values());
-					} finally {
-						// no explicit close needed for WorldGraph
-					}
-				} catch (Exception e) {
-					// If graph creation fails, fall back to serializing settings as-is
-					Logger.println("Failed to initialize edits for export: " + e);
-				}
+				initializeEditsFromGraph(settings);
 			}
-		} catch (Throwable t) {
+		} catch (Exception e) {
 			// Best-effort only; avoid failing the whole request for this step.
-			Logger.println("Unexpected error while preparing nort content: " + t);
+			Logger.println("Unexpected error while preparing nort content: " + e);
 		}
 
 		// Return the canonical JSON serialization of settings.
 		return settings.toJsonString();
+	}
+
+	private static void initializeEditsFromGraph(MapSettings settings) {
+		try {
+			nortantis.WorldGraph graph = MapCreator.createGraphForUnitTests(settings);
+			try {
+				if (settings.edits == null) settings.edits = new nortantis.swing.MapEdits();
+				settings.edits.initializeCenterEdits(graph.centers);
+				settings.edits.initializeEdgeEdits(graph.edges);
+				settings.edits.initializeRegionEdits(graph.regions.values());
+			} finally {
+				// no explicit close needed for WorldGraph
+			}
+		} catch (RuntimeException e) {
+			// If graph creation fails, fall back to serializing settings as-is
+			Logger.println("Failed to initialize edits for export: " + e);
+		}
 	}
 
 	private static void cleanupTempNortPath(Path tempNortPath)
@@ -1324,7 +1382,7 @@ private static Object handleUiOptions(Request req, Response res)
 			{
 				Files.deleteIfExists(tempNortPath);
 			}
-			catch (Exception ignore)
+			catch (java.io.IOException ignore)
 			{
 				// Ignore cleanup errors; temporary file will be cleaned up by system
 			}
@@ -1358,91 +1416,11 @@ private static Object handleUiOptions(Request req, Response res)
 		}
 	}
 
-	private static class Config
+	private static class Config extends MapSettings
 	{
-		String nortFile;
+		// API-specific helpers
+		// Deprecated legacy wrapper field (may contain nested settings map). Prefer full .nort body.
 		Map<String, Object> settings;
-		Integer generatedWidth;
-		Integer generatedHeight;
-		Long randomSeed;
-		String language;
-
-		// Random map generation parameters
-		String artPack;
-		Integer worldSize;
-		String landShape;
-		Integer regionCount;
-		Integer cityFrequency;
-		List<String> books;
-		String dimension;
-		Boolean drawRegionColors;
-		// Final map / theme override parameters
-		String backgroundType;
-		String textureRef;
-		Long backgroundRandomSeed;
-		Boolean drawRegionBoundaries;
-		Boolean colorizeLand;
-		Boolean colorizeOcean;
-		String oceanColorHex;
-		String landColorHex;
-		String regionBoundaryStyle;
-		String regionBoundaryColorHex;
-		Boolean drawBorder;
-		Boolean drawGridOverlay;
-		// Grid overlay parameters
-		String gridOverlayShape;
-		Integer gridOverlayRowOrColCount;
-		String gridOverlayColorHex;
-		String gridOverlayXOffset;
-		String gridOverlayYOffset;
-		Integer gridOverlayLineWidth;
-		String gridOverlayLayer;
-		Boolean drawVoronoiGridOverlayOnlyOnLand;
-		Boolean frayedBorder;
-		Integer frayedBorderBlurLevel;
-		Integer frayedBorderSize;
-		Long frayedBorderSeed;
-		String frayedBorderColorHex;
-		Boolean drawGrunge;
-		Integer grungeWidth;
-		String lineStyle;
-		Double coastlineWidth;
-		String coastlineColorHex;
-		Integer coastShadingLevel;
-		String coastShadingColorHex;
-		Integer coastShadingAlpha;
-		Integer oceanShadingLevel;
-		String oceanShadingColorHex;
-		String oceanWavesType;
-		Integer oceanWavesLevel;
-		String oceanWavesColorHex;
-		Boolean drawOceanEffectsInLakes;
-		Integer concentricWaveCount;
-		Boolean fadeConcentricWaves;
-		Boolean jitterToConcentricWaves;
-		Boolean brokenLinesForConcentricWaves;
-		String riverColorHex;
-		Boolean drawRoads;
-		String roadStyle;
-		Double roadWidth;
-		String roadColorHex;
-		Double mountainSize;
-		Double hillSize;
-		Double duneSize;
-		Double treeHeight;
-		Double citySize;
-		Boolean drawText;
-		String textColorHex;
-		Boolean drawBoldBackground;
-		String boldBackgroundColorHex;
-		Integer previewWidth;
-		Integer previewHeight;
-		String titleFontFamily;
-		String regionFontFamily;
-		String mountainRangeFontFamily;
-		String otherMountainsFontFamily;
-		String citiesFontFamily;
-		String riverFontFamily;
 	}
 
 	private static class GenerationContext
@@ -1450,7 +1428,7 @@ private static Object handleUiOptions(Request req, Response res)
 		MapSettings settings;
 		Path tempNortPath;
 
-		GenerationContext(MapSettings settings, Path tempNortPath, boolean providedNortContent)
+		GenerationContext(MapSettings settings, Path tempNortPath)
 		{
 			this.settings = settings;
 			this.tempNortPath = tempNortPath;
@@ -1477,383 +1455,7 @@ private static Object handleUiOptions(Request req, Response res)
 		}
 	}
 
-	private static void applyThemeOverrides(Config cfg, MapSettings settings)
-	{
-		applyBackgroundType(cfg, settings);
-		applyTextureRef(cfg, settings);
-		applyBackgroundSeed(cfg, settings);
-		applyBoundarySettings(cfg, settings);
-		applyColorizationSettings(cfg, settings);
-		applyColorSettings(cfg, settings);
-		applyRegionBoundarySettings(cfg, settings);
-		applyBorderSettings(cfg, settings);
-		applyGridOverlaySettings(cfg, settings);
-		applyLandColoringMethod(cfg, settings);
-		applyFontFamilies(cfg, settings);
-		applyEffectsAndVisualOverrides(cfg, settings);
-		applyRoadAndScaleOverrides(cfg, settings);
-	}
 
-	private static void applyBackgroundType(Config cfg, MapSettings settings)
-	{
-		if (cfg.backgroundType != null && !cfg.backgroundType.isEmpty())
-		{
-			settings.generateBackgroundFromTexture = "GeneratedFromTexture".equals(cfg.backgroundType);
-			settings.solidColorBackground = "SolidColor".equals(cfg.backgroundType);
-		}
-	}
-
-	private static void applyTextureRef(Config cfg, MapSettings settings)
-	{
-		if (cfg.textureRef != null && !cfg.textureRef.isEmpty())
-		{
-			String[] parts = cfg.textureRef.split("\\|", 2);
-			if (parts.length == 2)
-			{
-				settings.backgroundTextureResource = new NamedResource(parts[0], parts[1]);
-				settings.backgroundTextureSource = TextureSource.Assets;
-			}
-		}
-	}
-
-	private static void applyBackgroundSeed(Config cfg, MapSettings settings)
-	{
-		if (cfg.backgroundRandomSeed != null)
-		{
-			settings.backgroundRandomSeed = cfg.backgroundRandomSeed;
-		}
-	}
-
-	private static void applyBoundarySettings(Config cfg, MapSettings settings)
-	{
-		if (cfg.drawRegionBoundaries != null)
-		{
-			settings.drawRegionBoundaries = cfg.drawRegionBoundaries;
-		}
-	}
-
-	private static void applyColorizationSettings(Config cfg, MapSettings settings)
-	{
-		if (cfg.colorizeLand != null)
-		{
-			settings.colorizeLand = cfg.colorizeLand;
-		}
-		if (cfg.colorizeOcean != null)
-		{
-			settings.colorizeOcean = cfg.colorizeOcean;
-		}
-	}
-
-	private static void applyColorSettings(Config cfg, MapSettings settings)
-	{
-		if (cfg.oceanColorHex != null && !cfg.oceanColorHex.isEmpty())
-		{
-			settings.oceanColor = hexToColor(cfg.oceanColorHex);
-		}
-		if (cfg.landColorHex != null && !cfg.landColorHex.isEmpty())
-		{
-			settings.landColor = hexToColor(cfg.landColorHex);
-		}
-		if (cfg.regionBoundaryColorHex != null && !cfg.regionBoundaryColorHex.isEmpty())
-		{
-			settings.regionBoundaryColor = hexToColor(cfg.regionBoundaryColorHex);
-		}
-	}
-
-	private static void applyRegionBoundarySettings(Config cfg, MapSettings settings)
-	{
-		if (cfg.regionBoundaryStyle != null && !cfg.regionBoundaryStyle.isEmpty())
-		{
-			try
-			{
-				StrokeType strokeType = StrokeType.valueOf(cfg.regionBoundaryStyle);
-				// Width must be supplied via the settings JSON (regionBoundaryStyle.width).
-				float width = settings.regionBoundaryStyle.width;
-				settings.regionBoundaryStyle = new Stroke(strokeType, width);
-			}
-			catch (IllegalArgumentException ignored)
-			{
-				// If the stroke type is invalid, keep the existing region boundary style
-			}
-		}
-	}
-
-	private static void applyBorderSettings(Config cfg, MapSettings settings)
-	{
-		if (cfg.drawBorder != null)
-		{
-			settings.drawBorder = cfg.drawBorder;
-		}
-		if (cfg.drawGridOverlay != null)
-		{
-			settings.drawGridOverlay = cfg.drawGridOverlay;
-		}
-	}
-
-	private static void applyGridOverlaySettings(Config cfg, MapSettings settings)
-	{
-		if (cfg.gridOverlayShape != null && !cfg.gridOverlayShape.isEmpty())
-		{
-			try
-			{
-				settings.gridOverlayShape = Enum.valueOf(GridOverlayShape.class, cfg.gridOverlayShape);
-			}
-			catch (IllegalArgumentException ignored) {}
-		}
-		if (cfg.gridOverlayRowOrColCount != null)
-		{
-			settings.gridOverlayRowOrColCount = cfg.gridOverlayRowOrColCount;
-		}
-		if (cfg.gridOverlayColorHex != null && !cfg.gridOverlayColorHex.isEmpty())
-		{
-			settings.gridOverlayColor = hexToColor(cfg.gridOverlayColorHex);
-		}
-		if (cfg.gridOverlayXOffset != null && !cfg.gridOverlayXOffset.isEmpty())
-		{
-			try { settings.gridOverlayXOffset = GridOverlayOffset.parse(cfg.gridOverlayXOffset); } catch (Exception ignored) {}
-		}
-		if (cfg.gridOverlayYOffset != null && !cfg.gridOverlayYOffset.isEmpty())
-		{
-			try { settings.gridOverlayYOffset = GridOverlayOffset.parse(cfg.gridOverlayYOffset); } catch (Exception ignored) {}
-		}
-		if (cfg.gridOverlayLineWidth != null)
-		{
-			settings.gridOverlayLineWidth = cfg.gridOverlayLineWidth;
-		}
-		if (cfg.gridOverlayLayer != null && !cfg.gridOverlayLayer.isEmpty())
-		{
-			try
-			{
-				settings.gridOverlayLayer = Enum.valueOf(MapSettings.GridOverlayLayer.class, cfg.gridOverlayLayer);
-			}
-			catch (IllegalArgumentException ignored) {}
-		}
-		if (cfg.drawVoronoiGridOverlayOnlyOnLand != null)
-		{
-			settings.drawVoronoiGridOverlayOnlyOnLand = cfg.drawVoronoiGridOverlayOnlyOnLand;
-		}
-	}
-
-	private static void applyLandColoringMethod(Config cfg, MapSettings settings)
-	{
-		if (cfg.drawRegionColors != null)
-		{
-			settings.drawRegionColors = cfg.drawRegionColors;
-		}
-	}
-
-	private static void applyFontFamilies(Config cfg, MapSettings settings)
-	{
-		applyFontFamily(cfg.titleFontFamily, settings.titleFont, font -> settings.titleFont = font);
-		applyFontFamily(cfg.regionFontFamily, settings.regionFont, font -> settings.regionFont = font);
-		applyFontFamily(cfg.mountainRangeFontFamily, settings.mountainRangeFont, font -> settings.mountainRangeFont = font);
-		applyFontFamily(cfg.otherMountainsFontFamily, settings.otherMountainsFont, font -> settings.otherMountainsFont = font);
-		applyFontFamily(cfg.citiesFontFamily, settings.citiesFont, font -> settings.citiesFont = font);
-		applyFontFamily(cfg.riverFontFamily, settings.riverFont, font -> settings.riverFont = font);
-	}
-
-	private static void applyEffectsAndVisualOverrides(Config cfg, MapSettings settings)
-	{
-		if (cfg.frayedBorder != null)
-		{
-			settings.frayedBorder = cfg.frayedBorder;
-		}
-		if (cfg.frayedBorderBlurLevel != null)
-		{
-			settings.frayedBorderBlurLevel = cfg.frayedBorderBlurLevel;
-		}
-		if (cfg.frayedBorderSize != null)
-		{
-			settings.frayedBorderSize = cfg.frayedBorderSize;
-		}
-		if (cfg.frayedBorderSeed != null)
-		{
-			settings.frayedBorderSeed = cfg.frayedBorderSeed;
-		}
-		if (cfg.frayedBorderColorHex != null && !cfg.frayedBorderColorHex.isEmpty())
-		{
-			settings.frayedBorderColor = hexToColor(cfg.frayedBorderColorHex);
-		}
-
-		if (cfg.drawGrunge != null)
-		{
-			settings.drawGrunge = cfg.drawGrunge;
-		}
-		if (cfg.grungeWidth != null)
-		{
-			settings.grungeWidth = cfg.grungeWidth;
-		}
-
-		if (cfg.lineStyle != null && !cfg.lineStyle.isEmpty())
-		{
-            try
-            {
-                settings.lineStyle = MapSettings.LineStyle.valueOf(cfg.lineStyle);
-            }
-			catch (IllegalArgumentException ignored) {}
-		}
-
-		if (cfg.coastlineWidth != null)
-		{
-			settings.coastlineWidth = cfg.coastlineWidth;
-		}
-		if (cfg.coastlineColorHex != null && !cfg.coastlineColorHex.isEmpty())
-		{
-			settings.coastlineColor = hexToColor(cfg.coastlineColorHex);
-		}
-
-		if (cfg.coastShadingLevel != null)
-		{
-			settings.coastShadingLevel = cfg.coastShadingLevel;
-		}
-		if (cfg.coastShadingColorHex != null && !cfg.coastShadingColorHex.isEmpty())
-		{
-			if (cfg.coastShadingAlpha != null)
-			{
-				String h = cfg.coastShadingColorHex.startsWith("#") ? cfg.coastShadingColorHex.substring(1) : cfg.coastShadingColorHex;
-				int r = Integer.parseInt(h.substring(0, 2), 16);
-				int g = Integer.parseInt(h.substring(2, 4), 16);
-				int b = Integer.parseInt(h.substring(4, 6), 16);
-				int alpha = (int) ((1.0 - cfg.coastShadingAlpha / 100.0) * 255);
-				settings.coastShadingColor = Color.create(r, g, b, alpha);
-			}
-			else
-			{
-				settings.coastShadingColor = hexToColor(cfg.coastShadingColorHex);
-			}
-		}
-
-		if (cfg.oceanShadingLevel != null)
-		{
-			settings.oceanShadingLevel = cfg.oceanShadingLevel;
-		}
-		if (cfg.oceanShadingColorHex != null && !cfg.oceanShadingColorHex.isEmpty())
-		{
-			// The UI now encodes transparency into the color token itself.
-			settings.oceanShadingColor = hexToColor(cfg.oceanShadingColorHex);
-		}
-
-		if (cfg.oceanWavesType != null && !cfg.oceanWavesType.isEmpty())
-		{
-            try
-            {
-                settings.oceanWavesType = MapSettings.OceanWaves.valueOf(cfg.oceanWavesType);
-            }
-			catch (IllegalArgumentException ignored) {}
-		}
-		if (cfg.oceanWavesLevel != null)
-		{
-			settings.oceanWavesLevel = cfg.oceanWavesLevel;
-		}
-		if (cfg.oceanWavesColorHex != null && !cfg.oceanWavesColorHex.isEmpty())
-		{
-			settings.oceanWavesColor = hexToColor(cfg.oceanWavesColorHex);
-		}
-
-		if (cfg.drawOceanEffectsInLakes != null)
-		{
-			settings.drawOceanEffectsInLakes = cfg.drawOceanEffectsInLakes;
-		}
-
-		if (cfg.concentricWaveCount != null)
-		{
-			settings.concentricWaveCount = cfg.concentricWaveCount;
-		}
-		if (cfg.fadeConcentricWaves != null)
-		{
-			settings.fadeConcentricWaves = cfg.fadeConcentricWaves;
-		}
-		if (cfg.jitterToConcentricWaves != null)
-		{
-			settings.jitterToConcentricWaves = cfg.jitterToConcentricWaves;
-		}
-		if (cfg.brokenLinesForConcentricWaves != null)
-		{
-			settings.brokenLinesForConcentricWaves = cfg.brokenLinesForConcentricWaves;
-		}
-
-		if (cfg.riverColorHex != null && !cfg.riverColorHex.isEmpty())
-		{
-			settings.riverColor = hexToColor(cfg.riverColorHex);
-		}
-	}
-
-	private static void applyRoadAndScaleOverrides(Config cfg, MapSettings settings)
-	{
-		if (cfg.drawRoads != null)
-		{
-			settings.drawRoads = cfg.drawRoads;
-		}
-		if (cfg.roadStyle != null && !cfg.roadStyle.isEmpty())
-		{
-			try
-			{
-				StrokeType strokeType = StrokeType.valueOf(cfg.roadStyle);
-				float width = cfg.roadWidth != null ? cfg.roadWidth.floatValue() : (settings.roadStyle != null ? settings.roadStyle.width : 1.0f);
-				settings.roadStyle = new Stroke(strokeType, width);
-			}
-			catch (IllegalArgumentException ignored) {}
-		}
-		if (cfg.roadColorHex != null && !cfg.roadColorHex.isEmpty())
-		{
-			settings.roadColor = hexToColor(cfg.roadColorHex);
-		}
-
-		if (cfg.mountainSize != null)
-		{
-			settings.mountainScale = cfg.mountainSize;
-		}
-		if (cfg.hillSize != null)
-		{
-			settings.hillScale = cfg.hillSize;
-		}
-		if (cfg.duneSize != null)
-		{
-			settings.duneScale = cfg.duneSize;
-		}
-		if (cfg.treeHeight != null)
-		{
-			settings.treeHeightScale = cfg.treeHeight;
-		}
-		if (cfg.citySize != null)
-		{
-			settings.cityScale = cfg.citySize;
-		}
-
-		if (cfg.drawText != null)
-		{
-			settings.drawText = cfg.drawText;
-		}
-		if (cfg.textColorHex != null && !cfg.textColorHex.isEmpty())
-		{
-			settings.textColor = hexToColor(cfg.textColorHex);
-		}
-		if (cfg.drawBoldBackground != null)
-		{
-			settings.drawBoldBackground = cfg.drawBoldBackground;
-		}
-		if (cfg.boldBackgroundColorHex != null && !cfg.boldBackgroundColorHex.isEmpty())
-		{
-			settings.boldBackgroundColor = hexToColor(cfg.boldBackgroundColorHex);
-		}
-	}
-
-	private static void applyFontFamily(String fontFamily, Font currentFont, java.util.function.Consumer<Font> setter)
-	{
-		if (fontFamily != null && !fontFamily.isEmpty() && currentFont != null)
-		{
-			setter.accept(Font.create(fontFamily, currentFont.getStyle(), currentFont.getSize()));
-		}
-	}
-
-	private static Color hexToColor(String hex)
-	{
-		String h = hex.startsWith("#") ? hex.substring(1) : hex;
-		int r = Integer.parseInt(h.substring(0, 2), 16);
-		int g = Integer.parseInt(h.substring(2, 4), 16);
-		int b = Integer.parseInt(h.substring(4, 6), 16);
-		return Color.create(r, g, b);
-	}
 
 	@SuppressWarnings("unused")
 	private static class ApiResponse

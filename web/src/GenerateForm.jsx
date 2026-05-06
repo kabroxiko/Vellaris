@@ -561,13 +561,13 @@ function GenerateForm({ uiLanguage = 'en' }) {
             if (!artPack && firstArtPack) setArtPack(firstArtPack)
 
             // Prefetch city icon types for the selected/default art pack.
-            // Pass the backend-provided city icon default (if any) so the
-            // selection prefers the server canonical value even though
-            // React state updates are asynchronous.
+            // Use backend-provided city icon default if present. Some
+            // server responses use `cityIconSetName` instead of
+            // `cityIconType`, so accept that as a fallback.
             const packToLoad = artPack || firstArtPack || 'nortantis'
-            const preferredCityType = defs && defs.cityIconType ? String(defs.cityIconType) : cityIconType
+            const preferredCityDefault = defs && (defs.cityIconType ?? defs.cityIconSetName) ? String(defs.cityIconType ?? defs.cityIconSetName) : cityIconType
             loadCityIconTypes(packToLoad)
-              .then((types) => handleCityIconTypesLoaded(types, preferredCityType))
+              .then((types) => handleCityIconTypesLoaded(types, preferredCityDefault))
               .catch(() => {})
           } catch (e) {
             // ignore
@@ -619,7 +619,8 @@ function GenerateForm({ uiLanguage = 'en' }) {
                 setString(setDimension, defs.dimension)
                 setString(setLandShape, defs.landShape)
                 setString(setArtPack, defs.artPack)
-                setString(setCityIconType, defs.cityIconType)
+                // Accept either `cityIconType` or legacy `cityIconSetName`.
+                setString(setCityIconType, defs.cityIconType ?? defs.cityIconSetName)
                 setString(setBackgroundType, defs.backgroundType)
                 setString(setTextureRef, defs.textureRef)
                 setString(setBackgroundSeed, defs.backgroundRandomSeed)
@@ -1192,7 +1193,11 @@ function GenerateForm({ uiLanguage = 'en' }) {
 
   function handleCityIconTypesLoaded(types, previousType) {
     setCityIconTypes(types)
-    setCityIconType(selectCityIconType(previousType, types))
+    const selected = selectCityIconType(previousType, types)
+    // Only update the selected city icon type when the selector
+    // returns a non-empty value. This prevents asynchronous type
+    // enumeration from clearing a backend-provided default.
+    if (selected) setCityIconType(selected)
   }
 
   useEffect(() => {
@@ -1272,15 +1277,13 @@ function GenerateForm({ uiLanguage = 'en' }) {
               // changing numeric types (integers -> floats). Use the raw
               // uploaded content so the server receives exactly what the
               // user provided in the .nort file.
-              // Send the uploaded .nort content as JSON in the request body
-              // under the `settings` field (server expects Config JSON).
+              // Send the uploaded .nort content as the raw JSON body (no wrapper).
               const parsed = parsedSettings
-              const body = { settings: parsed }
               await runGenerate(
                 {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify(body),
+                  body: JSON.stringify(parsed),
                 },
                 f.name.replace(/\.[^.]+$/, ''),
                 source
@@ -1524,9 +1527,15 @@ function GenerateForm({ uiLanguage = 'en' }) {
       if (parsedReturned && isManual('mapLanguage') && mapLanguage) {
         parsedReturned.language = mapLanguage
       }
-      // Wrap settings under `settings` for the server Config parsing.
-      const bodyObj = { settings: parsedReturned || JSON.parse(nortContent) }
-      await runGenerate({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(bodyObj) }, 'random-map', { type: 'random', name: 'Random Map', nortContent }, 'preview', toast)
+      // Ensure a manually-selected city icon type is preserved in the
+      // returned settings. The server and other appliers expect the
+      // legacy `cityIconSetName` field.
+      if (parsedReturned && isManual('cityIconType') && cityIconType) {
+        parsedReturned.cityIconSetName = cityIconType
+      }
+      // Send the returned .nort JSON as the raw request body (no wrapper).
+      const bodyPayload = parsedReturned || JSON.parse(nortContent)
+      await runGenerate({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(bodyPayload) }, 'random-map', { type: 'random', name: 'Random Map', nortContent }, 'preview', toast)
     } catch (err) {
       setError(err.message)
       try {
@@ -1970,14 +1979,12 @@ function GenerateForm({ uiLanguage = 'en' }) {
     // If UI provides a language override, ensure it's stored in the settings JSON
     if (mapLanguage) parsedSettings.language = mapLanguage
     const settingsText = serializeNortObject(parsedSettings)
-    // Build JSON body matching server `Config` shape: embed settings under `settings`.
-    const bodyObj = { settings: parsedSettings }
-    // `saveNort` is always true on the server; do not send this parameter.
+    // Send the full .nort content as the JSON body (no wrapper).
     return {
       requestOptions: {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(bodyObj),
+        body: JSON.stringify(parsedSettings),
       },
       baseName: (preview?.filename || 'generated-map.png').replace(/\.png$/, ''),
       source: {
@@ -2013,10 +2020,10 @@ function GenerateForm({ uiLanguage = 'en' }) {
       // We now send JSON bodies. Parse the JSON and extract the `settings` object.
       let serialized
       if (typeof body === 'string') {
+        // Body is a raw .nort JSON (no wrapper).
         const parsed = JSON.parse(body)
-        const settingsObj = parsed && parsed.settings ? parsed.settings : null
-        if (!settingsObj) throw new Error('Merged settings not available for download.')
-        serialized = serializeNortObject(settingsObj)
+        if (!parsed) throw new Error('Merged settings not available for download.')
+        serialized = serializeNortObject(parsed)
       } else if (typeof body === 'object') {
         // Fallback: if callers supply a FormData-like object, attempt to read nortFile
         if (typeof body.get === 'function') {
