@@ -982,7 +982,7 @@ private static Object handleUiOptions(Request req, Response res)
 			}
 		}
 
-	private static MapSettings generateRandomMapSettings(Config cfg)
+	private static MapSettings generateRandomMapSettings(MapSettings cfg)
 	{
 		RandomMapParameters params = RandomMapParameters.fromConfig(cfg);
 		return generateRandomMapSettings(params);
@@ -1037,7 +1037,7 @@ private static Object handleUiOptions(Request req, Response res)
 		List<String> books;
 		String artPack;
 
-		static RandomMapParameters fromConfig(Config c) {
+		static RandomMapParameters fromConfig(MapSettings c) {
 			RandomMapParameters p = new RandomMapParameters();
 			p.language = c.language;
 			p.randomSeed = (c.randomSeed != 0L) ? Long.valueOf(c.randomSeed) : null;
@@ -1060,23 +1060,12 @@ private static Object handleUiOptions(Request req, Response res)
 		}
 	}
 
-	/**
-	 * Heuristic: determine whether the provided Config.settings map actually
-	 * represents a compact RandomMapParameters payload rather than a full
-	 * MapSettings object. Returns true when the settings map parses to a
-	 * RandomMapParameters instance that contains any generation parameter.
-	 */
-	private static boolean configLooksLikeRandomParameters(Config cfg) {
-		if (cfg == null || cfg.settings == null || cfg.settings.isEmpty()) return false;
-		try {
-			String content = gson.toJson(cfg.settings);
-			RandomMapParameters parsed = gson.fromJson(content, RandomMapParameters.class);
-			if (parsed == null) return false;
-			return parsed.language != null || parsed.randomSeed != null || parsed.dimension != null || parsed.worldSize != null || parsed.landShape != null || parsed.regionCount != null || parsed.cityFrequency != null || (parsed.books != null && !parsed.books.isEmpty());
-		} catch (com.google.gson.JsonSyntaxException ignore) {
-			return false;
-		}
-	}
+	// Removed heuristic that tried to detect compact parameter payloads in
+	// `Config.settings`. Clients MUST either send compact generation
+	// parameters (as RandomMapParameters) OR a full `.nort` settings JSON.
+	// If both are present the server will prefer the explicit settings
+	// object. This avoids brittle detection logic and prevents unnecessary
+	// deserialization attempts that caused Gson reflection errors.
 
 	/**
 	 * Internal helper holding parsed request context for generation endpoints.
@@ -1102,14 +1091,10 @@ private static Object handleUiOptions(Request req, Response res)
 		Config cfg = parseConfig(req, res);
 		RandomMapParameters params = parseRandomMapParameters(req, res);
 
-		// Heuristic: when the request body is a small JSON that represents
-		// generation parameters (RandomMapParameters) rather than a full
-		// .nort MapSettings, prefer `params` and discard the provided
-		// `settings` map on Config so generation proceeds from params.
-		if (allowGenerateRandomSettings && params != null && configLooksLikeRandomParameters(cfg)) {
-			cfg.settings = null;
-			cfg = null;
-		}
+		// If both params and a full settings object are provided, prefer
+		// the explicit settings object. Clients should send compact
+		// generation parameters only when they do not include a full
+		// `.nort` settings payload.
 		if (cfg == null && params == null)
 		{
 			res.status(400);
@@ -1172,16 +1157,16 @@ private static Object handleUiOptions(Request req, Response res)
 	private static void applyCommonSettings(Config cfg, MapSettings settings)
 	{
 		// Apply user-provided seed if present, overriding auto-generated value from SettingsGenerator
-			// Note: Config now inherits MapSettings; treat zero as "not provided".
-			if (cfg.randomSeed != 0L)
-			{
-				settings.randomSeed = cfg.randomSeed;
-				// Also set background-related seeds to match for deterministic background rendering
-				settings.backgroundRandomSeed = cfg.randomSeed;
-				settings.regionsRandomSeed = cfg.randomSeed;
-				settings.textRandomSeed = cfg.randomSeed;
-				settings.frayedBorderSeed = cfg.randomSeed;
-			}
+		// Note: Config now inherits MapSettings; treat zero as "not provided".
+		if (cfg.randomSeed != 0L)
+		{
+			settings.randomSeed = cfg.randomSeed;
+			// Also set background-related seeds to match for deterministic background rendering
+			settings.backgroundRandomSeed = cfg.randomSeed;
+			settings.regionsRandomSeed = cfg.randomSeed;
+			settings.textRandomSeed = cfg.randomSeed;
+			settings.frayedBorderSeed = cfg.randomSeed;
+		}
 	}
 
 	private static GenerationResult generateMap(MapSettings settings, Integer generatedWidth, Integer generatedHeight)
