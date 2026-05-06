@@ -15,13 +15,12 @@ function buildFormDataFromParsedJson(parsed) {
   appendOptionalField(form, 'width', parsed.width)
   appendOptionalField(form, 'height', parsed.height)
   appendOptionalField(form, 'randomSeed', parsed.randomSeed)
-  if (parsed.saveNort) form.append('saveNort', 'true')
   return form
 }
 
 function buildFormDataFromFormData(original) {
   const form = new FormData()
-  const allowedKeys = new Set(['nortFile', 'width', 'height', 'randomSeed', 'saveNort'])
+  const allowedKeys = new Set(['nortFile', 'width', 'height', 'randomSeed'])
   for (const [key, value] of original.entries()) {
     if (allowedKeys.has(key)) {
       form.append(key, value)
@@ -29,5 +28,3 @@ function buildFormDataFromFormData(original) {
   }
   return form
 }
-
-// Compatibility helpers removed per policy: fail-fast on invalid requests.

@@ -1482,7 +1482,7 @@ function GenerateForm({ uiLanguage = 'en' }) {
       toast.show('Preparing map settings...')
       const isManual = (k) => Object.prototype.hasOwnProperty.call(randomOverrides, k)
       const cfg = {
-        mapLanguage: isManual('mapLanguage') ? mapLanguage || undefined : undefined,
+        language: isManual('mapLanguage') ? mapLanguage || undefined : undefined,
         randomSeed: isManual('randomSeed') ? (randomSeed ? Number(randomSeed) : undefined) : undefined,
         artPack: isManual('artPack') ? artPack || undefined : undefined,
         dimension: isManual('dimension') ? dimension || undefined : undefined,
@@ -1930,7 +1930,7 @@ function GenerateForm({ uiLanguage = 'en' }) {
     }
   }
 
-  function buildNortContentRequest({ forceSaveNort = false, explicitNortContent = null } = {}) {
+  function buildNortContentRequest({ explicitNortContent = null } = {}) {
     let parsedSettings = null
     try {
       if (explicitNortContent) {
@@ -1972,7 +1972,7 @@ function GenerateForm({ uiLanguage = 'en' }) {
     const settingsText = serializeNortObject(parsedSettings)
     // Build JSON body matching server `Config` shape: embed settings under `settings`.
     const bodyObj = { settings: parsedSettings }
-    if (forceSaveNort) bodyObj.saveNort = true
+    // `saveNort` is always true on the server; do not send this parameter.
     return {
       requestOptions: {
         method: 'POST',
@@ -1988,7 +1988,7 @@ function GenerateForm({ uiLanguage = 'en' }) {
     }
   }
 
-  function buildFileRequest({ forceSaveNort = false } = {}) {
+  function buildFileRequest() {
     // For uploaded files we prefer to read the file text and POST JSON.
     // This helper builds a JSON body matching server `Config` shape when
     // the caller already has the parsed settings available.
@@ -2006,7 +2006,7 @@ function GenerateForm({ uiLanguage = 'en' }) {
     evt.preventDefault()
     // Build merged settings from current UI state and download that
     try {
-      const result = buildNortContentRequest({ forceSaveNort: true })
+      const result = buildNortContentRequest()
       const body = result.requestOptions && result.requestOptions.body
       if (!body) throw new Error('Failed to build merged settings for download.')
 

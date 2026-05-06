@@ -109,49 +109,21 @@ public class MapApiServer
 
 	private static Object handleGenerateSettings(Request req, Response res)
 	{
-		res.type(CONTENT_TYPE_JSON);
 		logHeaders(req);
 
-		Config cfg = parseConfig(req, res);
-		RandomMapParameters params = parseRandomMapParameters(req, res);
-		if (cfg == null && params == null)
+		GenerationRequestContext grc = prepareGenerationRequest(req, res, true);
+		if (grc == null)
 		{
-			res.status(400);
 			return gson.toJson(new ApiResponse(false, MSG_FAILED_TO_PARSE_CONFIG, null, null));
 		}
 
-		PlatformFactory.setInstance(new AwtFactory());
-		String previousLanguage = UserPreferences.getInstance().language;
-			String generationLanguage = (cfg != null) ? resolveGenerationLanguage(cfg) : null;
-		if ((generationLanguage == null || generationLanguage.isEmpty()) && params != null)
-		{
-				generationLanguage = (params.mapLanguage != null && !params.mapLanguage.isEmpty()) ? params.mapLanguage : params.uiLanguage;
-		}
-		applyRequestLanguage(generationLanguage);
-
 		try
 		{
-			MapSettings settings;
-			if (params != null && (cfg == null || (cfg.settings == null && (cfg.nortFile == null || cfg.nortFile.isEmpty()))))
-			{
-				settings = generateRandomMapSettings(params);
-				applyCommonSettings(cfg != null ? cfg : new Config(), settings);
-				applyThemeOverrides(cfg != null ? cfg : new Config(), settings);
-			}
-			else
-			{
-				GenerationContext ctx = loadSettings(cfg, res);
-				if (ctx == null)
-				{
-					res.status(400);
-					return gson.toJson(new ApiResponse(false, MSG_FAILED_TO_LOAD_SETTINGS, null, null));
-				}
-				settings = ctx.settings;
-			}
+			MapSettings settings = grc.settings;
 
 			// Ensure returned settings include the resolved generation language
-			if (generationLanguage != null && !generationLanguage.isEmpty()) {
-				settings.language = generationLanguage;
+			if (grc.generationLanguage != null && !grc.generationLanguage.isEmpty()) {
+				settings.language = grc.generationLanguage;
 			}
 
 			// Produce normalized settings map and canonical JSON to return to frontend.
@@ -174,7 +146,7 @@ public class MapApiServer
 		}
 		finally
 		{
-			restorePreviousLanguage(previousLanguage);
+			restorePreviousLanguage(grc.previousLanguage);
 		}
 	}
 
@@ -196,51 +168,23 @@ public class MapApiServer
 
 	private static Object handleGenerate(Request req, Response res)
 	{
-		res.type(CONTENT_TYPE_JSON);
 		logHeaders(req);
 
-		Config cfg = parseConfig(req, res);
-		RandomMapParameters params = parseRandomMapParameters(req, res);
-		if (cfg == null && params == null)
+		GenerationRequestContext grc = prepareGenerationRequest(req, res, false);
+		if (grc == null)
 		{
 			return gson.toJson(new ApiResponse(false, MSG_FAILED_TO_PARSE_CONFIG, null, null));
 		}
 
-		PlatformFactory.setInstance(new AwtFactory());
-		String previousLanguage = UserPreferences.getInstance().language;
-		// Prefer explicit language from Config; fall back to RandomMapParameters when present
-		String generationLanguage = (cfg != null) ? resolveGenerationLanguage(cfg) : null;
-		if ((generationLanguage == null || generationLanguage.isEmpty()) && params != null)
-		{
-				generationLanguage = (params.mapLanguage != null && !params.mapLanguage.isEmpty()) ? params.mapLanguage : params.uiLanguage;
-		}
-		applyRequestLanguage(generationLanguage);
-
 		try
 		{
-			GenerationContext ctx;
-			Config effectiveCfg = (cfg != null) ? cfg : new Config();
-
-			// Require pregenerated settings (returned by /api/generate-settings)
-			// or an uploaded .nort file / full settings JSON. Do not generate
-			// new random settings here; callers should call /api/generate-settings
-			// first and then POST the returned normalized .nort as `cfg.settings`.
-			if (cfg == null || (cfg.settings == null && (cfg.nortFile == null || cfg.nortFile.isEmpty())))
-			{
-				res.status(400);
-				return gson.toJson(new ApiResponse(false, "Missing settings: POST the normalized .nort (from /api/generate-settings) or upload a .nort file", null, null));
-			}
-
-			ctx = loadSettings(cfg, res);
-			if (ctx == null)
-			{
-				return gson.toJson(new ApiResponse(false, MSG_FAILED_TO_LOAD_SETTINGS, null, null));
-			}
+			GenerationContext ctx = grc.ctx;
+			Config effectiveCfg = grc.effectiveCfg;
 
 			// Ensure the settings object records the resolved generation language
 			// so downstream components that read settings.language can observe it.
-			if (generationLanguage != null && !generationLanguage.isEmpty()) {
-				ctx.settings.language = generationLanguage;
+			if (grc.generationLanguage != null && !grc.generationLanguage.isEmpty()) {
+				ctx.settings.language = grc.generationLanguage;
 			}
 
 			// If the loaded settings contain a language, apply it to the
@@ -250,31 +194,31 @@ public class MapApiServer
 			}
 
 			// Debug logging to help trace language propagation during generation
-			if (API_DEBUG) Logger.println("Generation language resolved: " + generationLanguage + ", settings.language: " + ctx.settings.language + ", effective applied language: " + UserPreferences.getInstance().language);
-				GenerationResult generation = generateMap(ctx.settings, effectiveCfg);
-					if (generation.image == null)
-					{
-						res.status(500);
-						return gson.toJson(new ApiResponse(false, generation.errorMessage, null, null));
-					}
-					Image img = generation.image;
+			if (API_DEBUG) Logger.println("Generation language resolved: " + grc.generationLanguage + ", settings.language: " + ctx.settings.language + ", effective applied language: " + UserPreferences.getInstance().language);
+			GenerationResult generation = generateMap(ctx.settings, effectiveCfg.generatedWidth, effectiveCfg.generatedHeight);
+			if (generation.image == null)
+			{
+				res.status(500);
+				return gson.toJson(new ApiResponse(false, generation.errorMessage, null, null));
+			}
+			Image img = generation.image;
 			// Always return JSON containing the image (base64) and the
 			// merged .nort settings so clients can retrieve edits.
 				try {
 					BufferedImage buf = nortantis.platform.awt.AwtFactory.unwrap(img);
-					return returnJsonResponse(buf, ctx.settings, effectiveCfg, res);
+					return returnJsonResponse(buf, ctx.settings, res);
 				} catch (Exception e) {
-					Logger.println("returnJsonResponse failed: " + e);
-					res.status(500);
-					return gson.toJson(new ApiResponse(false, "Failed to produce JSON response: " + e.getClass().getSimpleName() + (e.getMessage() != null ? (" - " + e.getMessage()) : ""), null, null));
-				} finally {
-					img.close();
-					cleanupTempNortPath(ctx.tempNortPath, effectiveCfg);
-				}
+				Logger.println("returnJsonResponse failed: " + e);
+				res.status(500);
+				return gson.toJson(new ApiResponse(false, "Failed to produce JSON response: " + e.getClass().getSimpleName() + (e.getMessage() != null ? (" - " + e.getMessage()) : ""), null, null));
+			} finally {
+				img.close();
+				cleanupTempNortPath(ctx.tempNortPath);
+			}
 		}
 		finally
 		{
-			restorePreviousLanguage(previousLanguage);
+			restorePreviousLanguage(grc.previousLanguage);
 		}
 	}
 
@@ -296,27 +240,7 @@ public class MapApiServer
 		}
 	}
 
-	private static String resolveGenerationLanguage(Config cfg)
-	{
-		if (cfg == null)
-		{
-			return null;
-		}
-
-		// Prefer an explicit `language` included inside provided settings JSON
-		if (cfg.settings != null && cfg.settings.containsKey("language")) {
-			Object lang = cfg.settings.get("language");
-			if (lang instanceof String && !((String) lang).isEmpty()) return (String) lang;
-		}
-
-		// Fall back to the legacy mapLanguage query/form parameter if provided
-		if (cfg.mapLanguage != null && !cfg.mapLanguage.isEmpty())
-		{
-			return cfg.mapLanguage;
-		}
-
-		return cfg.uiLanguage;
-	}
+    
 
 	private static void restorePreviousLanguage(String previousLanguage)
 	{
@@ -719,7 +643,17 @@ private static Object handleUiOptions(Request req, Response res)
 		Image baseImage = null;
 		try
 		{
-			baseImage = generateBackgroundBaseImage(ctx.settings, cfg);
+			BackgroundBaseParams bp = new BackgroundBaseParams(
+					cfg.previewWidth != null && cfg.previewWidth > 0 ? cfg.previewWidth : DEFAULT_BACKGROUND_PREVIEW_WIDTH,
+					cfg.previewHeight != null && cfg.previewHeight > 0 ? cfg.previewHeight : DEFAULT_BACKGROUND_PREVIEW_HEIGHT,
+					ctx.settings.generateBackground,
+					ctx.settings.generateBackgroundFromTexture,
+					ctx.settings.backgroundRandomSeed,
+					ctx.settings.getBackgroundImagePath(),
+					ctx.settings.backgroundTextureResource != null ? ctx.settings.backgroundTextureResource.artPack : null,
+					ctx.settings.customImagesPath
+			);
+			baseImage = generateBackgroundBaseImage(bp);
 			BufferedImage buffered = nortantis.platform.awt.AwtFactory.unwrap(baseImage);
 			res.type(CONTENT_TYPE_PNG);
 			res.status(200);
@@ -754,16 +688,42 @@ private static Object handleUiOptions(Request req, Response res)
 		}
 	}
 
-	private static Image generateBackgroundBaseImage(MapSettings settings, Config cfg)
+	private static class BackgroundBaseParams {
+		public final int width;
+		public final int height;
+		public final boolean generateBackground;
+		public final boolean generateBackgroundFromTexture;
+		public final Long backgroundRandomSeed;
+		public final Tuple2<Path, String> backgroundImagePath;
+		public final String backgroundTextureArtPack;
+		public final String customImagesPath;
+
+		public BackgroundBaseParams(int width, int height, boolean generateBackground, boolean generateBackgroundFromTexture,
+									Long backgroundRandomSeed, Tuple2<Path, String> backgroundImagePath,
+									String backgroundTextureArtPack, String customImagesPath)
+		{
+			this.width = width;
+			this.height = height;
+			this.generateBackground = generateBackground;
+			this.generateBackgroundFromTexture = generateBackgroundFromTexture;
+			this.backgroundRandomSeed = backgroundRandomSeed;
+			this.backgroundImagePath = backgroundImagePath;
+			this.backgroundTextureArtPack = backgroundTextureArtPack;
+			this.customImagesPath = customImagesPath;
+		}
+	}
+
+	private static Image generateBackgroundBaseImage(BackgroundBaseParams p)
 	{
-		int width = cfg.previewWidth != null && cfg.previewWidth > 0 ? cfg.previewWidth : DEFAULT_BACKGROUND_PREVIEW_WIDTH;
-		int height = cfg.previewHeight != null && cfg.previewHeight > 0 ? cfg.previewHeight : DEFAULT_BACKGROUND_PREVIEW_HEIGHT;
+		int width = p.width;
+		int height = p.height;
 
 		Image backgroundBase;
 
-		if (settings.generateBackground)
+		if (p.generateBackground)
 		{
-			Image fractal = FractalBGGenerator.generate(new Random(settings.backgroundRandomSeed), 1.3f, width, height, 0.75f);
+			Random rng = (p.backgroundRandomSeed != null) ? new Random(p.backgroundRandomSeed) : new Random();
+			Image fractal = FractalBGGenerator.generate(rng, 1.3f, width, height, 0.75f);
 			try
 			{
 				backgroundBase = fractal.deepCopy();
@@ -773,16 +733,17 @@ private static Object handleUiOptions(Request req, Response res)
 				fractal.close();
 			}
 		}
-		else if (settings.generateBackgroundFromTexture)
+		else if (p.generateBackgroundFromTexture)
 		{
-			Tuple2<Path, String> tuple = settings.getBackgroundImagePath();
-			Path texturePath = tuple.getFirst();
+			Tuple2<Path, String> tuple = p.backgroundImagePath;
+			Path texturePath = tuple != null ? tuple.getFirst() : null;
 
-			Image texture = ImageCache.getInstance(settings.backgroundTextureResource.artPack, settings.customImagesPath).getImageFromFile(texturePath);
+			Image texture = ImageCache.getInstance(p.backgroundTextureArtPack, p.customImagesPath).getImageFromFile(texturePath);
 			try
 			{
 				Image textureForOcean = ImageHelper.getInstance().convertToGrayscale(texture);
-				Image oceanBase = BackgroundGenerator.generateUsingWhiteNoiseConvolution(new Random(settings.backgroundRandomSeed), textureForOcean, height, width);
+				Random rng = (p.backgroundRandomSeed != null) ? new Random(p.backgroundRandomSeed) : new Random();
+				Image oceanBase = BackgroundGenerator.generateUsingWhiteNoiseConvolution(rng, textureForOcean, height, width);
 				try
 				{
 					backgroundBase = oceanBase.deepCopy();
@@ -911,7 +872,7 @@ private static Object handleUiOptions(Request req, Response res)
             cfg.nortFile = temp.toAbsolutePath().toString();
 		}
 
-		// Extract basic control fields (generatedWidth/generatedHeight/seed/saveNort/return flags).
+		// Extract basic control fields (generatedWidth/generatedHeight/seed/return flags).
 		// Theme-specific form fields are intentionally NOT extracted for
 		// multipart uploads: customization must be embedded into the uploaded
 		// .nort JSON. This preserves backward compatibility for clients that
@@ -922,25 +883,17 @@ private static Object handleUiOptions(Request req, Response res)
 
 	private static void extractFormFields(Request req, Config cfg)
 	{
-		String genWidthStr = param(req, "generatedWidth");
-		String genHeightStr = param(req, "generatedHeight");
-		String seedStr = param(req, "randomSeed");
+		String generatedWidth = param(req, "generatedWidth");
+		String generatedHeight = param(req, "generatedHeight");
+		String randomSeed = param(req, "randomSeed");
 
-		if (genWidthStr != null)
-			cfg.generatedWidth = Integer.valueOf(genWidthStr);
-		if (genHeightStr != null)
-			cfg.generatedHeight = Integer.valueOf(genHeightStr);
-		if (seedStr != null)
-			cfg.randomSeed = Long.valueOf(seedStr);
-		cfg.uiLanguage = param(req, "uiLanguage");
-		cfg.mapLanguage = param(req, "mapLanguage");
-		// Accept the newer `language` form parameter as a fallback for clients
-		// that send it instead of the legacy mapLanguage parameter.
-		if (cfg.mapLanguage == null) {
-			cfg.mapLanguage = param(req, "language");
-		}
-		// `saveNort` is always true (server persists .nort); do not accept as client parameter.
-		cfg.saveNort = Boolean.TRUE;
+		if (generatedWidth != null)
+			cfg.generatedWidth = Integer.valueOf(generatedWidth);
+		if (generatedHeight != null)
+			cfg.generatedHeight = Integer.valueOf(generatedHeight);
+		if (randomSeed != null)
+			cfg.randomSeed = Long.valueOf(randomSeed);
+		cfg.language = param(req, "language");
 	}
 
 	private static String param(Request req, String name)
@@ -1040,8 +993,7 @@ private static Object handleUiOptions(Request req, Response res)
 	}
 
 	private static class RandomMapParameters {
-		String uiLanguage;
-		String mapLanguage;
+		String language;
 		Long randomSeed;
 		String dimension;
 		Integer worldSize;
@@ -1054,8 +1006,7 @@ private static Object handleUiOptions(Request req, Response res)
 
 		static RandomMapParameters fromConfig(Config c) {
 			RandomMapParameters p = new RandomMapParameters();
-			p.uiLanguage = c.uiLanguage;
-			p.mapLanguage = c.mapLanguage;
+			p.language = c.language;
 			p.randomSeed = c.randomSeed;
 			p.dimension = c.dimension;
 			p.worldSize = c.worldSize;
@@ -1066,6 +1017,102 @@ private static Object handleUiOptions(Request req, Response res)
 			p.books = c.books;
 			p.artPack = c.artPack;
 			return p;
+		}
+	}
+
+	/**
+	 * Internal helper holding parsed request context for generation endpoints.
+	 */
+	private static class GenerationRequestContext {
+		String generationLanguage;
+		String previousLanguage;
+		Config effectiveCfg;
+		GenerationContext ctx; // populated for endpoints that load settings from .nort
+		MapSettings settings;  // populated when settings are available directly
+	}
+
+	/**
+	 * Parse request and prepare a GenerationRequestContext.
+	 * If allowGenerateRandomSettings is true, the helper will generate random
+	 * settings when params are provided and no settings are included. If false,
+	 * the request must include settings (or an uploaded .nort) and the function
+	 * will attempt to load them into a GenerationContext via loadSettings.
+	 * Returns null and sets response status on error.
+	 */
+	private static GenerationRequestContext prepareGenerationRequest(Request req, Response res, boolean allowGenerateRandomSettings)
+	{
+		Config cfg = parseConfig(req, res);
+		RandomMapParameters params = parseRandomMapParameters(req, res);
+		if (cfg == null && params == null)
+		{
+			res.status(400);
+			return null;
+		}
+
+		PlatformFactory.setInstance(new AwtFactory());
+		GenerationRequestContext out = new GenerationRequestContext();
+		out.previousLanguage = UserPreferences.getInstance().language;
+		// Prefer an explicit `language` provided as a parameter or config field.
+		// Do NOT fall back to UI language; if no explicit language is supplied
+		// the MapSettings object (loaded or generated) contains a default.
+		out.generationLanguage = null;
+		if (params != null && params.language != null && !params.language.isEmpty()) {
+			out.generationLanguage = params.language;
+		} else if (cfg != null && cfg.language != null && !cfg.language.isEmpty()) {
+			out.generationLanguage = cfg.language;
+		}
+		applyRequestLanguage(out.generationLanguage);
+
+		out.effectiveCfg = (cfg != null) ? cfg : new Config();
+
+		try
+		{
+			if (allowGenerateRandomSettings)
+			{
+				if (params != null && (cfg == null || (cfg.settings == null && (cfg.nortFile == null || cfg.nortFile.isEmpty()))))
+				{
+					out.settings = generateRandomMapSettings(params);
+					applyCommonSettings(cfg != null ? cfg : new Config(), out.settings);
+					applyThemeOverrides(cfg != null ? cfg : new Config(), out.settings);
+					return out;
+				}
+				else
+				{
+					// Load settings if provided
+					GenerationContext ctx = loadSettings(cfg, res);
+					if (ctx == null)
+					{
+						res.status(400);
+						return null;
+					}
+					out.ctx = ctx;
+					out.settings = ctx.settings;
+					return out;
+				}
+			}
+			else
+			{
+				// Caller requires settings to be provided (no random generation here)
+				if (cfg == null || (cfg.settings == null && (cfg.nortFile == null || cfg.nortFile.isEmpty())))
+				{
+					res.status(400);
+					return null;
+				}
+				GenerationContext ctx = loadSettings(cfg, res);
+				if (ctx == null)
+				{
+					res.status(400);
+					return null;
+				}
+				out.ctx = ctx;
+				out.settings = ctx.settings;
+				return out;
+			}
+		}
+		catch (Exception e)
+		{
+			res.status(500);
+			return null;
 		}
 	}
 
@@ -1083,7 +1130,7 @@ private static Object handleUiOptions(Request req, Response res)
 		}
 	}
 
-	private static GenerationResult generateMap(MapSettings settings, Config cfg)
+	private static GenerationResult generateMap(MapSettings settings, Integer generatedWidth, Integer generatedHeight)
 	{
 		// Only pass explicit render dimensions to the map creator when the
 		// caller provided `generatedWidth` or `generatedHeight`. The desktop
@@ -1091,7 +1138,7 @@ private static Object handleUiOptions(Request req, Response res)
 		// requested which influences resolution calculations; matching that
 		// behavior here ensures generated worlds are consistent given the
 		// same settings and seed.
-		Dimension dims = (cfg.generatedWidth != null || cfg.generatedHeight != null) ? computeRenderDimensions(settings, cfg) : null;
+		Dimension dims = (generatedWidth != null || generatedHeight != null) ? computeRenderDimensions(settings, generatedWidth, generatedHeight) : null;
 
 		try
 		{
@@ -1104,15 +1151,15 @@ private static Object handleUiOptions(Request req, Response res)
 		}
 	}
 
-	private static Dimension computeRenderDimensions(MapSettings settings, Config cfg)
+	private static Dimension computeRenderDimensions(MapSettings settings, Integer generatedWidth, Integer generatedHeight)
 	{
 		// If the caller did not provide explicit width/height, prefer the
 		// `generatedWidth`/`generatedHeight` from the loaded `.nort` settings
 		// so maps loaded from files render at their intended resolution.
 		int defaultWidth = settings.generatedWidth > 0 ? settings.generatedWidth : 2000;
 		int defaultHeight = settings.generatedHeight > 0 ? settings.generatedHeight : 1200;
-		int w = (cfg.generatedWidth != null) ? cfg.generatedWidth : defaultWidth;
-		int h = (cfg.generatedHeight != null) ? cfg.generatedHeight : defaultHeight;
+		int w = (generatedWidth != null) ? generatedWidth : defaultWidth;
+		int h = (generatedHeight != null) ? generatedHeight : defaultHeight;
 		return new Dimension(w, h);
 	}
 
@@ -1194,11 +1241,11 @@ private static Object handleUiOptions(Request req, Response res)
 
 	private static final int MAX_BASE64_PREVIEW_DIMENSION = 1920;
 
-	private static Object returnJsonResponse(BufferedImage buf, MapSettings settings, Config cfg, Response res) throws IOException
+	private static Object returnJsonResponse(BufferedImage buf, MapSettings settings, Response res) throws IOException
 	{
 		buf = scaleImageIfNeeded(buf);
 		byte[] bytes = serializeImageToBytes(buf);
-		String nortContent = resolveBestNortContent(cfg, settings);
+		String nortContent = resolveBestNortContent(settings);
 
 		// Parse canonical settings into a map, attach imageBase64, and return
 		@SuppressWarnings("unchecked")
@@ -1238,7 +1285,7 @@ private static Object handleUiOptions(Request req, Response res)
 		}
 	}
 
-	private static String resolveBestNortContent(Config cfg, MapSettings settings)
+	private static String resolveBestNortContent(MapSettings settings)
 	{
 		// Ensure edits arrays are populated so clients receive usable editor
 		// state in the returned .nort. If edits are not initialized, create a
@@ -1269,9 +1316,9 @@ private static Object handleUiOptions(Request req, Response res)
 		return settings.toJsonString();
 	}
 
-	private static void cleanupTempNortPath(Path tempNortPath, Config cfg)
+	private static void cleanupTempNortPath(Path tempNortPath)
 	{
-		if (tempNortPath != null && !cfg.saveNort)
+		if (tempNortPath != null)
 		{
 			try
 			{
@@ -1318,13 +1365,8 @@ private static Object handleUiOptions(Request req, Response res)
 		Integer generatedWidth;
 		Integer generatedHeight;
 		Long randomSeed;
-		String uiLanguage;
-		String mapLanguage;
-		Boolean saveNort;
-		// Always default to true; server persists .nort files by design.
-		{
-			saveNort = Boolean.TRUE;
-		}
+		String language;
+
 		// Random map generation parameters
 		String artPack;
 		Integer worldSize;
@@ -1337,7 +1379,7 @@ private static Object handleUiOptions(Request req, Response res)
 		// Final map / theme override parameters
 		String backgroundType;
 		String textureRef;
-		Long backgroundSeed;
+		Long backgroundRandomSeed;
 		Boolean drawRegionBoundaries;
 		Boolean colorizeLand;
 		Boolean colorizeOcean;
@@ -1476,9 +1518,9 @@ private static Object handleUiOptions(Request req, Response res)
 
 	private static void applyBackgroundSeed(Config cfg, MapSettings settings)
 	{
-		if (cfg.backgroundSeed != null)
+		if (cfg.backgroundRandomSeed != null)
 		{
-			settings.backgroundRandomSeed = cfg.backgroundSeed;
+			settings.backgroundRandomSeed = cfg.backgroundRandomSeed;
 		}
 	}
 
