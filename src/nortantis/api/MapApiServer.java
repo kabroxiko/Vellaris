@@ -779,7 +779,6 @@ private static Object handleUiOptions(Request req, Response res)
 		int getWidth() { return width; }
 		int getHeight() { return height; }
 		boolean isGenerateBackground() { return generateBackground; }
-		boolean isGenerateBackgroundFromTexture() { return generateBackgroundFromTexture; }
 		Long getBackgroundRandomSeed() { return backgroundRandomSeed; }
 		Tuple2<Path, String> getBackgroundImagePath() { return backgroundImagePath; }
 		String getBackgroundTextureArtPack() { return backgroundTextureArtPack; }
@@ -879,113 +878,31 @@ private static Object handleUiOptions(Request req, Response res)
 		}
 	}
 
-	private static Config parseConfig(Request req, Response res)
-	{
-		try
-		{
-			// Parse the request body as the full .nort JSON content and store
-			// it in the `settings` map on Config. We avoid creating temp files
-			// here; `loadSettings` will create a temp .nort when needed.
-			String body = req.body();
-			if (body == null) return null;
-			@SuppressWarnings("unchecked")
-			Map<String,Object> parsed = gson.fromJson(body, Map.class);
-			Config cfg = new Config();
-			cfg.settings = parsed;
-			return cfg;
-		}
-		catch (com.google.gson.JsonSyntaxException e)
-		{
-			res.status(400);
-			return null;
-		}
-	}
-
-	/**
-	 * Parse a request body (JSON or multipart form) into RandomMapParameters.
-	 * Returns null and sets response status 400 on parse errors.
-	 */
-	private static RandomMapParameters parseRandomMapParameters(Request req, Response res)
-	{
-		try
-		{
-			return gson.fromJson(req.body(), RandomMapParameters.class);
-		}
-		catch (com.google.gson.JsonSyntaxException e)
-		{
-			res.status(400);
-			return null;
-		}
-	}
-
 	private static String param(Request req, String name)
 	{
 		String v = req.raw().getParameter(name);
 		return (v != null && !v.isEmpty()) ? v : null;
 	}
 
-	private static GenerationContext loadSettings(Config cfg, Response res)
-	{
-		boolean providedSettings = cfg.settings != null && !cfg.settings.isEmpty();
-		Path tempNortPath = null;
-
-		try
-		{
-			MapSettings settings;
-			if (providedSettings)
-			{
-				// Persist provided settings to a temporary .nort file and load
-				// MapSettings from it to preserve numeric types exactly as
-				// serialized by the client.
-				tempNortPath = Files.createTempFile("nortantis-", NORT_EXTENSION);
-				String settingsJson = gson.toJson(cfg.settings);
-				Files.write(tempNortPath, settingsJson.getBytes(StandardCharsets.UTF_8), StandardOpenOption.TRUNCATE_EXISTING);
-				settings = new MapSettings(tempNortPath.toAbsolutePath().toString());
-			}
-			else
-			{
-				settings = generateRandomMapSettings(cfg);
-			}
-
-			applyCommonSettings(cfg, settings);
-			// Safety: if the provided settings JSON contains icon edits (freeIcons or centerEdits),
-			// ensure the hasIconEdits flag is set so MapCreator does not generate icons again.
-			ensureIconEditsFlag(settings);
-
-			return new GenerationContext(settings, tempNortPath);
-			}
-			catch (IOException ex)
-		{
-			res.status(400);
-			return null;
-		}
-	}
-
-		// Extracted helper to satisfy Sonar S1141: keep nested try logic in a
-		// separate method for clarity and single-responsibility.
-		private static void ensureIconEditsFlag(MapSettings settings) {
-			try {
-				if (settings.edits != null) {
-					// Only mark hasIconEdits true when centerEdits are present (initialized).
-					// If only freeIcons are present without initialized centerEdits, the
-					// editor state is incomplete and IconDrawer expects centerEdits to exist
-					// for full-map icon updates. The frontend should send initialized
-					// centerEdits when it intends to re-use edits; do not infer from
-					// freeIcons alone to avoid NPEs in the generation pipeline.
-					boolean hasCenterEdits = settings.edits.centerEdits != null && !settings.edits.centerEdits.isEmpty();
-					if (hasCenterEdits) {
-						settings.edits.hasIconEdits = true;
-					}
+	// Extracted helper to satisfy Sonar S1141: keep nested try logic in a
+	// separate method for clarity and single-responsibility.
+	private static void ensureIconEditsFlag(MapSettings settings) {
+		try {
+			if (settings.edits != null) {
+				// Only mark hasIconEdits true when centerEdits are present (initialized).
+				// If only freeIcons are present without initialized centerEdits, the
+				// editor state is incomplete and IconDrawer expects centerEdits to exist
+				// for full-map icon updates. The frontend should send initialized
+				// centerEdits when it intends to re-use edits; do not infer from
+				// freeIcons alone to avoid NPEs in the generation pipeline.
+				boolean hasCenterEdits = settings.edits.centerEdits != null && !settings.edits.centerEdits.isEmpty();
+				if (hasCenterEdits) {
+					settings.edits.hasIconEdits = true;
 				}
-			} catch (NullPointerException ignore) {
-				// best-effort; if this fails, default behavior remains unchanged
 			}
+		} catch (NullPointerException ignore) {
+			// best-effort; if this fails, default behavior remains unchanged
 		}
-
-	private static MapSettings generateRandomMapSettings(MapSettings cfg)
-	{
-		RandomMapParameters params = RandomMapParameters.fromConfig(cfg);
-		return generateRandomMapSettings(params);
 	}
 
 	private static MapSettings generateRandomMapSettings(RandomMapParameters params)
@@ -1036,36 +953,7 @@ private static Object handleUiOptions(Request req, Response res)
 		Integer cityFrequency;
 		List<String> books;
 		String artPack;
-
-		static RandomMapParameters fromConfig(MapSettings c) {
-			RandomMapParameters p = new RandomMapParameters();
-			p.language = c.language;
-			p.randomSeed = (c.randomSeed != 0L) ? Long.valueOf(c.randomSeed) : null;
-			// MapSettings stores enums/typed fields; convert to compact parameter shapes
-			p.dimension = null; // deprecated for direct-from-MapSettings path
-			p.worldSize = c.worldSize > 0 ? Integer.valueOf(c.worldSize) : null;
-			p.landShape = (c.landShape != null) ? c.landShape.name() : null;
-			p.regionCount = c.regionCount > 0 ? Integer.valueOf(c.regionCount) : null;
-			p.drawRegionColors = Boolean.valueOf(c.drawRegionColors);
-			// Convert cityProbability back to UI percentage (approx)
-			if (c.cityProbability > 0.0) {
-				int pct = (int) Math.round((c.cityProbability / SettingsGenerator.maxCityProbability) * 100.0);
-				p.cityFrequency = Integer.valueOf(pct);
-			} else {
-				p.cityFrequency = null;
-			}
-			if (c.books != null) p.books = new java.util.ArrayList<>(c.books);
-			p.artPack = c.artPack;
-			return p;
-		}
 	}
-
-	// Removed heuristic that tried to detect compact parameter payloads in
-	// `Config.settings`. Clients MUST either send compact generation
-	// parameters (as RandomMapParameters) OR a full `.nort` settings JSON.
-	// If both are present the server will prefer the explicit settings
-	// object. This avoids brittle detection logic and prevents unnecessary
-	// deserialization attempts that caused Gson reflection errors.
 
 	/**
 	 * Internal helper holding parsed request context for generation endpoints.
@@ -1088,84 +976,72 @@ private static Object handleUiOptions(Request req, Response res)
 	 */
 	private static GenerationRequestContext prepareGenerationRequest(Request req, Response res, boolean allowGenerateRandomSettings)
 	{
-		Config cfg = parseConfig(req, res);
-		RandomMapParameters params = parseRandomMapParameters(req, res);
-
-		// If both params and a full settings object are provided, prefer
-		// the explicit settings object. Clients should send compact
-		// generation parameters only when they do not include a full
-		// `.nort` settings payload.
-		if (cfg == null && params == null)
-		{
+		String body = req.body();
+		if (body == null || body.isBlank()) {
 			res.status(400);
 			return null;
 		}
 
 		PlatformFactory.setInstance(new AwtFactory());
+
+		RandomMapParameters params = tryParseParams(body);
+
+		if (allowGenerateRandomSettings && paramsContainGenerationFields(params)) {
+			return buildContextFromParams(params);
+		}
+
+		return buildContextFromNortBody(body, params, res);
+	}
+
+	// Helper: attempt to parse the request body as RandomMapParameters
+	private static RandomMapParameters tryParseParams(String body) {
+		try {
+			return gson.fromJson(body, RandomMapParameters.class);
+		} catch (com.google.gson.JsonSyntaxException e) {
+			return null;
+		}
+	}
+
+	// Helper: quick check whether parsed params contain any generation fields
+	private static boolean paramsContainGenerationFields(RandomMapParameters p) {
+		return p != null && (p.language != null || p.randomSeed != null || p.dimension != null || p.worldSize != null || p.landShape != null || p.regionCount != null || p.cityFrequency != null || (p.books != null && !p.books.isEmpty()));
+	}
+
+	// Build GenerationRequestContext when params-driven generation is requested
+	private static GenerationRequestContext buildContextFromParams(RandomMapParameters params) {
 		GenerationRequestContext out = new GenerationRequestContext();
 		out.previousLanguage = UserPreferences.getInstance().language;
-		// Prefer an explicit `language` provided as a parameter or config field.
-		// Do NOT fall back to UI language; if no explicit language is supplied
-		// the MapSettings object (loaded or generated) contains a default.
-		out.generationLanguage = null;
-		if (params != null && params.language != null && !params.language.isEmpty()) {
-			out.generationLanguage = params.language;
-		} else if (cfg != null && cfg.language != null && !cfg.language.isEmpty()) {
-			out.generationLanguage = cfg.language;
-		}
+		out.generationLanguage = (params.language != null && !params.language.isEmpty()) ? params.language : null;
 		applyRequestLanguage(out.generationLanguage);
-
-		out.effectiveCfg = (cfg != null) ? cfg : new Config();
-
-			if (!populateSettingsIntoOut(out, cfg, params, allowGenerateRandomSettings, res)) {
-				return null;
-			}
-			return out;
+		out.effectiveCfg = new Config();
+		out.settings = generateRandomMapSettings(params);
+		return out;
 	}
 
-	private static boolean populateSettingsIntoOut(GenerationRequestContext out, Config cfg, RandomMapParameters params, boolean allowGenerateRandomSettings, Response res) {
+	// Build GenerationRequestContext by persisting body to a temp .nort and loading MapSettings
+	private static GenerationRequestContext buildContextFromNortBody(String body, RandomMapParameters params, Response res) {
+		Path tempNortPath = null;
 		try {
-			if (allowGenerateRandomSettings && params != null && (cfg == null || cfg.settings == null || cfg.settings.isEmpty())) {
-				out.settings = generateRandomMapSettings(params);
-				applyCommonSettings(cfg != null ? cfg : new Config(), out.settings);
-				return true;
+			tempNortPath = Files.createTempFile("nortantis-", NORT_EXTENSION);
+			Files.write(tempNortPath, body.getBytes(StandardCharsets.UTF_8), StandardOpenOption.TRUNCATE_EXISTING);
+			MapSettings settings = new MapSettings(tempNortPath.toAbsolutePath().toString());
+
+			ensureIconEditsFlag(settings);
+
+			GenerationRequestContext out = new GenerationRequestContext();
+			out.previousLanguage = UserPreferences.getInstance().language;
+			out.ctx = new GenerationContext(settings, tempNortPath);
+			out.settings = settings;
+			out.generationLanguage = (params != null && params.language != null && !params.language.isEmpty()) ? params.language : settings.language;
+			applyRequestLanguage(out.generationLanguage);
+			out.effectiveCfg = new Config();
+			return out;
+		} catch (IOException e) {
+			if (tempNortPath != null) {
+				try { Files.deleteIfExists(tempNortPath); } catch (IOException ignore) {}
 			}
-
-			if (cfg == null || cfg.settings == null || cfg.settings.isEmpty()) {
-				res.status(400);
-				return false;
-			}
-
-			return loadSettingsIntoOut(out, cfg, res);
-		} catch (RuntimeException e) {
-			res.status(500);
-			return false;
-		}
-	}
-
-	private static boolean loadSettingsIntoOut(GenerationRequestContext out, Config cfg, Response res) {
-		GenerationContext ctx = loadSettings(cfg, res);
-		if (ctx == null) {
 			res.status(400);
-			return false;
-		}
-		out.ctx = ctx;
-		out.settings = ctx.settings;
-		return true;
-	}
-
-	private static void applyCommonSettings(Config cfg, MapSettings settings)
-	{
-		// Apply user-provided seed if present, overriding auto-generated value from SettingsGenerator
-		// Note: Config now inherits MapSettings; treat zero as "not provided".
-		if (cfg.randomSeed != 0L)
-		{
-			settings.randomSeed = cfg.randomSeed;
-			// Also set background-related seeds to match for deterministic background rendering
-			settings.backgroundRandomSeed = cfg.randomSeed;
-			settings.regionsRandomSeed = cfg.randomSeed;
-			settings.textRandomSeed = cfg.randomSeed;
-			settings.frayedBorderSeed = cfg.randomSeed;
+			return null;
 		}
 	}
 
