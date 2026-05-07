@@ -679,29 +679,73 @@ private static Object handleUiOptions(Request req, Response res)
 	private static BackgroundBaseParseResult parseBackgroundBaseRequest(Request req) throws java.io.IOException, javax.servlet.ServletException, com.google.gson.JsonSyntaxException {
 		String contentType = req.contentType();
 		if (contentType != null && contentType.toLowerCase().startsWith("multipart/form-data")) {
-			MultipartConfigElement multipartConfigElement = new MultipartConfigElement(System.getProperty("java.io.tmpdir"));
-			req.raw().setAttribute("org.eclipse.jetty.multipartConfig", multipartConfigElement);
-			Part part = req.raw().getPart("backgroundImage");
-			Path uploadedTemp = null;
-			if (part != null) {
-				uploadedTemp = Files.createTempFile("nortantis-bg-upload-", ".img");
-				try (InputStream is = part.getInputStream()) {
-					Files.copy(is, uploadedTemp, StandardCopyOption.REPLACE_EXISTING);
-				}
+			return parseMultipartBackgroundBaseRequest(req);
+		}
+
+		String body = req.body();
+		return parseJsonBackgroundBaseRequest(body);
+	}
+
+	private static BackgroundBaseParseResult parseMultipartBackgroundBaseRequest(Request req) throws java.io.IOException, javax.servlet.ServletException {
+		MultipartConfigElement multipartConfigElement = new MultipartConfigElement(System.getProperty("java.io.tmpdir"));
+		req.raw().setAttribute("org.eclipse.jetty.multipartConfig", multipartConfigElement);
+		Part part = req.raw().getPart("backgroundImage");
+		Path uploadedTemp = null;
+		if (part != null) {
+			uploadedTemp = Files.createTempFile("nortantis-bg-upload-", ".img");
+			try (InputStream is = part.getInputStream()) {
+				Files.copy(is, uploadedTemp, StandardCopyOption.REPLACE_EXISTING);
 			}
-			BackgroundBaseRequest br = new BackgroundBaseRequest();
-			br.previewWidth = param(req, "previewWidth") != null ? Integer.valueOf(param(req, "previewWidth")) : null;
-			br.previewHeight = param(req, "previewHeight") != null ? Integer.valueOf(param(req, "previewHeight")) : null;
-			br.generateBackground = param(req, "generateBackground") != null ? Boolean.valueOf(param(req, "generateBackground")) : null;
-			br.generateBackgroundFromTexture = param(req, "generateBackgroundFromTexture") != null ? Boolean.valueOf(param(req, "generateBackgroundFromTexture")) : null;
-			String seedStr = param(req, "backgroundRandomSeed");
-			br.backgroundRandomSeed = seedStr != null ? Long.valueOf(seedStr) : null;
-			br.backgroundTextureRef = param(req, "backgroundTextureRef");
-			br.customImagesPath = param(req, "customImagesPath");
-			return new BackgroundBaseParseResult(br, uploadedTemp);
-		} else {
-			BackgroundBaseRequest br = gson.fromJson(req.body(), BackgroundBaseRequest.class);
-			return new BackgroundBaseParseResult(br, null);
+		}
+
+		BackgroundBaseRequest br = new BackgroundBaseRequest();
+		br.previewWidth = param(req, "previewWidth") != null ? Integer.valueOf(param(req, "previewWidth")) : null;
+		br.previewHeight = param(req, "previewHeight") != null ? Integer.valueOf(param(req, "previewHeight")) : null;
+		br.generateBackground = param(req, "generateBackground") != null ? Boolean.valueOf(param(req, "generateBackground")) : null;
+		br.generateBackgroundFromTexture = param(req, "generateBackgroundFromTexture") != null ? Boolean.valueOf(param(req, "generateBackgroundFromTexture")) : null;
+		String seedStr = param(req, "backgroundRandomSeed");
+		br.backgroundRandomSeed = seedStr != null ? Long.valueOf(seedStr) : null;
+		br.backgroundTextureRef = param(req, "backgroundTextureRef");
+		br.customImagesPath = param(req, "customImagesPath");
+		return new BackgroundBaseParseResult(br, uploadedTemp);
+	}
+
+	private static BackgroundBaseParseResult parseJsonBackgroundBaseRequest(String body) {
+		BackgroundBaseRequest br = gson.fromJson(body, BackgroundBaseRequest.class);
+
+		try {
+			@SuppressWarnings("unchecked")
+			Map<String, Object> raw = gson.fromJson(body, Map.class);
+			if (br == null) br = new BackgroundBaseRequest();
+
+			mapAlternateTextureKeys(raw, br);
+			mapAlternateBackgroundKey(raw, br);
+		} catch (RuntimeException ignore) {
+			// If mapping fails, fall back to the direct deserialized object.
+		}
+
+		return new BackgroundBaseParseResult(br, null);
+	}
+
+	private static void mapAlternateTextureKeys(Map<String, Object> raw, BackgroundBaseRequest br) {
+		if (br.backgroundTextureRef != null && !br.backgroundTextureRef.isEmpty()) return;
+		Object v = null;
+		if (raw.containsKey("backgroundTextureRef")) v = raw.get("backgroundTextureRef");
+		if (v == null && raw.containsKey("backgroundTexture")) v = raw.get("backgroundTexture");
+		if (v == null && raw.containsKey("Texture")) v = raw.get("Texture");
+		if (v == null && raw.containsKey("texture")) v = raw.get("texture");
+		if (v != null) br.backgroundTextureRef = String.valueOf(v);
+	}
+
+	private static void mapAlternateBackgroundKey(Map<String, Object> raw, BackgroundBaseRequest br) {
+		Object bg = raw.get("background");
+		if (bg == null) return;
+		String bgStr = String.valueOf(bg);
+		if (br.generateBackgroundFromTexture == null && "GeneratedFromTexture".equals(bgStr)) {
+			br.generateBackgroundFromTexture = Boolean.TRUE;
+		}
+		if (br.generateBackground == null && "FractalNoise".equals(bgStr)) {
+			br.generateBackground = Boolean.TRUE;
 		}
 	}
 
@@ -782,64 +826,69 @@ private static Object handleUiOptions(Request req, Response res)
 		int width = p.getWidth();
 		int height = p.getHeight();
 
-		Image backgroundBase;
+		if (p.isGenerateBackground()) {
+			return generateFractalBackground(p, width, height);
+		}
 
-		if (p.isGenerateBackground())
-		{
+		if (p.generateBackgroundFromTexture) {
+			return generateBackgroundFromTexture(p, width, height);
+		}
+
+		return generateSolidBackground(width, height);
+	}
+
+	private static Image generateFractalBackground(BackgroundBaseParams p, int width, int height) {
+		Random rng = (p.getBackgroundRandomSeed() != null) ? new Random(p.getBackgroundRandomSeed()) : SHARED_RANDOM;
+		Image fractal = FractalBGGenerator.generate(rng, 1.3f, width, height, 0.75f);
+		try {
+			return fractal.deepCopy();
+		} finally {
+			fractal.close();
+		}
+	}
+
+	private static Image generateBackgroundFromTexture(BackgroundBaseParams p, int width, int height) {
+		Tuple2<Path, String> tuple = p.getBackgroundImagePath();
+		Path texturePath = tuple != null ? tuple.getFirst() : null;
+		String textureName = tuple != null ? tuple.getSecond() : null;
+
+		if (texturePath == null && textureName != null) {
+			String artPack = p.getBackgroundTextureArtPack();
+			if (artPack == null || artPack.isEmpty()) artPack = Assets.installedArtPack;
+			NamedResource nr = new NamedResource(artPack, textureName);
+			texturePath = Assets.getBackgroundTextureResourcePath(nr, p.getCustomImagesPath());
+		}
+
+		if (texturePath == null) {
+			Logger.println("Background texture not found: " + textureName + " (artPack=" + p.getBackgroundTextureArtPack() + ") - falling back to solid background");
+			return generateSolidBackground(width, height);
+		}
+
+		Image texture = ImageCache.getInstance(p.getBackgroundTextureArtPack(), p.getCustomImagesPath()).getImageFromFile(texturePath);
+		try {
+			Image textureForOcean = ImageHelper.getInstance().convertToGrayscale(texture);
 			Random rng = (p.getBackgroundRandomSeed() != null) ? new Random(p.getBackgroundRandomSeed()) : SHARED_RANDOM;
-			Image fractal = FractalBGGenerator.generate(rng, 1.3f, width, height, 0.75f);
-			try
-			{
-				backgroundBase = fractal.deepCopy();
-			}
-			finally
-			{
-				fractal.close();
-			}
-		}
-		else if (p.generateBackgroundFromTexture)
-		{
-			Tuple2<Path, String> tuple = p.getBackgroundImagePath();
-			Path texturePath = tuple != null ? tuple.getFirst() : null;
-
-			Image texture = ImageCache.getInstance(p.getBackgroundTextureArtPack(), p.getCustomImagesPath()).getImageFromFile(texturePath);
-			try
-			{
-				Image textureForOcean = ImageHelper.getInstance().convertToGrayscale(texture);
-				Random rng = (p.getBackgroundRandomSeed() != null) ? new Random(p.getBackgroundRandomSeed()) : SHARED_RANDOM;
-				Image oceanBase = BackgroundGenerator.generateUsingWhiteNoiseConvolution(rng, textureForOcean, height, width);
-				try
-				{
-					backgroundBase = oceanBase.deepCopy();
-				}
-				finally
-				{
-					oceanBase.close();
-					if (textureForOcean != texture)
-					{
-						textureForOcean.close();
-					}
+			Image oceanBase = BackgroundGenerator.generateUsingWhiteNoiseConvolution(rng, textureForOcean, height, width);
+			try {
+				return oceanBase.deepCopy();
+			} finally {
+				oceanBase.close();
+				if (textureForOcean != texture) {
+					textureForOcean.close();
 				}
 			}
-			finally
-			{
-				texture.close();
-			}
+		} finally {
+			texture.close();
 		}
-		else
-		{
-			Image solid = Image.create(width, height, ImageType.Grayscale8Bit);
-			try
-			{
-				backgroundBase = ImageHelper.getInstance().colorize(solid, nortantis.platform.Color.create(255,255,255), ImageHelper.ColorizeAlgorithm.solidColor);
-			}
-			finally
-			{
-				solid.close();
-			}
-		}
+	}
 
-		return backgroundBase;
+	private static Image generateSolidBackground(int width, int height) {
+		Image solid = Image.create(width, height, ImageType.Grayscale8Bit);
+		try {
+			return ImageHelper.getInstance().colorize(solid, nortantis.platform.Color.create(255,255,255), ImageHelper.ColorizeAlgorithm.solidColor);
+		} finally {
+			solid.close();
+		}
 	}
 
 	private static void logHeaders(Request req)
