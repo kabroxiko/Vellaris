@@ -143,38 +143,30 @@ public class MapApiServer
 		{
 			return gson.toJson(new ApiResponse(false, MSG_FAILED_TO_PARSE_CONFIG, null, null));
 		}
+		MapSettings settings = grc.settings;
 
-		try
-		{
-			MapSettings settings = grc.settings;
-
-			// Ensure returned settings include the resolved generation language
-			if (grc.generationLanguage != null && !grc.generationLanguage.isEmpty()) {
-				settings.language = grc.generationLanguage;
-			}
-
-			// Produce normalized settings map and canonical JSON to return to frontend.
-			String rawJson = settings.toJsonString();
-			@SuppressWarnings("unchecked")
-			Map<String, Object> settingsMap = gson.fromJson(rawJson, Map.class);
-			@SuppressWarnings("unchecked")
-			Map<String, Object> normalized = (Map<String, Object>) normalizeNumbersInObject(settingsMap);
-
-			// Ensure `books` arrays are sorted for deterministic output,
-			// then sort keys recursively to produce a deterministic canonical JSON
-			sortBooksInObject(normalized);
-			Object sorted = sortKeysInObject(normalized);
-			String normalizedJson = gson.toJson(sorted);
-
-			// Return the canonical normalized .nort JSON directly as the response body
-			// (clients expect raw .nort content, not a wrapper object).
-			res.type(CONTENT_TYPE_JSON);
-			return normalizedJson;
+		// Ensure returned settings include the resolved generation language
+		if (grc.effectiveCfg != null && grc.effectiveCfg.language != null && !grc.effectiveCfg.language.isEmpty()) {
+			settings.language = grc.effectiveCfg.language;
 		}
-		finally
-		{
-			restorePreviousLanguage(grc.previousLanguage);
-		}
+
+		// Produce normalized settings map and canonical JSON to return to frontend.
+		String rawJson = settings.toJsonString();
+		@SuppressWarnings("unchecked")
+		Map<String, Object> settingsMap = gson.fromJson(rawJson, Map.class);
+		@SuppressWarnings("unchecked")
+		Map<String, Object> normalized = (Map<String, Object>) normalizeNumbersInObject(settingsMap);
+
+		// Ensure `books` arrays are sorted for deterministic output,
+		// then sort keys recursively to produce a deterministic canonical JSON
+		sortBooksInObject(normalized);
+		Object sorted = sortKeysInObject(normalized);
+		String normalizedJson = gson.toJson(sorted);
+
+		// Return the canonical normalized .nort JSON directly as the response body
+		// (clients expect raw .nort content, not a wrapper object).
+		res.type(CONTENT_TYPE_JSON);
+		return normalizedJson;
 	}
 
 	private static String formatExceptionMessage(Exception exception)
@@ -206,7 +198,8 @@ public class MapApiServer
 		try {
 			return executeGenerationAndReturn(grc, res);
 		} finally {
-			restorePreviousLanguage(grc.previousLanguage);
+			// Do not modify or restore global UI language here; map generation
+			// must not depend on or mutate UserPreferences.language.
 		}
 	}
 
@@ -214,17 +207,15 @@ public class MapApiServer
 		GenerationContext ctx = grc.ctx;
 		Config effectiveCfg = grc.effectiveCfg;
 
-		if (grc.generationLanguage != null && !grc.generationLanguage.isEmpty()) {
-			ctx.settings.language = grc.generationLanguage;
+		if (effectiveCfg != null && effectiveCfg.language != null && !effectiveCfg.language.isEmpty()) {
+			ctx.settings.language = effectiveCfg.language;
 		}
 
-		if (ctx.settings.language != null && !ctx.settings.language.isEmpty()) {
-			applyRequestLanguage(ctx.settings.language);
-		}
-
-		if (API_DEBUG) Logger.println("Generation language resolved: " + grc.generationLanguage + ", settings.language: " + ctx.settings.language + ", effective applied language: " + UserPreferences.getInstance().language);
-		Integer gw = (effectiveCfg.generatedWidth > 0) ? Integer.valueOf(effectiveCfg.generatedWidth) : null;
-		Integer gh = (effectiveCfg.generatedHeight > 0) ? Integer.valueOf(effectiveCfg.generatedHeight) : null;
+		// Do not call applyRequestLanguage or read UserPreferences here —
+		// map generation must not depend on the instance UI language.
+		if (API_DEBUG) Logger.println("Generation language resolved: effectiveCfg=" + (effectiveCfg != null ? effectiveCfg.language : null) + ", settings.language: " + ctx.settings.language);
+		Integer gw = (effectiveCfg != null && effectiveCfg.generatedWidth > 0) ? Integer.valueOf(effectiveCfg.generatedWidth) : null;
+		Integer gh = (effectiveCfg != null && effectiveCfg.generatedHeight > 0) ? Integer.valueOf(effectiveCfg.generatedHeight) : null;
 		GenerationResult generation = generateMap(ctx.settings, gw, gh);
 		if (generation.image == null) {
 			res.status(500);
@@ -232,6 +223,16 @@ public class MapApiServer
 		}
 
 		Image img = generation.image;
+		try {
+			return produceResponseFromImage(img, ctx, res);
+		} finally {
+			img.close();
+			cleanupTempNortPath(ctx.tempNortPath);
+		}
+	}
+
+	// Helper to handle image -> JSON response conversion with centralized exception handling
+	private static Object produceResponseFromImage(Image img, GenerationContext ctx, Response res) {
 		try {
 			BufferedImage buf = nortantis.platform.awt.AwtFactory.unwrap(img);
 			return returnJsonResponse(buf, ctx.settings, res);
@@ -243,9 +244,6 @@ public class MapApiServer
 			Logger.println("returnJsonResponse failed: " + re);
 			res.status(500);
 			return gson.toJson(new ApiResponse(false, "Failed to produce JSON response: " + re.getClass().getSimpleName() + (re.getMessage() != null ? (" - " + re.getMessage()) : ""), null, null));
-		} finally {
-			img.close();
-			cleanupTempNortPath(ctx.tempNortPath);
 		}
 	}
 
@@ -265,14 +263,6 @@ public class MapApiServer
 					return;
 				}
 		}
-	}
-
-    
-
-	private static void restorePreviousLanguage(String previousLanguage)
-	{
-		UserPreferences.getInstance().language = previousLanguage;
-		Translation.initialize();
 	}
 
 	private static Map<String, Object> buildWebUiOptions()
@@ -465,66 +455,58 @@ private static Object handleUiOptions(Request req, Response res)
 {
 	res.type(CONTENT_TYPE_JSON);
 	String requestedLanguage = req.queryParams("uiLanguage");
-	String previousLanguage = UserPreferences.getInstance().language;
 	applyRequestLanguage(requestedLanguage);
 
 	// Ensure a platform implementation is available before any classes
 	// that depend on PlatformFactory (e.g. Color) are initialized.
 	PlatformFactory.setInstance(new AwtFactory());
 
-	try
-	{
-		// Build the standard UI options/labels. Deterministic seed
-		// support removed — defaults are always generated fresh.
-		Map<String, Object> ui = buildWebUiOptions();
+	// Build the standard UI options/labels. Deterministic seed
+	// support removed — defaults are always generated fresh.
+	Map<String, Object> ui = buildWebUiOptions();
 
-		// Also include resource lists so the frontend can fetch a single
-		// endpoint for all initial UI state (art packs, books, textures,
-		// border types, and city icon groups per art pack).
-		try {
-			List<String> artPacks = Assets.listArtPacks(false);
-			ui.put("artPacks", artPacks);
+	// Also include resource lists so the frontend can fetch a single
+	// endpoint for all initial UI state (art packs, books, textures,
+	// border types, and city icon groups per art pack).
+	try {
+		List<String> artPacks = Assets.listArtPacks(false);
+		ui.put("artPacks", artPacks);
 
-			ui.put("books", SettingsGenerator.getAllBooks());
+		ui.put("books", SettingsGenerator.getAllBooks());
 
-			List<NamedResource> textures = Assets.listBackgroundTexturesForAllArtPacks(null);
-			List<Map<String,String>> texturesResult = new java.util.ArrayList<>();
-			for (NamedResource t : textures) {
-				Map<String,String> entry = new LinkedHashMap<>();
-				entry.put("artPack", t.artPack);
-				entry.put("name", t.name);
-				texturesResult.add(entry);
-			}
-			ui.put("textures", texturesResult);
-
-			List<NamedResource> borderTypes = Assets.listAllBorderTypes(null);
-			List<Map<String,String>> borderResult = new java.util.ArrayList<>();
-			for (NamedResource b : borderTypes) {
-				Map<String,String> entry = new LinkedHashMap<>();
-				entry.put("artPack", b.artPack);
-				entry.put("name", b.name);
-				borderResult.add(entry);
-			}
-			ui.put("borderTypes", borderResult);
-
-			// City icon groups per art pack (may be empty for some packs)
-			Map<String, List<String>> cityIconTypesByPack = new LinkedHashMap<>();
-			PlatformFactory.setInstance(new AwtFactory());
-			for (String pack : artPacks) {
-				cityIconTypesByPack.put(pack, getCityIconTypesForPack(pack));
-			}
-			ui.put("cityIconTypesByPack", cityIconTypesByPack);
-		} catch (RuntimeException e) {
-			// If resource enumeration fails, still return UI options.
-			Logger.println("Failed to enumerate UI resources: " + e.getMessage());
+		List<NamedResource> textures = Assets.listBackgroundTexturesForAllArtPacks(null);
+		List<Map<String,String>> texturesResult = new java.util.ArrayList<>();
+		for (NamedResource t : textures) {
+			Map<String,String> entry = new LinkedHashMap<>();
+			entry.put("artPack", t.artPack);
+			entry.put("name", t.name);
+			texturesResult.add(entry);
 		}
+		ui.put("textures", texturesResult);
 
-		return gson.toJson(ui);
+		List<NamedResource> borderTypes = Assets.listAllBorderTypes(null);
+		List<Map<String,String>> borderResult = new java.util.ArrayList<>();
+		for (NamedResource b : borderTypes) {
+			Map<String,String> entry = new LinkedHashMap<>();
+			entry.put("artPack", b.artPack);
+			entry.put("name", b.name);
+			borderResult.add(entry);
+		}
+		ui.put("borderTypes", borderResult);
+
+		// City icon groups per art pack (may be empty for some packs)
+		Map<String, List<String>> cityIconTypesByPack = new LinkedHashMap<>();
+		PlatformFactory.setInstance(new AwtFactory());
+		for (String pack : artPacks) {
+			cityIconTypesByPack.put(pack, getCityIconTypesForPack(pack));
+		}
+		ui.put("cityIconTypesByPack", cityIconTypesByPack);
+	} catch (RuntimeException e) {
+		// If resource enumeration fails, still return UI options.
+		Logger.println("Failed to enumerate UI resources: " + e.getMessage());
 	}
-	finally
-	{
-		restorePreviousLanguage(previousLanguage);
-	}
+
+	return gson.toJson(ui);
 }
 
 	// Recursively sort Map keys (lexicographically) so JSON serialization
@@ -959,8 +941,6 @@ private static Object handleUiOptions(Request req, Response res)
 	 * Internal helper holding parsed request context for generation endpoints.
 	 */
 	private static class GenerationRequestContext {
-		String generationLanguage;
-		String previousLanguage;
 		Config effectiveCfg;
 		GenerationContext ctx; // populated for endpoints that load settings from .nort
 		MapSettings settings;  // populated when settings are available directly
@@ -1010,10 +990,10 @@ private static Object handleUiOptions(Request req, Response res)
 	// Build GenerationRequestContext when params-driven generation is requested
 	private static GenerationRequestContext buildContextFromParams(RandomMapParameters params) {
 		GenerationRequestContext out = new GenerationRequestContext();
-		out.previousLanguage = UserPreferences.getInstance().language;
-		out.generationLanguage = (params.language != null && !params.language.isEmpty()) ? params.language : null;
-		applyRequestLanguage(out.generationLanguage);
 		out.effectiveCfg = new Config();
+		if (params.language != null && !params.language.isEmpty()) {
+			out.effectiveCfg.language = params.language;
+		}
 		out.settings = generateRandomMapSettings(params);
 		return out;
 	}
@@ -1029,12 +1009,11 @@ private static Object handleUiOptions(Request req, Response res)
 			ensureIconEditsFlag(settings);
 
 			GenerationRequestContext out = new GenerationRequestContext();
-			out.previousLanguage = UserPreferences.getInstance().language;
 			out.ctx = new GenerationContext(settings, tempNortPath);
 			out.settings = settings;
-			out.generationLanguage = (params != null && params.language != null && !params.language.isEmpty()) ? params.language : settings.language;
-			applyRequestLanguage(out.generationLanguage);
 			out.effectiveCfg = new Config();
+			// Respect explicit language parameter when present, otherwise use settings.language
+			out.effectiveCfg.language = (params != null && params.language != null && !params.language.isEmpty()) ? params.language : settings.language;
 			return out;
 		} catch (IOException e) {
 			if (tempNortPath != null) {
