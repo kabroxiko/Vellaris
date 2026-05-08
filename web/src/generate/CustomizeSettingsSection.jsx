@@ -2,6 +2,10 @@ import React, { useEffect, useMemo, useState, useRef } from 'react'
 import { RgbaColorPicker } from 'react-colorful'
 import PropTypes from 'prop-types'
 import backgroundBaseCache from './backgroundBaseCache'
+import BackgroundTab from './tabs/BackgroundTab'
+import BorderTab from './tabs/BorderTab'
+import EffectsTab from './tabs/EffectsTab'
+import FontsTab from './tabs/FontsTab'
   
 
 const API_BASE = import.meta.env.VITE_API_BASE || '/api'
@@ -473,6 +477,9 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
       return sourceBlob
     }
   }
+  // expose existing local render helpers to the tab components so they
+  // can reuse the current implementations without duplicating logic.
+  // (render helpers will be attached to tabProps after it's created)
 
   async function onSubmitGenerate(e) {
     try {
@@ -1204,545 +1211,9 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     setOpenFontComboId(null)
   }
 
-  function renderBackgroundTab() {
-    return (
-      <div className="fields-grid two-col-layout">
-        <div className={`fields-column${!drawBorder ? ' is-disabled' : ''}`}>
-          <label htmlFor="bg-type-input">{translateLabel('theme.background.label')}</label>
-          <select
-            id="bg-type-input"
-            value={gatedControlValue(backgroundType)}
-            onChange={(e) => setBackgroundType(e.target.value)}
-          >
-            {emptyComboOption}
-            {backgroundTypes.map((item) => (
-              <option key={item.value} value={item.value}>
-                {item.label}
-              </option>
-            ))}
-          </select>
+  
 
-          <>
-            <label htmlFor="texture-input" className={!showTextureOptions ? 'is-disabled' : ''}>{translateLabel('theme.texture.label')}</label>
-            <select
-              id="texture-input"
-              value={gatedControlValue(textureRef)}
-              onChange={(e) => setTextureRef(e.target.value)}
-              disabled={!showTextureOptions || !hasTextures}
-            >
-              {emptyComboOption}
-              {!hasTextures && (
-                <option value="" disabled>
-                  {translateLabel('ui.texture.noneAvailable')}
-                </option>
-              )}
-              {textures.map((texture) => {
-                const ref = `${texture.artPack}|${texture.name}`
-                return (
-                  <option key={ref} value={ref}>
-                    {texture.name.replace(/\.[^.]+$/, '')} [{texture.artPack}]
-                  </option>
-                )
-              })}
-            </select>
-          </>
-
-            <label className="checkbox-label">
-              <input
-                type="checkbox"
-                checked={drawRegionBoundaries}
-                onChange={(e) => setDrawRegionBoundaries(e.target.checked)}
-              />
-              <span>{translateLabel('theme.drawRegionBoundaries')}</span>
-            </label>
-
-          
-
-          <div
-            className={`control-group${!drawRegionBoundaries ? ' is-disabled' : ''}`}
-            style={!drawRegionBoundaries ? { opacity: 0.5, pointerEvents: 'none' } : undefined}
-          >
-            <label htmlFor="region-boundary-style-input">
-              {translateLabel('theme.style.label')}
-            </label>
-            <select
-              id="region-boundary-style-input"
-              value={gatedControlValue(regionBoundaryStyle)}
-              onChange={(e) => setRegionBoundaryStyle(e.target.value)}
-              disabled={!drawRegionBoundaries}
-            >
-              {emptyComboOption}
-              {strokeTypes.map((item) => (
-                <option key={item.value} value={item.value}>
-                  {item.label}
-                </option>
-              ))}
-            </select>
-
-            <label htmlFor="region-boundary-width-input">
-              {translateLabel('theme.regionBoundaryWidth.help')}
-            </label>
-            <div className="slider-row">
-              <input
-                id="region-boundary-width-input"
-                type="range"
-                min={0.5}
-                max={10}
-                step={0.1}
-                value={regionBoundaryWidth}
-                onChange={(e) => setRegionBoundaryWidth(Number(e.target.value))}
-                disabled={!drawRegionBoundaries}
-              />
-              <span className="slider-value">{regionBoundaryWidth.toFixed(1)}</span>
-            </div>
-
-            {renderColorControl({
-              id: 'region-boundary-color',
-              label: translateLabel('theme.regionBoundaryColor.title'),
-              hexValue: regionBoundaryColorHex,
-              onHexChange: setRegionBoundaryColorHex,
-              showState: showRegionBoundaryPicker,
-              setShowState: setShowRegionBoundaryPicker,
-              disabled: !drawRegionBoundaries,
-            })}
-          </div>
-
-          <div />
-          <label className="checkbox-label">
-            <input
-              type="checkbox"
-              checked={colorizeLand}
-              onChange={(e) => setColorizeLand(e.target.checked)}
-            />
-            <span>{translateLabel('theme.colorLand')}</span>
-          </label>
-
-          <div
-            className={`control-group${!colorizeLand ? ' is-disabled' : ''}`}
-            style={!colorizeLand ? { opacity: 0.5, pointerEvents: 'none' } : undefined}
-          >
-            <label htmlFor="final-land-coloring-input">
-              {translateLabel('theme.landColoringMethod.label')}
-            </label>
-            <select
-              id="final-land-coloring-input"
-              value={gatedControlValue(finalLandColoringMethod)}
-              onChange={(e) => setFinalLandColoringMethod(e.target.value)}
-              disabled={!colorizeLand}
-            >
-              {emptyComboOption}
-              {landColoringMethods
-                .filter((item) => item.value)
-                .map((item) => (
-                  <option key={item.value} value={item.value}>
-                    {item.label}
-                  </option>
-                ))}
-            </select>
-
-            {renderColorControl({
-              id: 'land-color',
-              label: translateLabel('theme.landColor.label'),
-              hexValue: landColorHex,
-              onHexChange: (hex) => { setLandColorHex(hex); notifyManualChange(); },
-              showState: showLandPicker,
-              setShowState: setShowLandPicker,
-              disabled: !colorizeLand || finalLandColoringMethod === 'ColorPoliticalRegions',
-              onClose: () => { try { recomposeUsingLastBase({ landColorHex: landColorHex }) } catch (err) {} },
-            })}
-          </div>
-
-          <div />
-          <label className="checkbox-label">
-            <input
-              type="checkbox"
-              checked={colorizeOcean}
-              onChange={(e) => {
-                const v = e.target.checked
-                setColorizeOcean(v)
-                notifyManualChange()
-                // Recompose locally from cached base instead of forcing a network fetch
-                try { recomposeUsingLastBase({ colorizeOcean: v }) } catch (err) {}
-              }}
-            />
-            <span>{translateLabel('theme.colorOcean')}</span>
-          </label>
-
-          <div
-            className={`control-group${!colorizeOcean ? ' is-disabled' : ''}`}
-            style={!colorizeOcean ? { opacity: 0.5, pointerEvents: 'none' } : undefined}
-          >
-            {renderColorControl({
-              id: 'ocean-color',
-              label: translateLabel('theme.oceanColor.label'),
-              hexValue: oceanColorHex,
-              onHexChange: (hex) => { setOceanColorHex(hex); notifyManualChange(); },
-              showState: showOceanPicker,
-              setShowState: setShowOceanPicker,
-              disabled: !colorizeOcean,
-              onClose: () => { try { recomposeUsingLastBase({ oceanColorHex: oceanColorHex }) } catch (err) {} },
-            })}
-          </div>
-        </div>
-
-        <div className="fields-column">
-          <label htmlFor="bg-seed-input">{translateLabel('theme.randomSeed.label')}</label>
-          <input
-            id="bg-seed-input"
-            type="text"
-            value={gatedControlValue(sanitizeSeedValue(backgroundSeed))}
-            onChange={(e) => setBackgroundSeed(e.target.value)}
-            placeholder={''}
-          />
-
-
-          <label className="checkbox-label">
-            <input
-              type="checkbox"
-              checked={drawGridOverlay}
-              onChange={(e) => setDrawGridOverlay(e.target.checked)}
-            />
-            <span>{translateLabel('theme.drawGrid')}</span>
-          </label>
-
-          <div
-            className={`control-group${!drawGridOverlay ? ' is-disabled' : ''}`}
-            style={!drawGridOverlay ? { opacity: 0.5, pointerEvents: 'none' } : undefined}
-          >
-            <label htmlFor="grid-shape-input">{translateLabel('theme.shape.label')}</label>
-            <select
-              id="grid-shape-input"
-              value={gatedControlValue(gridOverlayShape)}
-              onChange={(e) => setGridOverlayShape(e.target.value)}
-              disabled={!drawGridOverlay}
-            >
-              {emptyComboOption}
-              {gridOverlayShapes.map((item) => (
-                <option key={item.value} value={item.value}>
-                  {item.label}
-                </option>
-              ))}
-            </select>
-
-            {(() => {
-              const shapeVal = gridOverlayShape || ''
-              const lower = String(shapeVal).toLowerCase()
-              const isVerticalHex = lower.includes('vertical')
-              const isVoronoi = lower.includes('voronoi')
-              return (
-                <>
-                  <label htmlFor="grid-rows-input" className={!drawGridOverlay || isVoronoi ? 'is-disabled' : ''}>
-                    {isVerticalHex ? translateLabel('theme.columns.label') : translateLabel('theme.rows.label')}
-                  </label>
-                  <div className="slider-row">
-                    <input
-                      id="grid-rows-input"
-                      type="range"
-                      min={4}
-                      max={64}
-                      step={1}
-                      value={gridOverlayRowOrColCount}
-                      onChange={(e) => setGridOverlayRowOrColCount(Number(e.target.value))}
-                      disabled={!drawGridOverlay || isVoronoi}
-                    />
-                    <span className="slider-value">{gridOverlayRowOrColCount}</span>
-                  </div>
-                </>
-              )
-            })()}
-
-            <label htmlFor="grid-linewidth-input">{translateLabel('theme.lineWidth.label')}</label>
-            <div className="slider-row">
-              <input
-                id="grid-linewidth-input"
-                type="range"
-                min={1}
-                max={10}
-                step={1}
-                value={gridOverlayLineWidth}
-                onChange={(e) => setGridOverlayLineWidth(Number(e.target.value))}
-                disabled={!drawGridOverlay}
-              />
-              <span className="slider-value">{gridOverlayLineWidth}</span>
-            </div>
-
-            {renderColorControl({
-              id: 'grid-color',
-              label: translateLabel('theme.color.label'),
-              hexValue: gridOverlayColorHex,
-              onHexChange: setGridOverlayColorHex,
-              showState: showGridPicker,
-              setShowState: setShowGridPicker,
-              disabled: !drawGridOverlay,
-            })}
-
-            {(() => {
-              const shapeVal = gridOverlayShape || ''
-              const isVoronoi = String(shapeVal).toLowerCase().includes('voronoi')
-              return (
-                <>
-                  <label htmlFor="grid-xoffset-input" className={!drawGridOverlay || isVoronoi ? 'is-disabled' : ''}>{translateLabel('theme.xOffset.label')}</label>
-                  <select id="grid-xoffset-input" value={gatedControlValue(gridOverlayXOffset)} onChange={(e) => setGridOverlayXOffset(e.target.value)} disabled={!drawGridOverlay || isVoronoi}>
-                    {emptyComboOption}
-                    {gridOverlayOffsets.map((item) => (
-                      <option key={item.value} value={item.value}>
-                        {item.label}
-                      </option>
-                    ))}
-                  </select>
-
-                  <label htmlFor="grid-yoffset-input" className={!drawGridOverlay || isVoronoi ? 'is-disabled' : ''}>{translateLabel('theme.yOffset.label')}</label>
-                  <select id="grid-yoffset-input" value={gatedControlValue(gridOverlayYOffset)} onChange={(e) => setGridOverlayYOffset(e.target.value)} disabled={!drawGridOverlay || isVoronoi}>
-                    {emptyComboOption}
-                    {gridOverlayOffsets.map((item) => (
-                      <option key={item.value} value={item.value}>
-                        {item.label}
-                      </option>
-                    ))}
-                  </select>
-                </>
-              )
-            })()}
-
-            <label className={`checkbox-label${(!drawGridOverlay || !String((gridOverlayShape || '')).toLowerCase().includes('voronoi')) ? ' is-disabled' : ''}`}>
-              <input
-                type="checkbox"
-                checked={drawVoronoiGridOverlayOnlyOnLand}
-                onChange={(e) => setDrawVoronoiGridOverlayOnlyOnLand(e.target.checked)}
-                disabled={!drawGridOverlay || !String((gridOverlayShape || '')).toLowerCase().includes('voronoi')}
-              />
-              <span>{translateLabel('theme.onlyOnLand')}</span>
-            </label>
-
-            <label htmlFor="grid-layer-input">{translateLabel('theme.layer.label')}</label>
-            <select id="grid-layer-input" value={gatedControlValue(gridOverlayLayer)} onChange={(e) => setGridOverlayLayer(e.target.value)} disabled={!drawGridOverlay}>
-              {emptyComboOption}
-              {gridOverlayLayers.map((item) => (
-                <option key={item.value} value={item.value}>
-                  {item.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div
-            className="background-preview-panel background-preview-panel--full-row"
-            role="img"
-                aria-label={translateLabel('theme.background.label')}
-          >
-            {backgroundPreviewUrl ? (
-              <img
-                className="background-preview-canvas"
-                src={backgroundPreviewUrl}
-                alt={translateLabel('theme.background.label')}
-              />
-            ) : (
-              <div className="background-preview-canvas background-preview-canvas--empty" />
-            )}
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  function renderBorderTab() {
-    return (
-      <div className="fields-grid two-col-layout">
-        <div className="fields-column">
-          <label className="checkbox-label">
-            <input
-              type="checkbox"
-              checked={drawBorder}
-              onChange={(e) => setDrawBorder(e.target.checked)}
-            />
-            <span>{translateLabel('theme.drawBorder')}</span>
-          </label>
-
-          <div
-            className={`control-group${!drawBorder ? ' is-disabled' : ''}`}
-            style={!drawBorder ? { opacity: 0.5, pointerEvents: 'none' } : undefined}
-          >
-            <label htmlFor="border-type-input">{translateLabel('theme.borderType.label')}</label>
-            <select
-              id="border-type-input"
-              value={gatedControlValue(borderRef)}
-              onChange={(e) => setBorderRef(e.target.value)}
-              disabled={!drawBorder}
-            >
-            {emptyComboOption}
-            <option value="">{translateLabel('theme.borderColor.title')}</option>
-            {borderTypes.map((borderType) => {
-              const ref = `${borderType.artPack}|${borderType.name}`
-              return (
-                <option key={ref} value={ref}>
-                  {borderType.name} [{borderType.artPack}]
-                </option>
-              )
-            })}
-          </select>
-
-          <label htmlFor="border-width-input" className={!drawBorder ? 'is-disabled' : ''}>
-            {translateLabel('theme.borderWidth.label')}
-          </label>
-          <div className="slider-row">
-            <input
-              id="border-width-input"
-              type="range"
-              min={0}
-              max={600}
-              step={1}
-              value={borderWidth}
-              onChange={(e) => setBorderWidth(Number(e.target.value))}
-              disabled={!drawBorder}
-            />
-            <span className="slider-value">{Math.round(borderWidth)}</span>
-          </div>
-
-          <label htmlFor="border-position-input" className={!drawBorder ? 'is-disabled' : ''}>{translateLabel('theme.borderPosition.label')}</label>
-          <select
-            id="border-position-input"
-            value={gatedControlValue(borderPosition)}
-            onChange={(e) => setBorderPosition(e.target.value)}
-            disabled={!drawBorder}
-          >
-            {emptyComboOption}
-            {borderPositions.map((item) => (
-              <option key={item.value} value={item.value}>
-                {item.label}
-              </option>
-            ))}
-          </select>
-
-          <label htmlFor="border-color-option-input" className={!drawBorder ? 'is-disabled' : ''}>{translateLabel('theme.borderColor.label')}</label>
-            <select
-              id="border-color-option-input"
-              value={gatedControlValue(borderColorOption)}
-              onChange={(e) => setBorderColorOption(e.target.value)}
-              disabled={!drawBorder}
-            >
-            {emptyComboOption}
-            {borderColorOptions.map((item) => (
-              <option key={item.value} value={item.value}>
-                {item.label}
-              </option>
-            ))}
-          </select>
-
-            {renderColorControl({
-              id: 'border-color',
-              label: translateLabel('theme.borderColor.title'),
-              hexValue: borderColorHex,
-              onHexChange: setBorderColorHex,
-              showState: showBorderColorPicker,
-              setShowState: setShowBorderColorPicker,
-              disabled: !drawBorder || borderColorOption !== 'Choose_color',
-            })}
-            </div>
-          </div>
-
-          <div className="fields-column">
-          <label className="checkbox-label">
-            <input
-              type="checkbox"
-              checked={frayedBorder}
-              onChange={(e) => setFrayedBorder(e.target.checked)}
-            />
-            <span>{translateLabel('theme.frayEdges')}</span>
-          </label>
-
-          <div
-            className={`control-group${!frayedBorder ? ' is-disabled' : ''}`}
-            style={!frayedBorder ? { opacity: 0.5, pointerEvents: 'none' } : undefined}
-          >
-            <label htmlFor="frayed-border-blur-input">
-              {translateLabel('theme.shadingWidth.label')}
-            </label>
-            <div className="slider-row">
-              <input
-                id="frayed-border-blur-input"
-                type="range"
-                min={0}
-                max={500}
-                step={1}
-                value={frayedBorderBlurLevel}
-                onChange={(e) => setFrayedBorderBlurLevel(Number(e.target.value))}
-                disabled={!frayedBorder}
-              />
-              <span className="slider-value">{Math.round(frayedBorderBlurLevel)}</span>
-            </div>
-
-            <label htmlFor="frayed-border-size-input">
-              {translateLabel('theme.fraySize.label')}
-            </label>
-            <div className="slider-row">
-              <input
-                id="frayed-border-size-input"
-                type="range"
-                min={1}
-                max={15}
-                step={1}
-                value={frayedBorderSize}
-                onChange={(e) => setFrayedBorderSize(Number(e.target.value))}
-                disabled={!frayedBorder}
-              />
-              <span className="slider-value">{Math.round(frayedBorderSize)}</span>
-            </div>
-
-            <label htmlFor="frayed-border-seed-input">{translateLabel('theme.randomSeed.label')}</label>
-            <input
-              id="frayed-border-seed-input"
-              type="text"
-              value={gatedControlValue(sanitizeSeedValue(frayedBorderSeed))}
-              onChange={(e) => setFrayedBorderSeed(e.target.value)}
-              placeholder={''}
-              disabled={!frayedBorder}
-            />
-          </div>
-
-          <label className="checkbox-label">
-            <input
-              type="checkbox"
-              checked={drawGrunge}
-              onChange={(e) => setDrawGrunge(e.target.checked)}
-            />
-            <span>{translateLabel('theme.drawGrunge')}</span>
-          </label>
-
-          <div
-            className={`control-group${!drawGrunge ? ' is-disabled' : ''}`}
-            style={!drawGrunge ? { opacity: 0.5, pointerEvents: 'none' } : undefined}
-          >
-            <label htmlFor="grunge-width-input">
-              {translateLabel('theme.grungeWidth.help')}
-            </label>
-            <div className="slider-row">
-              <input
-                id="grunge-width-input"
-                type="range"
-                min={0}
-                max={2000}
-                step={1}
-                value={grungeWidth}
-                onChange={(e) => setGrungeWidth(Number(e.target.value))}
-                disabled={!drawGrunge}
-              />
-              <span className="slider-value">{Math.round(grungeWidth)}</span>
-            </div>
-
-            {renderColorControl({
-              id: 'frayed-border-color',
-              label: translateLabel('theme.grungeColor.label'),
-              hexValue: frayedBorderColorHex,
-              onHexChange: setFrayedBorderColorHex,
-              showState: showFrayedBorderPicker,
-              setShowState: setShowFrayedBorderPicker,
-              disabled: !drawGrunge,
-            })}
-          </div>
-        </div>
-      </div>
-    )
-  }
+  
 
   function renderEffectsTab() {
     return (
@@ -2205,6 +1676,141 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     )
   }
 
+  const tabProps = {
+    values,
+    handlers,
+    options,
+    ui,
+    translateLabel,
+    translateLabelWithArgs,
+    sanitizeSeedValue,
+    sanitizeTranslation,
+    renderColorControl,
+    gatedControlValue,
+    emptyComboOption,
+    textures,
+    backgroundTypes,
+    hasTextures,
+    strokeTypes,
+    borderPositions,
+    borderColorOptions,
+    lineStyles,
+    oceanWaveTypes,
+    concentricWaveValue,
+    rippleWaveValue,
+    noneWaveValue,
+    availableFontFamilies,
+    fontFields,
+    fontFieldSetters,
+    openFontComboId,
+    setOpenFontComboId,
+    recomposeUsingLastBase,
+    notifyManualChange,
+    previewFields,
+    backgroundPreviewUrl,
+    preview,
+    // setters (from handlers destructured into local scope)
+    setBackgroundType,
+    setTextureRef,
+    setDrawRegionBoundaries,
+    setRegionBoundaryStyle,
+    setRegionBoundaryWidth,
+    setRegionBoundaryColorHex,
+    setColorizeLand,
+    setFinalLandColoringMethod,
+    setLandColorHex,
+    setColorizeOcean,
+    setOceanColorHex,
+    setBackgroundSeed,
+    setDrawGridOverlay,
+    setGridOverlayShape,
+    setGridOverlayRowOrColCount,
+    setGridOverlayLineWidth,
+    setGridOverlayColorHex,
+    setGridOverlayXOffset,
+    setGridOverlayYOffset,
+    setGridOverlayLayer,
+    setBorderRef,
+    setBorderWidth,
+    setBorderPosition,
+    setBorderColorOption,
+    setBorderColorHex,
+    setFrayedBorder,
+    setFrayedBorderBlurLevel,
+    setFrayedBorderSize,
+    setFrayedBorderSeed,
+    setDrawGrunge,
+    setGrungeWidth,
+    setFrayedBorderColorHex,
+    setRoadStyle,
+    setRoadWidth,
+    setRoadColorHex,
+    setMountainSize,
+    setHillSize,
+    setDuneSize,
+    setTreeHeight,
+    setCitySize,
+    setLineStyle,
+    setCoastlineWidth,
+    setCoastlineColorHex,
+    setCoastShadingLevel,
+    setCoastShadingColorHex,
+    setCoastShadingAlpha,
+    setOceanShadingAlpha,
+    setOceanShadingLevel,
+    setOceanShadingColorHex,
+    setOceanWavesType,
+    setOceanWavesLevel,
+    setOceanWavesAlpha,
+    setOceanWavesColorHex,
+    setConcentricWaveCount,
+    setFadeConcentricWaves,
+    setJitterToConcentricWaves,
+    setBrokenLinesForConcentricWaves,
+    setDrawOceanEffectsInLakes,
+    setRiverColorHex,
+    setDrawRoads,
+    setDrawText,
+    setTitleFontFamily,
+    setRegionFontFamily,
+    setMountainRangeFontFamily,
+    setOtherMountainsFontFamily,
+    setCitiesFontFamily,
+    setRiverFontFamily,
+    setTextColorHex,
+    setDrawBoldBackground,
+    setBoldBackgroundColorHex,
+    // picker visibility state
+    showCoastPicker,
+    setShowCoastPicker,
+    showGridPicker,
+    setShowGridPicker,
+    showOceanPicker,
+    setShowOceanPicker,
+    showRegionBoundaryPicker,
+    setShowRegionBoundaryPicker,
+    showLandPicker,
+    setShowLandPicker,
+    showBorderColorPicker,
+    setShowBorderColorPicker,
+    showFrayedBorderPicker,
+    setShowFrayedBorderPicker,
+    showCoastlinePicker,
+    setShowCoastlinePicker,
+    showOceanWavesPicker,
+    setShowOceanWavesPicker,
+    showRiverPicker,
+    setShowRiverPicker,
+    showRoadPicker,
+    setShowRoadPicker,
+    showTextColorPicker,
+    setShowTextColorPicker,
+    showBoldBackgroundPicker,
+    setShowBoldBackgroundPicker,
+  }
+
+  // Tab implementations have been moved into dedicated components.
+
   return (
     <section
       className={`generator-section customize-section${hasCustomizationSource ? '' : ' is-disabled'}`}
@@ -2262,10 +1868,10 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
           </div>
 
           <div className="customize-tab-panel" role="tabpanel">
-            {activeTab === 'background' && renderBackgroundTab()}
-            {activeTab === 'border' && renderBorderTab()}
-            {activeTab === 'effects' && renderEffectsTab()}
-            {activeTab === 'fonts' && renderFontsTab()}
+            {activeTab === 'background' && <BackgroundTab context={tabProps} />}
+            {activeTab === 'border' && <BorderTab context={tabProps} />}
+            {activeTab === 'effects' && <EffectsTab context={tabProps} />}
+            {activeTab === 'fonts' && <FontsTab context={tabProps} />}
           </div>
 
           <div className="section-actions">

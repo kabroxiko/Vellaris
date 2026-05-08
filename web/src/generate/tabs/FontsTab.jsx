@@ -1,0 +1,117 @@
+import React from 'react'
+
+export default function FontsTab({ context }) {
+  if (!context) return <div />
+  const { translateLabel, renderColorControl } = context
+  const get = (k) => (context[k] !== undefined ? context[k] : (context.values && context.values[k]))
+
+  const drawText = get('drawText')
+  const setDrawText = get('setDrawText')
+  const fontFields = get('fontFields') || []
+  const availableFontFamilies = get('availableFontFamilies') || []
+  const openFontComboId = get('openFontComboId')
+  const setOpenFontComboId = get('setOpenFontComboId')
+  const handleFontOptionClick = get('handleFontOptionClick')
+
+  const textColorHex = get('textColorHex')
+  const setTextColorHex = get('setTextColorHex')
+  const showTextColorPicker = get('showTextColorPicker')
+  const setShowTextColorPicker = get('setShowTextColorPicker')
+
+  const drawBoldBackground = get('drawBoldBackground')
+  const setDrawBoldBackground = get('setDrawBoldBackground')
+  const boldBackgroundColorHex = get('boldBackgroundColorHex')
+  const setBoldBackgroundColorHex = get('setBoldBackgroundColorHex')
+  const showBoldBackgroundPicker = get('showBoldBackgroundPicker')
+  const setShowBoldBackgroundPicker = get('setShowBoldBackgroundPicker')
+
+  return (
+    <div className="customize-fonts-panel">
+      <label className="checkbox-label">
+        <input
+          type="checkbox"
+          checked={drawText}
+          onChange={(e) => setDrawText(e.target.checked)}
+        />
+        <span>{translateLabel('theme.enableText')}</span>
+      </label>
+      <div className={`control-group${!drawText ? ' is-disabled' : ''}`}>
+        <div className="customize-font-grid">
+          <div className="fonts-grid two-col-layout" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', columnGap: 24, rowGap: 8, alignItems: 'start' }}>
+            <div className="fields-column">
+              {fontFields.map((field) => (
+                <React.Fragment key={field.id}>
+                  <label htmlFor={field.id}>{field.label}</label>
+                  <div className="font-combo" id={field.id}>
+                    <button
+                      type="button"
+                      className="font-combo-trigger"
+                      onClick={() => setOpenFontComboId(openFontComboId === field.id ? null : field.id)}
+                      style={{ fontFamily: field.value || 'serif' }}
+                      aria-haspopup="listbox"
+                      aria-expanded={openFontComboId === field.id}
+                      disabled={!drawText}
+                    >
+                      {field.value || translateLabel('common.choose')}
+                    </button>
+                    {openFontComboId === field.id && (
+                      <div className="font-combo-menu">
+                        {availableFontFamilies.map((family) => (
+                          <button
+                            key={family}
+                            type="button"
+                            className={`font-combo-option${field.value === family ? ' is-selected' : ''}`}
+                            data-field-id={field.id}
+                            data-family={family}
+                            onClick={handleFontOptionClick}
+                            style={{ fontFamily: family }}
+                            disabled={!drawText}
+                          >
+                            {family}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </React.Fragment>
+              ))}
+            </div>
+            <div className="fields-column">
+              {renderColorControl({
+                id: 'text-color',
+                label: translateLabel('theme.textColor.label'),
+                hexValue: textColorHex,
+                onHexChange: setTextColorHex,
+                showState: showTextColorPicker,
+                setShowState: setShowTextColorPicker,
+                disabled: !drawText,
+                swatchStyle: { flex: '0 0 180px', minWidth: 120 },
+              })}
+
+              <label className="checkbox-label" style={{ marginTop: 12 }}>
+                <input
+                  type="checkbox"
+                  checked={drawBoldBackground}
+                  onChange={(e) => setDrawBoldBackground(e.target.checked)}
+                  disabled={!drawText}
+                />
+                <span style={{ marginLeft: 8 }}>{translateLabel('theme.boldBackground')}</span>
+              </label>
+
+              {renderColorControl({
+                id: 'bold-background-color',
+                label: translateLabel('theme.boldBackgroundColor.label'),
+                hexValue: boldBackgroundColorHex,
+                onHexChange: setBoldBackgroundColorHex,
+                showState: showBoldBackgroundPicker,
+                setShowState: setShowBoldBackgroundPicker,
+                disabled: !drawText || !drawBoldBackground,
+                swatchStyle: { flex: '1 1 auto', minWidth: 48, marginTop: 8 },
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
