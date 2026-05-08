@@ -98,7 +98,7 @@ public class MapApiServer
 	// Builds params, generates the background image and writes the PNG to the
 	// response output stream. Returns the generated Image for the caller to
 	// close/cleanup when appropriate.
-	private static Image processBackgroundBaseAndWriteResponse(Request req, Response res) throws java.io.IOException {
+	private static Image generateBaseImageAndWriteResponse(Request req, Response res) throws java.io.IOException {
 		int width = -1;
 		int height = -1;
 		String type = null;
@@ -611,8 +611,8 @@ private static Object handleUiOptions(Request req, Response res)
 
 		Image baseImage = null;
 		try {
-			// Delegate the heavy lifting to a helper to keep this method simple
-			baseImage = processBackgroundBaseAndWriteResponse(req, res);
+				// Delegate the heavy lifting to a helper to keep this method simple
+				baseImage = generateBaseImageAndWriteResponse(req, res);
 			return res.raw();
 		} catch (java.io.IOException | com.google.gson.JsonSyntaxException e) {
 			Logger.println("handleBackgroundBase failed: " + e);
