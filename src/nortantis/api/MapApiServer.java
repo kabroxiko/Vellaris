@@ -22,7 +22,7 @@ import nortantis.platform.ImageType;
 import nortantis.platform.PlatformFactory;
 import nortantis.platform.awt.AwtFactory;
 import nortantis.util.Logger;
-import nortantis.util.Tuple2;
+ 
 import spark.Request;
 import spark.Response;
 
@@ -47,10 +47,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.nio.charset.StandardCharsets;
-import javax.servlet.MultipartConfigElement;
-import javax.servlet.http.Part;
-import java.io.InputStream;
-import java.nio.file.StandardCopyOption;
 
 import static spark.Spark.*;
 
@@ -62,12 +58,13 @@ public class MapApiServer
 {
 
 	private static final Gson gson = new Gson();
-	private static final boolean API_DEBUG = true;
+    
 	private static final Random SHARED_RANDOM = new Random();
 	private static final String CONTENT_TYPE_JSON = "application/json";
 	private static final String CONTENT_TYPE_PNG = "image/png";
 	private static final String PNG_FORMAT_NAME = "png";
 	private static final String ART_PACK = "artPack";
+	private static final String NAME = "name";
 	private static final String NORT_EXTENSION = ".nort";
 	private static final String MSG_FAILED_TO_PARSE_CONFIG = "Failed to parse config";
 	private static final float PNG_COMPRESSION_QUALITY = 0.95f;
@@ -80,8 +77,7 @@ public class MapApiServer
 		setupCors();
 		get("/api/health", (req, res) -> "ok");
 
-		// Simple resource list endpoints
-		registerSimpleLists();
+		// Simple resource list endpoints (removed)
 
 		get("/api/ui-options", MapApiServer::handleUiOptions);
 
@@ -98,32 +94,50 @@ public class MapApiServer
 		});
 
 		init();
-		if (API_DEBUG) Logger.println("Map API server started on port 8080");
 	}
 
 	// Extracted helper to reduce cognitive complexity in handleBackgroundBase.
 	// Builds params, generates the background image and writes the PNG to the
 	// response output stream. Returns the generated Image for the caller to
 	// close/cleanup when appropriate.
-	private static Image processBackgroundBaseAndWriteResponse(BackgroundBaseRequest br, Path uploadedTemp, Response res) throws java.io.IOException {
-		int width = (br != null && br.previewWidth != null && br.previewWidth > 0) ? br.previewWidth : DEFAULT_BACKGROUND_PREVIEW_WIDTH;
-		int height = (br != null && br.previewHeight != null && br.previewHeight > 0) ? br.previewHeight : DEFAULT_BACKGROUND_PREVIEW_HEIGHT;
-		boolean generateBackground = br != null && Boolean.TRUE.equals(br.generateBackground);
-		boolean generateFromTexture = br != null && Boolean.TRUE.equals(br.generateBackgroundFromTexture);
-		Long seed = br != null ? br.backgroundRandomSeed : null;
+	private static Image processBackgroundBaseAndWriteResponse(Request req, Response res) throws java.io.IOException {
+		Integer reqWidth = null;
+		Integer reqHeight = null;
+		String bgType = null;
+		String texture = null;
+		try {
+			@SuppressWarnings("unchecked")
+			Map<String, Object> raw = gson.fromJson(req.body(), Map.class);
+			if (raw != null) {
+				reqWidth = parseInteger(raw.get("width"));
+				reqHeight = parseInteger(raw.get("height"));
+				if (raw.containsKey("type")) {
+					bgType = String.valueOf(raw.get("type"));
+				}
+				if (raw.containsKey("texture")) {
+					texture = String.valueOf(raw.get("texture"));
+				}
+			}
+		} catch (RuntimeException ignore) {
+			// If mapping fails, fall through with nulls
+		}
+		int width = (reqWidth != null && reqWidth > 0) ? reqWidth : DEFAULT_BACKGROUND_PREVIEW_WIDTH;
+		int height = (reqHeight != null && reqHeight > 0) ? reqHeight : DEFAULT_BACKGROUND_PREVIEW_HEIGHT;
+		String backgroundType = bgType;
 
-		Tuple2<Path, String> backgroundImagePath = determineBackgroundImagePath(br, uploadedTemp);
-		String backgroundTextureArtPack = determineBackgroundTextureArtPack(br, uploadedTemp);
+		String backgroundTextureName = null;
+		String backgroundTextureArtPack = determineBackgroundTextureArtPack(texture);
+		if (texture != null && !texture.isEmpty()) {
+			String[] parts = texture.split("\\|", 2);
+			backgroundTextureName = (parts.length == 2) ? parts[1] : texture;
+		}
 
 		BackgroundBaseParams bp = new BackgroundBaseParams.Builder()
 			.width(width)
 			.height(height)
-			.generateBackground(generateBackground)
-			.generateFromTexture(generateFromTexture)
-			.backgroundRandomSeed(seed)
-			.backgroundImagePath(backgroundImagePath)
+			.backgroundType(backgroundType)
+			.backgroundTextureName(backgroundTextureName)
 			.backgroundTextureArtPack(backgroundTextureArtPack)
-			.customImagesPath(br != null ? br.customImagesPath : null)
 			.build();
 		Image baseImage = generateBackgroundBaseImage(bp);
 		BufferedImage buffered = nortantis.platform.awt.AwtFactory.unwrap(baseImage);
@@ -136,7 +150,7 @@ public class MapApiServer
 
 	private static Object handleGenerateSettings(Request req, Response res)
 	{
-		logHeaders(req);
+		// request header logging removed
 
 		GenerationRequestContext grc = prepareGenerationRequest(req, res, true);
 		if (grc == null)
@@ -145,10 +159,7 @@ public class MapApiServer
 		}
 		MapSettings settings = grc.settings;
 
-		// Ensure returned settings include the resolved generation language
-		if (grc.effectiveCfg != null && grc.effectiveCfg.language != null && !grc.effectiveCfg.language.isEmpty()) {
-			settings.language = grc.effectiveCfg.language;
-		}
+		// `settings` already contains any resolved language; no extra copy needed
 
 		// Produce normalized settings map and canonical JSON to return to frontend.
 		String rawJson = settings.toJsonString();
@@ -187,7 +198,7 @@ public class MapApiServer
 
 	private static Object handleGenerate(Request req, Response res)
 	{
-		logHeaders(req);
+		// request header logging removed
 
 		GenerationRequestContext grc = prepareGenerationRequest(req, res, false);
 		if (grc == null)
@@ -205,19 +216,29 @@ public class MapApiServer
 
 	private static Object executeGenerationAndReturn(GenerationRequestContext grc, Response res) {
 		GenerationContext ctx = grc.ctx;
-		Config effectiveCfg = grc.effectiveCfg;
+		MapSettings requestSettings = grc.settings;
 
-		if (effectiveCfg != null && effectiveCfg.language != null && !effectiveCfg.language.isEmpty()) {
-			ctx.settings.language = effectiveCfg.language;
+		if (requestSettings != null && requestSettings.language != null && !requestSettings.language.isEmpty()) {
+			ctx.settings.language = requestSettings.language;
 		}
 
-		// Do not call applyRequestLanguage or read UserPreferences here —
-		// map generation must not depend on the instance UI language.
-		if (API_DEBUG) Logger.println("Generation language resolved: effectiveCfg=" + (effectiveCfg != null ? effectiveCfg.language : null) + ", settings.language: " + ctx.settings.language);
-		Integer gw = (effectiveCfg != null && effectiveCfg.generatedWidth > 0) ? Integer.valueOf(effectiveCfg.generatedWidth) : null;
-		Integer gh = (effectiveCfg != null && effectiveCfg.generatedHeight > 0) ? Integer.valueOf(effectiveCfg.generatedHeight) : null;
+		// Use the MapSettings language for translations during generation
+		// without mutating global UserPreferences (safe for concurrent API use).
+		boolean appliedLanguage = false;
+		if (requestSettings != null && requestSettings.language != null && !requestSettings.language.isEmpty()) {
+			Translation.initializeWithLanguage(requestSettings.language);
+			appliedLanguage = true;
+		}
+
+        
+		Integer gw = (requestSettings != null && requestSettings.generatedWidth > 0) ? Integer.valueOf(requestSettings.generatedWidth) : null;
+		Integer gh = (requestSettings != null && requestSettings.generatedHeight > 0) ? Integer.valueOf(requestSettings.generatedHeight) : null;
 		GenerationResult generation = generateMap(ctx.settings, gw, gh);
 		if (generation.image == null) {
+			// restore translation state (re-initialize from UserPreferences)
+			if (appliedLanguage) {
+				Translation.initialize();
+			}
 			res.status(500);
 			return gson.toJson(new ApiResponse(false, generation.errorMessage, null, null));
 		}
@@ -228,6 +249,9 @@ public class MapApiServer
 		} finally {
 			img.close();
 			cleanupTempNortPath(ctx.tempNortPath);
+			if (appliedLanguage) {
+				Translation.initialize();
+			}
 		}
 	}
 
@@ -273,7 +297,7 @@ public class MapApiServer
 		try {
 			enumerateFonts(options);
 		} catch (java.awt.HeadlessException | SecurityException e) {
-			if (API_DEBUG) Logger.println("Failed to enumerate system fonts: " + e.getMessage());
+			// ignore font enumeration failures
 		}
 
 		options.put("maxCityProbability", SettingsGenerator.maxCityProbability);
@@ -354,7 +378,7 @@ public class MapApiServer
 				if (v != null) labels.put(k, v.trim());
 			}
 		} catch (java.util.MissingResourceException e) {
-			if (API_DEBUG) Logger.println("Failed to load translation bundle: " + e.getMessage());
+			// ignore missing translation bundle
 		}
 		return labels;
 	}
@@ -401,55 +425,6 @@ private static void setupCors()
 	before((req, res) -> res.header("Access-Control-Allow-Origin", "*"));
 }
 
-private static void registerSimpleLists()
-{
-	get("/api/art-packs", MapApiServer::handleArtPacks);
-	get("/api/books", MapApiServer::handleBooks);
-	get("/api/textures", MapApiServer::handleTextures);
-	get("/api/border-types", MapApiServer::handleBorderTypes);
-}
-
-private static Object handleArtPacks(Request req, Response res)
-{
-	res.type(CONTENT_TYPE_JSON);
-	return gson.toJson(Assets.listArtPacks(false));
-}
-
-private static Object handleBooks(Request req, Response res)
-{
-	res.type(CONTENT_TYPE_JSON);
-	return gson.toJson(SettingsGenerator.getAllBooks());
-}
-
-private static Object handleTextures(Request req, Response res)
-{
-	res.type(CONTENT_TYPE_JSON);
-	List<NamedResource> textures = Assets.listBackgroundTexturesForAllArtPacks(null);
-	List<Map<String, String>> result = new java.util.ArrayList<>();
-	for (NamedResource t : textures)
-	{
-		Map<String, String> entry = new LinkedHashMap<>();
-		entry.put(ART_PACK, t.artPack);
-		entry.put("name", t.name);
-		result.add(entry);
-	}
-	return gson.toJson(result);
-}
-
-private static Object handleBorderTypes(Request req, Response res)
-{
-	res.type(CONTENT_TYPE_JSON);
-	List<NamedResource> borderTypes = Assets.listAllBorderTypes(null);
-	List<Map<String, String>> result = new java.util.ArrayList<>();
-	for (NamedResource borderType : borderTypes)
-	{
-		Map<String, String> entry = new LinkedHashMap<>();
-		entry.put(ART_PACK, borderType.artPack);
-		entry.put("name", borderType.name);
-		result.add(entry);
-	}
-	return gson.toJson(result);
-}
 
 private static Object handleUiOptions(Request req, Response res)
 {
@@ -478,8 +453,8 @@ private static Object handleUiOptions(Request req, Response res)
 		List<Map<String,String>> texturesResult = new java.util.ArrayList<>();
 		for (NamedResource t : textures) {
 			Map<String,String> entry = new LinkedHashMap<>();
-			entry.put("artPack", t.artPack);
-			entry.put("name", t.name);
+			entry.put(ART_PACK, t.artPack);
+			entry.put(NAME, t.name);
 			texturesResult.add(entry);
 		}
 		ui.put("textures", texturesResult);
@@ -488,8 +463,8 @@ private static Object handleUiOptions(Request req, Response res)
 		List<Map<String,String>> borderResult = new java.util.ArrayList<>();
 		for (NamedResource b : borderTypes) {
 			Map<String,String> entry = new LinkedHashMap<>();
-			entry.put("artPack", b.artPack);
-			entry.put("name", b.name);
+			entry.put(ART_PACK, b.artPack);
+			entry.put(NAME, b.name);
 			borderResult.add(entry);
 		}
 		ui.put("borderTypes", borderResult);
@@ -635,138 +610,40 @@ private static Object handleUiOptions(Request req, Response res)
 
 	private static Object handleBackgroundBase(Request req, Response res)
 	{
-		// This endpoint no longer depends on Config/MapSettings. Accept a
+		// This endpoint no longer depends on MapSettings. Accept a
 		// small BackgroundBaseRequest JSON or multipart form with an optional
 		// uploaded image part named "backgroundImage".
 		PlatformFactory.setInstance(new AwtFactory());
 
-		BackgroundBaseRequest br = null;
-		Path uploadedTemp = null;
 		Image baseImage = null;
 		try {
-			BackgroundBaseParseResult parsed = parseBackgroundBaseRequest(req);
-			br = parsed.request;
-			uploadedTemp = parsed.uploadedTemp;
-
 			// Delegate the heavy lifting to a helper to keep this method simple
-			baseImage = processBackgroundBaseAndWriteResponse(br, uploadedTemp, res);
+			baseImage = processBackgroundBaseAndWriteResponse(req, res);
 			return res.raw();
-		} catch (java.io.IOException | javax.servlet.ServletException | com.google.gson.JsonSyntaxException e) {
+		} catch (java.io.IOException | com.google.gson.JsonSyntaxException e) {
 			Logger.println("handleBackgroundBase failed: " + e);
 			res.type(CONTENT_TYPE_JSON);
 			res.status(500);
 			return gson.toJson(new ApiResponse(false, "Failed to generate background base: " + e.getClass().getSimpleName() + (e.getMessage() != null ? (" - " + e.getMessage()) : ""), null, null));
 		} finally {
 			if (baseImage != null) baseImage.close();
-			if (uploadedTemp != null) {
-				try { Files.deleteIfExists(uploadedTemp); } catch (java.io.IOException ignore) {
-					// Ignore cleanup failures; temporary file will be cleaned up by the OS.
-				}
-			}
 		}
 	}
 
-	private static class BackgroundBaseParseResult {
-		final BackgroundBaseRequest request;
-		final Path uploadedTemp;
-
-		BackgroundBaseParseResult(BackgroundBaseRequest request, Path uploadedTemp) {
-			this.request = request;
-			this.uploadedTemp = uploadedTemp;
-		}
-	}
-
-	private static BackgroundBaseParseResult parseBackgroundBaseRequest(Request req) throws java.io.IOException, javax.servlet.ServletException, com.google.gson.JsonSyntaxException {
-		String contentType = req.contentType();
-		if (contentType != null && contentType.toLowerCase().startsWith("multipart/form-data")) {
-			return parseMultipartBackgroundBaseRequest(req);
-		}
-
-		String body = req.body();
-		return parseJsonBackgroundBaseRequest(body);
-	}
-
-	private static BackgroundBaseParseResult parseMultipartBackgroundBaseRequest(Request req) throws java.io.IOException, javax.servlet.ServletException {
-		MultipartConfigElement multipartConfigElement = new MultipartConfigElement(System.getProperty("java.io.tmpdir"));
-		req.raw().setAttribute("org.eclipse.jetty.multipartConfig", multipartConfigElement);
-		Part part = req.raw().getPart("backgroundImage");
-		Path uploadedTemp = null;
-		if (part != null) {
-			uploadedTemp = Files.createTempFile("nortantis-bg-upload-", ".img");
-			try (InputStream is = part.getInputStream()) {
-				Files.copy(is, uploadedTemp, StandardCopyOption.REPLACE_EXISTING);
-			}
-		}
-
-		BackgroundBaseRequest br = new BackgroundBaseRequest();
-		br.previewWidth = param(req, "previewWidth") != null ? Integer.valueOf(param(req, "previewWidth")) : null;
-		br.previewHeight = param(req, "previewHeight") != null ? Integer.valueOf(param(req, "previewHeight")) : null;
-		br.generateBackground = param(req, "generateBackground") != null ? Boolean.valueOf(param(req, "generateBackground")) : null;
-		br.generateBackgroundFromTexture = param(req, "generateBackgroundFromTexture") != null ? Boolean.valueOf(param(req, "generateBackgroundFromTexture")) : null;
-		String seedStr = param(req, "backgroundRandomSeed");
-		br.backgroundRandomSeed = seedStr != null ? Long.valueOf(seedStr) : null;
-		br.backgroundTextureRef = param(req, "backgroundTextureRef");
-		br.customImagesPath = param(req, "customImagesPath");
-		return new BackgroundBaseParseResult(br, uploadedTemp);
-	}
-
-	private static BackgroundBaseParseResult parseJsonBackgroundBaseRequest(String body) {
-		BackgroundBaseRequest br = gson.fromJson(body, BackgroundBaseRequest.class);
-
+	// Helper to robustly parse an Integer from a loosely-typed JSON value.
+	private static Integer parseInteger(Object v) {
+		if (v == null) return null;
+		if (v instanceof Number number) return number.intValue();
 		try {
-			@SuppressWarnings("unchecked")
-			Map<String, Object> raw = gson.fromJson(body, Map.class);
-			if (br == null) br = new BackgroundBaseRequest();
-
-			mapAlternateTextureKeys(raw, br);
-			mapAlternateBackgroundKey(raw, br);
-		} catch (RuntimeException ignore) {
-			// If mapping fails, fall back to the direct deserialized object.
-		}
-
-		return new BackgroundBaseParseResult(br, null);
-	}
-
-	private static void mapAlternateTextureKeys(Map<String, Object> raw, BackgroundBaseRequest br) {
-		if (br.backgroundTextureRef != null && !br.backgroundTextureRef.isEmpty()) return;
-		Object v = null;
-		if (raw.containsKey("backgroundTextureRef")) v = raw.get("backgroundTextureRef");
-		if (v == null && raw.containsKey("backgroundTexture")) v = raw.get("backgroundTexture");
-		if (v == null && raw.containsKey("Texture")) v = raw.get("Texture");
-		if (v == null && raw.containsKey("texture")) v = raw.get("texture");
-		if (v != null) br.backgroundTextureRef = String.valueOf(v);
-	}
-
-	private static void mapAlternateBackgroundKey(Map<String, Object> raw, BackgroundBaseRequest br) {
-		Object bg = raw.get("background");
-		if (bg == null) return;
-		String bgStr = String.valueOf(bg);
-		if (br.generateBackgroundFromTexture == null && "GeneratedFromTexture".equals(bgStr)) {
-			br.generateBackgroundFromTexture = Boolean.TRUE;
-		}
-		if (br.generateBackground == null && "FractalNoise".equals(bgStr)) {
-			br.generateBackground = Boolean.TRUE;
+			return Integer.valueOf(String.valueOf(v));
+		} catch (RuntimeException e) {
+			return null;
 		}
 	}
 
-	private static Tuple2<Path, String> determineBackgroundImagePath(BackgroundBaseRequest br, Path uploadedTemp) {
-		if (uploadedTemp != null) {
-			return new Tuple2<>(uploadedTemp, uploadedTemp.getFileName().toString());
-		}
-		if (br != null && br.backgroundTextureRef != null && !br.backgroundTextureRef.isEmpty()) {
-			String[] parts = br.backgroundTextureRef.split("\\|", 2);
-			if (parts.length == 2) {
-				return new Tuple2<>(null, parts[1]);
-			}
-			return new Tuple2<>(null, br.backgroundTextureRef);
-		}
-		return null;
-	}
-
-	private static String determineBackgroundTextureArtPack(BackgroundBaseRequest br, Path uploadedTemp) {
-		if (uploadedTemp != null) return null;
-		if (br != null && br.backgroundTextureRef != null && !br.backgroundTextureRef.isEmpty()) {
-			String[] parts = br.backgroundTextureRef.split("\\|", 2);
+	private static String determineBackgroundTextureArtPack(String texture) {
+		if (texture != null && !texture.isEmpty()) {
+			String[] parts = texture.split("\\|", 2);
 			if (parts.length == 2) return parts[0];
 		}
 		return null;
@@ -775,12 +652,9 @@ private static Object handleUiOptions(Request req, Response res)
 	private static class BackgroundBaseParams {
 		private int width;
 		private int height;
-		private boolean generateBackground;
-		private boolean generateBackgroundFromTexture;
-		private Long backgroundRandomSeed;
-		private Tuple2<Path, String> backgroundImagePath;
+		private String backgroundType;
+		private String backgroundTextureName;
 		private String backgroundTextureArtPack;
-		private String customImagesPath;
 
 		private BackgroundBaseParams() {
 		}
@@ -791,12 +665,9 @@ private static Object handleUiOptions(Request req, Response res)
 
 			Builder width(int w) { p.width = w; return this; }
 			Builder height(int h) { p.height = h; return this; }
-			Builder generateBackground(boolean v) { p.generateBackground = v; return this; }
-			Builder generateFromTexture(boolean v) { p.generateBackgroundFromTexture = v; return this; }
-			Builder backgroundRandomSeed(Long s) { p.backgroundRandomSeed = s; return this; }
-			Builder backgroundImagePath(Tuple2<Path,String> t) { p.backgroundImagePath = t; return this; }
+			Builder backgroundType(String s) { p.backgroundType = s; return this; }
+			Builder backgroundTextureName(String s) { p.backgroundTextureName = s; return this; }
 			Builder backgroundTextureArtPack(String s) { p.backgroundTextureArtPack = s; return this; }
-			Builder customImagesPath(String s) { p.customImagesPath = s; return this; }
 
 			BackgroundBaseParams build() { return p; }
 		}
@@ -804,21 +675,9 @@ private static Object handleUiOptions(Request req, Response res)
 		// Accessors (fields intentionally non-public to satisfy Sonar S1104)
 		int getWidth() { return width; }
 		int getHeight() { return height; }
-		boolean isGenerateBackground() { return generateBackground; }
-		Long getBackgroundRandomSeed() { return backgroundRandomSeed; }
-		Tuple2<Path, String> getBackgroundImagePath() { return backgroundImagePath; }
+		String getBackgroundType() { return backgroundType; }
+		String getBackgroundTextureName() { return backgroundTextureName; }
 		String getBackgroundTextureArtPack() { return backgroundTextureArtPack; }
-		String getCustomImagesPath() { return customImagesPath; }
-	}
-
-	private static class BackgroundBaseRequest {
-		Integer previewWidth;
-		Integer previewHeight;
-		Boolean generateBackground;
-		Boolean generateBackgroundFromTexture;
-		Long backgroundRandomSeed;
-		String backgroundTextureRef; // artPack|name or image token
-		String customImagesPath;
 	}
 
 	private static Image generateBackgroundBaseImage(BackgroundBaseParams p)
@@ -826,20 +685,18 @@ private static Object handleUiOptions(Request req, Response res)
 		int width = p.getWidth();
 		int height = p.getHeight();
 
-		if (p.isGenerateBackground()) {
-			return generateFractalBackground(p, width, height);
+		String type = p.getBackgroundType();
+		if (type != null && "FractalNoise".equalsIgnoreCase(type)) {
+			return generateFractalBackground(width, height);
 		}
-
-		if (p.generateBackgroundFromTexture) {
+		if (type != null && "GeneratedFromTexture".equalsIgnoreCase(type)) {
 			return generateBackgroundFromTexture(p, width, height);
 		}
-
 		return generateSolidBackground(width, height);
 	}
 
-	private static Image generateFractalBackground(BackgroundBaseParams p, int width, int height) {
-		Random rng = (p.getBackgroundRandomSeed() != null) ? new Random(p.getBackgroundRandomSeed()) : SHARED_RANDOM;
-		Image fractal = FractalBGGenerator.generate(rng, 1.3f, width, height, 0.75f);
+	private static Image generateFractalBackground(int width, int height) {
+		Image fractal = FractalBGGenerator.generate(SHARED_RANDOM, 1.3f, width, height, 0.75f);
 		try {
 			return fractal.deepCopy();
 		} finally {
@@ -848,15 +705,14 @@ private static Object handleUiOptions(Request req, Response res)
 	}
 
 	private static Image generateBackgroundFromTexture(BackgroundBaseParams p, int width, int height) {
-		Tuple2<Path, String> tuple = p.getBackgroundImagePath();
-		Path texturePath = tuple != null ? tuple.getFirst() : null;
-		String textureName = tuple != null ? tuple.getSecond() : null;
+		String textureName = p.getBackgroundTextureName();
+		Path texturePath = null;
 
-		if (texturePath == null && textureName != null) {
+		if (textureName != null) {
 			String artPack = p.getBackgroundTextureArtPack();
 			if (artPack == null || artPack.isEmpty()) artPack = Assets.installedArtPack;
 			NamedResource nr = new NamedResource(artPack, textureName);
-			texturePath = Assets.getBackgroundTextureResourcePath(nr, p.getCustomImagesPath());
+			texturePath = Assets.getBackgroundTextureResourcePath(nr, null);
 		}
 
 		if (texturePath == null) {
@@ -864,11 +720,10 @@ private static Object handleUiOptions(Request req, Response res)
 			return generateSolidBackground(width, height);
 		}
 
-		Image texture = ImageCache.getInstance(p.getBackgroundTextureArtPack(), p.getCustomImagesPath()).getImageFromFile(texturePath);
+		Image texture = ImageCache.getInstance(p.getBackgroundTextureArtPack(), null).getImageFromFile(texturePath);
 		try {
 			Image textureForOcean = ImageHelper.getInstance().convertToGrayscale(texture);
-			Random rng = (p.getBackgroundRandomSeed() != null) ? new Random(p.getBackgroundRandomSeed()) : SHARED_RANDOM;
-			Image oceanBase = BackgroundGenerator.generateUsingWhiteNoiseConvolution(rng, textureForOcean, height, width);
+			Image oceanBase = BackgroundGenerator.generateUsingWhiteNoiseConvolution(SHARED_RANDOM, textureForOcean, height, width);
 			try {
 				return oceanBase.deepCopy();
 			} finally {
@@ -889,30 +744,6 @@ private static Object handleUiOptions(Request req, Response res)
 		} finally {
 			solid.close();
 		}
-	}
-
-	private static void logHeaders(Request req)
-	{
-		if (!API_DEBUG) return;
-		try
-		{
-			String ct = req.contentType();
-			Logger.println("handleGenerate: contentType='" + ct + "' raw='" + req.raw().getContentType() + "'");
-			for (String h : req.headers())
-			{
-				Logger.println("handleGenerate header: " + h + " = " + req.headers(h));
-			}
-		}
-		catch (RuntimeException e)
-		{
-			if (API_DEBUG) Logger.println("handleGenerate: failed to log headers: " + e.getMessage());
-		}
-	}
-
-	private static String param(Request req, String name)
-	{
-		String v = req.raw().getParameter(name);
-		return (v != null && !v.isEmpty()) ? v : null;
 	}
 
 	// Extracted helper to satisfy Sonar S1141: keep nested try logic in a
@@ -938,7 +769,7 @@ private static Object handleUiOptions(Request req, Response res)
 
 	private static MapSettings generateRandomMapSettings(RandomMapParameters params)
 	{
-		Random rand = params.randomSeed != null ? new Random(params.randomSeed) : SHARED_RANDOM;
+		Random rand = SHARED_RANDOM;
 		String artPack = (params.artPack != null && !params.artPack.isEmpty()) ? params.artPack : Assets.installedArtPack;
 		MapSettings settings = SettingsGenerator.generate(rand, artPack, null);
 		applyRandomMapParameterOverrides(params, settings);
@@ -948,6 +779,7 @@ private static Object handleUiOptions(Request req, Response res)
 	private static void applyRandomMapParameterOverrides(RandomMapParameters p, MapSettings settings)
 	{
 		if (p.worldSize != null) settings.worldSize = p.worldSize;
+		if (p.cityIconSetName != null && !p.cityIconSetName.isEmpty()) settings.cityIconTypeName = p.cityIconSetName;
 		if (p.landShape != null && !p.landShape.isEmpty()) {
 			try { settings.landShape = LandShape.valueOf(p.landShape); } catch (IllegalArgumentException ignored) {
 				// Invalid landShape provided by client; ignore and keep generated default.
@@ -975,7 +807,6 @@ private static Object handleUiOptions(Request req, Response res)
 	}
 	private static class RandomMapParameters {
 		String language;
-		Long randomSeed;
 		String dimension;
 		Integer worldSize;
 		String landShape;
@@ -984,13 +815,13 @@ private static Object handleUiOptions(Request req, Response res)
 		Integer cityFrequency;
 		List<String> books;
 		String artPack;
+		String cityIconSetName;
 	}
 
 	/**
 	 * Internal helper holding parsed request context for generation endpoints.
 	 */
 	private static class GenerationRequestContext {
-		Config effectiveCfg;
 		GenerationContext ctx; // populated for endpoints that load settings from .nort
 		MapSettings settings;  // populated when settings are available directly
 	}
@@ -1033,17 +864,16 @@ private static Object handleUiOptions(Request req, Response res)
 
 	// Helper: quick check whether parsed params contain any generation fields
 	private static boolean paramsContainGenerationFields(RandomMapParameters p) {
-		return p != null && (p.language != null || p.randomSeed != null || p.dimension != null || p.worldSize != null || p.landShape != null || p.regionCount != null || p.cityFrequency != null || (p.books != null && !p.books.isEmpty()));
+		return p != null && (p.language != null || p.dimension != null || p.worldSize != null || p.landShape != null || p.regionCount != null || p.cityFrequency != null || (p.books != null && !p.books.isEmpty()));
 	}
 
 	// Build GenerationRequestContext when params-driven generation is requested
 	private static GenerationRequestContext buildContextFromParams(RandomMapParameters params) {
 		GenerationRequestContext out = new GenerationRequestContext();
-		out.effectiveCfg = new Config();
-		if (params.language != null && !params.language.isEmpty()) {
-			out.effectiveCfg.language = params.language;
-		}
 		out.settings = generateRandomMapSettings(params);
+		if (params.language != null && !params.language.isEmpty()) {
+			out.settings.language = params.language;
+		}
 		return out;
 	}
 
@@ -1060,13 +890,18 @@ private static Object handleUiOptions(Request req, Response res)
 			GenerationRequestContext out = new GenerationRequestContext();
 			out.ctx = new GenerationContext(settings, tempNortPath);
 			out.settings = settings;
-			out.effectiveCfg = new Config();
-			// Respect explicit language parameter when present, otherwise use settings.language
-			out.effectiveCfg.language = (params != null && params.language != null && !params.language.isEmpty()) ? params.language : settings.language;
+			// Respect explicit language parameter when present, otherwise keep settings.language
+			if (params != null && params.language != null && !params.language.isEmpty()) {
+				out.settings.language = params.language;
+			}
 			return out;
 		} catch (IOException e) {
 			if (tempNortPath != null) {
-				try { Files.deleteIfExists(tempNortPath); } catch (IOException ignore) {}
+				try {
+					Files.deleteIfExists(tempNortPath);
+				} catch (IOException ignore) {
+					// Best-effort cleanup failed; ignore.
+				}
 			}
 			res.status(400);
 			return null;
@@ -1303,13 +1138,6 @@ private static Object handleUiOptions(Request req, Response res)
 		{
 			writer.dispose();
 		}
-	}
-
-	private static class Config extends MapSettings
-	{
-		// API-specific helpers
-		// Deprecated legacy wrapper field (may contain nested settings map). Prefer full .nort body.
-		Map<String, Object> settings;
 	}
 
 	private static class GenerationContext

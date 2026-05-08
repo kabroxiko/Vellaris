@@ -18,9 +18,24 @@ public class Translation
 		bundle = ResourceBundle.getBundle("nortantis.swing.translation.messages", effectiveLocale);
 	}
 
+	/**
+	 * Initialize translations using an explicit language code (e.g. "en", "fr").
+	 * This does not modify UserPreferences and is safe for per-request use in the API.
+	 */
+	public static void initializeWithLanguage(String language)
+	{
+		effectiveLocale = determineLocaleForLanguage(language);
+		bundle = ResourceBundle.getBundle("nortantis.swing.translation.messages", effectiveLocale);
+	}
+
 	private static Locale determineLocale()
 	{
 		String language = UserPreferences.getInstance().language;
+		return determineLocaleForLanguage(language);
+	}
+
+	private static Locale determineLocaleForLanguage(String language)
+	{
 		if (language != null && !language.isEmpty())
 		{
 			Locale override = Locale.of(language);

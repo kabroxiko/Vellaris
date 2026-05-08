@@ -1494,6 +1494,8 @@ function GenerateForm({ uiLanguage = 'en' }) {
         regionCount: isManual('regionCount') ? regionCount : undefined,
         drawRegionColors: isManual('landColoringMethod') ? (landColoringMethod ? (landColoringMethod === 'ColorPoliticalRegions') : undefined) : undefined,
         cityFrequency: isManual('cityFrequency') ? cityFrequency : undefined,
+        // Preserve a manually-selected city icon set for the settings resolver
+        cityIconSetName: isManual('cityIconType') ? cityIconType || undefined : undefined,
         books: isManual('selectedBooks') ? (selectedBooks.size > 0 ? Array.from(selectedBooks) : undefined) : undefined,
       }
 

@@ -667,12 +667,12 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
       const candidates = []
       if (Array.isArray(textures) && textures.length > 0) {
         textures.slice(0, 5).forEach((t) => {
-          candidates.push({ previewWidth: 520, previewHeight: 170, background: 'GeneratedFromTexture', Texture: `${t.artPack}|${t.name}` })
+          candidates.push({ width: 520, height: 170, type: 'GeneratedFromTexture', texture: `${t.artPack}|${t.name}` })
         })
       }
       const fractal = Array.isArray(backgroundTypes) ? backgroundTypes.find((b) => b && b.value && String(b.value).toLowerCase().includes('fractal')) : null
-      if (fractal) candidates.push({ previewWidth: 520, previewHeight: 170, background: fractal.value })
-      else candidates.push({ previewWidth: 520, previewHeight: 170, background: 'Fractal' })
+      if (fractal) candidates.push({ width: 520, height: 170, type: fractal.value })
+      else candidates.push({ width: 520, height: 170, type: 'Fractal' })
 
       candidates.forEach((p) => {
         try { backgroundBaseCache.preload(p) } catch (e) {}
@@ -969,14 +969,14 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
         // base image to reduce API calls and server load.
         const normalizedPreviewFields = {}
 
-        const payload = Object.assign({ previewWidth: 520, previewHeight: 170 }, normalizedPreviewFields)
+        const payload = Object.assign({ width: 520, height: 170 }, normalizedPreviewFields)
 
         // Include a `background` key (server expects this name). When the
         // background is a texture-based generation, also include the
         // `Texture` field so the server can resolve the texture reference.
         try {
-          payload.background = previewFields.backgroundType === undefined ? null : previewFields.backgroundType
-          const bg = payload.background
+          payload.type = previewFields.backgroundType === undefined ? null : previewFields.backgroundType
+          const bg = payload.type
           if (
             bg === 'GeneratedFromTexture' ||
             (typeof bg === 'string' && bg.toLowerCase().includes('texture'))
@@ -988,9 +988,9 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
             const isEmpty = rawRef === undefined || rawRef === null || String(rawRef).trim() === ''
             if (isEmpty && Array.isArray(textures) && textures.length > 0) {
               const t = textures[0]
-              payload.Texture = `${t.artPack}|${t.name}`
+              payload.texture = `${t.artPack}|${t.name}`
             } else {
-              payload.Texture = isEmpty ? null : rawRef
+              payload.texture = isEmpty ? null : rawRef
             }
           }
         } catch (e) {}
