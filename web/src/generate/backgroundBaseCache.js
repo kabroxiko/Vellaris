@@ -9,7 +9,14 @@ const queue = []
 function makeKey(payload) {
   // keep key small and deterministic — include only relevant fields
   try {
-    return JSON.stringify(payload)
+    const keyObj = {
+      width: payload.width || payload.previewWidth || 0,
+      height: payload.height || payload.previewHeight || 0,
+      type: payload.type || payload.background || null,
+      artPack: payload.artPack || null,
+      cityIconType: payload.cityIconType || null,
+    }
+    return JSON.stringify(keyObj)
   } catch (e) {
     return String(Math.random())
   }

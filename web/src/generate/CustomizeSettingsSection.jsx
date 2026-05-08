@@ -631,7 +631,7 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     handleDownloadMap,
   } = handlers
 
-  const { textures, borderTypes, i18n } = options
+  const { textures, borderTypes, i18n, cityIconTypesByPack } = options
   const { loading } = ui
   // Debug logging removed to avoid console noise in the web UI.
   const labels = i18n?.labels || {}
@@ -667,7 +667,7 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
       const candidates = []
       if (Array.isArray(textures) && textures.length > 0) {
         textures.slice(0, 5).forEach((t) => {
-          candidates.push({ width: 520, height: 170, type: 'GeneratedFromTexture', texture: `${t.artPack}|${t.name}` })
+          candidates.push({ width: 520, height: 170, type: 'GeneratedFromTexture', artPack: t.artPack, cityIconType: t.name })
         })
       }
       const fractal = Array.isArray(backgroundTypes) ? backgroundTypes.find((b) => b && b.value && String(b.value).toLowerCase().includes('fractal')) : null
@@ -986,11 +986,39 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
             // enabling texture immediately produces a sensible preview.
             const rawRef = previewFields.textureRef
             const isEmpty = rawRef === undefined || rawRef === null || String(rawRef).trim() === ''
-            if (isEmpty && Array.isArray(textures) && textures.length > 0) {
-              const t = textures[0]
-              payload.texture = `${t.artPack}|${t.name}`
+            if (isEmpty) {
+              // Prefer canonical city icon lists from UI options
+              if (cityIconTypesByPack && Object.keys(cityIconTypesByPack).length > 0) {
+                const firstPack = Object.keys(cityIconTypesByPack)[0]
+                const firstTypes = cityIconTypesByPack[firstPack]
+                if (Array.isArray(firstTypes) && firstTypes.length > 0) {
+                  payload.artPack = firstPack
+                  payload.cityIconType = firstTypes[0]
+                }
+              }
+              // Fallback: use textures list if available
+              if ((!payload.cityIconType || !payload.artPack) && Array.isArray(textures) && textures.length > 0) {
+                const t = textures[0]
+                payload.artPack = t.artPack
+                payload.cityIconType = t.name
+              }
             } else {
-              payload.texture = isEmpty ? null : rawRef
+              // Resolve selection against known `textures` entries to avoid string parsing when possible
+              if (String(rawRef).includes('|') && Array.isArray(textures) && textures.length > 0) {
+                const ref = String(rawRef)
+                const found = textures.find((tt) => `${tt.artPack}|${tt.name}` === ref)
+                if (found) {
+                  payload.artPack = found.artPack
+                  payload.cityIconType = found.name
+                } else {
+                  // last-resort: parse the combined ref
+                  const [ap, nm] = ref.split('|', 2)
+                  payload.artPack = ap
+                  payload.cityIconType = nm
+                }
+              } else {
+                payload.cityIconType = isEmpty ? null : rawRef
+              }
             }
           }
         } catch (e) {}
@@ -999,9 +1027,9 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
           Object.assign(payload, currentSource.payload)
         }
 
-        
-
-        // background-preview payload logging removed
+        if (!payload.cityIconType && previewFields && previewFields.cityIconType) {
+          payload.cityIconType = previewFields.cityIconType
+        }
 
         // Retry fetch a few times to handle transient network changes (ERR_NETWORK_CHANGED)
         async function doFetchWithRetries(url, opts, attempts = 3, delayMs = 300) {

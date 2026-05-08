@@ -68,8 +68,6 @@ public class MapApiServer
 	private static final String NORT_EXTENSION = ".nort";
 	private static final String MSG_FAILED_TO_PARSE_CONFIG = "Failed to parse config";
 	private static final float PNG_COMPRESSION_QUALITY = 0.95f;
-	private static final int DEFAULT_BACKGROUND_PREVIEW_WIDTH = 320;
-	private static final int DEFAULT_BACKGROUND_PREVIEW_HEIGHT = 110;
 
 	public static void main(String[] args)
 	{
@@ -101,45 +99,41 @@ public class MapApiServer
 	// response output stream. Returns the generated Image for the caller to
 	// close/cleanup when appropriate.
 	private static Image processBackgroundBaseAndWriteResponse(Request req, Response res) throws java.io.IOException {
-		Integer reqWidth = null;
-		Integer reqHeight = null;
-		String bgType = null;
-		String texture = null;
+		int width = -1;
+		int height = -1;
+		String type = null;
+		String cityIconType = null;
+		String artPack = null;
+
 		try {
 			@SuppressWarnings("unchecked")
 			Map<String, Object> raw = gson.fromJson(req.body(), Map.class);
 			if (raw != null) {
-				reqWidth = parseInteger(raw.get("width"));
-				reqHeight = parseInteger(raw.get("height"));
-				if (raw.containsKey("type")) {
-					bgType = String.valueOf(raw.get("type"));
-				}
-				if (raw.containsKey("texture")) {
-					texture = String.valueOf(raw.get("texture"));
-				}
+				Integer w = parseInteger(raw.get("width"));
+				Integer h = parseInteger(raw.get("height"));
+				if (w != null) width = w;
+				if (h != null) height = h;
+				Object t = raw.get("type");
+				if (t != null) type = String.valueOf(t);
+				Object ap = raw.get("artPack");
+				if (ap != null) artPack = String.valueOf(ap);
+				Object cit = raw.get("cityIconType");
+				if (cit != null) cityIconType = String.valueOf(cit);
 			}
 		} catch (RuntimeException ignore) {
-			// If mapping fails, fall through with nulls
-		}
-		int width = (reqWidth != null && reqWidth > 0) ? reqWidth : DEFAULT_BACKGROUND_PREVIEW_WIDTH;
-		int height = (reqHeight != null && reqHeight > 0) ? reqHeight : DEFAULT_BACKGROUND_PREVIEW_HEIGHT;
-		String backgroundType = bgType;
-
-		String backgroundTextureName = null;
-		String backgroundTextureArtPack = determineBackgroundTextureArtPack(texture);
-		if (texture != null && !texture.isEmpty()) {
-			String[] parts = texture.split("\\|", 2);
-			backgroundTextureName = (parts.length == 2) ? parts[1] : texture;
+			// If mapping fails, fall through with defaults
 		}
 
-		BackgroundBaseParams bp = new BackgroundBaseParams.Builder()
-			.width(width)
-			.height(height)
-			.backgroundType(backgroundType)
-			.backgroundTextureName(backgroundTextureName)
-			.backgroundTextureArtPack(backgroundTextureArtPack)
-			.build();
-		Image baseImage = generateBackgroundBaseImage(bp);
+		if (width <= 0 || height <= 0) {
+			res.type(CONTENT_TYPE_JSON);
+			res.status(400);
+			res.body(gson.toJson(new ApiResponse(false, "Missing required fields: width and height must be positive integers", null, null)));
+			return null;
+		}
+
+		// `cityIconType` and `artPack` are optional; if absent the generator
+		// will use defaults or fall back to a solid background.
+		Image baseImage = generateBackgroundBaseImage(width, height, type, cityIconType, artPack);
 		BufferedImage buffered = nortantis.platform.awt.AwtFactory.unwrap(baseImage);
 		res.type(CONTENT_TYPE_PNG);
 		res.status(200);
@@ -640,57 +634,13 @@ private static Object handleUiOptions(Request req, Response res)
 			return null;
 		}
 	}
-
-	private static String determineBackgroundTextureArtPack(String texture) {
-		if (texture != null && !texture.isEmpty()) {
-			String[] parts = texture.split("\\|", 2);
-			if (parts.length == 2) return parts[0];
-		}
-		return null;
-	}
-
-	private static class BackgroundBaseParams {
-		private int width;
-		private int height;
-		private String backgroundType;
-		private String backgroundTextureName;
-		private String backgroundTextureArtPack;
-
-		private BackgroundBaseParams() {
-		}
-
-		// Builder to avoid large constructor parameter lists (Sonar S107)
-		private static class Builder {
-			private final BackgroundBaseParams p = new BackgroundBaseParams();
-
-			Builder width(int w) { p.width = w; return this; }
-			Builder height(int h) { p.height = h; return this; }
-			Builder backgroundType(String s) { p.backgroundType = s; return this; }
-			Builder backgroundTextureName(String s) { p.backgroundTextureName = s; return this; }
-			Builder backgroundTextureArtPack(String s) { p.backgroundTextureArtPack = s; return this; }
-
-			BackgroundBaseParams build() { return p; }
-		}
-
-		// Accessors (fields intentionally non-public to satisfy Sonar S1104)
-		int getWidth() { return width; }
-		int getHeight() { return height; }
-		String getBackgroundType() { return backgroundType; }
-		String getBackgroundTextureName() { return backgroundTextureName; }
-		String getBackgroundTextureArtPack() { return backgroundTextureArtPack; }
-	}
-
-	private static Image generateBackgroundBaseImage(BackgroundBaseParams p)
+	private static Image generateBackgroundBaseImage(int width, int height, String type, String cityIconType, String artPack)
 	{
-		int width = p.getWidth();
-		int height = p.getHeight();
-
-		String type = p.getBackgroundType();
 		if (type != null && "FractalNoise".equalsIgnoreCase(type)) {
 			return generateFractalBackground(width, height);
 		}
 		if (type != null && "GeneratedFromTexture".equalsIgnoreCase(type)) {
-			return generateBackgroundFromTexture(p, width, height);
+			return generateBackgroundFromTexture(cityIconType, artPack, width, height);
 		}
 		return generateSolidBackground(width, height);
 	}
@@ -704,23 +654,22 @@ private static Object handleUiOptions(Request req, Response res)
 		}
 	}
 
-	private static Image generateBackgroundFromTexture(BackgroundBaseParams p, int width, int height) {
-		String textureName = p.getBackgroundTextureName();
+	private static Image generateBackgroundFromTexture(String cityIconType, String artPack, int width, int height) {
 		Path texturePath = null;
 
-		if (textureName != null) {
-			String artPack = p.getBackgroundTextureArtPack();
-			if (artPack == null || artPack.isEmpty()) artPack = Assets.installedArtPack;
-			NamedResource nr = new NamedResource(artPack, textureName);
+		if (cityIconType != null) {
+			String pack = artPack;
+			if (pack == null || pack.isEmpty()) pack = Assets.installedArtPack;
+			NamedResource nr = new NamedResource(pack, cityIconType);
 			texturePath = Assets.getBackgroundTextureResourcePath(nr, null);
 		}
 
 		if (texturePath == null) {
-			Logger.println("Background texture not found: " + textureName + " (artPack=" + p.getBackgroundTextureArtPack() + ") - falling back to solid background");
+			Logger.println("Background texture not found: " + cityIconType + " (artPack=" + artPack + ") - falling back to solid background");
 			return generateSolidBackground(width, height);
 		}
 
-		Image texture = ImageCache.getInstance(p.getBackgroundTextureArtPack(), null).getImageFromFile(texturePath);
+		Image texture = ImageCache.getInstance(artPack, null).getImageFromFile(texturePath);
 		try {
 			Image textureForOcean = ImageHelper.getInstance().convertToGrayscale(texture);
 			Image oceanBase = BackgroundGenerator.generateUsingWhiteNoiseConvolution(SHARED_RANDOM, textureForOcean, height, width);
