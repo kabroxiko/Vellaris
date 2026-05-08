@@ -1957,6 +1957,10 @@ function GenerateForm({ uiLanguage = 'en' }) {
       throw new Error('Current settings are not valid JSON.')
     }      
 
+    // Merge UI overrides into the parsed settings so regenerate sends changed
+    // control values to the server.
+    try { mergeUiIntoParsed(parsedSettings) } catch (e) {}
+
     // Ensure map size/seed are stored inside the settings JSON so server only
     // needs to read the uploaded nort content to apply customization.
     // The backend reads `generatedWidth`/`generatedHeight` from settings
