@@ -43,10 +43,7 @@ import javax.imageio.IIOImage;
 import javax.imageio.ImageWriteParam;
 import javax.imageio.ImageWriter;
 import javax.imageio.stream.ImageOutputStream;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
-import java.nio.charset.StandardCharsets;
 
 import static spark.Spark.*;
 
@@ -65,7 +62,6 @@ public class MapApiServer
 	private static final String PNG_FORMAT_NAME = "png";
 	private static final String ART_PACK = "artPack";
 	private static final String NAME = "name";
-	private static final String NORT_EXTENSION = ".nort";
 	private static final String MSG_FAILED_TO_PARSE_CONFIG = "Failed to parse config";
 	private static final float PNG_COMPRESSION_QUALITY = 0.95f;
 
@@ -242,7 +238,6 @@ public class MapApiServer
 			return produceResponseFromImage(img, ctx, res);
 		} finally {
 			img.close();
-			cleanupTempNortPath(ctx.tempNortPath);
 			if (appliedLanguage) {
 				Translation.initialize();
 			}
@@ -826,32 +821,20 @@ private static Object handleUiOptions(Request req, Response res)
 		return out;
 	}
 
-	// Build GenerationRequestContext by persisting body to a temp .nort and loading MapSettings
+	// Build GenerationRequestContext by parsing JSON only. Reject non-JSON inputs.
 	private static GenerationRequestContext buildContextFromNortBody(String body, RandomMapParameters params, Response res) {
-		Path tempNortPath = null;
 		try {
-			tempNortPath = Files.createTempFile("nortantis-", NORT_EXTENSION);
-			Files.write(tempNortPath, body.getBytes(StandardCharsets.UTF_8), StandardOpenOption.TRUNCATE_EXISTING);
-			MapSettings settings = new MapSettings(tempNortPath.toAbsolutePath().toString());
-
+			MapSettings settings = MapSettings.fromJson(body);
 			ensureIconEditsFlag(settings);
-
 			GenerationRequestContext out = new GenerationRequestContext();
-			out.ctx = new GenerationContext(settings, tempNortPath);
+			out.ctx = new GenerationContext(settings);
 			out.settings = settings;
-			// Respect explicit language parameter when present, otherwise keep settings.language
 			if (params != null && params.language != null && !params.language.isEmpty()) {
 				out.settings.language = params.language;
 			}
 			return out;
-		} catch (IOException e) {
-			if (tempNortPath != null) {
-				try {
-					Files.deleteIfExists(tempNortPath);
-				} catch (IOException ignore) {
-					// Best-effort cleanup failed; ignore.
-				}
-			}
+		} catch (RuntimeException e) {
+			// Parsing failed: enforce API contract by returning 400.
 			res.status(400);
 			return null;
 		}
@@ -1047,20 +1030,7 @@ private static Object handleUiOptions(Request req, Response res)
 		}
 	}
 
-	private static void cleanupTempNortPath(Path tempNortPath)
-	{
-		if (tempNortPath != null)
-		{
-			try
-			{
-				Files.deleteIfExists(tempNortPath);
-			}
-			catch (java.io.IOException ignore)
-			{
-				// Ignore cleanup errors; temporary file will be cleaned up by system
-			}
-		}
-	}
+
 
 	private static void writeCompressedPng(BufferedImage image, OutputStream outputStream) throws IOException
 	{
@@ -1092,12 +1062,10 @@ private static Object handleUiOptions(Request req, Response res)
 	private static class GenerationContext
 	{
 		MapSettings settings;
-		Path tempNortPath;
 
-		GenerationContext(MapSettings settings, Path tempNortPath)
+		GenerationContext(MapSettings settings)
 		{
 			this.settings = settings;
-			this.tempNortPath = tempNortPath;
 		}
 	}
 

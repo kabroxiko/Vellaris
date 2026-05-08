@@ -245,6 +245,16 @@ public class MapSettings implements Serializable
 		}
 	}
 
+	/**
+	 * Construct MapSettings directly from a JSON string (no temp file).
+	 * Throws RuntimeException on parse/validation failure.
+	 */
+	public static MapSettings fromJson(String json) {
+		MapSettings settings = new MapSettings();
+		settings.parseFromJson(json);
+		return settings;
+	}
+
 	public static boolean isOldPropertiesFile(String filePath)
 	{
 		return FilenameUtils.getExtension(filePath).toLowerCase().equals("properties");
