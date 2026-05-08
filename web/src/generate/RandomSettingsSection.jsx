@@ -24,7 +24,6 @@ export default function RandomSettingsSection({ values, handlers, options, ui })
     cityIconType,
     cityFrequency,
     selectedBooks,
-    randomSeed,
     mapLanguage,
     fileName,
   } = values
@@ -39,7 +38,6 @@ export default function RandomSettingsSection({ values, handlers, options, ui })
     setCityIconType,
     setCityFrequency,
     setSelectedBooks,
-    setRandomSeed,
     setMapLanguage,
     handleRandomMap,
     handleFileInput,

@@ -1,39 +1,44 @@
 import React from 'react'
 
-export default function BorderTab({ context }) {
-  if (!context) return <div />
-  const { translateLabel, gatedControlValue, emptyComboOption, renderColorControl } = context
-  const get = (k) => (context[k] !== undefined ? context[k] : (context.values && context.values[k]))
+export default function BorderTab(props) {
+  if (!props) return <div />
+  const { translateLabel, gatedControlValue, emptyComboOption, renderColorControl } = props
 
-  const drawBorder = get('drawBorder')
-  const setDrawBorder = get('setDrawBorder')
-  const borderRef = get('borderRef')
-  const setBorderRef = get('setBorderRef')
-  const borderTypes = get('borderTypes')
-  const borderWidth = get('borderWidth')
-  const setBorderWidth = get('setBorderWidth')
-  const borderPosition = get('borderPosition')
-  const setBorderPosition = get('setBorderPosition')
-  const borderPositions = get('borderPositions')
-  const borderColorOption = get('borderColorOption')
-  const setBorderColorOption = get('setBorderColorOption')
-  const borderColorOptions = get('borderColorOptions')
-  const borderColorHex = get('borderColorHex')
-  const setBorderColorHex = get('setBorderColorHex')
-  const frayedBorder = get('frayedBorder')
-  const setFrayedBorder = get('setFrayedBorder')
-  const frayedBorderBlurLevel = get('frayedBorderBlurLevel')
-  const setFrayedBorderBlurLevel = get('setFrayedBorderBlurLevel')
-  const frayedBorderSize = get('frayedBorderSize')
-  const setFrayedBorderSize = get('setFrayedBorderSize')
-  const frayedBorderSeed = get('frayedBorderSeed')
-  const setFrayedBorderSeed = get('setFrayedBorderSeed')
-  const drawGrunge = get('drawGrunge')
-  const setDrawGrunge = get('setDrawGrunge')
-  const grungeWidth = get('grungeWidth')
-  const setGrungeWidth = get('setGrungeWidth')
-  const frayedBorderColorHex = get('frayedBorderColorHex')
-  const setFrayedBorderColorHex = get('setFrayedBorderColorHex')
+  const {
+    drawBorder = false,
+    setDrawBorder,
+    borderRef,
+    setBorderRef,
+    borderTypes = [],
+    borderWidth = 0,
+    setBorderWidth,
+    borderPosition,
+    setBorderPosition,
+    borderPositions = [],
+    borderColorOption,
+    setBorderColorOption,
+    borderColorOptions = [],
+    borderColorHex,
+    setBorderColorHex,
+    frayedBorder = false,
+    setFrayedBorder,
+    frayedBorderBlurLevel = 0,
+    setFrayedBorderBlurLevel,
+    frayedBorderSize = 0,
+    setFrayedBorderSize,
+    frayedBorderSeed,
+    setFrayedBorderSeed,
+    drawGrunge = false,
+    setDrawGrunge,
+    grungeWidth = 0,
+    setGrungeWidth,
+    frayedBorderColorHex,
+    setFrayedBorderColorHex,
+    showBorderColorPicker = false,
+    setShowBorderColorPicker,
+    showFrayedBorderPicker = false,
+    setShowFrayedBorderPicker,
+  } = props
 
   return (
     <div className="fields-grid two-col-layout">
@@ -122,8 +127,8 @@ export default function BorderTab({ context }) {
               label: translateLabel('theme.borderColor.title'),
               hexValue: borderColorHex,
               onHexChange: setBorderColorHex,
-              showState: context.showBorderColorPicker,
-              setShowState: context.setShowBorderColorPicker,
+              showState: showBorderColorPicker,
+              setShowState: setShowBorderColorPicker,
               disabled: !drawBorder || borderColorOption !== 'Choose_color',
             })}
             </div>
@@ -223,8 +228,8 @@ export default function BorderTab({ context }) {
               label: translateLabel('theme.grungeColor.label'),
               hexValue: frayedBorderColorHex,
               onHexChange: setFrayedBorderColorHex,
-              showState: context.showFrayedBorderPicker,
-              setShowState: context.setShowFrayedBorderPicker,
+              showState: showFrayedBorderPicker,
+              setShowState: setShowFrayedBorderPicker,
               disabled: !drawGrunge,
             })}
           </div>

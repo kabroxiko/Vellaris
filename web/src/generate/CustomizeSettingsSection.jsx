@@ -45,17 +45,12 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     textureRef,
     colorizeLand,
     colorizeOcean,
-    finalLandColoringMethod,
-    regionBoundaryStyle,
-    regionBoundaryWidth,
-    regionBoundaryColorHex,
     landColorHex,
     oceanColorHex,
     backgroundSeed,
     finalSeed,
     finalWidth,
     finalHeight,
-    drawRegionBoundaries,
     drawBorder,
     drawGridOverlay,
     gridOverlayShape,
@@ -65,7 +60,6 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     gridOverlayYOffset,
     gridOverlayLineWidth,
     gridOverlayLayer,
-    drawVoronoiGridOverlayOnlyOnLand,
     borderRef,
     borderWidth,
     borderPosition,
@@ -1211,471 +1205,6 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     setOpenFontComboId(null)
   }
 
-  
-
-  
-
-  function renderEffectsTab() {
-    return (
-      <div className="fields-grid two-col-layout">
-        <div className="fields-column">
-          <label htmlFor="line-style-input">{translateLabel('theme.lineStyle.label')}</label>
-          <select
-            id="line-style-input"
-            value={gatedControlValue(lineStyle)}
-            onChange={(e) => setLineStyle(e.target.value)}
-          >
-            {emptyComboOption}
-            {lineStyles.map((item) => (
-              <option key={item.value} value={item.value}>
-                {item.label}
-              </option>
-            ))}
-          </select>
-
-          <label htmlFor="coastline-width-input">
-            {translateLabel('theme.coastlineWidth.label')}
-          </label>
-          <div className="slider-row">
-            <input
-              id="coastline-width-input"
-              type="range"
-              min={0}
-              max={10}
-              step={0.1}
-              value={coastlineWidth}
-              onChange={(e) => setCoastlineWidth(Number(e.target.value))}
-            />
-            <span className="slider-value">{coastlineWidth.toFixed(1)}</span>
-          </div>
-
-          {renderColorControl({
-            id: 'coastline-color',
-            label: translateLabel('theme.coastlineColor.label'),
-            hexValue: coastlineColorHex,
-            onHexChange: setCoastlineColorHex,
-            showState: showCoastlinePicker,
-            setShowState: setShowCoastlinePicker,
-            disabled: false,
-          })}
-
-          <label htmlFor="coast-shading-level-input">
-            {translateLabel('theme.coastShadingWidth.label')}
-          </label>
-          <div className="slider-row">
-            <input
-              id="coast-shading-level-input"
-              type="range"
-              min={0}
-              max={100}
-              step={1}
-              value={coastShadingLevel}
-              onChange={(e) => setCoastShadingLevel(Number(e.target.value))}
-            />
-            <span className="slider-value">{Math.round(coastShadingLevel)}</span>
-          </div>
-
-          <>
-            <label htmlFor="coast-shading-alpha-input">
-              {translateLabel('theme.coastShadingTransparency.label')}
-            </label>
-            <div className="slider-row">
-              <input
-                id="coast-shading-alpha-input"
-                type="range"
-                min={0}
-                max={100}
-                step={1}
-                value={coastShadingAlpha}
-                onChange={(e) => setCoastShadingAlpha(Number(e.target.value))}
-                disabled={finalLandColoringMethod === 'SingleColor'}
-              />
-              <span className="slider-value">{Math.round(coastShadingAlpha)}</span>
-            </div>
-          </>
-
-          {/* Coast shading color input removed per UI preference */}
-
-          <label htmlFor="ocean-shading-level-input">
-            {translateLabel('theme.oceanShadingWidth.label')}
-          </label>
-          <div className="slider-row">
-            <input
-              id="ocean-shading-level-input"
-              type="range"
-              min={0}
-              max={100}
-              step={1}
-              value={oceanShadingLevel}
-              onChange={(e) => setOceanShadingLevel(Number(e.target.value))}
-            />
-            <span className="slider-value">{Math.round(oceanShadingLevel)}</span>
-          </div>
-
-            {(() => {
-              const shouldReplace = finalLandColoringMethod === 'ColorPoliticalRegions'
-              let swatchReplacement = undefined
-              if (shouldReplace) {
-                try {
-                  let txt = translateLabel('theme.coastShadingColor.disabled')
-                  // If the translation contains HTML tags (e.g. <html>...)</>, strip them for this small inline replacement
-                  if (typeof txt === 'string') {
-                    txt = txt.replace(/<[^>]*>/g, '')
-                    // MessageFormat uses doubled single-quotes to escape; convert to a single quote for display
-                    txt = txt.replace(/''/g, "'")
-                  }
-                  // Replace placeholder {0} with a human-friendly name for the method
-                  const methodLabel = translateLabel(`LandColoringMethod.${finalLandColoringMethod}`)
-                  if (typeof txt === 'string' && txt.indexOf('{0}') >= 0) txt = txt.replace('{0}', methodLabel)
-                  swatchReplacement = txt
-                } catch (e) { swatchReplacement = ('' + translateLabel('theme.coastShadingColor.disabled')).replace(/<[^>]*>/g, '').replace(/''/g, "'") }
-              }
-              return renderColorControl({
-                id: 'ocean-shading-color',
-                label: translateLabel('theme.oceanShadingColor.label'),
-                hexValue: oceanShadingColorHex,
-                onHexChange: setOceanShadingColorHex,
-                alphaValue: oceanShadingAlpha,
-                onAlphaChange: setOceanShadingAlpha,
-                showState: showOceanPicker,
-                setShowState: setShowOceanPicker,
-                disabled: shouldReplace,
-                swatchReplacement,
-              })
-            })()}
-        </div>
-
-        <div className="fields-column">
-          <label htmlFor="ocean-waves-type-input">{translateLabel('theme.waveType.label')}</label>
-          <select
-            id="ocean-waves-type-input"
-            value={gatedControlValue(oceanWavesType)}
-            onChange={(e) => setOceanWavesType(e.target.value)}
-          >
-            {emptyComboOption}
-            {oceanWaveTypes.map((item) => (
-              <option key={item.value} value={item.value}>
-                {item.label}
-              </option>
-            ))}
-          </select>
-
-          {/* Hide wave size when concentric waves are selected (concentric uses its own count/size) */}
-          <>
-            <label htmlFor="ocean-waves-level-input" className={oceanWavesType === concentricWaveValue ? 'is-disabled' : ''}>
-              {translateLabel('theme.waveWidth.label')}
-            </label>
-            <div className="slider-row">
-              <input
-                id="ocean-waves-level-input"
-                type="range"
-                min={0}
-                max={100}
-                step={1}
-                value={oceanWavesLevel}
-                onChange={(e) => setOceanWavesLevel(Number(e.target.value))}
-                disabled={oceanWavesType === concentricWaveValue}
-              />
-              <span className="slider-value">{Math.round(oceanWavesLevel)}</span>
-            </div>
-          </>
-
-          {/* Do not show wave color when 'None' wave type is selected */}
-          {
-            renderColorControl({
-              id: 'ocean-waves-color',
-              label: translateLabel('theme.waveColor.label'),
-              hexValue: oceanWavesColorHex,
-              onHexChange: setOceanWavesColorHex,
-              alphaValue: oceanWavesAlpha,
-              onAlphaChange: setOceanWavesAlpha,
-              showState: showOceanWavesPicker,
-              setShowState: setShowOceanWavesPicker,
-              disabled: oceanWavesType === noneWaveValue,
-            })
-          }
-
-          {/* Conditionally show concentric-specific controls when concentric waves selected */}
-          <>
-            <label htmlFor="concentric-wave-count" className={oceanWavesType === concentricWaveValue ? '' : 'is-disabled'}>{translateLabel('theme.waveCount.label')}</label>
-            <div className="slider-row">
-              <input
-                id="concentric-wave-count"
-                type="range"
-                min={1}
-                max={5}
-                step={1}
-                value={concentricWaveCount}
-                onChange={(e) => setConcentricWaveCount(Number(e.target.value))}
-                disabled={oceanWavesType !== concentricWaveValue}
-              />
-              <span className="slider-value">{concentricWaveCount}</span>
-            </div>
-
-            <label className={`section-subheading ${oceanWavesType === concentricWaveValue ? '' : 'is-disabled'}`} style={{ marginTop: '0.5rem' }}>Style options:</label>
-
-            <div className="style-options">
-              <label className={`checkbox-label ${oceanWavesType === concentricWaveValue ? '' : 'is-disabled'}`}>
-                <input type="checkbox" checked={fadeConcentricWaves} onChange={(e) => setFadeConcentricWaves(e.target.checked)} disabled={oceanWavesType !== concentricWaveValue} />
-                <span>{translateLabel('theme.fadeOuterWaves.label')}</span>
-              </label>
-
-              <label className={`checkbox-label ${oceanWavesType === concentricWaveValue ? '' : 'is-disabled'}`}>
-                <input type="checkbox" checked={jitterToConcentricWaves} onChange={(e) => setJitterToConcentricWaves(e.target.checked)} disabled={oceanWavesType !== concentricWaveValue} />
-                <span>{translateLabel('theme.jitter.label')}</span>
-              </label>
-
-              <label className={`checkbox-label ${oceanWavesType === concentricWaveValue ? '' : 'is-disabled'}`}>
-                <input type="checkbox" checked={brokenLinesForConcentricWaves} onChange={(e) => setBrokenLinesForConcentricWaves(e.target.checked)} disabled={oceanWavesType !== concentricWaveValue} />
-                <span>{translateLabel('theme.brokenLines.label')}</span>
-              </label>
-            </div>
-          </>
-
-          <label className="checkbox-label">
-            <input
-              type="checkbox"
-              checked={drawOceanEffectsInLakes}
-              onChange={(e) => setDrawOceanEffectsInLakes(e.target.checked)}
-            />
-            <span>{translateLabel('theme.drawOceanEffectsInLakes')}</span>
-          </label>
-
-              {renderColorControl({
-                id: 'river-color',
-                label: translateLabel('theme.riverColor.label'),
-                hexValue: riverColorHex,
-                onHexChange: setRiverColorHex,
-                showState: showRiverPicker,
-                setShowState: setShowRiverPicker,
-                disabled: false,
-              })}
-
-          <label className="checkbox-label">
-            <input
-              type="checkbox"
-              checked={drawRoads}
-              onChange={(e) => setDrawRoads(e.target.checked)}
-            />
-            <span>{translateLabel('theme.drawRoads')}</span>
-          </label>
-
-          <div
-            className={`control-group${!drawRoads ? ' is-disabled' : ''}`}
-            style={!drawRoads ? { opacity: 0.5, pointerEvents: 'none' } : undefined}
-          >
-            <label htmlFor="road-style-input">{translateLabel('theme.roadStyle.label')}</label>
-            <select
-              id="road-style-input"
-              value={gatedControlValue(roadStyle)}
-              onChange={(e) => setRoadStyle(e.target.value)}
-              disabled={!drawRoads}
-            >
-              {emptyComboOption}
-              {strokeTypes && strokeTypes.length > 0
-                ? strokeTypes.map((item) => (
-                    <option key={item.value || item} value={item.value || item}>
-                      {item.label || item}
-                    </option>
-                  ))
-                : emptyComboOption}
-            </select>
-
-            <label htmlFor="road-width-input">{translateLabel('theme.roadWidth.label')}</label>
-            <div className="slider-row">
-              <input
-                id="road-width-input"
-                type="range"
-                min={0}
-                max={10}
-                step={0.1}
-                value={roadWidth}
-                onChange={(e) => setRoadWidth(Number(e.target.value))}
-                disabled={!drawRoads}
-              />
-              <span className="slider-value">{Number(roadWidth).toFixed(1)}</span>
-            </div>
-
-            {renderColorControl({
-              id: 'road-color',
-              label: translateLabel('theme.roadColor.label'),
-              hexValue: roadColorHex,
-              onHexChange: setRoadColorHex,
-              showState: showRoadPicker,
-              setShowState: setShowRoadPicker,
-              disabled: !drawRoads,
-            })}
-          </div>
-
-          {/* Additional parameter controls (always enabled regardless of Draw roads) */}
-          <div className="control-group parameters-group" style={{ marginTop: 8 }}>
-            <label htmlFor="mountain-size-input">{translateLabel('theme.mountainSize.label')}</label>
-            <div className="slider-row">
-              <input
-                id="mountain-size-input"
-                type="range"
-                min={1}
-                max={15}
-                step={1}
-                value={mountainSize}
-                onChange={(e) => setMountainSize(Number(e.target.value))}
-              />
-              <span className="slider-value">{mountainSize}</span>
-            </div>
-
-            <label htmlFor="hill-size-input">{translateLabel('theme.hillSize.label')}</label>
-            <div className="slider-row">
-              <input
-                id="hill-size-input"
-                type="range"
-                min={1}
-                max={15}
-                step={1}
-                value={hillSize}
-                onChange={(e) => setHillSize(Number(e.target.value))}
-              />
-              <span className="slider-value">{hillSize}</span>
-            </div>
-
-            <label htmlFor="dune-size-input">{translateLabel('theme.duneSize.label')}</label>
-            <div className="slider-row">
-              <input
-                id="dune-size-input"
-                type="range"
-                min={1}
-                max={15}
-                step={1}
-                value={duneSize}
-                onChange={(e) => setDuneSize(Number(e.target.value))}
-              />
-              <span className="slider-value">{duneSize}</span>
-            </div>
-
-            <label htmlFor="tree-height-input">{translateLabel('theme.treeHeight.label')}</label>
-            <div className="slider-row">
-              <input
-                id="tree-height-input"
-                type="range"
-                min={1}
-                max={15}
-                step={1}
-                value={treeHeight}
-                onChange={(e) => setTreeHeight(Number(e.target.value))}
-              />
-              <span className="slider-value">{treeHeight}</span>
-            </div>
-
-            <label htmlFor="city-size-input">{translateLabel('theme.citySize.label')}</label>
-            <div className="slider-row">
-              <input
-                id="city-size-input"
-                type="range"
-                min={1}
-                max={15}
-                step={1}
-                value={citySize}
-                onChange={(e) => setCitySize(Number(e.target.value))}
-              />
-              <span className="slider-value">{citySize}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  function renderFontsTab() {
-    return (
-      <div className="customize-fonts-panel">
-        <label className="checkbox-label">
-          <input
-            type="checkbox"
-            checked={drawText}
-            onChange={(e) => setDrawText(e.target.checked)}
-          />
-          <span>{translateLabel('theme.enableText')}</span>
-        </label>
-        <div className={`control-group${!drawText ? ' is-disabled' : ''}`}>
-          <div className="customize-font-grid">
-            <div className="fonts-grid two-col-layout" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', columnGap: 24, rowGap: 8, alignItems: 'start' }}>
-              <div className="fields-column">
-                {fontFields.map((field) => (
-                  <React.Fragment key={field.id}>
-                    <label htmlFor={field.id}>{field.label}</label>
-                    <div className="font-combo" id={field.id}>
-                        <button
-                        type="button"
-                        className="font-combo-trigger"
-                        onClick={() => setOpenFontComboId(openFontComboId === field.id ? null : field.id)}
-                        style={{ fontFamily: field.value || 'serif' }}
-                        aria-haspopup="listbox"
-                        aria-expanded={openFontComboId === field.id}
-                        disabled={!drawText}
-                      >
-                        {field.value || translateLabel('common.choose')}
-                      </button>
-                      {openFontComboId === field.id && (
-                        <div className="font-combo-menu">
-                          {availableFontFamilies.map((family) => (
-                            <button
-                              key={family}
-                              type="button"
-                              className={`font-combo-option${field.value === family ? ' is-selected' : ''}`}
-                              data-field-id={field.id}
-                              data-family={family}
-                              onClick={handleFontOptionClick}
-                              style={{ fontFamily: family }}
-                              disabled={!drawText}
-                            >
-                              {family}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </React.Fragment>
-                ))}
-              </div>
-              <div className="fields-column">
-                {renderColorControl({
-                  id: 'text-color',
-                  label: translateLabel('theme.textColor.label'),
-                  hexValue: textColorHex,
-                  onHexChange: setTextColorHex,
-                  showState: showTextColorPicker,
-                  setShowState: setShowTextColorPicker,
-                  disabled: !drawText,
-                  swatchStyle: { flex: '0 0 180px', minWidth: 120 },
-                })}
-
-                <label className="checkbox-label" style={{ marginTop: 12 }}>
-                  <input
-                    type="checkbox"
-                    checked={drawBoldBackground}
-                    onChange={(e) => setDrawBoldBackground(e.target.checked)}
-                    disabled={!drawText}
-                  />
-                  <span style={{ marginLeft: 8 }}>{translateLabel('theme.boldBackground')}</span>
-                </label>
-
-                {renderColorControl({
-                  id: 'bold-background-color',
-                  label: translateLabel('theme.boldBackgroundColor.label'),
-                  hexValue: boldBackgroundColorHex,
-                  onHexChange: setBoldBackgroundColorHex,
-                  showState: showBoldBackgroundPicker,
-                  setShowState: setShowBoldBackgroundPicker,
-                  disabled: !drawText || !drawBoldBackground,
-                  swatchStyle: { flex: '1 1 auto', minWidth: 48, marginTop: 8 },
-                })}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
   const tabProps = {
     values,
     handlers,
@@ -1692,8 +1221,13 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     backgroundTypes,
     hasTextures,
     strokeTypes,
+    borderTypes,
     borderPositions,
     borderColorOptions,
+    landColoringMethods,
+    gridOverlayShapes,
+    gridOverlayOffsets,
+    gridOverlayLayers,
     lineStyles,
     oceanWaveTypes,
     concentricWaveValue,
@@ -1711,6 +1245,67 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     preview,
     // setters (from handlers destructured into local scope)
     setBackgroundType,
+    backgroundType,
+    textureRef,
+    colorizeLand,
+    colorizeOcean,
+    landColorHex,
+    oceanColorHex,
+    backgroundSeed,
+    finalSeed,
+    finalWidth,
+    finalHeight,
+    drawBorder,
+    drawGridOverlay,
+    gridOverlayShape,
+    gridOverlayRowOrColCount,
+    gridOverlayColorHex,
+    gridOverlayXOffset,
+    gridOverlayYOffset,
+    gridOverlayLineWidth,
+    gridOverlayLayer,
+    borderRef,
+    borderWidth,
+    borderPosition,
+    borderColorOption,
+    borderColorHex,
+    frayedBorder,
+    frayedBorderBlurLevel,
+    frayedBorderSize,
+    frayedBorderSeed,
+    frayedBorderColorHex,
+    lineStyle,
+    coastlineWidth,
+    coastlineColorHex,
+    coastShadingLevel,
+    coastShadingColorHex,
+    coastShadingAlpha,
+    oceanShadingAlpha,
+    oceanShadingLevel,
+    oceanShadingColorHex,
+    oceanWavesType,
+    oceanWavesLevel,
+    oceanWavesAlpha,
+    oceanWavesColorHex,
+    concentricWaveCount,
+    fadeConcentricWaves,
+    jitterToConcentricWaves,
+    brokenLinesForConcentricWaves,
+    drawOceanEffectsInLakes,
+    riverColorHex,
+    drawRoads,
+    roadStyle,
+    roadWidth,
+    roadColorHex,
+    mountainSize,
+    hillSize,
+    duneSize,
+    treeHeight,
+    citySize,
+    drawText,
+    textColorHex,
+    drawBoldBackground,
+    boldBackgroundColorHex,
     setTextureRef,
     setDrawRegionBoundaries,
     setRegionBoundaryStyle,
@@ -1810,6 +1405,31 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
   }
 
   // Tab implementations have been moved into dedicated components.
+  // Helper to pass a narrowed `context` object to each tab (avoid passing whole `tabProps`).
+  const pick = (obj, keys) => {
+    const out = { values: obj.values }
+    for (const k of keys) {
+      if (Object.prototype.hasOwnProperty.call(obj, k)) out[k] = obj[k]
+    }
+    return out
+  }
+
+  const backgroundKeys = [
+    'translateLabel', 'gatedControlValue', 'emptyComboOption', 'renderColorControl', 'notifyManualChange', 'recomposeUsingLastBase', 'textures', 'backgroundTypes', 'strokeTypes',
+    'backgroundType','setBackgroundType','showTextureOptions','hasTextures','textureRef','setTextureRef','drawRegionBoundaries','setDrawRegionBoundaries','regionBoundaryStyle','setRegionBoundaryStyle','regionBoundaryWidth','setRegionBoundaryWidth','regionBoundaryColorHex','setRegionBoundaryColorHex','showRegionBoundaryPicker','setShowRegionBoundaryPicker','colorizeLand','setColorizeLand','finalLandColoringMethod','setFinalLandColoringMethod','landColorHex','setLandColorHex','showLandPicker','setShowLandPicker','colorizeOcean','setColorizeOcean','showOceanPicker','setShowOceanPicker','oceanColorHex','setOceanColorHex','backgroundSeed','sanitizeSeedValue','setBackgroundSeed','drawGridOverlay','setDrawGridOverlay','gridOverlayShape','setGridOverlayShape','gridOverlayRowOrColCount','setGridOverlayRowOrColCount','gridOverlayLineWidth','setGridOverlayLineWidth','gridOverlayColorHex','setGridOverlayColorHex','gridOverlayOffsets','gridOverlayXOffset','setGridOverlayXOffset','gridOverlayYOffset','setGridOverlayYOffset','gridOverlayLayers','gridOverlayLayer','setGridOverlayLayer','backgroundPreviewUrl','gridOverlayShapes','drawVoronoiGridOverlayOnlyOnLand','setDrawVoronoiGridOverlayOnlyOnLand'
+  ]
+
+  const borderKeys = [
+    'translateLabel','gatedControlValue','emptyComboOption','renderColorControl','drawBorder','setDrawBorder','borderRef','setBorderRef','borderTypes','borderWidth','setBorderWidth','borderPosition','setBorderPosition','borderPositions','borderColorOption','setBorderColorOption','borderColorOptions','borderColorHex','setBorderColorHex','frayedBorder','setFrayedBorder','frayedBorderBlurLevel','setFrayedBorderBlurLevel','frayedBorderSize','setFrayedBorderSize','frayedBorderSeed','setFrayedBorderSeed','drawGrunge','setDrawGrunge','grungeWidth','setGrungeWidth','frayedBorderColorHex','setFrayedBorderColorHex','showBorderColorPicker','setShowBorderColorPicker','showFrayedBorderPicker','setShowFrayedBorderPicker'
+  ]
+
+  const effectsKeys = [
+    'translateLabel','gatedControlValue','emptyComboOption','renderColorControl','lineStyles','lineStyle','setLineStyle','coastlineWidth','setCoastlineWidth','coastlineColorHex','setCoastlineColorHex','showCoastlinePicker','setShowCoastlinePicker','coastShadingLevel','setCoastShadingLevel','coastShadingAlpha','setCoastShadingAlpha','finalLandColoringMethod','oceanShadingLevel','setOceanShadingLevel','oceanShadingColorHex','setOceanShadingColorHex','oceanShadingAlpha','setOceanShadingAlpha','showOceanPicker','setShowOceanPicker','oceanWaveTypes','oceanWavesType','setOceanWavesType','concentricWaveValue','noneWaveValue','oceanWavesLevel','setOceanWavesLevel','oceanWavesAlpha','setOceanWavesAlpha','oceanWavesColorHex','setOceanWavesColorHex','showOceanWavesPicker','setShowOceanWavesPicker','concentricWaveCount','setConcentricWaveCount','fadeConcentricWaves','setFadeConcentricWaves','jitterToConcentricWaves','setJitterToConcentricWaves','brokenLinesForConcentricWaves','setBrokenLinesForConcentricWaves','drawOceanEffectsInLakes','setDrawOceanEffectsInLakes','riverColorHex','setRiverColorHex','showRiverPicker','setShowRiverPicker','drawRoads','setDrawRoads','roadStyle','setRoadStyle','strokeTypes','roadWidth','setRoadWidth','roadColorHex','setRoadColorHex','showRoadPicker','setShowRoadPicker','mountainSize','setMountainSize','hillSize','setHillSize','duneSize','setDuneSize','treeHeight','setTreeHeight','citySize','setCitySize'
+  ]
+
+  const fontsKeys = [
+    'translateLabel','renderColorControl','drawText','setDrawText','fontFields','availableFontFamilies','openFontComboId','setOpenFontComboId','handleFontOptionClick','textColorHex','setTextColorHex','showTextColorPicker','setShowTextColorPicker','drawBoldBackground','setDrawBoldBackground','boldBackgroundColorHex','setBoldBackgroundColorHex','showBoldBackgroundPicker','setShowBoldBackgroundPicker'
+  ]
 
   return (
     <section
@@ -1868,10 +1488,10 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
           </div>
 
           <div className="customize-tab-panel" role="tabpanel">
-            {activeTab === 'background' && <BackgroundTab context={tabProps} />}
-            {activeTab === 'border' && <BorderTab context={tabProps} />}
-            {activeTab === 'effects' && <EffectsTab context={tabProps} />}
-            {activeTab === 'fonts' && <FontsTab context={tabProps} />}
+            {activeTab === 'background' && <BackgroundTab {...pick(tabProps, backgroundKeys)} />}
+            {activeTab === 'border' && <BorderTab {...pick(tabProps, borderKeys)} />}
+            {activeTab === 'effects' && <EffectsTab {...pick(tabProps, effectsKeys)} />}
+            {activeTab === 'fonts' && <FontsTab {...pick(tabProps, fontsKeys)} />}
           </div>
 
           <div className="section-actions">

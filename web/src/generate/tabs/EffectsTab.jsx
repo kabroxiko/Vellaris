@@ -1,87 +1,88 @@
 import React from 'react'
 
-export default function EffectsTab({ context }) {
-  if (!context) return <div />
-  const { translateLabel, gatedControlValue, emptyComboOption, renderColorControl } = context
-  const get = (k) => (context[k] !== undefined ? context[k] : (context.values && context.values[k]))
+export default function EffectsTab(props) {
+  if (!props) return <div />
+  const { translateLabel, gatedControlValue, emptyComboOption, renderColorControl } = props
 
-  const lineStyles = get('lineStyles') || []
-  const lineStyle = get('lineStyle')
-  const setLineStyle = get('setLineStyle')
-  const coastlineWidth = Number(get('coastlineWidth') || 0)
-  const setCoastlineWidth = get('setCoastlineWidth')
-  const coastlineColorHex = get('coastlineColorHex')
-  const setCoastlineColorHex = get('setCoastlineColorHex')
-  const showCoastlinePicker = get('showCoastlinePicker')
-  const setShowCoastlinePicker = get('setShowCoastlinePicker')
-  const coastShadingLevel = Number(get('coastShadingLevel') || 0)
-  const setCoastShadingLevel = get('setCoastShadingLevel')
-  const coastShadingAlpha = Number(get('coastShadingAlpha') || 0)
-  const setCoastShadingAlpha = get('setCoastShadingAlpha')
-  const finalLandColoringMethod = get('finalLandColoringMethod')
+  const {
+    lineStyles = [],
+    lineStyle,
+    setLineStyle,
+    coastlineWidth = 0,
+    setCoastlineWidth,
+    coastlineColorHex,
+    setCoastlineColorHex,
+    showCoastlinePicker = false,
+    setShowCoastlinePicker,
+    coastShadingLevel = 0,
+    setCoastShadingLevel,
+    coastShadingAlpha = 0,
+    setCoastShadingAlpha,
+    finalLandColoringMethod,
 
-  const oceanShadingLevel = Number(get('oceanShadingLevel') || 0)
-  const setOceanShadingLevel = get('setOceanShadingLevel')
-  const oceanShadingColorHex = get('oceanShadingColorHex')
-  const setOceanShadingColorHex = get('setOceanShadingColorHex')
-  const oceanShadingAlpha = Number(get('oceanShadingAlpha') || 0)
-  const setOceanShadingAlpha = get('setOceanShadingAlpha')
-  const showOceanPicker = get('showOceanPicker')
-  const setShowOceanPicker = get('setShowOceanPicker')
+    oceanShadingLevel = 0,
+    setOceanShadingLevel,
+    oceanShadingColorHex,
+    setOceanShadingColorHex,
+    oceanShadingAlpha = 0,
+    setOceanShadingAlpha,
+    showOceanPicker = false,
+    setShowOceanPicker,
 
-  const oceanWaveTypes = get('oceanWaveTypes') || []
-  const oceanWavesType = get('oceanWavesType')
-  const setOceanWavesType = get('setOceanWavesType')
-  const concentricWaveValue = get('concentricWaveValue')
-  const noneWaveValue = get('noneWaveValue')
-  const oceanWavesLevel = Number(get('oceanWavesLevel') || 0)
-  const setOceanWavesLevel = get('setOceanWavesLevel')
-  const oceanWavesAlpha = Number(get('oceanWavesAlpha') || 0)
-  const setOceanWavesAlpha = get('setOceanWavesAlpha')
-  const oceanWavesColorHex = get('oceanWavesColorHex')
-  const setOceanWavesColorHex = get('setOceanWavesColorHex')
-  const showOceanWavesPicker = get('showOceanWavesPicker')
-  const setShowOceanWavesPicker = get('setShowOceanWavesPicker')
+    oceanWaveTypes = [],
+    oceanWavesType,
+    setOceanWavesType,
+    concentricWaveValue,
+    noneWaveValue,
+    oceanWavesLevel = 0,
+    setOceanWavesLevel,
+    oceanWavesAlpha = 0,
+    setOceanWavesAlpha,
+    oceanWavesColorHex,
+    setOceanWavesColorHex,
+    showOceanWavesPicker = false,
+    setShowOceanWavesPicker,
 
-  const concentricWaveCount = Number(get('concentricWaveCount') || 0)
-  const setConcentricWaveCount = get('setConcentricWaveCount')
-  const fadeConcentricWaves = get('fadeConcentricWaves')
-  const setFadeConcentricWaves = get('setFadeConcentricWaves')
-  const jitterToConcentricWaves = get('jitterToConcentricWaves')
-  const setJitterToConcentricWaves = get('setJitterToConcentricWaves')
-  const brokenLinesForConcentricWaves = get('brokenLinesForConcentricWaves')
-  const setBrokenLinesForConcentricWaves = get('setBrokenLinesForConcentricWaves')
+    concentricWaveCount = 0,
+    setConcentricWaveCount,
+    fadeConcentricWaves,
+    setFadeConcentricWaves,
+    jitterToConcentricWaves,
+    setJitterToConcentricWaves,
+    brokenLinesForConcentricWaves,
+    setBrokenLinesForConcentricWaves,
 
-  const drawOceanEffectsInLakes = get('drawOceanEffectsInLakes')
-  const setDrawOceanEffectsInLakes = get('setDrawOceanEffectsInLakes')
+    drawOceanEffectsInLakes,
+    setDrawOceanEffectsInLakes,
 
-  const riverColorHex = get('riverColorHex')
-  const setRiverColorHex = get('setRiverColorHex')
-  const showRiverPicker = get('showRiverPicker')
-  const setShowRiverPicker = get('setShowRiverPicker')
+    riverColorHex,
+    setRiverColorHex,
+    showRiverPicker = false,
+    setShowRiverPicker,
 
-  const drawRoads = get('drawRoads')
-  const setDrawRoads = get('setDrawRoads')
-  const roadStyle = get('roadStyle')
-  const setRoadStyle = get('setRoadStyle')
-  const strokeTypes = get('strokeTypes') || []
-  const roadWidth = Number(get('roadWidth') || 0)
-  const setRoadWidth = get('setRoadWidth')
-  const roadColorHex = get('roadColorHex')
-  const setRoadColorHex = get('setRoadColorHex')
-  const showRoadPicker = get('showRoadPicker')
-  const setShowRoadPicker = get('setShowRoadPicker')
+    drawRoads,
+    setDrawRoads,
+    roadStyle,
+    setRoadStyle,
+    strokeTypes = [],
+    roadWidth = 0,
+    setRoadWidth,
+    roadColorHex,
+    setRoadColorHex,
+    showRoadPicker = false,
+    setShowRoadPicker,
 
-  const mountainSize = get('mountainSize')
-  const setMountainSize = get('setMountainSize')
-  const hillSize = get('hillSize')
-  const setHillSize = get('setHillSize')
-  const duneSize = get('duneSize')
-  const setDuneSize = get('setDuneSize')
-  const treeHeight = get('treeHeight')
-  const setTreeHeight = get('setTreeHeight')
-  const citySize = get('citySize')
-  const setCitySize = get('setCitySize')
+    mountainSize,
+    setMountainSize,
+    hillSize,
+    setHillSize,
+    duneSize,
+    setDuneSize,
+    treeHeight,
+    setTreeHeight,
+    citySize,
+    setCitySize,
+  } = props
 
   return (
     <div className="fields-grid two-col-layout">

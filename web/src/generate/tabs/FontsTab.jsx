@@ -1,29 +1,30 @@
 import React from 'react'
 
-export default function FontsTab({ context }) {
-  if (!context) return <div />
-  const { translateLabel, renderColorControl } = context
-  const get = (k) => (context[k] !== undefined ? context[k] : (context.values && context.values[k]))
+export default function FontsTab(props) {
+  if (!props) return <div />
+  const { translateLabel, renderColorControl } = props
 
-  const drawText = get('drawText')
-  const setDrawText = get('setDrawText')
-  const fontFields = get('fontFields') || []
-  const availableFontFamilies = get('availableFontFamilies') || []
-  const openFontComboId = get('openFontComboId')
-  const setOpenFontComboId = get('setOpenFontComboId')
-  const handleFontOptionClick = get('handleFontOptionClick')
+  const {
+    drawText = false,
+    setDrawText,
+    fontFields = [],
+    availableFontFamilies = [],
+    openFontComboId,
+    setOpenFontComboId,
+    handleFontOptionClick,
 
-  const textColorHex = get('textColorHex')
-  const setTextColorHex = get('setTextColorHex')
-  const showTextColorPicker = get('showTextColorPicker')
-  const setShowTextColorPicker = get('setShowTextColorPicker')
+    textColorHex,
+    setTextColorHex,
+    showTextColorPicker = false,
+    setShowTextColorPicker,
 
-  const drawBoldBackground = get('drawBoldBackground')
-  const setDrawBoldBackground = get('setDrawBoldBackground')
-  const boldBackgroundColorHex = get('boldBackgroundColorHex')
-  const setBoldBackgroundColorHex = get('setBoldBackgroundColorHex')
-  const showBoldBackgroundPicker = get('showBoldBackgroundPicker')
-  const setShowBoldBackgroundPicker = get('setShowBoldBackgroundPicker')
+    drawBoldBackground = false,
+    setDrawBoldBackground,
+    boldBackgroundColorHex,
+    setBoldBackgroundColorHex,
+    showBoldBackgroundPicker = false,
+    setShowBoldBackgroundPicker,
+  } = props
 
   return (
     <div className="customize-fonts-panel">

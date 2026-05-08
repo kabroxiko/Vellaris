@@ -18,6 +18,9 @@ function makeKey(payload) {
     }
     return JSON.stringify(keyObj)
   } catch (e) {
+    /* eslint-disable no-console */
+    console.debug('backgroundBaseCache: makeKey failed, using fallback key', e)
+    /* eslint-enable no-console */
     return String(Math.random())
   }
 }
@@ -29,8 +32,14 @@ function evictIfNeeded() {
   if (!it.done) {
     const k = it.value
     const v = cache.get(k)
-    if (v && v.objectUrl) {
-      try { URL.revokeObjectURL(v.objectUrl) } catch (e) {}
+    if (v?.objectUrl) {
+      try {
+        URL.revokeObjectURL(v.objectUrl)
+      } catch (e) {
+        /* eslint-disable no-console */
+        console.debug('backgroundBaseCache: revokeObjectURL failed', e)
+        /* eslint-enable no-console */
+      }
     }
     cache.delete(k)
   }
@@ -52,7 +61,13 @@ function releaseSlot() {
   if (queue.length > 0) {
     const r = queue.shift()
     active++
-    try { r() } catch (e) {}
+    try {
+      r()
+    } catch (e) {
+      /* eslint-disable no-console */
+      console.warn('backgroundBaseCache: queued resolver threw', e)
+      /* eslint-enable no-console */
+    }
   }
 }
 
@@ -64,13 +79,13 @@ async function fetchWithRetries(url, opts, attempts = 3, delayMs = 300) {
       return resp
     } catch (err) {
       if (i === attempts - 1) throw err
-      if (opts.signal && opts.signal.aborted) throw err
+      if (opts.signal?.aborted) throw err
       await new Promise((r) => setTimeout(r, delayMs))
     }
   }
 }
 
-const API_BASE = (import.meta.env && import.meta.env.VITE_API_BASE) || '/api'
+const API_BASE = import.meta?.env?.VITE_API_BASE || '/api'
 
 async function _doFetchBase(payload, signal) {
   await acquireSlot()
@@ -114,15 +129,26 @@ function preload(payload) {
   const key = makeKey(payload)
   if (cache.has(key) || pending.has(key)) return
   const ctrl = new AbortController()
-  const p = get(payload, ctrl.signal).catch(() => {})
+  const p = get(payload, ctrl.signal).catch((err) => {
+    /* Intentionally ignore preload failures but log at debug level */
+    /* eslint-disable no-console */
+    console.debug('backgroundBaseCache: preload ignored error', err)
+    /* eslint-enable no-console */
+  })
   // store pending so concurrent preloads share work
   pending.set(key, p)
 }
 
 function clear() {
   for (const v of cache.values()) {
-    if (v && v.objectUrl) {
-      try { URL.revokeObjectURL(v.objectUrl) } catch (e) {}
+    if (v?.objectUrl) {
+      try {
+        URL.revokeObjectURL(v.objectUrl)
+      } catch (e) {
+        /* eslint-disable no-console */
+        console.debug('backgroundBaseCache: revokeObjectURL failed', e)
+        /* eslint-enable no-console */
+      }
     }
   }
   cache.clear()

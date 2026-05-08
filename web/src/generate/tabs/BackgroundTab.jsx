@@ -1,7 +1,7 @@
 import React from 'react'
 
-export default function BackgroundTab({ context }) {
-  if (!context) return <div />
+export default function BackgroundTab(props) {
+  if (!props) return <div />
   const {
     translateLabel,
     gatedControlValue,
@@ -9,65 +9,70 @@ export default function BackgroundTab({ context }) {
     renderColorControl,
     notifyManualChange,
     recomposeUsingLastBase,
-    textures,
-    backgroundTypes,
-    strokeTypes,
-  } = context
-
-  const get = (k) => (context[k] !== undefined ? context[k] : (context.values && context.values[k]))
-
-  const backgroundType = get('backgroundType')
-  const setBackgroundType = get('setBackgroundType')
-  const showTextureOptions = get('showTextureOptions')
-  const hasTextures = get('hasTextures')
-  const textureRef = get('textureRef')
-  const setTextureRef = get('setTextureRef')
-  const drawRegionBoundaries = get('drawRegionBoundaries')
-  const setDrawRegionBoundaries = get('setDrawRegionBoundaries')
-  const regionBoundaryStyle = get('regionBoundaryStyle')
-  const setRegionBoundaryStyle = get('setRegionBoundaryStyle')
-  const regionBoundaryWidth = get('regionBoundaryWidth')
-  const setRegionBoundaryWidth = get('setRegionBoundaryWidth')
-  const regionBoundaryColorHex = get('regionBoundaryColorHex')
-  const setRegionBoundaryColorHex = get('setRegionBoundaryColorHex')
-  const showRegionBoundaryPicker = get('showRegionBoundaryPicker')
-  const setShowRegionBoundaryPicker = get('setShowRegionBoundaryPicker')
-  const colorizeLand = get('colorizeLand')
-  const setColorizeLand = get('setColorizeLand')
-  const finalLandColoringMethod = get('finalLandColoringMethod')
-  const setFinalLandColoringMethod = get('setFinalLandColoringMethod')
-  const landColorHex = get('landColorHex')
-  const setLandColorHex = get('setLandColorHex')
-  const showLandPicker = get('showLandPicker')
-  const setShowLandPicker = get('setShowLandPicker')
-  const colorizeOcean = get('colorizeOcean')
-  const setColorizeOcean = get('setColorizeOcean')
-  const showOceanPicker = get('showOceanPicker')
-  const setShowOceanPicker = get('setShowOceanPicker')
-  const oceanColorHex = get('oceanColorHex')
-  const setOceanColorHex = get('setOceanColorHex')
-  const backgroundSeed = get('backgroundSeed')
-  const sanitizeSeedValue = get('sanitizeSeedValue')
-  const setBackgroundSeed = get('setBackgroundSeed')
-  const drawGridOverlay = get('drawGridOverlay')
-  const setDrawGridOverlay = get('setDrawGridOverlay')
-  const gridOverlayShape = get('gridOverlayShape')
-  const setGridOverlayShape = get('setGridOverlayShape')
-  const gridOverlayRowOrColCount = get('gridOverlayRowOrColCount')
-  const setGridOverlayRowOrColCount = get('setGridOverlayRowOrColCount')
-  const gridOverlayLineWidth = get('gridOverlayLineWidth')
-  const setGridOverlayLineWidth = get('setGridOverlayLineWidth')
-  const gridOverlayColorHex = get('gridOverlayColorHex')
-  const setGridOverlayColorHex = get('setGridOverlayColorHex')
-  const gridOverlayOffsets = get('gridOverlayOffsets')
-  const gridOverlayXOffset = get('gridOverlayXOffset')
-  const setGridOverlayXOffset = get('setGridOverlayXOffset')
-  const gridOverlayYOffset = get('gridOverlayYOffset')
-  const setGridOverlayYOffset = get('setGridOverlayYOffset')
-  const gridOverlayLayers = get('gridOverlayLayers')
-  const gridOverlayLayer = get('gridOverlayLayer')
-  const setGridOverlayLayer = get('setGridOverlayLayer')
-  const backgroundPreviewUrl = get('backgroundPreviewUrl')
+    textures = [],
+    backgroundTypes = [],
+    strokeTypes = [],
+    // values passed directly
+    backgroundType,
+    setBackgroundType,
+    showTextureOptions = false,
+    hasTextures = false,
+    textureRef,
+    setTextureRef,
+    drawRegionBoundaries = false,
+    setDrawRegionBoundaries,
+    regionBoundaryStyle,
+    setRegionBoundaryStyle,
+    regionBoundaryWidth = 0,
+    setRegionBoundaryWidth,
+    regionBoundaryColorHex,
+    setRegionBoundaryColorHex,
+    showRegionBoundaryPicker = false,
+    setShowRegionBoundaryPicker,
+    colorizeLand = false,
+    setColorizeLand,
+    finalLandColoringMethod,
+    setFinalLandColoringMethod,
+    landColorHex,
+    setLandColorHex,
+    showLandPicker = false,
+    setShowLandPicker,
+    colorizeOcean = false,
+    setColorizeOcean,
+    showOceanPicker = false,
+    setShowOceanPicker,
+    oceanColorHex,
+    setOceanColorHex,
+    backgroundSeed,
+    sanitizeSeedValue = (v) => v,
+    setBackgroundSeed,
+    drawGridOverlay = false,
+    setDrawGridOverlay,
+    gridOverlayShape = '',
+    setGridOverlayShape,
+    gridOverlayRowOrColCount = 0,
+    setGridOverlayRowOrColCount,
+    gridOverlayLineWidth = 0,
+    setGridOverlayLineWidth,
+    gridOverlayColorHex,
+    setGridOverlayColorHex,
+    gridOverlayOffsets = [],
+    gridOverlayXOffset,
+    setGridOverlayXOffset,
+    gridOverlayYOffset,
+    setGridOverlayYOffset,
+    gridOverlayLayers = [],
+    gridOverlayLayer,
+    setGridOverlayLayer,
+    backgroundPreviewUrl,
+    gridOverlayShapes = [],
+    showGridPicker = false,
+    setShowGridPicker,
+    drawVoronoiGridOverlayOnlyOnLand = false,
+    setDrawVoronoiGridOverlayOnlyOnLand,
+    // fallback arrays that may have been under props.values
+    landColoringMethods = [],
+  } = props
 
   const isVoronoi = String((gridOverlayShape || '')).toLowerCase().includes('voronoi')
   const lowerShape = String(gridOverlayShape || '').toLowerCase()
@@ -197,7 +202,7 @@ export default function BackgroundTab({ context }) {
             disabled={!colorizeLand}
           >
             {emptyComboOption}
-            {(get('landColoringMethods') || [])
+            {landColoringMethods
               .filter((item) => item.value)
               .map((item) => (
                 <option key={item.value} value={item.value}>
@@ -282,7 +287,7 @@ export default function BackgroundTab({ context }) {
           >
             {emptyComboOption}
             {gridOverlayOffsets && gridOverlayOffsets.length === 0 ? null : null}
-            {context.gridOverlayShapes && context.gridOverlayShapes.map((item) => (
+            {gridOverlayShapes && gridOverlayShapes.map((item) => (
               <option key={item.value} value={item.value}>
                 {item.label}
               </option>
@@ -321,20 +326,20 @@ export default function BackgroundTab({ context }) {
             <span className="slider-value">{gridOverlayLineWidth}</span>
           </div>
 
-          {renderColorControl({
+            {renderColorControl({
             id: 'grid-color',
             label: translateLabel('theme.color.label'),
             hexValue: gridOverlayColorHex,
             onHexChange: setGridOverlayColorHex,
-            showState: context.showGridPicker,
-            setShowState: context.setShowGridPicker,
+              showState: showGridPicker,
+              setShowState: setShowGridPicker,
             disabled: !drawGridOverlay,
           })}
 
           <label htmlFor="grid-xoffset-input" className={!drawGridOverlay || isVoronoi ? 'is-disabled' : ''}>{translateLabel('theme.xOffset.label')}</label>
-          <select id="grid-xoffset-input" value={gatedControlValue(gridOverlayXOffset)} onChange={(e) => setGridOverlayXOffset(e.target.value)} disabled={!drawGridOverlay || isVoronoi}>
+            <select id="grid-xoffset-input" value={gatedControlValue(gridOverlayXOffset)} onChange={(e) => setGridOverlayXOffset(e.target.value)} disabled={!drawGridOverlay || isVoronoi}>
             {emptyComboOption}
-            {(get('gridOverlayOffsets') || []).map((item) => (
+            {(gridOverlayOffsets || []).map((item) => (
               <option key={item.value} value={item.value}>
                 {item.label}
               </option>
@@ -342,9 +347,9 @@ export default function BackgroundTab({ context }) {
           </select>
 
           <label htmlFor="grid-yoffset-input" className={!drawGridOverlay || isVoronoi ? 'is-disabled' : ''}>{translateLabel('theme.yOffset.label')}</label>
-          <select id="grid-yoffset-input" value={gatedControlValue(gridOverlayYOffset)} onChange={(e) => setGridOverlayYOffset(e.target.value)} disabled={!drawGridOverlay || isVoronoi}>
+            <select id="grid-yoffset-input" value={gatedControlValue(gridOverlayYOffset)} onChange={(e) => setGridOverlayYOffset(e.target.value)} disabled={!drawGridOverlay || isVoronoi}>
             {emptyComboOption}
-            {(get('gridOverlayOffsets') || []).map((item) => (
+            {(gridOverlayOffsets || []).map((item) => (
               <option key={item.value} value={item.value}>
                 {item.label}
               </option>
@@ -354,8 +359,8 @@ export default function BackgroundTab({ context }) {
           <label className={`checkbox-label${(!drawGridOverlay || !String((gridOverlayShape || '')).toLowerCase().includes('voronoi')) ? ' is-disabled' : ''}`}>
             <input
               type="checkbox"
-              checked={context.drawVoronoiGridOverlayOnlyOnLand}
-              onChange={(e) => context.setDrawVoronoiGridOverlayOnlyOnLand(e.target.checked)}
+              checked={drawVoronoiGridOverlayOnlyOnLand}
+              onChange={(e) => setDrawVoronoiGridOverlayOnlyOnLand(e.target.checked)}
               disabled={!drawGridOverlay || !String((gridOverlayShape || '')).toLowerCase().includes('voronoi')}
             />
             <span>{translateLabel('theme.onlyOnLand')}</span>
