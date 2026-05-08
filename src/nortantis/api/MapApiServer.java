@@ -60,8 +60,6 @@ public class MapApiServer
 	private static final String CONTENT_TYPE_JSON = "application/json";
 	private static final String CONTENT_TYPE_PNG = "image/png";
 	private static final String PNG_FORMAT_NAME = "png";
-	private static final String ART_PACK = "artPack";
-	private static final String NAME = "name";
 	private static final String MSG_FAILED_TO_PARSE_CONFIG = "Failed to parse config";
 	private static final float PNG_COMPRESSION_QUALITY = 0.95f;
 
@@ -393,6 +391,36 @@ public class MapApiServer
 		}
 	}
 
+	// Convert a list of NamedResource into the lightweight map form used by the UI
+	@SuppressWarnings("unused")
+	private static class ResourceInfo {
+		private final String artPack;
+		private final String name;
+
+		ResourceInfo(NamedResource r) {
+			this.artPack = r.artPack;
+			this.name = r.name;
+		}
+
+		public String getArtPack() {
+			return artPack;
+		}
+
+		public String getName() {
+			return name;
+		}
+	}
+
+	// Convert a list of NamedResource into the lightweight POJO list used by the UI
+	private static List<ResourceInfo> namedResourcesToList(List<NamedResource> resources) {
+		List<ResourceInfo> out = new java.util.ArrayList<>();
+		if (resources == null) return out;
+		for (NamedResource r : resources) {
+			out.add(new ResourceInfo(r));
+		}
+		return out;
+	}
+
 // Extracted helpers to keep `main` small and focused.
 private static void setupCors()
 {
@@ -438,25 +466,9 @@ private static Object handleUiOptions(Request req, Response res)
 
 		ui.put("books", SettingsGenerator.getAllBooks());
 
-		List<NamedResource> textures = Assets.listBackgroundTexturesForAllArtPacks(null);
-		List<Map<String,String>> texturesResult = new java.util.ArrayList<>();
-		for (NamedResource t : textures) {
-			Map<String,String> entry = new LinkedHashMap<>();
-			entry.put(ART_PACK, t.artPack);
-			entry.put(NAME, t.name);
-			texturesResult.add(entry);
-		}
-		ui.put("textures", texturesResult);
+		ui.put("textures", namedResourcesToList(Assets.listBackgroundTexturesForAllArtPacks(null)));
 
-		List<NamedResource> borderTypes = Assets.listAllBorderTypes(null);
-		List<Map<String,String>> borderResult = new java.util.ArrayList<>();
-		for (NamedResource b : borderTypes) {
-			Map<String,String> entry = new LinkedHashMap<>();
-			entry.put(ART_PACK, b.artPack);
-			entry.put(NAME, b.name);
-			borderResult.add(entry);
-		}
-		ui.put("borderTypes", borderResult);
+		ui.put("borderTypes", namedResourcesToList(Assets.listAllBorderTypes(null)));
 
 		// City icon groups per art pack (may be empty for some packs)
 		Map<String, List<String>> cityIconTypesByPack = new LinkedHashMap<>();
