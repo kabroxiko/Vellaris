@@ -354,120 +354,8 @@ function GenerateForm({ uiLanguage = 'en' }) {
       if (!regionBoundaryStyle && Array.isArray(opts.lineStyles) && opts.lineStyles.length > 0) {
         setRegionBoundaryStyle(opts.lineStyles[0].value)
       }
-
       try {
-        if (defs) {
-          const setHex = (setter, value) => {
-            if (value) setter(colorToHex(value) || '')
-          }
-          const setNumber = (setter, value) => {
-            if (Number.isFinite(Number(value))) setter(Number(value))
-          }
-          const setString = (setter, value) => {
-            if (value !== undefined && value !== null) setter(String(value))
-          }
-          const setBoolean = (setter, value) => {
-            if (typeof value === 'boolean') setter(value)
-          }
-
-          setNumber(setWorldSize, defs.worldSize)
-          setNumber(setRegionCount, defs.regionCount)
-          if (defs.cityProbability !== undefined && opts.maxCityProbability !== undefined) {
-            setNumber(setCityFrequency, (Number(defs.cityProbability) / Number(opts.maxCityProbability)) * 100)
-          }
-          setNumber(setFinalWidth, defs.generatedWidth)
-          setNumber(setFinalHeight, defs.generatedHeight)
-          setString(setMapLanguage, defs.mapLanguage)
-          setString(setDimension, defs.dimension)
-          setString(setLandShape, defs.landShape)
-          setString(setArtPack, defs.artPack)
-          setString(setCityIconType, defs.cityIconType ?? defs.cityIconSetName)
-          setString(setBackgroundType, defs.backgroundType)
-          setString(setTextureRef, defs.textureRef)
-          setString(setBackgroundSeed, defs.backgroundRandomSeed)
-          setBoolean(setDrawRegionBoundaries, defs.drawRegionBoundaries)
-          setBoolean(setColorizeLand, defs.colorizeLand)
-          setBoolean(setColorizeOcean, defs.colorizeOcean)
-          setHex(setOceanColorHex, defs.oceanColor)
-          setHex(setLandColorHex, defs.landColor)
-          setHex(setRegionBoundaryColorHex, defs.regionBoundaryColor)
-          setNumber(setRegionBoundaryWidth, defs.regionBoundaryWidth)
-          setBoolean(setDrawBorder, defs.drawBorder)
-          setBoolean(setDrawGridOverlay, defs.drawGridOverlay)
-          setString(setGridOverlayShape, defs.gridOverlayShape)
-          setNumber(setGridOverlayRowOrColCount, defs.gridOverlayRowOrColCount)
-          setHex(setGridOverlayColorHex, defs.gridOverlayColor)
-          if (defs.gridOverlayXOffset !== undefined && defs.gridOverlayXOffset !== null) setGridOverlayXOffset(defs.gridOverlayXOffset)
-          if (defs.gridOverlayYOffset !== undefined && defs.gridOverlayYOffset !== null) setGridOverlayYOffset(defs.gridOverlayYOffset)
-          setNumber(setGridOverlayLineWidth, defs.gridOverlayLineWidth)
-          setString(setGridOverlayLayer, defs.gridOverlayLayer)
-          setBoolean(setDrawVoronoiGridOverlayOnlyOnLand, defs.drawVoronoiGridOverlayOnlyOnLand)
-          setString(setFinalLandColoringMethod, defs.finalLandColoringMethod)
-          if (typeof defs.drawRegionColors === 'boolean') {
-            const method = defs.drawRegionColors ? 'ColorPoliticalRegions' : 'SingleColor'
-            setString(setLandColoringMethod, method)
-            setString(setFinalLandColoringMethod, method)
-          }
-          setString(setBorderRef, defs.borderRef)
-          setNumber(setBorderWidth, defs.borderWidth)
-          setString(setBorderPosition, defs.borderPosition)
-          setString(setBorderColorOption, defs.borderColorOption)
-          setHex(setBorderColorHex, defs.borderColor)
-          setBoolean(setFrayedBorder, defs.frayedBorder)
-          setNumber(setFrayedBorderBlurLevel, defs.frayedBorderBlurLevel)
-          setNumber(setFrayedBorderSize, defs.frayedBorderSize)
-          setString(setFrayedBorderSeed, defs.frayedBorderSeed)
-          setBoolean(setDrawGrunge, defs.drawGrunge)
-          setNumber(setGrungeWidth, defs.grungeWidth)
-          setHex(setFrayedBorderColorHex, defs.frayedBorderColor)
-          setString(setLineStyle, defs.lineStyle)
-          setNumber(setCoastlineWidth, defs.coastlineWidth)
-          setHex(setCoastlineColorHex, defs.coastlineColor)
-          setNumber(setCoastShadingLevel, defs.coastShadingLevel)
-          setHex(setCoastShadingColorHex, defs.coastShadingColor)
-          setNumber(setCoastShadingAlpha, defs.coastShadingAlpha)
-          setNumber(setOceanShadingAlpha, defs.oceanShadingAlpha)
-          setNumber(setOceanShadingLevel, defs.oceanShadingLevel)
-          setHex(setOceanShadingColorHex, defs.oceanShadingColor)
-          setString(setOceanWavesType, defs.oceanWavesType)
-          setNumber(setOceanWavesLevel, defs.oceanWavesLevel)
-          setHex(setOceanWavesColorHex, defs.oceanWavesColor)
-          setNumber(setOceanWavesAlpha, defs.oceanWavesAlpha)
-          setNumber(setConcentricWaveCount, defs.concentricWaveCount)
-          setBoolean(setFadeConcentricWaves, defs.fadeConcentricWaves)
-          setBoolean(setJitterToConcentricWaves, defs.jitterToConcentricWaves)
-          setBoolean(setBrokenLinesForConcentricWaves, defs.brokenLinesForConcentricWaves)
-          setBoolean(setDrawOceanEffectsInLakes, defs.drawOceanEffectsInLakes)
-          setHex(setRiverColorHex, defs.riverColor)
-          setBoolean(setDrawRoads, defs.drawRoads)
-          setString(setRoadStyle, defs.roadStyle)
-          setNumber(setRoadWidth, defs.roadWidth)
-          setHex(setRoadColorHex, defs.roadColor)
-          setNumber(setMountainSize, defs.mountainSize)
-          setNumber(setHillSize, defs.hillSize)
-          setNumber(setDuneSize, defs.duneSize)
-          setNumber(setTreeHeight, defs.treeHeight)
-          setNumber(setCitySize, defs.citySize)
-          setBoolean(setDrawText, defs.drawText)
-          setString(setTitleFontFamily, defs.titleFontFamily)
-          setString(setRegionFontFamily, defs.regionFontFamily)
-          setString(setMountainRangeFontFamily, defs.mountainRangeFontFamily)
-          setString(setOtherMountainsFontFamily, defs.otherMountainsFontFamily)
-          setString(setCitiesFontFamily, defs.citiesFontFamily)
-          setString(setRiverFontFamily, defs.riverFontFamily)
-          setHex(setTextColorHex, defs.textColor)
-          setBoolean(setDrawBoldBackground, defs.drawBoldBackground)
-          setHex(setBoldBackgroundColorHex, defs.boldBackgroundColor)
-
-          const backendDefaultFont = (opts && opts.defaultFontFamily) || (Array.isArray(opts.fonts) && opts.fonts.length > 0 ? opts.fonts[0] : null)
-          if (!titleFontFamily && backendDefaultFont) setTitleFontFamily(backendDefaultFont)
-          if (!regionFontFamily && backendDefaultFont) setRegionFontFamily(backendDefaultFont)
-          if (!mountainRangeFontFamily && backendDefaultFont) setMountainRangeFontFamily(backendDefaultFont)
-          if (!otherMountainsFontFamily && backendDefaultFont) setOtherMountainsFontFamily(backendDefaultFont)
-          if (!citiesFontFamily && backendDefaultFont) setCitiesFontFamily(backendDefaultFont)
-          if (!riverFontFamily && backendDefaultFont) setRiverFontFamily(backendDefaultFont)
-          if (Array.isArray(defs.books)) setSelectedBooks(new Set(defs.books))
-        }
+        if (defs) applyServerDefaults(defs, opts)
       } catch (e) {
         if (typeof console !== 'undefined' && typeof console.debug === 'function') console.debug('GenerateForm: backend defaults inner handler failed', e)
       }
@@ -810,18 +698,138 @@ function GenerateForm({ uiLanguage = 'en' }) {
   // text. If the user has no saved customize overrides, apply sensible
   // defaults from the server-provided options.
   useEffect(() => {
-    ;(async () => {
-      try {
-        const uiOpts = await loadUiOptions(requestLanguage)
-        if (uiOpts) await handleInitialUiOpts(uiOpts)
-      } catch (e) {
-        if (typeof console !== 'undefined' && typeof console.debug === 'function') console.debug('GenerateForm: startup option load failed', e)
-      } finally {
-        try { setUiLoaded(true) } catch (e) { if (typeof console !== 'undefined' && console.debug) console.debug('GenerateForm: setUiLoaded failed', e) }
-      }
-    })()
+    initializeUiForLanguage(requestLanguage)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [requestLanguage])
+
+  async function initializeUiForLanguage(lang) {
+    try {
+      const uiOpts = await loadUiOptions(lang)
+      if (uiOpts) await handleInitialUiOpts(uiOpts)
+    } catch (e) {
+      if (typeof console !== 'undefined' && typeof console.debug === 'function') console.debug('GenerateForm: startup option load failed', e)
+    } finally {
+      try {
+        setUiLoaded(true)
+      } catch (e) {
+        if (typeof console !== 'undefined' && typeof console.debug === 'function') console.debug('GenerateForm: setUiLoaded failed', e)
+      }
+    }
+  }
+
+  // Apply backend `defaults` to the UI using the existing setters.
+  function applyServerDefaults(defs, opts) {
+    const setHex = (setter, value) => {
+      if (value) setter(colorToHex(value) || '')
+    }
+    const setNumber = (setter, value) => {
+      if (Number.isFinite(Number(value))) setter(Number(value))
+    }
+    const setString = (setter, value) => {
+      if (value !== undefined && value !== null) setter(String(value))
+    }
+    const setBoolean = (setter, value) => {
+      if (typeof value === 'boolean') setter(value)
+    }
+
+    setNumber(setWorldSize, defs.worldSize)
+    setNumber(setRegionCount, defs.regionCount)
+    if (defs.cityProbability !== undefined && opts.maxCityProbability !== undefined) {
+      setNumber(setCityFrequency, (Number(defs.cityProbability) / Number(opts.maxCityProbability)) * 100)
+    }
+    setNumber(setFinalWidth, defs.generatedWidth)
+    setNumber(setFinalHeight, defs.generatedHeight)
+    setString(setMapLanguage, defs.mapLanguage)
+    setString(setDimension, defs.dimension)
+    setString(setLandShape, defs.landShape)
+    setString(setArtPack, defs.artPack)
+    setString(setCityIconType, defs.cityIconType ?? defs.cityIconSetName)
+    setString(setBackgroundType, defs.backgroundType)
+    setString(setTextureRef, defs.textureRef)
+    setString(setBackgroundSeed, defs.backgroundRandomSeed)
+    setBoolean(setDrawRegionBoundaries, defs.drawRegionBoundaries)
+    setBoolean(setColorizeLand, defs.colorizeLand)
+    setBoolean(setColorizeOcean, defs.colorizeOcean)
+    setHex(setOceanColorHex, defs.oceanColor)
+    setHex(setLandColorHex, defs.landColor)
+    setHex(setRegionBoundaryColorHex, defs.regionBoundaryColor)
+    setNumber(setRegionBoundaryWidth, defs.regionBoundaryWidth)
+    setBoolean(setDrawBorder, defs.drawBorder)
+    setBoolean(setDrawGridOverlay, defs.drawGridOverlay)
+    setString(setGridOverlayShape, defs.gridOverlayShape)
+    setNumber(setGridOverlayRowOrColCount, defs.gridOverlayRowOrColCount)
+    setHex(setGridOverlayColorHex, defs.gridOverlayColor)
+    if (defs.gridOverlayXOffset !== undefined && defs.gridOverlayXOffset !== null) setGridOverlayXOffset(defs.gridOverlayXOffset)
+    if (defs.gridOverlayYOffset !== undefined && defs.gridOverlayYOffset !== null) setGridOverlayYOffset(defs.gridOverlayYOffset)
+    setNumber(setGridOverlayLineWidth, defs.gridOverlayLineWidth)
+    setString(setGridOverlayLayer, defs.gridOverlayLayer)
+    setBoolean(setDrawVoronoiGridOverlayOnlyOnLand, defs.drawVoronoiGridOverlayOnlyOnLand)
+    setString(setFinalLandColoringMethod, defs.finalLandColoringMethod)
+    if (typeof defs.drawRegionColors === 'boolean') {
+      const method = defs.drawRegionColors ? 'ColorPoliticalRegions' : 'SingleColor'
+      setString(setLandColoringMethod, method)
+      setString(setFinalLandColoringMethod, method)
+    }
+    setString(setBorderRef, defs.borderRef)
+    setNumber(setBorderWidth, defs.borderWidth)
+    setString(setBorderPosition, defs.borderPosition)
+    setString(setBorderColorOption, defs.borderColorOption)
+    setHex(setBorderColorHex, defs.borderColor)
+    setBoolean(setFrayedBorder, defs.frayedBorder)
+    setNumber(setFrayedBorderBlurLevel, defs.frayedBorderBlurLevel)
+    setNumber(setFrayedBorderSize, defs.frayedBorderSize)
+    setString(setFrayedBorderSeed, defs.frayedBorderSeed)
+    setBoolean(setDrawGrunge, defs.drawGrunge)
+    setNumber(setGrungeWidth, defs.grungeWidth)
+    setHex(setFrayedBorderColorHex, defs.frayedBorderColor)
+    setString(setLineStyle, defs.lineStyle)
+    setNumber(setCoastlineWidth, defs.coastlineWidth)
+    setHex(setCoastlineColorHex, defs.coastlineColor)
+    setNumber(setCoastShadingLevel, defs.coastShadingLevel)
+    setHex(setCoastShadingColorHex, defs.coastShadingColor)
+    setNumber(setCoastShadingAlpha, defs.coastShadingAlpha)
+    setNumber(setOceanShadingAlpha, defs.oceanShadingAlpha)
+    setNumber(setOceanShadingLevel, defs.oceanShadingLevel)
+    setHex(setOceanShadingColorHex, defs.oceanShadingColor)
+    setString(setOceanWavesType, defs.oceanWavesType)
+    setNumber(setOceanWavesLevel, defs.oceanWavesLevel)
+    setHex(setOceanWavesColorHex, defs.oceanWavesColor)
+    setNumber(setOceanWavesAlpha, defs.oceanWavesAlpha)
+    setNumber(setConcentricWaveCount, defs.concentricWaveCount)
+    setBoolean(setFadeConcentricWaves, defs.fadeConcentricWaves)
+    setBoolean(setJitterToConcentricWaves, defs.jitterToConcentricWaves)
+    setBoolean(setBrokenLinesForConcentricWaves, defs.brokenLinesForConcentricWaves)
+    setBoolean(setDrawOceanEffectsInLakes, defs.drawOceanEffectsInLakes)
+    setHex(setRiverColorHex, defs.riverColor)
+    setBoolean(setDrawRoads, defs.drawRoads)
+    setString(setRoadStyle, defs.roadStyle)
+    setNumber(setRoadWidth, defs.roadWidth)
+    setHex(setRoadColorHex, defs.roadColor)
+    setNumber(setMountainSize, defs.mountainSize)
+    setNumber(setHillSize, defs.hillSize)
+    setNumber(setDuneSize, defs.duneSize)
+    setNumber(setTreeHeight, defs.treeHeight)
+    setNumber(setCitySize, defs.citySize)
+    setBoolean(setDrawText, defs.drawText)
+    setString(setTitleFontFamily, defs.titleFontFamily)
+    setString(setRegionFontFamily, defs.regionFontFamily)
+    setString(setMountainRangeFontFamily, defs.mountainRangeFontFamily)
+    setString(setOtherMountainsFontFamily, defs.otherMountainsFontFamily)
+    setString(setCitiesFontFamily, defs.citiesFontFamily)
+    setString(setRiverFontFamily, defs.riverFontFamily)
+    setHex(setTextColorHex, defs.textColor)
+    setBoolean(setDrawBoldBackground, defs.drawBoldBackground)
+    setHex(setBoldBackgroundColorHex, defs.boldBackgroundColor)
+
+    const backendDefaultFont = (opts && opts.defaultFontFamily) || (Array.isArray(opts.fonts) && opts.fonts.length > 0 ? opts.fonts[0] : null)
+    if (!titleFontFamily && backendDefaultFont) setTitleFontFamily(backendDefaultFont)
+    if (!regionFontFamily && backendDefaultFont) setRegionFontFamily(backendDefaultFont)
+    if (!mountainRangeFontFamily && backendDefaultFont) setMountainRangeFontFamily(backendDefaultFont)
+    if (!otherMountainsFontFamily && backendDefaultFont) setOtherMountainsFontFamily(backendDefaultFont)
+    if (!citiesFontFamily && backendDefaultFont) setCitiesFontFamily(backendDefaultFont)
+    if (!riverFontFamily && backendDefaultFont) setRiverFontFamily(backendDefaultFont)
+    if (Array.isArray(defs.books)) setSelectedBooks(new Set(defs.books))
+  }
 
   const updateRandomOverride = useCallback((key, value) => {
     setRandomOverrides((previous) => {
@@ -876,6 +884,14 @@ function GenerateForm({ uiLanguage = 'en' }) {
     (value) => {
       setCityIconType(value)
       updateRandomOverride('cityIconType', value)
+    },
+    [updateRandomOverride]
+  )
+
+  const handleCityFrequencyChange = useCallback(
+    (value) => {
+      setCityFrequency(value)
+      updateRandomOverride('cityFrequency', value)
     },
     [updateRandomOverride]
   )
@@ -978,7 +994,12 @@ function GenerateForm({ uiLanguage = 'en' }) {
 
   const handleRegionCountChange = useCallback(
     (value) => {
-      refreshUiForSeed(value)
+      setRegionCount(value)
+      updateRandomOverride('regionCount', value)
+    },
+    [updateRandomOverride]
+  )
+
   const handleSelectedBooksChange = useCallback(
     (booksSet) => {
       setSelectedBooks(booksSet)
