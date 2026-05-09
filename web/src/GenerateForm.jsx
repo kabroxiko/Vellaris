@@ -3,7 +3,7 @@ import PropTypes from 'prop-types'
 import CustomizeSettingsSection from './generate/CustomizeSettingsSection'
 import RandomSettingsSection from './generate/RandomSettingsSection'
 import { base64ToBlob, formatColorString, colorToHex, colorToAlphaPercent, parseColorChannels } from './generate/utils'
-import { selectCityIconType, fetchJson, handleResponseError, appendIfSet } from './generate/helpers'
+import { selectCityIconType, fetchJson, handleResponseError, appendIfSet, tryParseJson as tryParse } from './generate/helpers'
 import { downloadNortContent } from './generate/responseHandlers'
 import { createSettingsAppliers } from './generate/settingsAppliers'
 import { getFrontendLabels } from './i18n/webLabels'
@@ -72,21 +72,13 @@ function sanitizeFilenameBase(name, fallback) {
   return fallback || 'vellaris-map'
 }
 
-// Safe JSON parse helper that returns null on failure.
-function tryParse(content) {
-  try {
-    if (typeof content === 'string') {
-      const t = content.trim()
-      if (!t) return null
-      if (!(t.startsWith('{') || t.startsWith('['))) return null
-      return JSON.parse(t)
-    }
-    return content
-  } catch (e) {
-    if (typeof console !== 'undefined' && typeof console.debug === 'function') console.debug('tryParse: JSON parse failed', e)
-    return null
+function safeDebugLog(functionName, message, error) {
+  if (typeof console !== 'undefined' && console.debug) {
+    console.debug(`${functionName}: ${message}`, error)
   }
 }
+
+// `tryParse` is imported from shared helpers to centralize parsing logic.
 
 // Build the customize-panel payload from a values object.
 function buildCustomizePayload(values) {
@@ -1283,7 +1275,7 @@ function GenerateForm({ uiLanguage = 'en' }) {
     // Ensure font family controls are initialized to backend canonical
     // default if available.
     const opts = uiI18n.options || {}
-    const backendDefaultFont = (opts && opts.defaultFontFamily) || (Array.isArray(opts.fonts) && opts.fonts.length > 0 ? opts.fonts[0] : null)
+    const backendDefaultFont = opts?.defaultFontFamily || (Array.isArray(opts?.fonts) && opts.fonts.length > 0 ? opts.fonts[0] : null)
     if (backendDefaultFont) {
       setTitleFontFamily(backendDefaultFont)
       setRegionFontFamily(backendDefaultFont)
@@ -1477,10 +1469,10 @@ function GenerateForm({ uiLanguage = 'en' }) {
       // keep it.
       setCurrentSource((prev) => {
         try {
-          if (source?.type === 'random' && prev && prev.nortContent) return prev
+          if (source?.type === 'random' && prev?.nortContent) return prev
           // If the source we're about to set already contains nortContent,
           // avoid clobbering the previous source which may have UI overrides.
-          if (source?.nortContent && prev && prev.nortContent) return prev
+          if (source?.nortContent && prev?.nortContent) return prev
         } catch (e) {
           if (typeof console !== 'undefined' && typeof console.debug === 'function') console.debug('GenerateForm: setCurrentSource prev-check failed', e)
         }
@@ -1664,41 +1656,114 @@ function GenerateForm({ uiLanguage = 'en' }) {
     return finalLandColoringMethod || fallbackMethod || undefined
   }
 
+  // Helper: parse hex color to RGB tuple or return null
+  function parseHexColor(hexStr) {
+    if (!hexStr) return null
+    const hex = hexStr.replace(/^#/, '')
+    if (!/^[0-9a-fA-F]{6}$/.test(hex)) return null
+    return {
+      r: Number.parseInt(hex.substring(0, 2), 16),
+      g: Number.parseInt(hex.substring(2, 4), 16),
+      b: Number.parseInt(hex.substring(4, 6), 16),
+    }
+  }
+
+  // Helper: convert hex to RGBA string or fallback
+  function hexToRgbaString(hexStr, alpha = 255) {
+    const rgb = parseHexColor(hexStr)
+    return rgb ? `${rgb.r},${rgb.g},${rgb.b},${alpha}` : hexStr
+  }
+
+  // Helper: merge color with optional formatColorString fallback
+  function mergeColor(parsedSettings, key, hexStr, opacityPercent = 100, useFormatter = false) {
+    if (!hexStr) return
+    if (useFormatter) {
+      try {
+        const formatted = formatColorString(hexStr, opacityPercent)
+        if (formatted) { parsedSettings[key] = formatted; return }
+      } catch (e) { /* fallthrough to hex parse */ }
+    }
+    parsedSettings[key] = hexToRgbaString(hexStr, 255)
+  }
+
+  // Helper: parse and set resource (artPack|name)
+  function setResourceFromRef(parsedSettings, key, ref) {
+    if (!ref) return
+    const parts = ref.split('|', 2)
+    if (parts.length === 2) {
+      parsedSettings[key] = { artPack: parts[0], name: parts[1] }
+    }
+  }
+
+  // Helper: parse boolean with optional merge from prior settings
+  function parseBooleanWithDefault(value, mergedRef, priorKey, uiValue) {
+    try {
+      const orig = mergedRef?.current?.[priorKey]
+      if (typeof orig === 'boolean' && uiValue === false && orig !== uiValue) {
+        return Boolean(orig)
+      }
+    } catch (e) { /* use uiValue */ }
+    return Boolean(value)
+  }
+
+  // Helper: scale value with linear interpolation
+  function scaleSliderValue(sliderValue, sliderValueFor1Scale = 5, scaleMin = 0.5, scaleMax = 3.0) {
+    const v = Number(sliderValue)
+    if (!Number.isFinite(v)) return undefined
+    const minSlider = 1, maxSlider = 15
+    if (v <= sliderValueFor1Scale) {
+      const slope = (sliderValueFor1Scale - minSlider) / (1.0 - scaleMin)
+      return (v - (sliderValueFor1Scale - slope)) / slope
+    } else {
+      const slope = (maxSlider - sliderValueFor1Scale) / (scaleMax - 1.0)
+      return (v - (sliderValueFor1Scale - slope * 1.0)) / slope
+    }
+  }
+
+  // Helper: preserve grid overlay alpha from prior settings if color unchanged
+  function getGridOverlayAlpha() {
+    try {
+      const origColor = mergedSettingsRef?.current?.gridOverlayColor
+      if (!origColor) return 255
+      const origHex = colorToHex(origColor)
+      if (origHex && origHex.toLowerCase() === gridOverlayColorHex.toLowerCase()) {
+        const ch = parseColorChannels(origColor)
+        if (ch?.a !== undefined && Number.isFinite(Number(ch.a))) return Number(ch.a)
+      }
+    } catch (e) { /* use default */ }
+    return 255
+  }
+
+  // Helper: handle wave count preservation
+  function getConcentricWaveCount() {
+    try {
+      const origCount = mergedSettingsRef?.current?.concentricWaveCount
+      const uiCountNum = Number(concentricWaveCount)
+      if (typeof origCount === 'number' && (!Number.isFinite(uiCountNum) || uiCountNum === 0)) {
+        return origCount
+      } else if (Number.isFinite(uiCountNum)) {
+        return uiCountNum
+      }
+    } catch (e) { /* use uiCountNum */ }
+    return Number.isFinite(Number(concentricWaveCount)) ? Number(concentricWaveCount) : undefined
+  }
+
   // Merge current UI theme/visual settings into a parsed settings object.
   // Reused by buildNortContentRequest and random-map outgoing settings.
   function mergeUiIntoParsed(parsedSettings) {
     try {
-      // Handle background type flags that need to be set for server-side processing
-      if (backgroundType === 'SolidColor') {
-        parsedSettings.solidColorBackground = true
-        parsedSettings.generateBackgroundFromTexture = false
-        parsedSettings.generateBackground = false
-      } else if (backgroundType === 'GeneratedFromTexture') {
-        parsedSettings.solidColorBackground = false
-        parsedSettings.generateBackgroundFromTexture = true
-        parsedSettings.generateBackground = false
-      } else {
-        // FractalNoise or unknown - generate fractal background and
-        // ensure texture/solid flags are off.
-        parsedSettings.solidColorBackground = false
-        parsedSettings.generateBackgroundFromTexture = false
-        parsedSettings.generateBackground = true
+      // Handle background type flags
+      const bgFlags = {
+        'SolidColor': { solidColorBackground: true, generateBackgroundFromTexture: false, generateBackground: false },
+        'GeneratedFromTexture': { solidColorBackground: false, generateBackgroundFromTexture: true, generateBackground: false },
       }
+      const flags = bgFlags[backgroundType] || { solidColorBackground: false, generateBackgroundFromTexture: false, generateBackground: true }
+      Object.assign(parsedSettings, flags)
 
-      // Border resource (artPack|name)
-      if (borderRef) {
-        const parts = borderRef.split('|', 2)
-        if (parts.length === 2) {
-          parsedSettings.borderResource = { artPack: parts[0], name: parts[1] }
-        }
-      }
-      // Background texture resource (artPack|name)
-      if (textureRef) {
-        const tparts = textureRef.split('|', 2)
-        if (tparts.length === 2) {
-          parsedSettings.backgroundTextureResource = { artPack: tparts[0], name: tparts[1] }
-        }
-      }
+      // Resources
+      setResourceFromRef(parsedSettings, 'borderResource', borderRef)
+      setResourceFromRef(parsedSettings, 'backgroundTextureResource', textureRef)
+
       // Background seed
       if (backgroundSeed) parsedSettings.backgroundRandomSeed = Number(backgroundSeed)
 
@@ -1708,89 +1773,28 @@ function GenerateForm({ uiLanguage = 'en' }) {
       if (landShape) parsedSettings.landShape = landShape
       if (Number.isFinite(Number(regionCount))) parsedSettings.regionCount = Number(regionCount)
       if (randomSeed) parsedSettings.randomSeed = Number(randomSeed)
-      // cityIconTypeName removed: do not write cityIconTypeName into .nort
       if (selectedBooks && typeof selectedBooks === 'object' && typeof selectedBooks.size === 'number') parsedSettings.books = Array.from(selectedBooks).sort()
 
-      // Region boundary style (type + width) & color
+      // Region boundary style & color
       if (!parsedSettings.regionBoundaryStyle || typeof parsedSettings.regionBoundaryStyle !== 'object') parsedSettings.regionBoundaryStyle = {}
       if (regionBoundaryStyle) parsedSettings.regionBoundaryStyle.type = regionBoundaryStyle
       if (Number.isFinite(Number(regionBoundaryWidth))) parsedSettings.regionBoundaryStyle.width = Number(regionBoundaryWidth)
-      if (regionBoundaryColorHex) {
-        const rbc = regionBoundaryColorHex.replace(/^#/, '')
-        if (/^[0-9a-fA-F]{6}$/.test(rbc)) {
-          const rr = Number.parseInt(rbc.substring(0, 2), 16)
-          const rg = Number.parseInt(rbc.substring(2, 4), 16)
-          const rb = Number.parseInt(rbc.substring(4, 6), 16)
-          parsedSettings.regionBoundaryColor = `${rr},${rg},${rb},255`
-        } else {
-          parsedSettings.regionBoundaryColor = regionBoundaryColorHex
-        }
-      }
+      mergeColor(parsedSettings, 'regionBoundaryColor', regionBoundaryColorHex)
 
       // Draw flags and colorization
       parsedSettings.drawRegionBoundaries = Boolean(drawRegionBoundaries)
       parsedSettings.colorizeLand = Boolean(colorizeLand)
       parsedSettings.colorizeOcean = Boolean(colorizeOcean)
-      if (oceanColorHex) {
-        try {
-          const formatted = formatColorString(oceanColorHex, 100)
-          if (formatted) parsedSettings.oceanColor = formatted
-        } catch (e) {
-          const oh = oceanColorHex.replace(/^#/, '')
-          if (/^[0-9a-fA-F]{6}$/.test(oh)) {
-            const or = Number.parseInt(oh.substring(0, 2), 16)
-            const og = Number.parseInt(oh.substring(2, 4), 16)
-            const ob = Number.parseInt(oh.substring(4, 6), 16)
-            parsedSettings.oceanColor = `${or},${og},${ob},255`
-          } else {
-            parsedSettings.oceanColor = oceanColorHex
-          }
-        }
-      }
-      if (landColorHex) {
-        try {
-          const formattedLand = formatColorString(landColorHex, 100)
-          if (formattedLand) parsedSettings.landColor = formattedLand
-        } catch (e) {
-          const lh = landColorHex.replace(/^#/, '')
-          if (/^[0-9a-fA-F]{6}$/.test(lh)) {
-            const lr = Number.parseInt(lh.substring(0, 2), 16)
-            const lg = Number.parseInt(lh.substring(2, 4), 16)
-            const lb = Number.parseInt(lh.substring(4, 6), 16)
-            parsedSettings.landColor = `${lr},${lg},${lb},255`
-          } else {
-            parsedSettings.landColor = landColorHex
-          }
-        }
-      }
+      mergeColor(parsedSettings, 'oceanColor', oceanColorHex, 100, true)
+      mergeColor(parsedSettings, 'landColor', landColorHex, 100, true)
 
       // Grid overlay settings
       parsedSettings.drawGridOverlay = Boolean(drawGridOverlay)
       if (gridOverlayShape) parsedSettings.gridOverlayShape = gridOverlayShape
       if (Number.isFinite(Number(gridOverlayRowOrColCount))) parsedSettings.gridOverlayRowOrColCount = Number(gridOverlayRowOrColCount)
       if (gridOverlayColorHex) {
-        const gh = gridOverlayColorHex.replace(/^#/, '')
-        if (/^[0-9a-fA-F]{6}$/.test(gh)) {
-          const gr = Number.parseInt(gh.substring(0, 2), 16)
-          const gg = Number.parseInt(gh.substring(2, 4), 16)
-          const gb = Number.parseInt(gh.substring(4, 6), 16)
-          // Preserve original alpha from merged settings when the user
-          // hasn't changed the color hex (frontend only exposes hex).
-          let alpha = 255
-            try {
-              const orig = mergedSettingsRef && mergedSettingsRef.current && mergedSettingsRef.current.gridOverlayColor
-              const origHex = orig ? colorToHex(orig) : null
-              if (origHex && origHex.toLowerCase() === gridOverlayColorHex.toLowerCase()) {
-                const ch = parseColorChannels(orig)
-                if (ch && Number.isFinite(Number(ch.a))) {
-                  alpha = Number(ch.a)
-                }
-              }
-            } catch (e) { if (typeof console !== 'undefined' && console.debug) console.debug('mergeUiIntoParsed: gridOverlay alpha preserve failed', e) }
-          parsedSettings.gridOverlayColor = `${gr},${gg},${gb},${alpha}`
-        } else {
-          parsedSettings.gridOverlayColor = gridOverlayColorHex
-        }
+        const alpha = getGridOverlayAlpha()
+        parsedSettings.gridOverlayColor = hexToRgbaString(gridOverlayColorHex, alpha)
       }
       if (gridOverlayXOffset) parsedSettings.gridOverlayXOffset = gridOverlayXOffset
       if (gridOverlayYOffset) parsedSettings.gridOverlayYOffset = gridOverlayYOffset
@@ -1798,23 +1802,13 @@ function GenerateForm({ uiLanguage = 'en' }) {
       if (gridOverlayLayer) parsedSettings.gridOverlayLayer = gridOverlayLayer
       parsedSettings.drawVoronoiGridOverlayOnlyOnLand = Boolean(drawVoronoiGridOverlayOnlyOnLand)
 
-      // Land coloring / region shading method
+      // Land coloring / border settings
       const resolvedLandMethod = resolveLandColoringMethod(parsedSettings.landColoringMethod)
       if (resolvedLandMethod) parsedSettings.drawRegionColors = (resolvedLandMethod === 'ColorPoliticalRegions')
       parsedSettings.borderWidth = Number(borderWidth)
       parsedSettings.borderPosition = borderPosition
       parsedSettings.borderColorOption = borderColorOption
-      if (borderColorHex) {
-        const hex = borderColorHex.replace(/^#/, '')
-        if (/^[0-9a-fA-F]{6}$/.test(hex)) {
-          const r = Number.parseInt(hex.substring(0, 2), 16)
-          const g = Number.parseInt(hex.substring(2, 4), 16)
-          const b = Number.parseInt(hex.substring(4, 6), 16)
-          parsedSettings.borderColor = `${r},${g},${b},255`
-        } else {
-          parsedSettings.borderColor = borderColorHex
-        }
-      }
+      mergeColor(parsedSettings, 'borderColor', borderColorHex)
 
       // Frayed border / grunge
       parsedSettings.frayedBorder = Boolean(frayedBorder)
@@ -1823,147 +1817,40 @@ function GenerateForm({ uiLanguage = 'en' }) {
       if (frayedBorderSeed) parsedSettings.frayedBorderSeed = Number(frayedBorderSeed)
       parsedSettings.drawGrunge = Boolean(drawGrunge)
       if (Number.isFinite(Number(grungeWidth))) parsedSettings.grungeWidth = Number(grungeWidth)
-      if (frayedBorderColorHex) {
-        const hex2 = frayedBorderColorHex.replace(/^#/, '')
-        if (/^[0-9a-fA-F]{6}$/.test(hex2)) {
-          const r2 = Number.parseInt(hex2.substring(0, 2), 16)
-          const g2 = Number.parseInt(hex2.substring(2, 4), 16)
-          const b2 = Number.parseInt(hex2.substring(4, 6), 16)
-          parsedSettings.frayedBorderColor = `${r2},${g2},${b2},255`
-        } else {
-          parsedSettings.frayedBorderColor = frayedBorderColorHex
-        }
-      }
-
-      // Region boundary style (merge type only; width is handled separately)
-      if (regionBoundaryStyle) {
-        if (!parsedSettings.regionBoundaryStyle || typeof parsedSettings.regionBoundaryStyle !== 'object') parsedSettings.regionBoundaryStyle = {}
-        parsedSettings.regionBoundaryStyle.type = regionBoundaryStyle
-      }
+      mergeColor(parsedSettings, 'frayedBorderColor', frayedBorderColorHex)
 
       // Line / coastline settings
       if (lineStyle) parsedSettings.lineStyle = lineStyle
       if (Number.isFinite(Number(coastlineWidth))) parsedSettings.coastlineWidth = Number(coastlineWidth)
-      if (coastlineColorHex) {
-        const ch = coastlineColorHex.replace(/^#/, '')
-        if (/^[0-9a-fA-F]{6}$/.test(ch)) {
-          const cr = Number.parseInt(ch.substring(0, 2), 16)
-          const cg = Number.parseInt(ch.substring(2, 4), 16)
-          const cb = Number.parseInt(ch.substring(4, 6), 16)
-          parsedSettings.coastlineColor = `${cr},${cg},${cb},255`
-        } else {
-          parsedSettings.coastlineColor = coastlineColorHex
-        }
-      }
+      mergeColor(parsedSettings, 'coastlineColor', coastlineColorHex)
 
       // Coast shading
       if (Number.isFinite(Number(coastShadingLevel))) parsedSettings.coastShadingLevel = Number(coastShadingLevel)
       if (coastShadingColorHex) {
-        try {
-          const opacityPercent = 100 - Number(coastShadingAlpha || 0)
-          const formatted = formatColorString(coastShadingColorHex, opacityPercent)
-          if (formatted) parsedSettings.coastShadingColor = formatted
-        } catch (e) {
-          const csh = coastShadingColorHex.replace(/^#/, '')
-          if (/^[0-9a-fA-F]{6}$/.test(csh)) {
-            const csr = Number.parseInt(csh.substring(0, 2), 16)
-            const csg = Number.parseInt(csh.substring(2, 4), 16)
-            const csb = Number.parseInt(csh.substring(4, 6), 16)
-            parsedSettings.coastShadingColor = `${csr},${csg},${csb},255`
-          } else {
-            parsedSettings.coastShadingColor = coastShadingColorHex
-          }
-        }
+        const opacityPercent = 100 - Number(coastShadingAlpha || 0)
+        mergeColor(parsedSettings, 'coastShadingColor', coastShadingColorHex, opacityPercent, true)
       }
 
       // Ocean shading / waves
       if (Number.isFinite(Number(oceanShadingLevel))) parsedSettings.oceanShadingLevel = Number(oceanShadingLevel)
       if (oceanShadingColorHex) {
-        try {
-          const oceanOpacityPercent = 100 - Number(oceanShadingAlpha || 0)
-          const formattedOcean = formatColorString(oceanShadingColorHex, oceanOpacityPercent)
-          if (formattedOcean) parsedSettings.oceanShadingColor = formattedOcean
-        } catch (e) {
-          const osh = oceanShadingColorHex.replace(/^#/, '')
-          if (/^[0-9a-fA-F]{6}$/.test(osh)) {
-            const osr = Number.parseInt(osh.substring(0, 2), 16)
-            const osg = Number.parseInt(osh.substring(2, 4), 16)
-            const osb = Number.parseInt(osh.substring(4, 6), 16)
-            parsedSettings.oceanShadingColor = `${osr},${osg},${osb},255`
-          } else {
-            parsedSettings.oceanShadingColor = oceanShadingColorHex
-          }
-        }
+        const oceanOpacityPercent = 100 - Number(oceanShadingAlpha || 0)
+        mergeColor(parsedSettings, 'oceanShadingColor', oceanShadingColorHex, oceanOpacityPercent, true)
       }
       if (oceanWavesType) parsedSettings.oceanEffect = oceanWavesType
       if (Number.isFinite(Number(oceanWavesLevel))) parsedSettings.oceanWavesLevel = Number(oceanWavesLevel)
-      try {
-        const origCount = mergedSettingsRef && mergedSettingsRef.current && mergedSettingsRef.current.concentricWaveCount
-        const uiCountNum = Number(concentricWaveCount)
-        if (typeof origCount === 'number' && (!Number.isFinite(uiCountNum) || uiCountNum === 0)) {
-          parsedSettings.concentricWaveCount = origCount
-        } else if (Number.isFinite(uiCountNum)) {
-          parsedSettings.concentricWaveCount = uiCountNum
-        }
-      } catch (e) {
-        if (Number.isFinite(Number(concentricWaveCount))) parsedSettings.concentricWaveCount = Number(concentricWaveCount)
-      }
+      parsedSettings.concentricWaveCount = getConcentricWaveCount()
       parsedSettings.fadeConcentricWaves = Boolean(fadeConcentricWaves)
-      // Preserve server-provided jitter value when the UI still has the
-      // initial default (user didn't change the control). This avoids
-      // unintentionally overwriting a `.nort`'s `jitterToConcentricWaves`
-      // when the frontend only exposes a checkbox defaulting to `false`.
-      try {
-        const orig = mergedSettingsRef && mergedSettingsRef.current && mergedSettingsRef.current.jitterToConcentricWaves
-        if (typeof orig === 'boolean' && jitterToConcentricWaves === false && orig !== jitterToConcentricWaves) {
-          parsedSettings.jitterToConcentricWaves = Boolean(orig)
-        } else {
-          parsedSettings.jitterToConcentricWaves = Boolean(jitterToConcentricWaves)
-        }
-      } catch (e) {
-        parsedSettings.jitterToConcentricWaves = Boolean(jitterToConcentricWaves)
-      }
-      try {
-        const origBroken = mergedSettingsRef && mergedSettingsRef.current && mergedSettingsRef.current.brokenLinesForConcentricWaves
-        if (typeof origBroken === 'boolean' && brokenLinesForConcentricWaves === false && origBroken !== brokenLinesForConcentricWaves) {
-          parsedSettings.brokenLinesForConcentricWaves = Boolean(origBroken)
-        } else {
-          parsedSettings.brokenLinesForConcentricWaves = Boolean(brokenLinesForConcentricWaves)
-        }
-      } catch (e) {
-        parsedSettings.brokenLinesForConcentricWaves = Boolean(brokenLinesForConcentricWaves)
-      }
+      parsedSettings.jitterToConcentricWaves = parseBooleanWithDefault(jitterToConcentricWaves, mergedSettingsRef, 'jitterToConcentricWaves', jitterToConcentricWaves)
+      parsedSettings.brokenLinesForConcentricWaves = parseBooleanWithDefault(brokenLinesForConcentricWaves, mergedSettingsRef, 'brokenLinesForConcentricWaves', brokenLinesForConcentricWaves)
       if (oceanWavesColorHex) {
-        try {
-          const opacityPercent = 100 - Number(oceanWavesAlpha || 0)
-          const formatted = formatColorString(oceanWavesColorHex, opacityPercent)
-          if (formatted) parsedSettings.oceanWavesColor = formatted
-        } catch (e) {
-          const ow = oceanWavesColorHex.replace(/^#/, '')
-          if (/^[0-9a-fA-F]{6}$/.test(ow)) {
-            const owr = Number.parseInt(ow.substring(0, 2), 16)
-            const owg = Number.parseInt(ow.substring(2, 4), 16)
-            const owb = Number.parseInt(ow.substring(4, 6), 16)
-            parsedSettings.oceanWavesColor = `${owr},${owg},${owb},255`
-          } else {
-            parsedSettings.oceanWavesColor = oceanWavesColorHex
-          }
-        }
+        const opacityPercent = 100 - Number(oceanWavesAlpha || 0)
+        mergeColor(parsedSettings, 'oceanWavesColor', oceanWavesColorHex, opacityPercent, true)
       }
       parsedSettings.drawOceanEffectsInLakes = Boolean(drawOceanEffectsInLakes)
 
       // River
-      if (riverColorHex) {
-        const rrh = riverColorHex.replace(/^#/, '')
-        if (/^[0-9a-fA-F]{6}$/.test(rrh)) {
-          const rrr = Number.parseInt(rrh.substring(0, 2), 16)
-          const rrg = Number.parseInt(rrh.substring(2, 4), 16)
-          const rrb = Number.parseInt(rrh.substring(4, 6), 16)
-          parsedSettings.riverColor = `${rrr},${rrg},${rrb},255`
-        } else {
-          parsedSettings.riverColor = riverColorHex
-        }
-      }
+      mergeColor(parsedSettings, 'riverColor', riverColorHex)
 
       // Roads
       parsedSettings.drawRoads = Boolean(drawRoads)
@@ -1972,132 +1859,79 @@ function GenerateForm({ uiLanguage = 'en' }) {
       } else if (Number.isFinite(Number(roadWidth))) {
         parsedSettings.roadStyle = { width: Number(roadWidth) }
       }
-      if (roadColorHex) {
-        const rh = roadColorHex.replace(/^#/, '')
-        if (/^[0-9a-fA-F]{6}$/.test(rh)) {
-          const rr = Number.parseInt(rh.substring(0, 2), 16)
-          const rg = Number.parseInt(rh.substring(2, 4), 16)
-          const rb = Number.parseInt(rh.substring(4, 6), 16)
-          parsedSettings.roadColor = `${rr},${rg},${rb},255`
-        } else {
-          parsedSettings.roadColor = roadColorHex
-        }
-      }
+      mergeColor(parsedSettings, 'roadColor', roadColorHex)
 
-      // Scales and sizes - convert slider values (1-15) to MapSettings scales
-      const sliderValueFor1Scale = 5
-      const scaleMax = 3.0
-      const scaleMin = 0.5
-      const minScaleSliderValue = 1
-      const maxScaleSliderValue = 15
-      function getScaleForSliderValue(sliderValue) {
-        const v = Number(sliderValue)
-        if (!Number.isFinite(v)) return undefined
-        if (v <= sliderValueFor1Scale) {
-          const slope = (sliderValueFor1Scale - minScaleSliderValue) / (1.0 - scaleMin)
-          const yIntercept = sliderValueFor1Scale - slope
-          return (v - yIntercept) / slope
-        } else {
-          const slope = (maxScaleSliderValue - sliderValueFor1Scale) / (scaleMax - 1.0)
-          const yIntercept = sliderValueFor1Scale - slope * 1.0
-          return (v - yIntercept) / slope
-        }
-      }
-      function getTreeHeightScaleFromSlider(sliderValue) {
-        const v = Number(sliderValue)
-        if (!Number.isFinite(v)) return undefined
-        return 0.1 + v * 0.05
-      }
-
-      if (Number.isFinite(Number(mountainSize))) parsedSettings.mountainScale = getScaleForSliderValue(mountainSize)
-      if (Number.isFinite(Number(hillSize))) parsedSettings.hillScale = getScaleForSliderValue(hillSize)
-      if (Number.isFinite(Number(duneSize))) parsedSettings.duneScale = getScaleForSliderValue(duneSize)
-      if (Number.isFinite(Number(treeHeight))) parsedSettings.treeHeightScale = getTreeHeightScaleFromSlider(treeHeight)
-      if (Number.isFinite(Number(citySize))) parsedSettings.cityScale = getScaleForSliderValue(citySize)
+      // Scales and sizes
+      if (Number.isFinite(Number(mountainSize))) parsedSettings.mountainScale = scaleSliderValue(mountainSize)
+      if (Number.isFinite(Number(hillSize))) parsedSettings.hillScale = scaleSliderValue(hillSize)
+      if (Number.isFinite(Number(duneSize))) parsedSettings.duneScale = scaleSliderValue(duneSize)
+      if (Number.isFinite(Number(treeHeight))) parsedSettings.treeHeightScale = 0.1 + Number(treeHeight) * 0.05
+      if (Number.isFinite(Number(citySize))) parsedSettings.cityScale = scaleSliderValue(citySize)
 
       // Text and bold background
       parsedSettings.drawText = Boolean(drawText)
-      if (textColorHex) {
-        const th = textColorHex.replace(/^#/, '')
-        if (/^[0-9a-fA-F]{6}$/.test(th)) {
-          const tr = Number.parseInt(th.substring(0, 2), 16)
-          const tg = Number.parseInt(th.substring(2, 4), 16)
-          const tb = Number.parseInt(th.substring(4, 6), 16)
-          parsedSettings.textColor = `${tr},${tg},${tb},255`
-        } else {
-          parsedSettings.textColor = textColorHex
-        }
-      }
+      mergeColor(parsedSettings, 'textColor', textColorHex)
       parsedSettings.drawBoldBackground = Boolean(drawBoldBackground)
-      if (boldBackgroundColorHex) {
-        const bh = boldBackgroundColorHex.replace(/^#/, '')
-        if (/^[0-9a-fA-F]{6}$/.test(bh)) {
-          const br = Number.parseInt(bh.substring(0, 2), 16)
-          const bg = Number.parseInt(bh.substring(2, 4), 16)
-          const bb = Number.parseInt(bh.substring(4, 6), 16)
-          parsedSettings.boldBackgroundColor = `${br},${bg},${bb},255`
-        } else {
-          parsedSettings.boldBackgroundColor = boldBackgroundColorHex
-        }
-      }
-      } catch (e) {
+      mergeColor(parsedSettings, 'boldBackgroundColor', boldBackgroundColorHex)
+    } catch (e) {
       if (typeof console !== 'undefined' && typeof console.debug === 'function') console.debug('GenerateForm: merge of UI values failed', e)
     }
   }
 
-  function buildNortContentRequest({ explicitNortContent = null } = {}) {
-    let parsedSettings = null
+  function parseNortSettings(explicitNortContent) {
     try {
       if (explicitNortContent) {
-        parsedSettings = tryParse(explicitNortContent)
-      } else if (mergedSettingsRef && mergedSettingsRef.current) {
-        // clone the in-memory canonical settings so we can safely mutate
-        try {
-          parsedSettings = tryParse(JSON.stringify(mergedSettingsRef.current))
-        } catch (e) {
-          parsedSettings = mergedSettingsRef.current
-        }
-      } else {
-        const sourceContent = currentSource?.nortContent
-        parsedSettings = tryParse(sourceContent)
+        return tryParse(explicitNortContent)
       }
-      if (!parsedSettings) throw new Error('Current settings are not valid JSON.')
+      if (mergedSettingsRef?.current) {
+        return cloneMergedSettings()
+      }
+      return tryParse(currentSource?.nortContent)
     } catch (e) {
       throw new Error('Current settings are not valid JSON.')
-    }      
-
-    // Merge UI overrides into the parsed settings so regenerate sends changed
-    // control values to the server.
-    try { mergeUiIntoParsed(parsedSettings) } catch (e) { if (typeof console !== 'undefined' && console.debug) console.debug('buildNortContentRequest: mergeUiIntoParsed failed', e) }
-
-    // Ensure map size/seed are stored inside the settings JSON so server only
-    // needs to read the uploaded nort content to apply customization.
-    // The backend reads `generatedWidth`/`generatedHeight` from settings
-    // when rendering from a .nort file, so set those fields here. Do NOT
-    // write top-level `width`/`height` fields anymore.
-    if (finalWidth) {
-      parsedSettings.generatedWidth = Number(finalWidth)
     }
-    if (finalHeight) {
-      parsedSettings.generatedHeight = Number(finalHeight)
+  }
+
+  function cloneMergedSettings() {
+    try {
+      return tryParse(JSON.stringify(mergedSettingsRef.current))
+    } catch (e) {
+      return mergedSettingsRef.current
     }
+  }
+
+  function updateSettingsWithDimensions(parsedSettings) {
+    if (finalWidth) parsedSettings.generatedWidth = Number(finalWidth)
+    if (finalHeight) parsedSettings.generatedHeight = Number(finalHeight)
     if (finalSeed) parsedSettings.randomSeed = finalSeed ? Number(finalSeed) : undefined
+  }
 
-    // Expose merged settings for debugging and log key UI->merged mappings.
+  function exposeSettingsForDebugging(parsedSettings) {
     try {
       if (typeof globalThis !== 'undefined') {
         globalThis.__lastMergedParsedSettings = parsedSettings
-        // suppressed merged settings debug
       }
-    } catch (dbg) { if (typeof console !== 'undefined' && console.debug) console.debug('buildNortContentRequest: set __lastMergedParsedSettings failed', dbg) }
+    } catch (dbg) {
+      safeDebugLog('buildNortContentRequest', 'set __lastMergedParsedSettings failed', dbg)
+    }
+  }
 
-    // If UI provides a language override, ensure it's stored in the settings JSON
+  function buildNortContentRequest({ explicitNortContent = null } = {}) {
+    let parsedSettings = parseNortSettings(explicitNortContent)
+    if (!parsedSettings) throw new Error('Current settings are not valid JSON.')
+
+    try {
+      mergeUiIntoParsed(parsedSettings)
+    } catch (e) {
+      safeDebugLog('buildNortContentRequest', 'mergeUiIntoParsed failed', e)
+    }
+
+    updateSettingsWithDimensions(parsedSettings)
+    exposeSettingsForDebugging(parsedSettings)
+
     if (mapLanguage) parsedSettings.language = mapLanguage
-    const settingsText = serializeNortObject(parsedSettings)
+    serializeNortObject(parsedSettings)
 
-    // instrumentation removed
-
-    // Send the full .nort content as the JSON body (no wrapper).
     return {
       requestOptions: {
         method: 'POST',
@@ -2111,15 +1945,6 @@ function GenerateForm({ uiLanguage = 'en' }) {
         nortContent: currentSource.nortContent,
       },
     }
-  }
-
-  function buildFileRequest() {
-    // For uploaded files we prefer to read the file text and POST JSON.
-    // This helper builds a JSON body matching server `Config` shape when
-    // the caller already has the parsed settings available.
-    // If the caller requires raw file handling, they should use the
-    // file-read path that converts file content to JSON first.
-    throw new Error('buildFileRequest is deprecated: send JSON body using buildNortContentRequest instead.')
   }
 
   async function handleGenerateFromSettings(evt) {

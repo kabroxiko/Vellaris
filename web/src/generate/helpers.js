@@ -27,7 +27,7 @@ export function fetchJson(url) {
 }
 
 // Safe JSON parse helper to avoid throwing on malformed input.
-function tryParseJson(s) {
+export function tryParseJson(s) {
   try {
     if (typeof s === 'string') {
       const t = s.trim()

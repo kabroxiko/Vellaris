@@ -1,21 +1,6 @@
 import { base64ToBlob } from './utils'
+import { tryParseJson as tryParse } from './helpers'
 
-// Try to parse a .nort content string or return the object as-is.
-// Moved to module scope to reduce nested function complexity (Sonar S7721).
-function tryParse(content) {
-  try {
-    if (typeof content === 'string') {
-      const t = content.trim()
-      if (!t) return null
-      if (!(t.startsWith('{') || t.startsWith('['))) return null
-      return JSON.parse(t)
-    }
-    return content
-  } catch (e) {
-    if (typeof console !== 'undefined' && typeof console.debug === 'function') console.debug('tryParse: JSON parse failed', e)
-    return null
-  }
-}
 
 // Find a Title entry in a parsed .nort `edits` structure, if present.
 function findTitle(parsed) {
@@ -145,22 +130,22 @@ export function handleSuccess(blob, options) {
 
 // Compatibility fallbacks removed: server and client should fail-fast on errors.
 
+function requireJson() {
+  throw new Error('Invalid JSON response from server')
+}
+
+async function showFailureToast(err) {
+  try {
+    globalThis.showToast?.(err.message || 'Generate response processing failed', { type: 'error', duration: 5000 })
+  } catch (error_) {
+    if (typeof console !== 'undefined' && console.debug) console.debug('processGenerateResponse: showToast failed', error_)
+  }
+}
+
 export async function processGenerateResponse(bytes, contentType, options) {
   const { outputMode, baseName, source, fileName, setPreview, setCurrentSource } = options
 
   // client log download removed
-
-  function requireJson() {
-    throw new Error('Invalid JSON response from server')
-  }
-
-  function showFailureToast(err) {
-    try {
-      globalThis.showToast?.(err.message || 'Generate response processing failed', { type: 'error', duration: 5000 })
-    } catch (err2) {
-      if (typeof console !== 'undefined' && console.debug) console.debug('processGenerateResponse: showToast failed', err2)
-    }
-  }
 
   async function handleJsonImageResponse(data) {
     if (!data.imageBase64 || typeof data.imageBase64 !== 'string') throw new Error('Server did not return image data')
