@@ -1,0 +1,6 @@
+projectKey=nortantis-web
+serverUrl=https://sonarqube.lonecesito.cl
+serverVersion=26.4.0.121862
+dashboardUrl=https://sonarqube.lonecesito.cl/dashboard?id=nortantis-web
+ceTaskId=4ee06a13-b9e8-406f-a002-c3782f3a01ec
+ceTaskUrl=https://sonarqube.lonecesito.cl/api/ce/task?id=4ee06a13-b9e8-406f-a002-c3782f3a01ec

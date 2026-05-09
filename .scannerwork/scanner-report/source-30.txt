@@ -1,0 +1,20 @@
+import enLabels from './labels/en'
+
+// Lazy-load other language bundles to avoid bundling all translations
+// into the initial frontend payload. Always include English as the
+// baseline so untranslated keys still resolve locally.
+export async function getFrontendLabels(language) {
+  const code = (language || 'en').slice(0, 2).toLowerCase()
+  if (code === 'en') return { ...enLabels }
+
+  try {
+    const module = await import(/* @vite-ignore */ `./labels/${code}.js`)
+    const localized = module && module.default ? module.default : {}
+    return { ...enLabels, ...localized }
+  } catch (e) {
+    // If dynamic import fails (unsupported language or missing file),
+    // fall back to English labels only.
+    if (typeof console !== 'undefined' && typeof console.debug === 'function') console.debug('getFrontendLabels: dynamic import failed, falling back to English', e)
+    return { ...enLabels }
+  }
+}

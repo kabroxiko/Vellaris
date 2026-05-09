@@ -5,15 +5,19 @@ import enLabels from './labels/en'
 // baseline so untranslated keys still resolve locally.
 export async function getFrontendLabels(language) {
   const code = (language || 'en').slice(0, 2).toLowerCase()
-  if (code === 'en') return { ...enLabels }
+  // Only allow known two-letter language codes to avoid unsafe dynamic import paths
+  const allowed = new Set(['en', 'de', 'es', 'fr', 'pt', 'ru', 'zh'])
+  const safeCode = allowed.has(code) ? code : 'en'
+  if (safeCode === 'en') return { ...enLabels }
 
   try {
-    const module = await import(/* @vite-ignore */ `./labels/${code}.js`)
+    const module = await import(/* @vite-ignore */ `./labels/${safeCode}.js`)
     const localized = module && module.default ? module.default : {}
     return { ...enLabels, ...localized }
   } catch (e) {
     // If dynamic import fails (unsupported language or missing file),
     // fall back to English labels only.
+    if (typeof console !== 'undefined' && typeof console.debug === 'function') console.debug('getFrontendLabels: dynamic import failed, falling back to English', e)
     return { ...enLabels }
   }
 }

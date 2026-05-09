@@ -15,19 +15,26 @@ const uiOptionsCache = new Map()
 
 function serializeNortObject(obj) {
   function sortRec(v) {
-    if (v && typeof v === 'object') {
-      if (Array.isArray(v)) return v.map(sortRec)
+    if (v && typeof v === 'object' && !Array.isArray(v)) {
       const keys = Object.keys(v).sort()
       const out = {}
       for (const k of keys) out[k] = sortRec(v[k])
       return out
     }
+    if (Array.isArray(v)) return v.map(sortRec)
     return v
   }
+
   try {
     return JSON.stringify(sortRec(obj), null, 2)
   } catch (e) {
-    return JSON.stringify(obj)
+    if (typeof console !== 'undefined' && typeof console.debug === 'function')
+      console.debug('serializeNortObject: JSON stringify failed, falling back to raw stringify', e)
+    try {
+      return JSON.stringify(obj)
+    } catch (err) {
+      return String(obj)
+    }
   }
 }
 
@@ -49,7 +56,7 @@ function deriveNortFilenameFromContent(nortContent) {
       if (tType === 'Title' && typeof tText === 'string' && tText.trim()) return tText.trim()
     }
   } catch (e) {
-    // ignore parse errors
+    if (typeof console !== 'undefined' && console.debug) console.debug('deriveNortFilenameFromContent: parse failed', e)
   }
   return null
 }
@@ -61,8 +68,18 @@ function sanitizeFilenameBase(name, fallback) {
     s = s.replace(/[\\/:*?"<>|]+/g, '-')
     s = s.replace(/\s+/g, '-')
     if (s) return s
-  } catch (e) {}
+  } catch (e) { if (typeof console !== 'undefined' && console.debug) console.debug('sanitizeFilenameBase: error sanitizing', e) }
   return fallback || 'vellaris-map'
+}
+
+// Safe JSON parse helper that returns null on failure.
+function tryParse(content) {
+  try {
+    return typeof content === 'string' ? JSON.parse(content) : content
+  } catch (e) {
+    if (typeof console !== 'undefined' && typeof console.debug === 'function') console.debug('tryParse: JSON parse failed', e)
+    return null
+  }
 }
 
 async function loadUiOptions(lang) {
@@ -87,7 +104,8 @@ function loadRandomOverrides() {
     if (!raw) return {}
     const parsed = JSON.parse(raw)
     return parsed && typeof parsed === 'object' ? parsed : {}
-  } catch {
+  } catch (e) {
+    if (typeof console !== 'undefined' && console.debug) console.debug('loadRandomOverrides: failed to parse overrides', e)
     return {}
   }
 }
@@ -98,7 +116,8 @@ function loadCustomizeOverrides() {
     if (!raw) return {}
     const parsed = JSON.parse(raw)
     return parsed && typeof parsed === 'object' ? parsed : {}
-  } catch {
+  } catch (e) {
+    if (typeof console !== 'undefined' && console.debug) console.debug('loadCustomizeOverrides: failed to parse overrides', e)
     return {}
   }
 }
@@ -179,7 +198,7 @@ function usePostApplierLogger(lastApplierRunRef, deps = []) {
         console.debug('post-applier run', lastApplierRunRef.current, deps)
       }
     } catch (e) {
-      // swallow logging errors
+      if (typeof console !== 'undefined' && typeof console.debug === 'function') console.debug('usePostApplierLogger: logging failed', e)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lastApplierRunRef && lastApplierRunRef.current, ...(Array.isArray(deps) ? deps : [])])
@@ -262,6 +281,7 @@ function GenerateForm({ uiLanguage = 'en' }) {
   const [drawVoronoiGridOverlayOnlyOnLand, setDrawVoronoiGridOverlayOnlyOnLand] = useState(
     typeof initialCustomize.drawVoronoiGridOverlayOnlyOnLand === 'boolean' ? initialCustomize.drawVoronoiGridOverlayOnlyOnLand : false
   )
+  
   const [finalLandColoringMethod, setFinalLandColoringMethod] = useState(initialCustomize.finalLandColoringMethod || '')
   const [borderRef, setBorderRef] = useState(initialCustomize.borderRef || '')
   const [borderWidth, setBorderWidth] = useState(
@@ -283,6 +303,7 @@ function GenerateForm({ uiLanguage = 'en' }) {
   const [drawGrunge, setDrawGrunge] = useState(
     typeof initialCustomize.drawGrunge === 'boolean' ? initialCustomize.drawGrunge : false
   )
+  
   const [grungeWidth, setGrungeWidth] = useState(
     typeof initialCustomize.grungeWidth === 'number' ? initialCustomize.grungeWidth : 0
   )
@@ -453,7 +474,7 @@ function GenerateForm({ uiLanguage = 'en' }) {
       }
       localStorage.setItem(CUSTOMIZE_OVERRIDES_STORAGE_KEY, JSON.stringify(payload))
     } catch (e) {
-      // ignore storage errors
+      if (typeof console !== 'undefined' && typeof console.debug === 'function') console.debug('GenerateForm: localStorage persist failed', e)
     }
   }, [
     backgroundType,
@@ -543,7 +564,7 @@ function GenerateForm({ uiLanguage = 'en' }) {
               cityIconTypesRequestByPack.set(pack, Promise.resolve(byPack[pack]))
             }
           } catch (e) {
-            // ignore
+            if (typeof console !== 'undefined' && typeof console.debug === 'function') console.debug('GenerateForm: cityIconTypes enumeration failed', e)
           }
 
           // Set sensible defaults for Random panel and selected books
@@ -568,9 +589,11 @@ function GenerateForm({ uiLanguage = 'en' }) {
             const preferredCityDefault = defs && (defs.cityIconType ?? defs.cityIconSetName) ? String(defs.cityIconType ?? defs.cityIconSetName) : cityIconType
             loadCityIconTypes(packToLoad)
               .then((types) => handleCityIconTypesLoaded(types, preferredCityDefault))
-              .catch(() => {})
+              .catch((e) => {
+                if (typeof console !== 'undefined' && typeof console.debug === 'function') console.debug('GenerateForm: loadCityIconTypes failed', e)
+              })
           } catch (e) {
-            // ignore
+            if (typeof console !== 'undefined' && typeof console.debug === 'function') console.debug('GenerateForm: applying defaults failed', e)
           }
 
           // Merge backend i18n labels with frontend labels so untranslated
@@ -711,7 +734,7 @@ function GenerateForm({ uiLanguage = 'en' }) {
                 if (Array.isArray(defs.books)) setSelectedBooks(new Set(defs.books))
               }
           } catch (e) {
-            // ignore
+            if (typeof console !== 'undefined' && typeof console.debug === 'function') console.debug('GenerateForm: backend defaults inner handler failed', e)
           }
 
           // Persist the raw backend defaults so we can later force-apply
@@ -719,9 +742,9 @@ function GenerateForm({ uiLanguage = 'en' }) {
           lastUiDefaultsRef.current = uiOpts.defaults || null
         }
       } catch (e) {
-        // ignore startup option load failures
+        if (typeof console !== 'undefined' && typeof console.debug === 'function') console.debug('GenerateForm: startup option load failed', e)
       } finally {
-        try { setUiLoaded(true) } catch (e) {}
+        try { setUiLoaded(true) } catch (e) { if (typeof console !== 'undefined' && console.debug) console.debug('GenerateForm: setUiLoaded failed', e) }
       }
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -822,7 +845,7 @@ function GenerateForm({ uiLanguage = 'en' }) {
             for (const pack of Object.keys(byPack)) {
               cityIconTypesRequestByPack.set(pack, Promise.resolve(byPack[pack]))
             }
-          } catch (e) {}
+          } catch (e) { if (typeof console !== 'undefined' && console.debug) console.debug('GenerateForm: startup defaults composition error', e) }
 
           // Merge backend i18n labels with frontend labels
           const frontendLabels = await getFrontendLabels(requestLanguage)
@@ -850,10 +873,10 @@ function GenerateForm({ uiLanguage = 'en' }) {
               ap.applyTextSettings(defs)
             }
           } catch (e) {
-            // swallow errors; UI remains interactive
+            if (typeof console !== 'undefined' && typeof console.debug === 'function') console.debug('GenerateForm: apply appliers failed during ui defaults application', e)
           }
         } catch (e) {
-          // ignore
+          if (typeof console !== 'undefined' && typeof console.debug === 'function') console.debug('GenerateForm: ui defaults processing failed', e)
         }
       })()
     },
@@ -950,6 +973,10 @@ function GenerateForm({ uiLanguage = 'en' }) {
         setOceanWavesType,
         setOceanWavesLevel,
         setOceanWavesColorHex,
+        setConcentricWaveCount,
+        setFadeConcentricWaves,
+        setJitterToConcentricWaves,
+        setBrokenLinesForConcentricWaves,
         setDrawOceanEffectsInLakes,
         setRiverColorHex,
         setDrawRoads,
@@ -1158,7 +1185,7 @@ function GenerateForm({ uiLanguage = 'en' }) {
       const seedVal = defs && defs.randomSeed !== undefined && defs.randomSeed !== null ? String(defs.randomSeed) : ''
       setRandomSeed(seedVal)
       updateRandomOverride('randomSeed', seedVal || null)
-    } catch (e) {}
+    } catch (e) { if (typeof console !== 'undefined' && console.debug) console.debug('GenerateForm: preview prefetch error', e) }
 
     // Ensure font family controls are initialized to backend canonical
     // default if available.
@@ -1204,7 +1231,9 @@ function GenerateForm({ uiLanguage = 'en' }) {
     const pack = artPack || 'nortantis'
     loadCityIconTypes(pack)
       .then((types) => handleCityIconTypesLoaded(types, cityIconType))
-      .catch(() => {})
+      .catch((e) => {
+        if (typeof console !== 'undefined' && typeof console.debug === 'function') console.debug('GenerateForm: loadCityIconTypes (useEffect) failed', e)
+      })
   }, [artPack])
 
   useEffect(() => {
@@ -1216,10 +1245,10 @@ function GenerateForm({ uiLanguage = 'en' }) {
       // are derived from canonical numeric colors where appropriate.
       let settings = JSON.parse(currentSource.nortContent)
       // mark origin so appliers can log which source triggered them
-      try { settings.__applierSource = 'currentSource' } catch (e) {}
+      try { settings.__applierSource = 'currentSource' } catch (e) { if (typeof console !== 'undefined' && console.debug) console.debug('GenerateForm: set __applierSource failed', e) }
       // Always apply map size and seed settings so the Random panel
       // reflects server-resolved values (width, height, seed, worldSize, etc.).
-      try { appliersRef.current.applyMapSizeAndSeedSettings(settings) } catch (e) {}
+      try { appliersRef.current.applyMapSizeAndSeedSettings(settings) } catch (e) { if (typeof console !== 'undefined' && console.debug) console.debug('GenerateForm: applyMapSizeAndSeedSettings failed', e) }
       appliersRef.current.applyBackgroundTypeSettings(settings)
       appliersRef.current.applyColorAndBoundarySettings(settings)
       appliersRef.current.applyBorderSettings(settings)
@@ -1228,7 +1257,8 @@ function GenerateForm({ uiLanguage = 'en' }) {
       appliersRef.current.applyOceanSettings(settings)
       appliersRef.current.applyRoadAndScaleSettings(settings)
       appliersRef.current.applyTextSettings(settings)
-    } catch {
+    } catch (e) {
+      if (typeof console !== 'undefined' && console.debug) console.debug('GenerateForm: failed to parse currentSource.nortContent', e)
       // Ignore parse failures; form keeps current values.
     }
   }, [currentSource?.nortContent, currentSource?.originType])
@@ -1250,7 +1280,7 @@ function GenerateForm({ uiLanguage = 'en' }) {
       if (typeof ms.brokenLinesForConcentricWaves === 'boolean' && !brokenLinesForConcentricWaves)
         setBrokenLinesForConcentricWaves(Boolean(ms.brokenLinesForConcentricWaves))
     } catch (e) {
-      // ignore
+      if (typeof console !== 'undefined' && typeof console.debug === 'function') console.debug('GenerateForm: concentric wave defaults update failed', e)
     }
   }, [oceanWavesType])
 
@@ -1289,9 +1319,9 @@ function GenerateForm({ uiLanguage = 'en' }) {
                 source
               )
         })
-        .catch(() => {
-          // Ignore read errors; upload path still works through FormData.
-        })
+        .catch((e) => {
+              if (typeof console !== 'undefined' && typeof console.debug === 'function') console.debug('GenerateForm: file read failed', e)
+            })
     },
     [requestLanguage, runGenerate]
   )
@@ -1318,7 +1348,7 @@ function GenerateForm({ uiLanguage = 'en' }) {
           const derived = deriveNortFilenameFromContent(nortContent)
           if (derived) filenameBase = derived
         }
-      } catch (e) {}
+      } catch (e) { if (typeof console !== 'undefined' && console.debug) console.debug('handleSuccess: deriveNortFilenameFromContent failed', e) }
       const filename = `${sanitizeFilenameBase(filenameBase, 'vellaris-map')}.png`
       return {
         url,
@@ -1340,7 +1370,7 @@ function GenerateForm({ uiLanguage = 'en' }) {
       try {
         mergedSettingsRef.current = JSON.parse(nortContent)
       } catch (e) {
-        // ignore parse failures
+        if (typeof console !== 'undefined' && typeof console.debug === 'function') console.debug('GenerateForm: failed to parse nortContent from server', e)
       }
     } else if (source) {
       // Do not overwrite currentSource when server did not return merged
@@ -1356,7 +1386,7 @@ function GenerateForm({ uiLanguage = 'en' }) {
           // avoid clobbering the previous source which may have UI overrides.
           if (source?.nortContent && prev && prev.nortContent) return prev
         } catch (e) {
-          // ignore
+          if (typeof console !== 'undefined' && typeof console.debug === 'function') console.debug('GenerateForm: setCurrentSource prev-check failed', e)
         }
         return source
       })
@@ -1370,7 +1400,7 @@ function GenerateForm({ uiLanguage = 'en' }) {
     try {
       setHasGeneratedOnce(true)
       setCustomizationDirty(false)
-    } catch (e) {}
+    } catch (e) { if (typeof console !== 'undefined' && console.debug) console.debug('GenerateForm: failed to set generated/dirty flags', e) }
   }
 
   async function processGenerateResponse(bytes, contentType, outputMode, baseName, source) {
@@ -1414,36 +1444,11 @@ function GenerateForm({ uiLanguage = 'en' }) {
     setLoading(true)
     const toast = externalToast ?? makeProgressToastController()
 
+    // no-op: instrumentation removed
+
     try {
       if (!externalToast) toast.show(outputMode === 'nort-only' ? 'Preparing settings...' : 'Generating map..')
-      // Debug: if we're sending FormData, capture and expose its entries
-      try {
-        const body = requestOptions.body
-        if (body && typeof FormData !== 'undefined' && body instanceof FormData) {
-          const entries = []
-          for (const [k, v] of body.entries()) {
-            if (v instanceof File || (typeof Blob !== 'undefined' && v instanceof Blob)) {
-              let info = { key: k, type: 'file', name: v.name || 'blob', size: v.size }
-              // reuse previously read nort text if available
-              if (k === 'nortFile' && window.__lastUploadedNort) {
-                info.snippet = window.__lastUploadedNort.slice(0, 800)
-              } else if (typeof v.text === 'function') {
-                try {
-                  const txt = await v.text()
-                  info.snippet = txt.slice(0, 800)
-                } catch (e) {
-                  info.snippet = '<unreadable>'
-                }
-              }
-              entries.push(info)
-            } else {
-              entries.push({ key: k, type: 'field', value: String(v) })
-            }
-          }
-          try { window.__lastUploadedFormData = entries } catch (e) {}
-          // suppressed verbose FormData debug
-        }
-      } catch (dbg) { console.warn('FormData debug failed', dbg) }
+      // FormData debug removed
 
       // If caller requested `nort-only`, ask server to return merged
       // settings alongside the image as JSON.
@@ -1452,7 +1457,7 @@ function GenerateForm({ uiLanguage = 'en' }) {
         if (outputMode === 'nort-only' && body && typeof FormData !== 'undefined' && body instanceof FormData) {
           body.append('returnSettings', 'true')
         }
-      } catch (e) {}
+      } catch (e) { if (typeof console !== 'undefined' && console.debug) console.debug('runGenerate: failed to append returnSettings to FormData', e) }
 
       let res = await fetch(`${API_BASE}/generate`, requestOptions)
       if (!res.ok) await handleResponseError(res)
@@ -1516,10 +1521,10 @@ function GenerateForm({ uiLanguage = 'en' }) {
         parsedReturned = JSON.parse(nortContent)
         mergedSettingsRef.current = parsedReturned
       } catch (e) {
-        // ignore parse failures
+        if (typeof console !== 'undefined' && typeof console.debug === 'function') console.debug('GenerateForm: failed to parse nortContent from handleRandom response', e)
       }
-      try { appliersRef.current.applyMapSizeAndSeedSettings(mergedSettingsRef.current) } catch (e) {}
-      try { appliersRef.current.applyBackgroundTypeSettings(mergedSettingsRef.current) } catch (e) {}
+      try { appliersRef.current.applyMapSizeAndSeedSettings(mergedSettingsRef.current) } catch (e) { if (typeof console !== 'undefined' && console.debug) console.debug('handleRandomMap: applyMapSizeAndSeedSettings failed', e) }
+      try { appliersRef.current.applyBackgroundTypeSettings(mergedSettingsRef.current) } catch (e) { if (typeof console !== 'undefined' && console.debug) console.debug('handleRandomMap: applyBackgroundTypeSettings failed', e) }
 
       // Now request final image by POSTing the returned .nort as FormData
       toast.show('Generating random map...')
@@ -1614,9 +1619,9 @@ function GenerateForm({ uiLanguage = 'en' }) {
       if (regionBoundaryColorHex) {
         const rbc = regionBoundaryColorHex.replace(/^#/, '')
         if (/^[0-9a-fA-F]{6}$/.test(rbc)) {
-          const rr = parseInt(rbc.substring(0, 2), 16)
-          const rg = parseInt(rbc.substring(2, 4), 16)
-          const rb = parseInt(rbc.substring(4, 6), 16)
+          const rr = Number.parseInt(rbc.substring(0, 2), 16)
+          const rg = Number.parseInt(rbc.substring(2, 4), 16)
+          const rb = Number.parseInt(rbc.substring(4, 6), 16)
           parsedSettings.regionBoundaryColor = `${rr},${rg},${rb},255`
         } else {
           parsedSettings.regionBoundaryColor = regionBoundaryColorHex
@@ -1634,9 +1639,9 @@ function GenerateForm({ uiLanguage = 'en' }) {
         } catch (e) {
           const oh = oceanColorHex.replace(/^#/, '')
           if (/^[0-9a-fA-F]{6}$/.test(oh)) {
-            const or = parseInt(oh.substring(0, 2), 16)
-            const og = parseInt(oh.substring(2, 4), 16)
-            const ob = parseInt(oh.substring(4, 6), 16)
+            const or = Number.parseInt(oh.substring(0, 2), 16)
+            const og = Number.parseInt(oh.substring(2, 4), 16)
+            const ob = Number.parseInt(oh.substring(4, 6), 16)
             parsedSettings.oceanColor = `${or},${og},${ob},255`
           } else {
             parsedSettings.oceanColor = oceanColorHex
@@ -1650,9 +1655,9 @@ function GenerateForm({ uiLanguage = 'en' }) {
         } catch (e) {
           const lh = landColorHex.replace(/^#/, '')
           if (/^[0-9a-fA-F]{6}$/.test(lh)) {
-            const lr = parseInt(lh.substring(0, 2), 16)
-            const lg = parseInt(lh.substring(2, 4), 16)
-            const lb = parseInt(lh.substring(4, 6), 16)
+            const lr = Number.parseInt(lh.substring(0, 2), 16)
+            const lg = Number.parseInt(lh.substring(2, 4), 16)
+            const lb = Number.parseInt(lh.substring(4, 6), 16)
             parsedSettings.landColor = `${lr},${lg},${lb},255`
           } else {
             parsedSettings.landColor = landColorHex
@@ -1667,9 +1672,9 @@ function GenerateForm({ uiLanguage = 'en' }) {
       if (gridOverlayColorHex) {
         const gh = gridOverlayColorHex.replace(/^#/, '')
         if (/^[0-9a-fA-F]{6}$/.test(gh)) {
-          const gr = parseInt(gh.substring(0, 2), 16)
-          const gg = parseInt(gh.substring(2, 4), 16)
-          const gb = parseInt(gh.substring(4, 6), 16)
+          const gr = Number.parseInt(gh.substring(0, 2), 16)
+          const gg = Number.parseInt(gh.substring(2, 4), 16)
+          const gb = Number.parseInt(gh.substring(4, 6), 16)
           // Preserve original alpha from merged settings when the user
           // hasn't changed the color hex (frontend only exposes hex).
           let alpha = 255
@@ -1682,7 +1687,7 @@ function GenerateForm({ uiLanguage = 'en' }) {
                   alpha = Number(ch.a)
                 }
               }
-            } catch (e) {}
+            } catch (e) { if (typeof console !== 'undefined' && console.debug) console.debug('mergeUiIntoParsed: gridOverlay alpha preserve failed', e) }
           parsedSettings.gridOverlayColor = `${gr},${gg},${gb},${alpha}`
         } else {
           parsedSettings.gridOverlayColor = gridOverlayColorHex
@@ -1703,9 +1708,9 @@ function GenerateForm({ uiLanguage = 'en' }) {
       if (borderColorHex) {
         const hex = borderColorHex.replace(/^#/, '')
         if (/^[0-9a-fA-F]{6}$/.test(hex)) {
-          const r = parseInt(hex.substring(0, 2), 16)
-          const g = parseInt(hex.substring(2, 4), 16)
-          const b = parseInt(hex.substring(4, 6), 16)
+          const r = Number.parseInt(hex.substring(0, 2), 16)
+          const g = Number.parseInt(hex.substring(2, 4), 16)
+          const b = Number.parseInt(hex.substring(4, 6), 16)
           parsedSettings.borderColor = `${r},${g},${b},255`
         } else {
           parsedSettings.borderColor = borderColorHex
@@ -1722,9 +1727,9 @@ function GenerateForm({ uiLanguage = 'en' }) {
       if (frayedBorderColorHex) {
         const hex2 = frayedBorderColorHex.replace(/^#/, '')
         if (/^[0-9a-fA-F]{6}$/.test(hex2)) {
-          const r2 = parseInt(hex2.substring(0, 2), 16)
-          const g2 = parseInt(hex2.substring(2, 4), 16)
-          const b2 = parseInt(hex2.substring(4, 6), 16)
+          const r2 = Number.parseInt(hex2.substring(0, 2), 16)
+          const g2 = Number.parseInt(hex2.substring(2, 4), 16)
+          const b2 = Number.parseInt(hex2.substring(4, 6), 16)
           parsedSettings.frayedBorderColor = `${r2},${g2},${b2},255`
         } else {
           parsedSettings.frayedBorderColor = frayedBorderColorHex
@@ -1743,9 +1748,9 @@ function GenerateForm({ uiLanguage = 'en' }) {
       if (coastlineColorHex) {
         const ch = coastlineColorHex.replace(/^#/, '')
         if (/^[0-9a-fA-F]{6}$/.test(ch)) {
-          const cr = parseInt(ch.substring(0, 2), 16)
-          const cg = parseInt(ch.substring(2, 4), 16)
-          const cb = parseInt(ch.substring(4, 6), 16)
+          const cr = Number.parseInt(ch.substring(0, 2), 16)
+          const cg = Number.parseInt(ch.substring(2, 4), 16)
+          const cb = Number.parseInt(ch.substring(4, 6), 16)
           parsedSettings.coastlineColor = `${cr},${cg},${cb},255`
         } else {
           parsedSettings.coastlineColor = coastlineColorHex
@@ -1762,9 +1767,9 @@ function GenerateForm({ uiLanguage = 'en' }) {
         } catch (e) {
           const csh = coastShadingColorHex.replace(/^#/, '')
           if (/^[0-9a-fA-F]{6}$/.test(csh)) {
-            const csr = parseInt(csh.substring(0, 2), 16)
-            const csg = parseInt(csh.substring(2, 4), 16)
-            const csb = parseInt(csh.substring(4, 6), 16)
+            const csr = Number.parseInt(csh.substring(0, 2), 16)
+            const csg = Number.parseInt(csh.substring(2, 4), 16)
+            const csb = Number.parseInt(csh.substring(4, 6), 16)
             parsedSettings.coastShadingColor = `${csr},${csg},${csb},255`
           } else {
             parsedSettings.coastShadingColor = coastShadingColorHex
@@ -1782,9 +1787,9 @@ function GenerateForm({ uiLanguage = 'en' }) {
         } catch (e) {
           const osh = oceanShadingColorHex.replace(/^#/, '')
           if (/^[0-9a-fA-F]{6}$/.test(osh)) {
-            const osr = parseInt(osh.substring(0, 2), 16)
-            const osg = parseInt(osh.substring(2, 4), 16)
-            const osb = parseInt(osh.substring(4, 6), 16)
+            const osr = Number.parseInt(osh.substring(0, 2), 16)
+            const osg = Number.parseInt(osh.substring(2, 4), 16)
+            const osb = Number.parseInt(osh.substring(4, 6), 16)
             parsedSettings.oceanShadingColor = `${osr},${osg},${osb},255`
           } else {
             parsedSettings.oceanShadingColor = oceanShadingColorHex
@@ -1837,9 +1842,9 @@ function GenerateForm({ uiLanguage = 'en' }) {
         } catch (e) {
           const ow = oceanWavesColorHex.replace(/^#/, '')
           if (/^[0-9a-fA-F]{6}$/.test(ow)) {
-            const owr = parseInt(ow.substring(0, 2), 16)
-            const owg = parseInt(ow.substring(2, 4), 16)
-            const owb = parseInt(ow.substring(4, 6), 16)
+            const owr = Number.parseInt(ow.substring(0, 2), 16)
+            const owg = Number.parseInt(ow.substring(2, 4), 16)
+            const owb = Number.parseInt(ow.substring(4, 6), 16)
             parsedSettings.oceanWavesColor = `${owr},${owg},${owb},255`
           } else {
             parsedSettings.oceanWavesColor = oceanWavesColorHex
@@ -1852,9 +1857,9 @@ function GenerateForm({ uiLanguage = 'en' }) {
       if (riverColorHex) {
         const rrh = riverColorHex.replace(/^#/, '')
         if (/^[0-9a-fA-F]{6}$/.test(rrh)) {
-          const rrr = parseInt(rrh.substring(0, 2), 16)
-          const rrg = parseInt(rrh.substring(2, 4), 16)
-          const rrb = parseInt(rrh.substring(4, 6), 16)
+          const rrr = Number.parseInt(rrh.substring(0, 2), 16)
+          const rrg = Number.parseInt(rrh.substring(2, 4), 16)
+          const rrb = Number.parseInt(rrh.substring(4, 6), 16)
           parsedSettings.riverColor = `${rrr},${rrg},${rrb},255`
         } else {
           parsedSettings.riverColor = riverColorHex
@@ -1871,9 +1876,9 @@ function GenerateForm({ uiLanguage = 'en' }) {
       if (roadColorHex) {
         const rh = roadColorHex.replace(/^#/, '')
         if (/^[0-9a-fA-F]{6}$/.test(rh)) {
-          const rr = parseInt(rh.substring(0, 2), 16)
-          const rg = parseInt(rh.substring(2, 4), 16)
-          const rb = parseInt(rh.substring(4, 6), 16)
+          const rr = Number.parseInt(rh.substring(0, 2), 16)
+          const rg = Number.parseInt(rh.substring(2, 4), 16)
+          const rb = Number.parseInt(rh.substring(4, 6), 16)
           parsedSettings.roadColor = `${rr},${rg},${rb},255`
         } else {
           parsedSettings.roadColor = roadColorHex
@@ -1916,9 +1921,9 @@ function GenerateForm({ uiLanguage = 'en' }) {
       if (textColorHex) {
         const th = textColorHex.replace(/^#/, '')
         if (/^[0-9a-fA-F]{6}$/.test(th)) {
-          const tr = parseInt(th.substring(0, 2), 16)
-          const tg = parseInt(th.substring(2, 4), 16)
-          const tb = parseInt(th.substring(4, 6), 16)
+          const tr = Number.parseInt(th.substring(0, 2), 16)
+          const tg = Number.parseInt(th.substring(2, 4), 16)
+          const tb = Number.parseInt(th.substring(4, 6), 16)
           parsedSettings.textColor = `${tr},${tg},${tb},255`
         } else {
           parsedSettings.textColor = textColorHex
@@ -1928,16 +1933,16 @@ function GenerateForm({ uiLanguage = 'en' }) {
       if (boldBackgroundColorHex) {
         const bh = boldBackgroundColorHex.replace(/^#/, '')
         if (/^[0-9a-fA-F]{6}$/.test(bh)) {
-          const br = parseInt(bh.substring(0, 2), 16)
-          const bg = parseInt(bh.substring(2, 4), 16)
-          const bb = parseInt(bh.substring(4, 6), 16)
+          const br = Number.parseInt(bh.substring(0, 2), 16)
+          const bg = Number.parseInt(bh.substring(2, 4), 16)
+          const bb = Number.parseInt(bh.substring(4, 6), 16)
           parsedSettings.boldBackgroundColor = `${br},${bg},${bb},255`
         } else {
           parsedSettings.boldBackgroundColor = boldBackgroundColorHex
         }
       }
-    } catch (e) {
-      // Ignore merge failures; fall back to original parsedSettings
+      } catch (e) {
+      if (typeof console !== 'undefined' && typeof console.debug === 'function') console.debug('GenerateForm: merge of UI values failed', e)
     }
   }
 
@@ -1959,7 +1964,7 @@ function GenerateForm({ uiLanguage = 'en' }) {
 
     // Merge UI overrides into the parsed settings so regenerate sends changed
     // control values to the server.
-    try { mergeUiIntoParsed(parsedSettings) } catch (e) {}
+    try { mergeUiIntoParsed(parsedSettings) } catch (e) { if (typeof console !== 'undefined' && console.debug) console.debug('buildNortContentRequest: mergeUiIntoParsed failed', e) }
 
     // Ensure map size/seed are stored inside the settings JSON so server only
     // needs to read the uploaded nort content to apply customization.
@@ -1976,15 +1981,18 @@ function GenerateForm({ uiLanguage = 'en' }) {
 
     // Expose merged settings for debugging and log key UI->merged mappings.
     try {
-      if (typeof window !== 'undefined') {
-        window.__lastMergedParsedSettings = parsedSettings
+      if (typeof globalThis !== 'undefined') {
+        globalThis.__lastMergedParsedSettings = parsedSettings
         // suppressed merged settings debug
       }
-    } catch (dbg) {}
+    } catch (dbg) { if (typeof console !== 'undefined' && console.debug) console.debug('buildNortContentRequest: set __lastMergedParsedSettings failed', dbg) }
 
     // If UI provides a language override, ensure it's stored in the settings JSON
     if (mapLanguage) parsedSettings.language = mapLanguage
     const settingsText = serializeNortObject(parsedSettings)
+
+    // instrumentation removed
+
     // Send the full .nort content as the JSON body (no wrapper).
     return {
       requestOptions: {
@@ -2098,6 +2106,7 @@ function GenerateForm({ uiLanguage = 'en' }) {
     anchor.click()
     anchor.remove()
   }
+  // instrumentation removed
 
   if (!uiLoaded) {
     return (
@@ -2319,7 +2328,7 @@ function GenerateForm({ uiLanguage = 'en' }) {
           notifyManualChange: () => {
             try {
               if (hasGeneratedOnce) setCustomizationDirty(true)
-            } catch (e) {}
+            } catch (e) { if (typeof console !== 'undefined' && console.debug) console.debug('Notify manual change: setCustomizationDirty failed', e) }
           },
         }}
         options={{
