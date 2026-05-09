@@ -6,39 +6,74 @@ import { seedStringOrEmpty, stringValueOrEmpty, dimensionFromSize } from './help
 // paths under React StrictMode. Inspect via `globalThis.__applierCallCache`.
 const applierCallCache = new Map()
 
-export function createSettingsAppliers(setters, currentValues = {}) {
-  // Helper to call a state setter only when the new value differs from
-  // the current value. `key` is the property name inside `currentValues`.
-    function setIfChanged(setter, key, newValue) {
-      try {
-        const oldValue = currentValues ? currentValues[key] : undefined
-        // Normalize numbers vs strings where reasonable
-        if (typeof newValue === 'number' || (typeof newValue === 'string' && !Number.isNaN(Number(newValue)))) {
-          const nOld = Number(oldValue)
-          const nNew = Number(newValue)
-          if (Number.isFinite(nOld) && Number.isFinite(nNew) && Object.is(nOld, nNew)) return
-        }
-        if (Object.is(oldValue, newValue)) return
-      } catch (e) {
-        if (typeof console !== 'undefined' && console.debug) console.debug('setIfChanged: comparison failed', e)
-        // fall through to attempt setter
-      }
-      // Guard against invalid setter references (e.g., undefined or non-function)
-      if (typeof setter !== 'function') {
-        if (typeof console !== 'undefined' && console.debug) console.debug('createSettingsAppliers: setter is not a function', key, setter)
-        return
-      }
-      try {
-        setter(newValue)
-      } catch (e) {
-        if (typeof console !== 'undefined' && console.debug) console.debug('createSettingsAppliers: primary setter failed', e)
-        try {
-          if (typeof setter === 'function') setter(String(newValue))
-        } catch (e2) {
-          if (typeof console !== 'undefined' && console.debug) console.debug('createSettingsAppliers: fallback setter failed', e2)
-        }
-      }
+function setIfChanged(currentValues, setter, key, newValue) {
+  try {
+    const oldValue = currentValues ? currentValues[key] : undefined
+    // Normalize numbers vs strings where reasonable
+    if (typeof newValue === 'number' || (typeof newValue === 'string' && !Number.isNaN(Number(newValue)))) {
+      const nOld = Number(oldValue)
+      const nNew = Number(newValue)
+      if (Number.isFinite(nOld) && Number.isFinite(nNew) && Object.is(nOld, nNew)) return
     }
+    if (Object.is(oldValue, newValue)) return
+  } catch (e) {
+    if (typeof console !== 'undefined' && console.debug) console.debug('setIfChanged: comparison failed', e)
+    // fall through to attempt setter
+  }
+  // Guard against invalid setter references (e.g., undefined or non-function)
+  if (typeof setter !== 'function') {
+    if (typeof console !== 'undefined' && console.debug) console.debug('createSettingsAppliers: setter is not a function', key, setter)
+    return
+  }
+  try {
+    setter(newValue)
+  } catch (e) {
+    if (typeof console !== 'undefined' && console.debug) console.debug('createSettingsAppliers: primary setter failed', e)
+    try {
+      if (typeof setter === 'function') setter(String(newValue))
+    } catch (e2) {
+      if (typeof console !== 'undefined' && console.debug) console.debug('createSettingsAppliers: fallback setter failed', e2)
+    }
+  }
+}
+
+function inverseGetSliderFromScale(scale) {
+  const sliderValueFor1Scale = 5
+  const scaleMax = 3.0
+  const scaleMin = 0.5
+  const minScaleSliderValue = 1
+  const maxScaleSliderValue = 15
+
+  const s = Number(scale)
+  if (!Number.isFinite(s)) return undefined
+  const v1Slope = (sliderValueFor1Scale - minScaleSliderValue) / (1.0 - scaleMin)
+  const v1YIntercept = sliderValueFor1Scale - v1Slope
+  const v2Slope = (maxScaleSliderValue - sliderValueFor1Scale) / (scaleMax - 1.0)
+  const v2YIntercept = sliderValueFor1Scale - v2Slope * 1.0
+  let v
+  if (s <= 1.0) {
+    v = v1Slope * s + v1YIntercept
+  } else {
+    v = v2Slope * s + v2YIntercept
+  }
+  v = Math.round(v)
+  if (v < minScaleSliderValue) v = minScaleSliderValue
+  if (v > maxScaleSliderValue) v = maxScaleSliderValue
+  return v
+}
+
+function inverseGetTreeHeightSliderFromScale(scale) {
+  const s = Number(scale)
+  if (!Number.isFinite(s)) return undefined
+  // forward: treeScale = 0.1 + v * 0.05 -> inverse: v = (scale - 0.1)/0.05
+  let v = (s - 0.1) / 0.05
+  v = Math.round(v)
+  if (v < 1) v = 1
+  if (v > 15) v = 15
+  return v
+}
+
+export function createSettingsAppliers(setters, currentValues = {}) {
 
   // Per-applier instrumentation: record creation and calls.
   const applierId = `applier-${Date.now()}-${Math.random().toString(36).slice(2,8)}`

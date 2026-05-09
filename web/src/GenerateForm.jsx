@@ -88,6 +88,85 @@ function tryParse(content) {
   }
 }
 
+// Build the customize-panel payload from a values object.
+function buildCustomizePayload(values) {
+  return {
+    backgroundType: values.backgroundType,
+    textureRef: values.textureRef,
+    backgroundSeed: values.backgroundSeed,
+    drawRegionBoundaries: values.drawRegionBoundaries,
+    colorizeLand: values.colorizeLand,
+    colorizeOcean: values.colorizeOcean,
+    oceanColorHex: values.oceanColorHex,
+    landColorHex: values.landColorHex,
+    regionBoundaryStyle: values.regionBoundaryStyle,
+    regionBoundaryWidth: values.regionBoundaryWidth,
+    regionBoundaryColorHex: values.regionBoundaryColorHex,
+    drawBorder: values.drawBorder,
+    drawGridOverlay: values.drawGridOverlay,
+    finalLandColoringMethod: values.finalLandColoringMethod,
+    borderRef: values.borderRef,
+    borderWidth: values.borderWidth,
+    borderPosition: values.borderPosition,
+    borderColorOption: values.borderColorOption,
+    borderColorHex: values.borderColorHex,
+    frayedBorder: values.frayedBorder,
+    frayedBorderBlurLevel: values.frayedBorderBlurLevel,
+    frayedBorderSize: values.frayedBorderSize,
+    frayedBorderSeed: values.frayedBorderSeed,
+    drawGrunge: values.drawGrunge,
+    grungeWidth: values.grungeWidth,
+    frayedBorderColorHex: values.frayedBorderColorHex,
+    lineStyle: values.lineStyle,
+    coastlineWidth: values.coastlineWidth,
+    coastlineColorHex: values.coastlineColorHex,
+    coastShadingLevel: values.coastShadingLevel,
+    coastShadingColorHex: values.coastShadingColorHex,
+    coastShadingAlpha: values.coastShadingAlpha,
+    oceanShadingAlpha: values.oceanShadingAlpha,
+    oceanShadingLevel: values.oceanShadingLevel,
+    oceanShadingColorHex: values.oceanShadingColorHex,
+    oceanWavesType: values.oceanWavesType,
+    oceanWavesLevel: values.oceanWavesLevel,
+    oceanWavesColorHex: values.oceanWavesColorHex,
+    oceanWavesAlpha: values.oceanWavesAlpha,
+    concentricWaveCount: values.concentricWaveCount,
+    fadeConcentricWaves: values.fadeConcentricWaves,
+    jitterToConcentricWaves: values.jitterToConcentricWaves,
+    brokenLinesForConcentricWaves: values.brokenLinesForConcentricWaves,
+    drawOceanEffectsInLakes: values.drawOceanEffectsInLakes,
+    riverColorHex: values.riverColorHex,
+    drawRoads: values.drawRoads,
+    roadStyle: values.roadStyle,
+    roadWidth: values.roadWidth,
+    roadColorHex: values.roadColorHex,
+    mountainSize: values.mountainSize,
+    hillSize: values.hillSize,
+    duneSize: values.duneSize,
+    treeHeight: values.treeHeight,
+    citySize: values.citySize,
+    drawText: values.drawText,
+    titleFontFamily: values.titleFontFamily,
+    regionFontFamily: values.regionFontFamily,
+    mountainRangeFontFamily: values.mountainRangeFontFamily,
+    otherMountainsFontFamily: values.otherMountainsFontFamily,
+    citiesFontFamily: values.citiesFontFamily,
+    riverFontFamily: values.riverFontFamily,
+    textColorHex: values.textColorHex,
+    drawBoldBackground: values.drawBoldBackground,
+    boldBackgroundColorHex: values.boldBackgroundColorHex,
+  }
+}
+
+function persistCustomizeOverrides(values) {
+  try {
+    const payload = buildCustomizePayload(values)
+    localStorage.setItem(CUSTOMIZE_OVERRIDES_STORAGE_KEY, JSON.stringify(payload))
+  } catch (e) {
+    if (typeof console !== 'undefined' && typeof console.debug === 'function') console.debug('GenerateForm: localStorage persist failed', e)
+  }
+}
+
 async function loadUiOptions(lang) {
   const key = String(lang || 'default')
   if (uiOptionsCache.has(key)) return uiOptionsCache.get(key)
@@ -593,77 +672,72 @@ function GenerateForm({ uiLanguage = 'en' }) {
 
   // Persist Customize panel values so they are restored on next load
   useEffect(() => {
-    try {
-      const payload = {
-        backgroundType,
-        textureRef,
-        backgroundSeed,
-        drawRegionBoundaries,
-        colorizeLand,
-        colorizeOcean,
-        oceanColorHex,
-        landColorHex,
-        regionBoundaryStyle,
-        regionBoundaryWidth,
-        regionBoundaryColorHex,
-        drawBorder,
-        drawGridOverlay,
-        finalLandColoringMethod,
-        borderRef,
-        borderWidth,
-        borderPosition,
-        borderColorOption,
-        borderColorHex,
-        frayedBorder,
-        frayedBorderBlurLevel,
-        frayedBorderSize,
-        frayedBorderSeed,
-        drawGrunge,
-        grungeWidth,
-        frayedBorderColorHex,
-        lineStyle,
-        coastlineWidth,
-        coastlineColorHex,
-        coastShadingLevel,
-        coastShadingColorHex,
-        coastShadingAlpha,
-        oceanShadingAlpha,
-        oceanShadingLevel,
-        oceanShadingColorHex,
-        oceanWavesType,
-        oceanWavesLevel,
-        oceanWavesColorHex,
-        oceanWavesAlpha,
-        concentricWaveCount,
-        fadeConcentricWaves,
-        jitterToConcentricWaves,
-        brokenLinesForConcentricWaves,
-        drawOceanEffectsInLakes,
-        riverColorHex,
-        drawRoads,
-        roadStyle,
-        roadWidth,
-        roadColorHex,
-        mountainSize,
-        hillSize,
-        duneSize,
-        treeHeight,
-        citySize,
-        drawText,
-        titleFontFamily,
-        regionFontFamily,
-        mountainRangeFontFamily,
-        otherMountainsFontFamily,
-        citiesFontFamily,
-        riverFontFamily,
-        textColorHex,
-        drawBoldBackground,
-        boldBackgroundColorHex,
-      }
-      localStorage.setItem(CUSTOMIZE_OVERRIDES_STORAGE_KEY, JSON.stringify(payload))
-    } catch (e) {
-      if (typeof console !== 'undefined' && typeof console.debug === 'function') console.debug('GenerateForm: localStorage persist failed', e)
-    }
+    persistCustomizeOverrides({
+      backgroundType,
+      textureRef,
+      backgroundSeed,
+      drawRegionBoundaries,
+      colorizeLand,
+      colorizeOcean,
+      oceanColorHex,
+      landColorHex,
+      regionBoundaryStyle,
+      regionBoundaryWidth,
+      regionBoundaryColorHex,
+      drawBorder,
+      drawGridOverlay,
+      finalLandColoringMethod,
+      borderRef,
+      borderWidth,
+      borderPosition,
+      borderColorOption,
+      borderColorHex,
+      frayedBorder,
+      frayedBorderBlurLevel,
+      frayedBorderSize,
+      frayedBorderSeed,
+      drawGrunge,
+      grungeWidth,
+      frayedBorderColorHex,
+      lineStyle,
+      coastlineWidth,
+      coastlineColorHex,
+      coastShadingLevel,
+      coastShadingColorHex,
+      coastShadingAlpha,
+      oceanShadingAlpha,
+      oceanShadingLevel,
+      oceanShadingColorHex,
+      oceanWavesType,
+      oceanWavesLevel,
+      oceanWavesColorHex,
+      oceanWavesAlpha,
+      concentricWaveCount,
+      fadeConcentricWaves,
+      jitterToConcentricWaves,
+      brokenLinesForConcentricWaves,
+      drawOceanEffectsInLakes,
+      riverColorHex,
+      drawRoads,
+      roadStyle,
+      roadWidth,
+      roadColorHex,
+      mountainSize,
+      hillSize,
+      duneSize,
+      treeHeight,
+      citySize,
+      drawText,
+      titleFontFamily,
+      regionFontFamily,
+      mountainRangeFontFamily,
+      otherMountainsFontFamily,
+      citiesFontFamily,
+      riverFontFamily,
+      textColorHex,
+      drawBoldBackground,
+      boldBackgroundColorHex,
+    })
   }, [
     backgroundType,
     textureRef,
@@ -889,23 +963,22 @@ function GenerateForm({ uiLanguage = 'en' }) {
     },
     [updateRandomOverride]
   )
+  async function refreshUiForSeed(value) {
+    try {
+      const uiOpts = await loadUiOptions(requestLanguage)
+      if (!uiOpts) return
+      setArtPacks(uiOpts.artPacks || [])
+      setAllBooks(uiOpts.books || [])
+      setTextures(uiOpts.textures || [])
+      setBorderTypes(uiOpts.borderTypes || [])
+    } catch (e) {
+      if (typeof console !== 'undefined' && typeof console.debug === 'function') console.debug('GenerateForm: refreshUiForSeed failed', e)
+    }
+  }
 
   const handleRegionCountChange = useCallback(
     (value) => {
-      setRegionCount(value)
-      updateRandomOverride('regionCount', value)
-    },
-    [updateRandomOverride]
-  )
-
-  const handleCityFrequencyChange = useCallback(
-    (value) => {
-      setCityFrequency(value)
-      updateRandomOverride('cityFrequency', value)
-    },
-    [updateRandomOverride]
-  )
-
+      refreshUiForSeed(value)
   const handleSelectedBooksChange = useCallback(
     (booksSet) => {
       setSelectedBooks(booksSet)

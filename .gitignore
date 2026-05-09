@@ -57,3 +57,4 @@ web/public/apple-touch-icon.png
 web/public/*.png
 web/public/*.ico
 dist/
+.scannerwork
