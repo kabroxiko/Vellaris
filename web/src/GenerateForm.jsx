@@ -41,7 +41,7 @@ function serializeNortObject(obj) {
 function deriveNortFilenameFromContent(nortContent) {
   try {
     let parsed = null
-    if (typeof nortContent === 'string') parsed = JSON.parse(nortContent)
+    if (typeof nortContent === 'string') parsed = tryParse(nortContent)
     else parsed = nortContent
     if (!parsed || !parsed.edits) return null
     const textList = Array.isArray(parsed.edits.textEdits)
@@ -102,7 +102,7 @@ function loadRandomOverrides() {
   try {
     const raw = localStorage.getItem(RANDOM_OVERRIDES_STORAGE_KEY)
     if (!raw) return {}
-    const parsed = JSON.parse(raw)
+    const parsed = tryParse(raw)
     return parsed && typeof parsed === 'object' ? parsed : {}
   } catch (e) {
     if (typeof console !== 'undefined' && console.debug) console.debug('loadRandomOverrides: failed to parse overrides', e)
@@ -114,7 +114,7 @@ function loadCustomizeOverrides() {
   try {
     const raw = localStorage.getItem(CUSTOMIZE_OVERRIDES_STORAGE_KEY)
     if (!raw) return {}
-    const parsed = JSON.parse(raw)
+    const parsed = tryParse(raw)
     return parsed && typeof parsed === 'object' ? parsed : {}
   } catch (e) {
     if (typeof console !== 'undefined' && console.debug) console.debug('loadCustomizeOverrides: failed to parse overrides', e)
@@ -1243,7 +1243,8 @@ function GenerateForm({ uiLanguage = 'en' }) {
       // ad-hoc, case-by-case merges here — the canonical merged settings
       // are stored in `mergedSettingsRef` and UI helper values (hex/alpha)
       // are derived from canonical numeric colors where appropriate.
-      let settings = JSON.parse(currentSource.nortContent)
+      let settings = tryParse(currentSource.nortContent)
+      if (!settings) throw new Error('Current source nortContent is not valid JSON.')
       // mark origin so appliers can log which source triggered them
       try { settings.__applierSource = 'currentSource' } catch (e) { if (typeof console !== 'undefined' && console.debug) console.debug('GenerateForm: set __applierSource failed', e) }
       // Always apply map size and seed settings so the Random panel
@@ -1298,11 +1299,12 @@ function GenerateForm({ uiLanguage = 'en' }) {
           // Immediately render the loaded settings so users can start customizing from preview.
           let parsedSettings = null
           try {
-            parsedSettings = JSON.parse(text)
+            parsedSettings = tryParse(text)
+            if (!parsedSettings) throw new Error('Loaded settings file is not valid JSON.')
           } catch {
             throw new Error('Loaded settings file is not valid JSON.')
           }
-              try { mergedSettingsRef.current = JSON.parse(text) } catch (e) { mergedSettingsRef.current = parsedSettings }
+              try { mergedSettingsRef.current = tryParse(text) || parsedSettings } catch (e) { mergedSettingsRef.current = parsedSettings }
               // Upload the original file text to avoid re-serializing and
               // changing numeric types (integers -> floats). Use the raw
               // uploaded content so the server receives exactly what the
@@ -1368,7 +1370,8 @@ function GenerateForm({ uiLanguage = 'en' }) {
         originType: source?.type,
       })
       try {
-        mergedSettingsRef.current = JSON.parse(nortContent)
+        const parsed = tryParse(nortContent)
+        if (parsed) mergedSettingsRef.current = parsed
       } catch (e) {
         if (typeof console !== 'undefined' && typeof console.debug === 'function') console.debug('GenerateForm: failed to parse nortContent from server', e)
       }
@@ -1410,7 +1413,9 @@ function GenerateForm({ uiLanguage = 'en' }) {
       handleSuccess(new Blob([bytes], { type: contentType || 'image/png' }), baseName, source)
       return
     }
-    const data = JSON.parse(new TextDecoder('utf-8').decode(bytes))
+    const decoded = new TextDecoder('utf-8').decode(bytes)
+    const data = tryParse(decoded)
+    if (!data || typeof data !== 'object') throw new Error('Invalid JSON response from server')
     if (outputMode !== 'nort-only') {
       const imageBase64 = data.imageBase64
       // Build nortContent by serializing the returned settings object without imageBase64
@@ -1425,7 +1430,8 @@ function GenerateForm({ uiLanguage = 'en' }) {
     delete copy.imageBase64
     const nortContent = serializeNortObject(copy)
     try {
-      mergedSettingsRef.current = JSON.parse(nortContent)
+      const parsed = tryParse(nortContent)
+      if (parsed) mergedSettingsRef.current = parsed
     } catch (e) {
       // ignore parse failures
     }
@@ -1518,8 +1524,8 @@ function GenerateForm({ uiLanguage = 'en' }) {
       // Apply returned settings to UI so controls reflect generated values
       let parsedReturned = null
       try {
-        parsedReturned = JSON.parse(nortContent)
-        mergedSettingsRef.current = parsedReturned
+        parsedReturned = tryParse(nortContent)
+        if (parsedReturned) mergedSettingsRef.current = parsedReturned
       } catch (e) {
         if (typeof console !== 'undefined' && typeof console.debug === 'function') console.debug('GenerateForm: failed to parse nortContent from handleRandom response', e)
       }
@@ -1541,7 +1547,7 @@ function GenerateForm({ uiLanguage = 'en' }) {
         parsedReturned.cityIconSetName = cityIconType
       }
       // Send the returned .nort JSON as the raw request body (no wrapper).
-      const bodyPayload = parsedReturned || JSON.parse(nortContent)
+      const bodyPayload = parsedReturned || tryParse(nortContent)
       await runGenerate({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(bodyPayload) }, 'random-map', { type: 'random', name: 'Random Map', nortContent }, 'preview', toast)
     } catch (err) {
       setError(err.message)
@@ -1950,14 +1956,19 @@ function GenerateForm({ uiLanguage = 'en' }) {
     let parsedSettings = null
     try {
       if (explicitNortContent) {
-        parsedSettings = JSON.parse(explicitNortContent)
+        parsedSettings = tryParse(explicitNortContent)
       } else if (mergedSettingsRef && mergedSettingsRef.current) {
         // clone the in-memory canonical settings so we can safely mutate
-        parsedSettings = JSON.parse(JSON.stringify(mergedSettingsRef.current))
+        try {
+          parsedSettings = tryParse(JSON.stringify(mergedSettingsRef.current))
+        } catch (e) {
+          parsedSettings = mergedSettingsRef.current
+        }
       } else {
         const sourceContent = currentSource?.nortContent
-        parsedSettings = JSON.parse(sourceContent)
+        parsedSettings = tryParse(sourceContent)
       }
+      if (!parsedSettings) throw new Error('Current settings are not valid JSON.')
     } catch (e) {
       throw new Error('Current settings are not valid JSON.')
     }      
@@ -2035,7 +2046,7 @@ function GenerateForm({ uiLanguage = 'en' }) {
       let serialized
       if (typeof body === 'string') {
         // Body is a raw .nort JSON (no wrapper).
-        const parsed = JSON.parse(body)
+        const parsed = tryParse(body)
         if (!parsed) throw new Error('Merged settings not available for download.')
         serialized = serializeNortObject(parsed)
       } else if (typeof body === 'object') {
