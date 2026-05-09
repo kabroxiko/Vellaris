@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import GenerateForm from './GenerateForm'
+import GenerateForm from './generate/GenerateForm'
 import Modal from './Modal'
 import ToastContainer from './Toast'
 
