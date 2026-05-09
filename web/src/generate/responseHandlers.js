@@ -4,7 +4,13 @@ import { base64ToBlob } from './utils'
 // Moved to module scope to reduce nested function complexity (Sonar S7721).
 function tryParse(content) {
   try {
-    return typeof content === 'string' ? JSON.parse(content) : content
+    if (typeof content === 'string') {
+      const t = content.trim()
+      if (!t) return null
+      if (!(t.startsWith('{') || t.startsWith('['))) return null
+      return JSON.parse(t)
+    }
+    return content
   } catch (e) {
     if (typeof console !== 'undefined' && typeof console.debug === 'function') console.debug('tryParse: JSON parse failed', e)
     return null

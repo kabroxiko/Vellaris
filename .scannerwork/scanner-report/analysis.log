@@ -1,12 +1,13 @@
 Plugins:
+  - Dependency-Check 6.0.0 (dependencycheck)
 Bundled analyzers:
-  - Clean as You Code 2.6.0.3665 (cayc)
   - IaC Code Quality and Security 2.8.0.19776 (iac)
   - Text Code Quality and Security 2.42.0.10784 (text)
+  - Clean as You Code 2.6.0.3665 (cayc)
 Global server settings:
   - sonar.azureresourcemanager.file.suffixes=.bicep
   - sonar.core.id=86E1FA4D-AZ4J0MnAHHOtBF0KrYwa
-  - sonar.core.startTime=2026-05-08T19:21:52-0400
+  - sonar.core.startTime=2026-05-08T22:43:31-0400
   - sonar.cs.file.suffixes=.cs,.razor
   - sonar.css.file.suffixes=.css,.less,.scss,.sass
   - sonar.docker.file.patterns=*.dockerfile,Dockerfile,dockerfile
@@ -26,6 +27,7 @@ Global server settings:
   - sonar.kotlin.file.suffixes=.kt,.kts
   - sonar.multi-quality-mode.enabled=true
   - sonar.php.file.suffixes=php,php3,php4,php5,phtml,inc
+  - sonar.plugins.risk.consent=ACCEPTED
   - sonar.python.file.suffixes=py
   - sonar.qualityProfiles.allowDisableInheritedRules=true
   - sonar.ruby.file.suffixes=.rb
@@ -74,11 +76,10 @@ Project scanner properties:
   - sonar.scanner.app=ScannerCLI
   - sonar.scanner.appVersion=8.1.0.6389
   - sonar.scanner.arch=x86_64
-  - sonar.scanner.bootstrapStartTime=1778290828038
-  - sonar.scanner.home=/usr/local/Cellar/sonar-scanner/8.1.0.6389/libexec
+  - sonar.scanner.bootstrapStartTime=1778294688180
   - sonar.scanner.os=macos
   - sonar.scanner.truststorePassword=******
-  - sonar.scanner.truststorePath=/usr/local/Cellar/openjdk/25.0.2/libexec/openjdk.jdk/Contents/Home/lib/security/cacerts
+  - sonar.scanner.truststorePath=/Library/Java/JavaVirtualMachines/temurin-21.jdk/Contents/Home/lib/security/cacerts
   - sonar.scanner.wasEngineCacheHit=true
   - sonar.scanner.wasJreCacheHit=HIT
   - sonar.sources=web/src

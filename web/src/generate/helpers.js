@@ -29,7 +29,14 @@ export function fetchJson(url) {
 // Safe JSON parse helper to avoid throwing on malformed input.
 function tryParseJson(s) {
   try {
-    return typeof s === 'string' ? JSON.parse(s) : s
+    if (typeof s === 'string') {
+      const t = s.trim()
+      if (!t) return null
+      // Basic sanity check: must start with object or array token.
+      if (!(t.startsWith('{') || t.startsWith('['))) return null
+      return JSON.parse(t)
+    }
+    return s
   } catch (e) {
     if (typeof console !== 'undefined' && typeof console.debug === 'function') console.debug('tryParseJson failed', e)
     return null
