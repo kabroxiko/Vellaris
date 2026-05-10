@@ -59,10 +59,9 @@ export function downloadNortContent(nortContent, baseName) {
     if (!baseName) {
       const title = findTitle(parsed)
       if (title) filenameBase = title
-      else {
+        else {
         // treat as parse-failure for filename derivation so we fall back
         pretty = null
-        if (typeof console !== 'undefined' && typeof console.debug === 'function') console.debug('downloadNortContent: cannot derive title from edits')
       }
     }
   }
@@ -113,11 +112,7 @@ export function handleSuccess(blob, options) {
     // when the source is a random-origin source to avoid disabling
     // the Customize panel after a generate completes.
     setCurrentSource((prev) => {
-      try {
-        if (source?.originType === 'random' && prev && prev.nortContent) return prev
-      } catch (e) {
-        if (typeof console !== 'undefined' && console.debug) console.debug('handleSuccess: preserve current source check failed', e)
-      }
+      if (source?.originType === 'random' && prev?.nortContent) return prev
       return source
     })
   }
@@ -136,9 +131,9 @@ function requireJson() {
 
 async function showFailureToast(err) {
   try {
-    globalThis.showToast?.(err.message || 'Generate response processing failed', { type: 'error', duration: 5000 })
+    globalThis.showToast?.(err?.message || 'Generate response processing failed', { type: 'error', duration: 5000 })
   } catch (error_) {
-    if (typeof console !== 'undefined' && console.debug) console.debug('processGenerateResponse: showToast failed', error_)
+    console.error('showToast failed', error_)
   }
 }
 
@@ -163,13 +158,13 @@ export async function processGenerateResponse(bytes, contentType, options) {
     if (!data.nortContent || typeof data.nortContent !== 'string') throw new Error('Server did not return settings content for download.')
     try {
       downloadNortContent(data.nortContent, baseName)
-    } catch (e) {
+    } catch (err) {
       try {
-        globalThis.showToast?.(e.message || 'Failed to download settings', { type: 'error', duration: 5000 })
-      } catch (err) {
-        if (typeof console !== 'undefined' && console.debug) console.debug('processGenerateResponse: showToast failed', err)
+        globalThis.showToast?.(err?.message || 'Failed to download settings', { type: 'error', duration: 5000 })
+      } catch (showErr) {
+        console.error('showToast failed', showErr)
       }
-      throw e
+      throw err
     }
     setCurrentSource({
       type: 'nort-content',

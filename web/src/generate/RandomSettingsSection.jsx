@@ -1,6 +1,5 @@
 import React from 'react'
 import PropTypes from 'prop-types'
-import { DIMENSIONS } from './constants'
 import FileUploadButton from './FileUploadButton'
 
 const MAP_LANGUAGE_OPTIONS = [
@@ -47,21 +46,19 @@ export default function RandomSettingsSection({ values, handlers, options, ui })
   const { artPacks, cityIconTypes, allBooks, i18n } = options
   const { loading } = ui
 
-  const labels = i18n?.labels || {}
-  const backendOptions = i18n?.options || {}
+  const labels = i18n?.labels
+  const backendOptions = i18n?.options
   const translateLabel = (key) => {
-    const v = labels[key] || key
+    const v = labels?.[key] || key
     if (typeof v === 'string' && /<br\s*\/?\>/i.test(v)) {
       const parts = v.split(/<br\s*\/?\>/i)
       return parts.flatMap((p, i) => (i === parts.length - 1 ? [p] : [p, React.createElement('br', { key: i })]))
     }
     return v
   }
-  const dimensions = backendOptions.dimensions
-    ? backendOptions.dimensions
-    : DIMENSIONS
-  const landShapes = backendOptions.landShapes || []
-  const landColoringMethods = backendOptions.landColoringMethods || []
+  const dimensions = backendOptions?.dimensions
+  const landShapes = backendOptions?.landShapes
+  const landColoringMethods = backendOptions?.landColoringMethods
 
   return (
     <section className="generator-section">
@@ -89,12 +86,10 @@ export default function RandomSettingsSection({ values, handlers, options, ui })
 
             <fieldset className="books-widget">
               <legend>{translateLabel('textTool.booksForText.label')}</legend>
-              {allBooks.length === 0 ? (
-                <div className="disabled-note">{translateLabel('textTool.booksForText.none')}</div>
-              ) : (
+              {Array.isArray(allBooks) && allBooks.length > 0 ? (
                 <>
                   <div className="books-actions">
-                    <button type="button" onClick={() => setSelectedBooks(new Set(allBooks))}>
+                    <button type="button" onClick={() => setSelectedBooks(new Set(Array.isArray(allBooks) ? allBooks : []))}>
                       {translateLabel('books.checkAll')}
                     </button>
                     <button type="button" onClick={() => setSelectedBooks(new Set())}>
@@ -102,7 +97,7 @@ export default function RandomSettingsSection({ values, handlers, options, ui })
                     </button>
                   </div>
                   <div className="books-list">
-                    {allBooks.map((book) => (
+                    {Array.isArray(allBooks) ? allBooks.map((book) => (
                       <label key={book} className="book-item">
                         <input
                           type="checkbox"
@@ -116,9 +111,11 @@ export default function RandomSettingsSection({ values, handlers, options, ui })
                         />
                         <span className="book-title">{book}</span>
                       </label>
-                    ))}
+                    )) : null}
                   </div>
                 </>
+              ) : (
+                <div className="disabled-note">{translateLabel('textTool.booksForText.none')}</div>
               )}
             </fieldset>
           </div>
@@ -130,11 +127,11 @@ export default function RandomSettingsSection({ values, handlers, options, ui })
               value={dimension}
               onChange={(e) => setDimension(e.target.value)}
             >
-              {dimensions.map((item) => (
+              {Array.isArray(dimensions) ? dimensions.map((item) => (
                 <option key={item.value} value={item.value}>
                   {item.label}
                 </option>
-              ))}
+                )) : null}
             </select>
 
             <label htmlFor="world-size-input">
@@ -159,11 +156,11 @@ export default function RandomSettingsSection({ values, handlers, options, ui })
               value={landShape}
               onChange={(e) => setLandShape(e.target.value)}
             >
-              {landShapes.map((item) => (
+              {Array.isArray(landShapes) ? landShapes.map((item) => (
                 <option key={item.value} value={item.value}>
                   {item.label}
                 </option>
-              ))}
+                )) : null}
             </select>
 
             <label htmlFor="region-count-input">
@@ -190,14 +187,14 @@ export default function RandomSettingsSection({ values, handlers, options, ui })
               value={landColoringMethod}
               onChange={(e) => setLandColoringMethod(e.target.value)}
             >
-              {landColoringMethods.map((item) => (
-                <option key={item.value} value={item.value}>
-                  {item.label}
-                </option>
-              ))}
+              {Array.isArray(landColoringMethods) ? landColoringMethods.map((item) => (
+                  <option key={item.value} value={item.value}>
+                    {item.label}
+                  </option>
+                )) : null}
             </select>
 
-            <label htmlFor="art-pack-input" className={artPacks.length === 0 ? 'is-disabled' : ''}>{translateLabel('newSettingsDialog.artPack.label')}</label>
+            <label htmlFor="art-pack-input" className={Array.isArray(artPacks) && artPacks.length === 0 ? 'is-disabled' : ''}>{translateLabel('newSettingsDialog.artPack.label')}</label>
             <select
               id="art-pack-input"
               value={artPack}
@@ -276,19 +273,19 @@ export default function RandomSettingsSection({ values, handlers, options, ui })
 
 RandomSettingsSection.propTypes = {
   values: PropTypes.shape({
-    dimension: PropTypes.string.isRequired,
-    worldSize: PropTypes.number.isRequired,
-    landShape: PropTypes.string.isRequired,
-    regionCount: PropTypes.number.isRequired,
-    landColoringMethod: PropTypes.string.isRequired,
-    artPack: PropTypes.string.isRequired,
-    cityIconType: PropTypes.string.isRequired,
-    cityFrequency: PropTypes.number.isRequired,
-    selectedBooks: PropTypes.instanceOf(Set).isRequired,
-    randomSeed: PropTypes.string.isRequired,
-    mapLanguage: PropTypes.string.isRequired,
-    fileName: PropTypes.string.isRequired,
-  }).isRequired,
+    dimension: PropTypes.string,
+    worldSize: PropTypes.number,
+    landShape: PropTypes.string,
+    regionCount: PropTypes.number,
+    landColoringMethod: PropTypes.string,
+    artPack: PropTypes.string,
+    cityIconType: PropTypes.string,
+    cityFrequency: PropTypes.number,
+    selectedBooks: PropTypes.instanceOf(Set),
+    randomSeed: PropTypes.string,
+    mapLanguage: PropTypes.string,
+    fileName: PropTypes.string,
+  }),
   handlers: PropTypes.shape({
     setDimension: PropTypes.func.isRequired,
     setWorldSize: PropTypes.func.isRequired,
@@ -306,11 +303,11 @@ RandomSettingsSection.propTypes = {
     onDrop: PropTypes.func.isRequired,
   }).isRequired,
   options: PropTypes.shape({
-    artPacks: PropTypes.arrayOf(PropTypes.string).isRequired,
-    cityIconTypes: PropTypes.arrayOf(PropTypes.string).isRequired,
-    allBooks: PropTypes.arrayOf(PropTypes.string).isRequired,
+    artPacks: PropTypes.arrayOf(PropTypes.string),
+    cityIconTypes: PropTypes.arrayOf(PropTypes.string),
+    allBooks: PropTypes.arrayOf(PropTypes.string),
     i18n: PropTypes.object,
-  }).isRequired,
+  }),
   ui: PropTypes.shape({
     loading: PropTypes.bool.isRequired,
     dropRef: PropTypes.shape({ current: PropTypes.any }),

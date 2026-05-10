@@ -2,7 +2,7 @@ import React from 'react'
 import PropTypes from 'prop-types'
 
 export default function FontsTab(props) {
-  if (!props) return <div />
+  if (props == null) return <div />
   const { translateLabel, renderColorControl } = props
 
   const {

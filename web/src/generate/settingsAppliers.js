@@ -6,52 +6,24 @@ import { seedStringOrEmpty, stringValueOrEmpty, dimensionFromSize } from './help
 // paths under React StrictMode. Inspect via `globalThis.__applierCallCache`.
 const applierCallCache = new Map()
 
-function setIfChanged(currentValues, setter, key, newValue) {
-  try {
-    const oldValue = currentValues ? currentValues[key] : undefined
-    // Normalize numbers vs strings where reasonable
-    if (typeof newValue === 'number' || (typeof newValue === 'string' && !Number.isNaN(Number(newValue)))) {
-      const nOld = Number(oldValue)
-      const nNew = Number(newValue)
-      if (Number.isFinite(nOld) && Number.isFinite(nNew) && Object.is(nOld, nNew)) return
-    }
-    if (Object.is(oldValue, newValue)) return
-  } catch (e) {
-    if (typeof console !== 'undefined' && console.debug) console.debug('setIfChanged: comparison failed', e)
-    // fall through to attempt setter
-  }
-  // Guard against invalid setter references (e.g., undefined or non-function)
-  if (typeof setter !== 'function') {
-    if (typeof console !== 'undefined' && console.debug) console.debug('createSettingsAppliers: setter is not a function', key, setter)
-    return
-  }
-  try {
-    setter(newValue)
-  } catch (e) {
-    if (typeof console !== 'undefined' && console.debug) console.debug('createSettingsAppliers: primary setter failed', e)
-    try {
-      if (typeof setter === 'function') setter(String(newValue))
-    } catch (e2) {
-      if (typeof console !== 'undefined' && console.debug) console.debug('createSettingsAppliers: fallback setter failed', e2)
-    }
-  }
-}
+// NOTE: `setIfChanged` is defined inside `createSettingsAppliers` so it
+// can access the `currentValues` parameter for idempotent comparisons.
 
 function inverseGetSliderFromScale(scale) {
   const sliderValueFor1Scale = 5
-  const scaleMax = 3.0
+  const scaleMax = 3
   const scaleMin = 0.5
   const minScaleSliderValue = 1
   const maxScaleSliderValue = 15
 
   const s = Number(scale)
   if (!Number.isFinite(s)) return undefined
-  const v1Slope = (sliderValueFor1Scale - minScaleSliderValue) / (1.0 - scaleMin)
+  const v1Slope = (sliderValueFor1Scale - minScaleSliderValue) / (1 - scaleMin)
   const v1YIntercept = sliderValueFor1Scale - v1Slope
-  const v2Slope = (maxScaleSliderValue - sliderValueFor1Scale) / (scaleMax - 1.0)
-  const v2YIntercept = sliderValueFor1Scale - v2Slope * 1.0
+  const v2Slope = (maxScaleSliderValue - sliderValueFor1Scale) / (scaleMax - 1)
+  const v2YIntercept = sliderValueFor1Scale - v2Slope * 1
   let v
-  if (s <= 1.0) {
+  if (s <= 1) {
     v = v1Slope * s + v1YIntercept
   } else {
     v = v2Slope * s + v2YIntercept
@@ -81,7 +53,9 @@ export function createSettingsAppliers(setters, currentValues = {}) {
     try {
       applierCallCache.set(applierId, { createdAt: Date.now(), createdStack, calls: [] })
       if (typeof globalThis !== 'undefined') globalThis.__applierCallCache = applierCallCache
-    } catch (e) { if (typeof console !== 'undefined' && console.debug) console.debug('createSettingsAppliers: applierCallCache assignment failed', e) }
+    } catch (e) {
+      console.error('applierCallCache assignment failed', e)
+    }
 
     function recordCall(name) {
       try {
@@ -89,7 +63,46 @@ export function createSettingsAppliers(setters, currentValues = {}) {
         const entry = { name, ts: Date.now(), stack: (new Error()).stack }
         info.calls.push(entry)
         applierCallCache.set(applierId, info)
-      } catch (e) { console.debug('createSettingsAppliers: recordCall failed', e) }
+      } catch (e) {
+        console.error('recordCall failed', e)
+      }
+    }
+
+    function setIfChanged(setter, key, newValue) {
+      try {
+        const oldValue = currentValues ? currentValues[key] : undefined
+        // Normalize numbers vs strings where reasonable
+        if (typeof newValue === 'number' || (typeof newValue === 'string' && !Number.isNaN(Number(newValue)))) {
+          const nOld = Number(oldValue)
+          const nNew = Number(newValue)
+          if (Number.isFinite(nOld) && Number.isFinite(nNew) && Object.is(nOld, nNew)) return
+        }
+        if (Object.is(oldValue, newValue)) return
+      } catch (e) {
+        console.error('setIfChanged: comparison failed', e)
+        // fall through to attempt setter
+      }
+      // Guard against invalid setter references (e.g., undefined or non-function)
+      if (typeof setter !== 'function') {
+        // setter is not a function (debug suppressed)
+        return
+      }
+      // Instrument setter invocation
+      try {
+        recordCall(`set:${key}`)
+        setter(newValue)
+        recordCall(`set:${key}:done`)
+      } catch (e) {
+        console.error(`setter failed for ${key}`, e)
+        // attempt a string fallback if possible
+        try {
+          recordCall(`set:${key}:string-fallback`)
+          if (typeof setter === 'function') setter(String(newValue))
+          recordCall(`set:${key}:string-fallback-done`)
+        } catch (e2) {
+          console.error(`setter string fallback failed for ${key}`, e2)
+        }
+      }
     }
 
   return {
@@ -438,42 +451,8 @@ export function createSettingsAppliers(setters, currentValues = {}) {
       const roadHex = colorToHex(settings.roadColor)
       if (roadHex) setIfChanged(setRoadColorHex, 'roadColorHex', roadHex)
 
-      // Convert MapSettings scales back into slider values used by the UI.
-      const sliderValueFor1Scale = 5
-      const scaleMax = 3.0
-      const scaleMin = 0.5
-      const minScaleSliderValue = 1
-      const maxScaleSliderValue = 15
-
-      function inverseGetSliderFromScale(scale) {
-        const s = Number(scale)
-        if (!Number.isFinite(s)) return undefined
-        const v1Slope = (sliderValueFor1Scale - minScaleSliderValue) / (1.0 - scaleMin)
-        const v1YIntercept = sliderValueFor1Scale - v1Slope
-        const v2Slope = (maxScaleSliderValue - sliderValueFor1Scale) / (scaleMax - 1.0)
-        const v2YIntercept = sliderValueFor1Scale - v2Slope * 1.0
-        let v
-        if (s <= 1.0) {
-          v = v1Slope * s + v1YIntercept
-        } else {
-          v = v2Slope * s + v2YIntercept
-        }
-        v = Math.round(v)
-        if (v < minScaleSliderValue) v = minScaleSliderValue
-        if (v > maxScaleSliderValue) v = maxScaleSliderValue
-        return v
-      }
-
-      function inverseGetTreeHeightSliderFromScale(scale) {
-        const s = Number(scale)
-        if (!Number.isFinite(s)) return undefined
-        // forward: treeScale = 0.1 + v * 0.05 -> inverse: v = (scale - 0.1)/0.05
-        let v = (s - 0.1) / 0.05
-        v = Math.round(v)
-        if (v < 1) v = 1
-        if (v > 15) v = 15
-        return v
-      }
+      // Reuse the module-level helper implementations for conversion
+      // from scale to slider values (avoid duplicate implementations).
 
       const ms = settings.mountainScale ?? settings.mountainSize
       const hs = settings.hillScale ?? settings.hillSize

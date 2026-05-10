@@ -111,7 +111,7 @@ async function colorizeBitmap(sourceBitmap, colorHex, w, h, previewFieldsLocal, 
     data[i+2] = Math.round((1 - preserveTexture) * bC + preserveTexture * b0)
   }
   tctx.putImageData(imd, 0, 0)
-  try { return await createImageBitmap(tmp) } catch (e) { if (typeof console !== 'undefined' && typeof console.debug === 'function') console.debug('createImageBitmap failed, returning sourceBitmap', e); return sourceBitmap }
+  return await createImageBitmap(tmp)
 }
 
 export default function CustomizeSettingsSection({ values, handlers, options, ui }) {
@@ -401,23 +401,13 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     const useColorizeOcean = (typeof opts.colorizeOcean === 'boolean') ? opts.colorizeOcean : colorizeOcean
     const useOceanColorHex = opts.oceanColorHex || oceanColorHex
     if (useColorizeOcean && useOceanColorHex) {
-      try {
-        processed.displayBitmap = await colorizeBitmap(imgBitmap, useOceanColorHex, w, h, previewFields, opts)
-      } catch (e) {
-        if (typeof console !== 'undefined' && typeof console.debug === 'function') console.debug('CustomizeSettingsSection: colorize ocean failed, using original bitmap', e)
-        processed.displayBitmap = imgBitmap
-      }
+      processed.displayBitmap = await colorizeBitmap(imgBitmap, useOceanColorHex, w, h, previewFields, opts)
     }
 
     const useColorizeLand = (typeof opts.colorizeLand === 'boolean') ? opts.colorizeLand : colorizeLand
     const useLandColorHex = opts.landColorHex || landColorHex
     if (useColorizeLand && useLandColorHex) {
-      try {
-        processed.landBitmap = await colorizeBitmap(imgBitmap, useLandColorHex, w, h, previewFields, opts)
-      } catch (e) {
-        if (typeof console !== 'undefined' && typeof console.debug === 'function') console.debug('CustomizeSettingsSection: colorize land failed, using original bitmap', e)
-        processed.landBitmap = imgBitmap
-      }
+      processed.landBitmap = await colorizeBitmap(imgBitmap, useLandColorHex, w, h, previewFields, opts)
     }
     return processed
   }
@@ -452,114 +442,82 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     ctx.closePath()
 
     const landColor = '#c2b891'
-    try {
-      const pattern = ctx.createPattern(landBitmap || displayBitmap || imgBitmap, 'repeat')
-      if (pattern) {
-        ctx.save()
-        ctx.clip()
-        ctx.fillStyle = pattern
-        ctx.fillRect(x, y, boxW, boxH)
-        try {
-          ctx.globalCompositeOperation = 'source-over'
-          ctx.strokeStyle = 'rgba(255,255,240,0.55)'
-          ctx.lineWidth = Math.max(1, Math.round(baseRadius * 0.03))
-          ctx.lineJoin = 'round'
-          ctx.stroke()
-        } catch (e) {
-          console.debug('CustomizeSettingsSection: canvas stroke failed', e)
-        }
-        ctx.restore()
-      } else {
-        ctx.fillStyle = landColor
-        ctx.fill()
-      }
-    } catch (err) {
-      // If pattern creation fails, fallback to simple fill
-      try {
-        ctx.fillStyle = landColor
-        ctx.fill()
-      } catch (e) {
-        console.debug('CustomizeSettingsSection: drawing fallback failed', e)
-      }
+    const pattern = ctx.createPattern(landBitmap || displayBitmap || imgBitmap, 'repeat')
+    if (pattern) {
+      ctx.save()
+      ctx.clip()
+      ctx.fillStyle = pattern
+      ctx.fillRect(x, y, boxW, boxH)
+      ctx.globalCompositeOperation = 'source-over'
+      ctx.strokeStyle = 'rgba(255,255,240,0.55)'
+      ctx.lineWidth = Math.max(1, Math.round(baseRadius * 0.03))
+      ctx.lineJoin = 'round'
+      ctx.stroke()
+      ctx.restore()
+    } else {
+      ctx.fillStyle = landColor
+      ctx.fill()
     }
     ctx.lineWidth = 1
     ctx.stroke()
   }
 
   async function composeMiniIslandFromBlob(sourceBlob, opts = {}) {
-    try {
-      const imgBitmap = await createImageBitmap(sourceBlob)
-      const { canvas, ctx, w, h } = makeCanvasForBitmap(imgBitmap)
+    const imgBitmap = await createImageBitmap(sourceBlob)
+    const { canvas, ctx, w, h } = makeCanvasForBitmap(imgBitmap)
 
-      const boxW = Math.round(w * 0.45)
-      const boxH = Math.round(h * 0.45)
-      const x = Math.round((w - boxW) / 2)
-      const y = Math.round((h - boxH) / 2)
+    const boxW = Math.round(w * 0.45)
+    const boxH = Math.round(h * 0.45)
+    const x = Math.round((w - boxW) / 2)
+    const y = Math.round((h - boxH) / 2)
 
-      const seed = Number(previewFields.backgroundSeed) || Date.now()
-      const rng = mulberry32(seed & 0xffffffff)
+    const seed = Number(previewFields.backgroundSeed) || Date.now()
+    const rng = mulberry32(seed & 0xffffffff)
 
-      const { displayBitmap, landBitmap } = await prepareBitmaps(imgBitmap, w, h, opts)
+    const { displayBitmap, landBitmap } = await prepareBitmaps(imgBitmap, w, h, opts)
 
-      drawBackgroundAndInset(ctx, displayBitmap, w, h, x, y, boxW, boxH)
+    drawBackgroundAndInset(ctx, displayBitmap, w, h, x, y, boxW, boxH)
 
-      const cx = x + Math.round(boxW * 0.5)
-      const cy = y + Math.round(boxH * 0.5)
-      const baseRadius = Math.round(Math.min(boxW, boxH) * 0.48)
-      const xRadius = Math.round(baseRadius * 1.45)
-      const yRadius = baseRadius
+    const cx = x + Math.round(boxW * 0.5)
+    const cy = y + Math.round(boxH * 0.5)
+    const baseRadius = Math.round(Math.min(boxW, boxH) * 0.48)
+    const xRadius = Math.round(baseRadius * 1.45)
+    const yRadius = baseRadius
 
-      drawIslandShape(ctx, rng, cx, cy, baseRadius, xRadius, yRadius, boxW, boxH, x, y, landBitmap, displayBitmap, imgBitmap)
+    drawIslandShape(ctx, rng, cx, cy, baseRadius, xRadius, yRadius, boxW, boxH, x, y, landBitmap, displayBitmap, imgBitmap)
 
-      return await new Promise((resolve) => canvas.toBlob(resolve))
-    } catch (e) {
-      if (typeof console !== 'undefined' && typeof console.debug === 'function') console.debug('CustomizeSettingsSection: composeMiniIslandFromBlob failed, returning sourceBlob', e)
-      return sourceBlob
-    }
+    return await new Promise((resolve) => canvas.toBlob(resolve))
   }
   // expose existing local render helpers to the tab components so they
   // can reuse the current implementations without duplicating logic.
   // (render helpers will be attached to tabProps after it's created)
 
   async function onSubmitGenerate(e) {
-    try {
-      if (e && typeof e.preventDefault === 'function') e.preventDefault()
-      if (typeof handleGenerateFromSettings === 'function') {
-        // Await parent handler in case it updates preview state
-        await handleGenerateFromSettings(e)
-      }
-    } catch (err) {
-      // Log handler errors so failures are visible during debugging
-      console.debug('CustomizeSettingsSection: onSubmitGenerate handler threw', err)
-    } finally {
-      // Ensure background preview updates to match the latest map settings
-      try { triggerPreviewRefresh() } catch (e) { console.debug('CustomizeSettingsSection: triggerPreviewRefresh failed', e) }
+    if (e && typeof e.preventDefault === 'function') e.preventDefault()
+    if (typeof handleGenerateFromSettings === 'function') {
+      await handleGenerateFromSettings(e)
     }
+    // Let errors propagate; caller will observe failures. Trigger preview refresh afterwards.
+    triggerPreviewRefresh()
   }
 
   async function recomposeUsingLastBase(opts = {}) {
     if (!lastBaseBlobRef.current) return
-    try {
-      const processed = await composeMiniIslandFromBlob(lastBaseBlobRef.current, opts)
-      const url = URL.createObjectURL(processed || lastBaseBlobRef.current)
-      setBackgroundPreviewUrl((previous) => {
-        if (previous) URL.revokeObjectURL(previous)
-        return url
-      })
-    } catch (e) { console.debug('CustomizeSettingsSection: recomposeUsingLastBase error', e) }
+    const processed = await composeMiniIslandFromBlob(lastBaseBlobRef.current, opts)
+    const url = URL.createObjectURL(processed || lastBaseBlobRef.current)
+    setBackgroundPreviewUrl((previous) => {
+      if (previous) URL.revokeObjectURL(previous)
+      return url
+    })
   }
 
  
   // Use a filtered preview key so color toggles/values DO NOT trigger
   // the background preview. We only want texture/background changes
   // (and other visual parameters) to trigger backend fetches.
-  const previewTriggerKey = useMemo(() => {
-    try {
-      const { colorizeLand, colorizeOcean, landColorHex, oceanColorHex, ...rest } = previewFields || {}
-      return JSON.stringify(rest)
-    } catch (e) {
-      return ''
-    }
+    const previewTriggerKey = useMemo(() => {
+    const { colorizeLand, colorizeOcean, landColorHex, oceanColorHex, ...rest } = previewFields || {}
+    return JSON.stringify(rest)
   }, [
     // include the specific previewFields members we care about so React
     // invalidation still works but color state changes are ignored.
@@ -682,59 +640,46 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
   const { textures, borderTypes, i18n, cityIconTypesByPack } = options
   const { loading } = ui
   // Debug logging removed to avoid console noise in the web UI.
-  const labels = i18n?.labels || {}
-  const backendOptions = i18n?.options || {}
-  const DEFAULT_TABS = [
-    { id: 'background', label: 'Background' },
-    { id: 'border', label: 'Border' },
-    { id: 'effects', label: 'Effects' },
-    { id: 'fonts', label: 'Fonts' },
-  ]
+  const labels = i18n?.labels
+  const backendOptions = i18n?.options
 
-  const tabs = (backendOptions.tabs || DEFAULT_TABS).map((tab) => ({
-    id: tab.id || tab.value,
-    label: tab.label,
-  }))
-  const landColoringMethods = backendOptions.landColoringMethods || []
-  const gridOverlayShapes = backendOptions.gridOverlayShapes || []
-  const gridOverlayOffsets = backendOptions.gridOverlayOffsets || []
-  const gridOverlayLayers = backendOptions.gridOverlayLayers || []
-  const backgroundTypes = backendOptions.backgroundTypes || []
+  const tabs = backendOptions?.tabs
+  const landColoringMethods = backendOptions?.landColoringMethods
+  const gridOverlayShapes = backendOptions?.gridOverlayShapes
+  const gridOverlayOffsets = backendOptions?.gridOverlayOffsets
+  const gridOverlayLayers = backendOptions?.gridOverlayLayers
+  const backgroundTypes = backendOptions?.backgroundTypes
 
   // Fonts are provided by the backend via `i18n.options.fonts`.
   // Per project policy: do not introduce client-side fallbacks — if the
   // server does not provide fonts, the list will be empty.
-  const availableFontFamilies = useMemo(() => {
-    return Array.isArray(backendOptions?.fonts) ? backendOptions.fonts : []
-  }, [backendOptions?.fonts])
+  const availableFontFamilies = backendOptions?.fonts
 
   // Preload the first few texture bases and a fractal base so the UI
   // doesn't hit the backend on first open. Uses `backgroundBaseCache.preload`.
   useEffect(() => {
-    try {
-      const candidates = []
-      if (Array.isArray(textures) && textures.length > 0) {
-        textures.slice(0, 5).forEach((t) => {
-          candidates.push({ width: 520, height: 170, type: 'GeneratedFromTexture', artPack: t.artPack, cityIconType: t.name })
-        })
-      }
-      const fractal = Array.isArray(backgroundTypes) ? backgroundTypes.find((b) => b && b.value && String(b.value).toLowerCase().includes('fractal')) : null
-      if (fractal) candidates.push({ width: 520, height: 170, type: fractal.value })
-      else candidates.push({ width: 520, height: 170, type: 'Fractal' })
-
-      candidates.forEach((p) => {
-        try { backgroundBaseCache.preload(p) } catch (e) { console.debug('CustomizeSettingsSection: backgroundBaseCache.preload candidate failed', e) }
+    const candidates = []
+    if (Array.isArray(textures) && textures.length > 0) {
+      textures.slice(0, 5).forEach((t) => {
+        candidates.push({ width: 520, height: 170, type: 'GeneratedFromTexture', artPack: t.artPack, cityIconType: t.name })
       })
-    } catch (e) { console.debug('CustomizeSettingsSection: preload textures effect failed', e) }
+    }
+    const fractal = Array.isArray(backgroundTypes) ? backgroundTypes.find((b) => b && b.value && String(b.value).toLowerCase().includes('fractal')) : null
+    if (fractal) candidates.push({ width: 520, height: 170, type: fractal.value })
+    else candidates.push({ width: 520, height: 170, type: 'Fractal' })
+
+    candidates.forEach((p) => {
+      backgroundBaseCache.preload(p)
+    })
   }, [textures, backgroundTypes])
-  const strokeTypes = backendOptions.strokeTypes || []
-  const borderPositions = backendOptions.borderPositions || []
-  const borderColorOptions = backendOptions.borderColorOptions || []
-  const lineStyles = backendOptions.lineStyles || []
-  const oceanWaveTypes = backendOptions.oceanWaveTypes || []
-  const concentricWaveValue = oceanWaveTypes.find(o => o && o.value && /Concentric/i.test(o.value))?.value
-  const rippleWaveValue = oceanWaveTypes.find(o => o && o.value && /Ripple|Ripples/i.test(o.value))?.value
-  const noneWaveValue = oceanWaveTypes.find(o => o && o.value && /^(None|No|NoEffect|NoneWaves)$/i.test(o.value))?.value
+  const strokeTypes = backendOptions?.strokeTypes
+  const borderPositions = backendOptions?.borderPositions
+  const borderColorOptions = backendOptions?.borderColorOptions
+  const lineStyles = backendOptions?.lineStyles
+  const oceanWaveTypes = backendOptions?.oceanWaveTypes
+  const concentricWaveValue = Array.isArray(oceanWaveTypes) ? oceanWaveTypes.find(o => o && o.value && /Concentric/i.test(o.value))?.value : undefined
+  const rippleWaveValue = Array.isArray(oceanWaveTypes) ? oceanWaveTypes.find(o => o && o.value && /Ripple|Ripples/i.test(o.value))?.value : undefined
+  const noneWaveValue = Array.isArray(oceanWaveTypes) ? oceanWaveTypes.find(o => o && o.value && /^(None|No|NoEffect|NoneWaves)$/i.test(o.value))?.value : undefined
   const translateLabel = (key) => {
     const has = labels && Object.prototype.hasOwnProperty.call(labels, key) && labels[key]
     const txt = has ? labels[key] : null
@@ -766,11 +711,9 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
   // treat it as empty so the input appears blank.
   const seedLabelFallback = translateLabel('theme.randomSeed.label')
   const sanitizeSeedValue = (v) => {
-    try {
-      if (!v) return ''
-      if (typeof v === 'string' && v.trim() === '') return ''
-      if (v === seedLabelFallback) return ''
-    } catch (e) { console.debug('CustomizeSettingsSection: sanitizeSeedValue error', e) }
+    if (!v) return ''
+    if (typeof v === 'string' && v.trim() === '') return ''
+    if (v === seedLabelFallback) return ''
     return v
   }
 
@@ -853,14 +796,10 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
   // The parent decides whether to mark the UI as dirty (only after
   // the first successful generation) and therefore disable downloads.
   const notifyManualChange = () => {
-    try {
-      if (typeof handlers.notifyManualChange === 'function') handlers.notifyManualChange()
-    } catch (e) { console.debug('CustomizeSettingsSection: notifyManualChange threw', e) }
+    if (typeof handlers.notifyManualChange === 'function') handlers.notifyManualChange()
   }
   const triggerPreviewRefresh = () => {
-    try {
-      setPreviewRefreshNonce((n) => n + 1)
-    } catch (e) { console.debug('CustomizeSettingsSection: triggerPreviewRefresh failed', e) }
+    setPreviewRefreshNonce((n) => n + 1)
   }
   
   const showTextureOptions = backgroundType === 'GeneratedFromTexture'
@@ -882,7 +821,16 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
   // a prior generation until a new map is generated.
   const canDownloadSettings = !loading && hasCustomizationSource && !(customizationDirty && hasGeneratedOnce)
   const canDownloadMap = !loading && hasCustomizationSource && Boolean(preview?.url) && !(customizationDirty && hasGeneratedOnce)
-  const gatedControlValue = (value) => (hasCustomizationSource ? value : '')
+  const gatedControlValue = (value) => {
+    // Show explicit values supplied by the server or a loaded .nort file.
+    // Only hide controls when the value is undefined or null and there
+    // is no customization source. This avoids synthesizing defaults
+    // while ensuring server-provided values (numbers/strings) are visible.
+    if (value !== undefined && value !== null) return value
+    return hasCustomizationSource ? value : ''
+  }
+
+  // debug helper removed
   const emptyComboOption = hasCustomizationSource ? null : (
     <option value=""></option>
   )
@@ -960,18 +908,16 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     // If a prefetch was performed on page load, use it and skip the
     // immediate fetch. This lets the UI show a warm preview without
     // waiting for the normal fetch cycle.
-    try {
-      if (typeof globalThis !== 'undefined' && globalThis.__prefetchedBackgroundPreviewBlob) {
-        const blob = globalThis.__prefetchedBackgroundPreviewBlob
-        try { delete globalThis.__prefetchedBackgroundPreviewBlob } catch (e) { console.debug('CustomizeSettingsSection: failed to delete __prefetchedBackgroundPreviewBlob', e) }
-        const url = URL.createObjectURL(blob)
-        setBackgroundPreviewUrl((previous) => {
-          if (previous) URL.revokeObjectURL(previous)
-          return url
-        })
-        return
-      }
-    } catch (e) { console.debug('CustomizeSettingsSection: prefetch handling error', e) }
+    if (typeof globalThis !== 'undefined' && globalThis.__prefetchedBackgroundPreviewBlob) {
+      const blob = globalThis.__prefetchedBackgroundPreviewBlob
+      delete globalThis.__prefetchedBackgroundPreviewBlob
+      const url = URL.createObjectURL(blob)
+      setBackgroundPreviewUrl((previous) => {
+        if (previous) URL.revokeObjectURL(previous)
+        return url
+      })
+      return
+    }
 
     // If there is no customization source available, there's nothing to
     // preview. However, allow the panel's force-enable flag (used during
@@ -996,7 +942,6 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     // request is sent with the fully-settled state.
     let timerId = setTimeout(async () => {
       if (controller.signal.aborted) return
-      try {
         // Build a minimal preview payload. If the user has an explicit
         // `nortContent` source, send only that JSON plus preview dimensions
         // and light overrides. Avoid sending duplicated UI-only fields that
@@ -1022,54 +967,52 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
         // Include a `background` key (server expects this name). When the
         // background is a texture-based generation, also include the
         // `Texture` field so the server can resolve the texture reference.
-        try {
-          payload.type = previewFields.backgroundType === undefined ? null : previewFields.backgroundType
-          const bg = payload.type
-          if (
-            bg === 'GeneratedFromTexture' ||
-            (typeof bg === 'string' && bg.toLowerCase().includes('texture'))
-          ) {
-            // If the user hasn't explicitly selected a texture yet, prefer
-            // the first available texture from the server-provided list so
-            // enabling texture immediately produces a sensible preview.
-            const rawRef = previewFields.textureRef
-            const isEmpty = rawRef === undefined || rawRef === null || String(rawRef).trim() === ''
-            if (isEmpty) {
-              // Prefer canonical city icon lists from UI options
-              if (cityIconTypesByPack && Object.keys(cityIconTypesByPack).length > 0) {
-                const firstPack = Object.keys(cityIconTypesByPack)[0]
-                const firstTypes = cityIconTypesByPack[firstPack]
-                if (Array.isArray(firstTypes) && firstTypes.length > 0) {
-                  payload.artPack = firstPack
-                  payload.cityIconType = firstTypes[0]
-                }
-              }
-              // Fallback: use textures list if available
-              if ((!payload.cityIconType || !payload.artPack) && Array.isArray(textures) && textures.length > 0) {
-                const t = textures[0]
-                payload.artPack = t.artPack
-                payload.cityIconType = t.name
-              }
-            } else {
-              // Resolve selection against known `textures` entries to avoid string parsing when possible
-              if (String(rawRef).includes('|') && Array.isArray(textures) && textures.length > 0) {
-                const ref = String(rawRef)
-                const found = textures.find((tt) => `${tt.artPack}|${tt.name}` === ref)
-                if (found) {
-                  payload.artPack = found.artPack
-                  payload.cityIconType = found.name
-                } else {
-                  // last-resort: parse the combined ref
-                  const [ap, nm] = ref.split('|', 2)
-                  payload.artPack = ap
-                  payload.cityIconType = nm
-                }
-              } else {
-                payload.cityIconType = isEmpty ? null : rawRef
+        payload.type = previewFields.backgroundType === undefined ? null : previewFields.backgroundType
+        const bg = payload.type
+        if (
+          bg === 'GeneratedFromTexture' ||
+          (typeof bg === 'string' && bg.toLowerCase().includes('texture'))
+        ) {
+          // If the user hasn't explicitly selected a texture yet, prefer
+          // the first available texture from the server-provided list so
+          // enabling texture immediately produces a sensible preview.
+          const rawRef = previewFields.textureRef
+          const isEmpty = rawRef === undefined || rawRef === null || String(rawRef).trim() === ''
+          if (isEmpty) {
+            // Prefer canonical city icon lists from UI options
+            if (cityIconTypesByPack && Object.keys(cityIconTypesByPack).length > 0) {
+              const firstPack = Object.keys(cityIconTypesByPack)[0]
+              const firstTypes = cityIconTypesByPack[firstPack]
+              if (Array.isArray(firstTypes) && firstTypes.length > 0) {
+                payload.artPack = firstPack
+                payload.cityIconType = firstTypes[0]
               }
             }
+            // Fallback: use textures list if available
+            if ((!payload.cityIconType || !payload.artPack) && Array.isArray(textures) && textures.length > 0) {
+              const t = textures[0]
+              payload.artPack = t.artPack
+              payload.cityIconType = t.name
+            }
+          } else {
+            // Resolve selection against known `textures` entries to avoid string parsing when possible
+            if (String(rawRef).includes('|') && Array.isArray(textures) && textures.length > 0) {
+              const ref = String(rawRef)
+              const found = textures.find((tt) => `${tt.artPack}|${tt.name}` === ref)
+              if (found) {
+                payload.artPack = found.artPack
+                payload.cityIconType = found.name
+              } else {
+                // last-resort: parse the combined ref
+                const [ap, nm] = ref.split('|', 2)
+                payload.artPack = ap
+                payload.cityIconType = nm
+              }
+            } else {
+              payload.cityIconType = isEmpty ? null : rawRef
+            }
           }
-        } catch (e) { console.debug('CustomizeSettingsSection: error resolving textureRef', e) }
+        }
 
         if (hasRandomPayloadSource) {
           Object.assign(payload, currentSource.payload)
@@ -1099,25 +1042,13 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
         // Use the background base cache to preload and fetch small neutral
         // background images for client-side tinting. Falls back to
         // `/background-preview` if the base endpoint isn't available.
-        try {
           // kick off a background preload (non-blocking)
-          try { backgroundBaseCache.preload(payload) } catch (e) { console.debug('CustomizeSettingsSection: backgroundBaseCache.preload failed', e) }
+          backgroundBaseCache.preload(payload)
           // await cached or in-flight fetch
           blob = await backgroundBaseCache.get(payload, controller.signal)
-        } catch (e) {
-          console.debug('CustomizeSettingsSection: backgroundBaseCache.get failed, falling back to legacy preview', e)
-          // Fallback to legacy preview if base not available
-          const response = await doFetchWithRetries(`${API_BASE}/background-preview`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-            signal: controller.signal,
-          }, 3, 300)
-          blob = await response.blob()
-        }
 
         // store last fetched neutral base so color-only changes can recompose locally
-        try { lastBaseBlobRef.current = blob } catch (e) { console.debug('CustomizeSettingsSection: failed to set lastBaseBlobRef', e) }
+        lastBaseBlobRef.current = blob
 
         
 
@@ -1149,15 +1080,6 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
           if (previous) URL.revokeObjectURL(previous)
           return url
         })
-      } catch (error) {
-        if (controller.signal.aborted) {
-          return
-        }
-        setBackgroundPreviewUrl((previous) => {
-          if (previous) URL.revokeObjectURL(previous)
-          return null
-        })
-      }
     }, 100)
 
     return () => {
@@ -1178,8 +1100,8 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
       const openerClick = (e) => { if (!disabled) setShowState(true) }
       const openerKey = (e) => { if ((e.key === 'Enter' || e.key === ' ') && !disabled) { e.preventDefault(); setShowState(true) } }
       const closePicker = () => {
-        try { setShowState(false) } catch (e) { console.debug('CustomizeSettingsSection: setShowState failed', e) }
-        try { if (typeof onClose === 'function') onClose() } catch (e) { console.debug('CustomizeSettingsSection: onClose threw', e) }
+        setShowState(false)
+        if (typeof onClose === 'function') onClose()
       }
       return (
         <>
@@ -1325,6 +1247,7 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     frayedBorderSeed,
     frayedBorderColorHex,
     drawGrunge,
+    grungeWidth,
     lineStyle,
     coastlineWidth,
     coastlineColorHex,
@@ -1471,7 +1394,7 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
   }
 
   const backgroundKeys = [
-    'translateLabel', 'gatedControlValue', 'emptyComboOption', 'renderColorControl', 'notifyManualChange', 'recomposeUsingLastBase', 'textures', 'backgroundTypes', 'strokeTypes',
+    'translateLabel', 'gatedControlValue', 'emptyComboOption', 'renderColorControl', 'notifyManualChange', 'recomposeUsingLastBase', 'textures', 'backgroundTypes', 'strokeTypes', 'landColoringMethods',
     'backgroundType','setBackgroundType','showTextureOptions','hasTextures','textureRef','setTextureRef','drawRegionBoundaries','setDrawRegionBoundaries','regionBoundaryStyle','setRegionBoundaryStyle','regionBoundaryWidth','setRegionBoundaryWidth','regionBoundaryColorHex','setRegionBoundaryColorHex','showRegionBoundaryPicker','setShowRegionBoundaryPicker','colorizeLand','setColorizeLand','finalLandColoringMethod','setFinalLandColoringMethod','landColorHex','setLandColorHex','showLandPicker','setShowLandPicker','colorizeOcean','setColorizeOcean','showOceanPicker','setShowOceanPicker','oceanColorHex','setOceanColorHex','backgroundSeed','sanitizeSeedValue','setBackgroundSeed','drawGridOverlay','setDrawGridOverlay','gridOverlayShape','setGridOverlayShape','gridOverlayRowOrColCount','setGridOverlayRowOrColCount','gridOverlayLineWidth','setGridOverlayLineWidth','gridOverlayColorHex','setGridOverlayColorHex','gridOverlayOffsets','gridOverlayXOffset','setGridOverlayXOffset','gridOverlayYOffset','setGridOverlayYOffset','gridOverlayLayers','gridOverlayLayer','setGridOverlayLayer','backgroundPreviewUrl','gridOverlayShapes','drawVoronoiGridOverlayOnlyOnLand','setDrawVoronoiGridOverlayOnlyOnLand'
   ]
 
@@ -1529,18 +1452,27 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
 
         <fieldset className="customize-disabled-fieldset" disabled={!hasCustomizationSource}>
           <div className="customize-tabs" role="tablist" aria-label="Customization sections">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                role="tab"
-                className={`customize-tab-button${activeTab === tab.id ? ' is-active' : ''}`}
-                aria-selected={activeTab === tab.id}
-                onClick={() => setActiveTab(tab.id)}
-              >
-                {tab.label}
-              </button>
-            ))}
+            {Array.isArray(tabs)
+                ? tabs.map((tab, idx) => {
+                  let derivedId
+                  if (tab?.id) derivedId = String(tab.id)
+                  else if (tab?.label) derivedId = String(tab.label)
+                  else derivedId = `tab-${idx}`
+                  const normId = derivedId.toLowerCase()
+                  return (
+                    <button
+                      key={derivedId}
+                      type="button"
+                      role="tab"
+                      className={`customize-tab-button${activeTab === normId ? ' is-active' : ''}`}
+                      aria-selected={activeTab === normId}
+                      onClick={() => setActiveTab(normId)}
+                    >
+                      {tab?.label ? tab.label : `Tab ${idx + 1}`}
+                    </button>
+                  )
+                })
+              : null}
           </div>
 
           <div className="customize-tab-panel" role="tabpanel">

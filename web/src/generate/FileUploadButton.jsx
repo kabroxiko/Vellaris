@@ -19,9 +19,7 @@ export default function FileUploadButton({
     if (file) {
       onFileSelect(file)
       // Clear the input value so selecting the same file again fires change
-      try {
-        if (fileInputRef.current) fileInputRef.current.value = ''
-      } catch (e) { console.debug('FileUploadButton: failed to clear file input value', e) }
+      if (fileInputRef.current) fileInputRef.current.value = ''
     }
   }
 

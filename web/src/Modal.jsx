@@ -22,7 +22,7 @@ export default function Modal({ open, onClose, children }) {
           if (error instanceof DOMException && error?.name === 'InvalidStateError') {
             return
           }
-          console.warn('Modal: failed to show native dialog', error)
+          throw error
         }
       }
       tryShow()
@@ -55,7 +55,7 @@ export default function Modal({ open, onClose, children }) {
         try {
           img.style.webkitUserDrag = 'none'
         } catch (e) {
-          console.warn('Modal: failed to set webkitUserDrag', e)
+          throw e
         }
         // Prevent native image dragging which interferes with pointer-drag panning
         const onDragStart = (ev) => ev.preventDefault()
@@ -193,7 +193,7 @@ export default function Modal({ open, onClose, children }) {
             ) {
               return
             }
-            console.warn('Modal: failed to set pointer capture', error)
+            throw error
           }
 
           if (pointers.size === 1) {
@@ -283,7 +283,7 @@ export default function Modal({ open, onClose, children }) {
             ) {
               return
             }
-            console.warn('Modal: failed to release pointer capture', error)
+            throw error
           }
           pointers.delete(e.pointerId)
           if (pointers.size === 0) {
@@ -324,63 +324,63 @@ export default function Modal({ open, onClose, children }) {
           try {
             container.removeEventListener('wheel', onWheel)
           } catch (e) {
-            console.warn('Modal: failed to remove wheel listener', e)
+            throw e
           }
           try {
             container.removeEventListener('pointerdown', onPointerDown)
           } catch (e) {
-            console.warn('Modal: failed to remove pointerdown listener', e)
+            throw e
           }
           try {
             container.removeEventListener('pointercancel', onPointerUp)
           } catch (e) {
-            console.warn('Modal: failed to remove pointercancel listener', e)
+            throw e
           }
           try {
             img.removeEventListener('pointerdown', onPointerDown)
           } catch (e) {
-            console.warn('Modal: failed to remove img pointerdown listener', e)
+            throw e
           }
           try {
             img.removeEventListener('pointercancel', onPointerUp)
           } catch (e) {
-            console.warn('Modal: failed to remove img pointercancel listener', e)
+            throw e
           }
           try {
             img.removeEventListener('dragstart', onDragStart)
           } catch (e) {
-            console.warn('Modal: failed to remove img dragstart listener', e)
+            throw e
           }
           try {
             globalThis.removeEventListener('pointermove', onPointerMove)
           } catch (e) {
-            console.warn('Modal: failed to remove global pointermove listener', e)
+            throw e
           }
           try {
             globalThis.removeEventListener('pointerup', onPointerUp)
           } catch (e) {
-            console.warn('Modal: failed to remove global pointerup listener', e)
+            throw e
           }
           try {
             globalThis.removeEventListener('resize', onResize)
           } catch (e) {
-            console.warn('Modal: failed to remove global resize listener', e)
+            throw e
           }
           try {
             cancelAnimationFrame(rafId)
           } catch (e) {
-            console.warn('Modal: failed to cancel animation frame', e)
+            throw e
           }
           // restore styles
           try {
             modalEl.style.width = ''
           } catch (e) {
-            console.warn('Modal: failed to restore modal width style', e)
+            throw e
           }
           try {
             container.style.height = ''
           } catch (e) {
-            console.warn('Modal: failed to restore container height style', e)
+            throw e
           }
         }
 
@@ -397,7 +397,7 @@ export default function Modal({ open, onClose, children }) {
         try {
           modalEl.__cleanupImg()
         } catch (e) {
-          console.warn('Modal: cleanup function threw', e)
+          throw e
         }
         delete modalEl.__cleanupImg
       }
@@ -405,7 +405,7 @@ export default function Modal({ open, onClose, children }) {
       try {
         if (typeof modalEl?.close === 'function' && modalEl?.open) modalEl.close()
       } catch (e) {
-        console.warn('Modal: failed to close native dialog', e)
+        throw e
       }
     }
   }, [open, onClose])

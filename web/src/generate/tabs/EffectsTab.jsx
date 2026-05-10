@@ -2,49 +2,49 @@ import React from 'react'
 import PropTypes from 'prop-types'
 
 export default function EffectsTab(props) {
-  if (!props) return <div />
+  if (props == null) return <div />
   const { translateLabel, gatedControlValue, emptyComboOption, renderColorControl } = props
 
   const {
-    lineStyles = [],
+    lineStyles,
     lineStyle,
     setLineStyle,
-    coastlineWidth = 0,
+    coastlineWidth,
     setCoastlineWidth,
     coastlineColorHex,
     setCoastlineColorHex,
-    showCoastlinePicker = false,
+    showCoastlinePicker,
     setShowCoastlinePicker,
-    coastShadingLevel = 0,
+    coastShadingLevel,
     setCoastShadingLevel,
-    coastShadingAlpha = 0,
+    coastShadingAlpha,
     setCoastShadingAlpha,
     finalLandColoringMethod,
 
-    oceanShadingLevel = 0,
+    oceanShadingLevel,
     setOceanShadingLevel,
     oceanShadingColorHex,
     setOceanShadingColorHex,
-    oceanShadingAlpha = 0,
+    oceanShadingAlpha,
     setOceanShadingAlpha,
-    showOceanPicker = false,
+    showOceanPicker,
     setShowOceanPicker,
 
-    oceanWaveTypes = [],
+    oceanWaveTypes,
     oceanWavesType,
     setOceanWavesType,
     concentricWaveValue,
     noneWaveValue,
-    oceanWavesLevel = 0,
+    oceanWavesLevel,
     setOceanWavesLevel,
-    oceanWavesAlpha = 0,
+    oceanWavesAlpha,
     setOceanWavesAlpha,
     oceanWavesColorHex,
     setOceanWavesColorHex,
-    showOceanWavesPicker = false,
+    showOceanWavesPicker,
     setShowOceanWavesPicker,
 
-    concentricWaveCount = 0,
+    concentricWaveCount,
     setConcentricWaveCount,
     fadeConcentricWaves,
     setFadeConcentricWaves,
@@ -58,19 +58,19 @@ export default function EffectsTab(props) {
 
     riverColorHex,
     setRiverColorHex,
-    showRiverPicker = false,
+    showRiverPicker,
     setShowRiverPicker,
 
     drawRoads,
     setDrawRoads,
     roadStyle,
     setRoadStyle,
-    strokeTypes = [],
-    roadWidth = 0,
+    strokeTypes,
+    roadWidth,
     setRoadWidth,
     roadColorHex,
     setRoadColorHex,
-    showRoadPicker = false,
+    showRoadPicker,
     setShowRoadPicker,
 
     mountainSize,
@@ -95,11 +95,16 @@ export default function EffectsTab(props) {
           onChange={(e) => setLineStyle(e.target.value)}
         >
           {emptyComboOption}
-          {lineStyles.map((item) => (
-            <option key={item.value} value={item.value}>
-              {item.label}
-            </option>
-          ))}
+            {Array.isArray(lineStyles)
+            ? lineStyles.map((item) => {
+                if (item?.value === undefined) return null
+                return (
+                  <option key={String(item.value)} value={item.value}>
+                    {item.label}
+                  </option>
+                )
+              })
+            : null}
         </select>
 
         <label htmlFor="coastline-width-input">{translateLabel('theme.coastlineWidth.label')}</label>
@@ -175,16 +180,14 @@ export default function EffectsTab(props) {
           const shouldReplace = finalLandColoringMethod === 'ColorPoliticalRegions'
           let swatchReplacement = undefined
           if (shouldReplace) {
-            try {
-              let txt = translateLabel('theme.coastShadingColor.disabled')
-              if (typeof txt === 'string') {
-                txt = txt.replace(/<[^>]*>/g, '')
-                txt = txt.replace(/''/g, "'")
-              }
-              const methodLabel = translateLabel(`LandColoringMethod.${finalLandColoringMethod}`)
-              if (typeof txt === 'string' && txt.indexOf('{0}') >= 0) txt = txt.replace('{0}', methodLabel)
-              swatchReplacement = txt
-            } catch (e) { if (typeof console !== 'undefined' && typeof console.debug === 'function') console.debug('EffectsTab: failed to build swatchReplacement', e); swatchReplacement = ('' + translateLabel('theme.coastShadingColor.disabled')).replace(/<[^>]*>/g, '').replace(/''/g, "'") }
+            let txt = translateLabel('theme.coastShadingColor.disabled')
+            if (typeof txt === 'string') {
+              txt = txt.replaceAll(/<[^>]*>/g, '')
+              txt = txt.replaceAll("''", "'")
+            }
+            const methodLabel = translateLabel(`LandColoringMethod.${finalLandColoringMethod}`)
+            if (typeof txt === 'string' && txt.indexOf('{0}') >= 0) txt = txt.replace('{0}', methodLabel)
+            swatchReplacement = txt
           }
           return renderColorControl({
             id: 'ocean-shading-color',
@@ -209,11 +212,16 @@ export default function EffectsTab(props) {
           onChange={(e) => setOceanWavesType(e.target.value)}
         >
           {emptyComboOption}
-          {oceanWaveTypes.map((item) => (
-            <option key={item.value} value={item.value}>
-              {item.label}
-            </option>
-          ))}
+          {Array.isArray(oceanWaveTypes)
+            ? oceanWaveTypes.map((item) => {
+                if (item?.value === undefined) return null
+                return (
+                  <option key={String(item.value)} value={item.value}>
+                    {item.label}
+                  </option>
+                )
+              })
+            : null}
         </select>
 
         <>
@@ -318,13 +326,16 @@ export default function EffectsTab(props) {
             disabled={!drawRoads}
           >
             {emptyComboOption}
-            {strokeTypes && strokeTypes.length > 0
-              ? strokeTypes.map((item) => (
-                  <option key={item.value || item} value={item.value || item}>
-                    {item.label || item}
-                  </option>
-                ))
-              : emptyComboOption}
+            {Array.isArray(strokeTypes) && strokeTypes.length > 0
+              ? strokeTypes.map((item) => {
+                  if (item?.value === undefined) return null
+                  return (
+                    <option key={String(item.value)} value={item.value}>
+                      {item.label}
+                    </option>
+                  )
+                })
+              : null}
           </select>
 
           <label htmlFor="road-width-input">{translateLabel('theme.roadWidth.label')}</label>

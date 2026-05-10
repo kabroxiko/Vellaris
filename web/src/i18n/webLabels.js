@@ -15,9 +15,6 @@ export async function getFrontendLabels(language) {
     const localized = module && module.default ? module.default : {}
     return { ...enLabels, ...localized }
   } catch (e) {
-    // If dynamic import fails (unsupported language or missing file),
-    // fall back to English labels only.
-    if (typeof console !== 'undefined' && typeof console.debug === 'function') console.debug('getFrontendLabels: dynamic import failed, falling back to English', e)
-    return { ...enLabels }
+    throw e
   }
 }

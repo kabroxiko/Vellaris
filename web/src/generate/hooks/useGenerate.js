@@ -83,7 +83,7 @@ export default function useGenerate({ apiBase, handleResponseError, base64ToBlob
           // caller may manage merged settings
         }
       } catch (e) {
-        // ignore
+        throw e
       }
       downloadNortContent(nortContent, baseName)
       handleSuccessRef.current?.(null, baseName, source, nortContent)
@@ -104,7 +104,7 @@ export default function useGenerate({ apiBase, handleResponseError, base64ToBlob
           if (outputMode === 'nort-only' && body && typeof FormData !== 'undefined' && body instanceof FormData) {
             body.append('returnSettings', 'true')
           }
-        } catch (e) {}
+        } catch (e) { throw e }
 
         let res = await fetch(`${apiBase}/generate`, requestOptions)
         if (!res.ok) await handleResponseError(res)
@@ -117,7 +117,9 @@ export default function useGenerate({ apiBase, handleResponseError, base64ToBlob
         setError(err.message)
         try {
           globalThis.showToast?.(err.message, { type: 'error', duration: 6000 })
-        } catch (e) {}
+        } catch (e) {
+          console.warn('showToast failed', e)
+        }
       } finally {
         setLoading(false)
         if (!externalToast) toast.hide()

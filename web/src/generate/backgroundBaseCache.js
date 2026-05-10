@@ -18,10 +18,7 @@ function makeKey(payload) {
     }
     return JSON.stringify(keyObj)
   } catch (e) {
-    /* eslint-disable no-console */
-    console.debug('backgroundBaseCache: makeKey failed, using fallback key', e)
-    /* eslint-enable no-console */
-    return String(Math.random())
+    throw e
   }
 }
 
@@ -36,9 +33,7 @@ function evictIfNeeded() {
       try {
         URL.revokeObjectURL(v.objectUrl)
       } catch (e) {
-        /* eslint-disable no-console */
-        console.debug('backgroundBaseCache: revokeObjectURL failed', e)
-        /* eslint-enable no-console */
+        throw e
       }
     }
     cache.delete(k)
@@ -64,9 +59,7 @@ function releaseSlot() {
     try {
       r()
     } catch (e) {
-      /* eslint-disable no-console */
-      console.warn('backgroundBaseCache: queued resolver threw', e)
-      /* eslint-enable no-console */
+      throw e
     }
   }
 }
@@ -130,14 +123,7 @@ function preload(payload) {
   if (cache.has(key) || pending.has(key)) return
   const ctrl = new AbortController()
   const p = get(payload, ctrl.signal).catch((err) => {
-    /* Intentionally ignore preload failures but log at debug level */
-    /* eslint-disable no-console */
-    console.debug('backgroundBaseCache: preload ignored error', err)
-    /* eslint-enable no-console */
-  })
-  // Log preload failures
-  const pWithLogging = get(payload, ctrl.signal).catch((e) => {
-    if (typeof console !== 'undefined' && typeof console.debug === 'function') console.debug('backgroundBaseCache: preload failed', e)
+    throw err
   })
   // store pending so concurrent preloads share work
   pending.set(key, p)

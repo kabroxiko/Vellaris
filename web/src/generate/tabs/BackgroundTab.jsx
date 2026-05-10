@@ -2,7 +2,7 @@ import React from 'react'
 import PropTypes from 'prop-types'
 
 export default function BackgroundTab(props) {
-  if (!props) return <div />
+  if (props == null) return <div />
   const {
     translateLabel,
     gatedControlValue,
@@ -71,8 +71,8 @@ export default function BackgroundTab(props) {
     setShowGridPicker,
     drawVoronoiGridOverlayOnlyOnLand = false,
     setDrawVoronoiGridOverlayOnlyOnLand,
-    // fallback arrays that may have been under props.values
-    landColoringMethods = [],
+    // landColoringMethods provided by parent via `options`; use only that
+    landColoringMethods,
   } = props
 
   const isVoronoi = String((gridOverlayShape || '')).toLowerCase().includes('voronoi')
@@ -203,13 +203,15 @@ export default function BackgroundTab(props) {
             disabled={!colorizeLand}
           >
             {emptyComboOption}
-            {landColoringMethods
-              .filter((item) => item.value)
-              .map((item) => (
-                <option key={item.value} value={item.value}>
-                  {item.label}
-                </option>
-              ))}
+            {Array.isArray(landColoringMethods)
+              ? landColoringMethods
+                  .filter((item) => item?.value)
+                  .map((item) => (
+                    <option key={item.value} value={item.value}>
+                      {item.label}
+                    </option>
+                  ))
+              : null}
           </select>
 
           {renderColorControl({
@@ -356,21 +358,21 @@ export default function BackgroundTab(props) {
           <label htmlFor="grid-xoffset-input" className={drawGridOverlay && !isVoronoi ? '' : 'is-disabled'}>{translateLabel('theme.xOffset.label')}</label>
             <select id="grid-xoffset-input" value={gatedControlValue(gridOverlayXOffset)} onChange={(e) => setGridOverlayXOffset(e.target.value)} disabled={!(drawGridOverlay && !isVoronoi)}>
             {emptyComboOption}
-            {(gridOverlayOffsets || []).map((item) => (
+            {Array.isArray(gridOverlayOffsets) ? gridOverlayOffsets.map((item) => (
               <option key={item.value} value={item.value}>
                 {item.label}
               </option>
-            ))}
+            )) : null}
           </select>
 
           <label htmlFor="grid-yoffset-input" className={drawGridOverlay && !isVoronoi ? '' : 'is-disabled'}>{translateLabel('theme.yOffset.label')}</label>
             <select id="grid-yoffset-input" value={gatedControlValue(gridOverlayYOffset)} onChange={(e) => setGridOverlayYOffset(e.target.value)} disabled={!(drawGridOverlay && !isVoronoi)}>
             {emptyComboOption}
-            {(gridOverlayOffsets || []).map((item) => (
+            {Array.isArray(gridOverlayOffsets) ? gridOverlayOffsets.map((item) => (
               <option key={item.value} value={item.value}>
                 {item.label}
               </option>
-            ))}
+            )) : null}
           </select>
 
           <label className={`checkbox-label${drawGridOverlay && isVoronoi ? '' : ' is-disabled'}`}>
@@ -386,11 +388,11 @@ export default function BackgroundTab(props) {
           <label htmlFor="grid-layer-input">{translateLabel('theme.layer.label')}</label>
           <select id="grid-layer-input" value={gatedControlValue(gridOverlayLayer)} onChange={(e) => setGridOverlayLayer(e.target.value)} disabled={!drawGridOverlay}>
             {emptyComboOption}
-            {(gridOverlayLayers || []).map((item) => (
+            {Array.isArray(gridOverlayLayers) ? gridOverlayLayers.map((item) => (
               <option key={item.value} value={item.value}>
                 {item.label}
               </option>
-            ))}
+            )) : null}
           </select>
         </div>
 
