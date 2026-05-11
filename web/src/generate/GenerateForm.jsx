@@ -239,59 +239,74 @@ function GenerateForm({ uiLanguage = 'en' }) {
   const [currentSource, setCurrentSource] = useState(null)
   const requestLanguage = uiLanguage
   
-  async function handleInitialUiOpts(uiOpts) {
-    setArtPacks(uiOpts.artPacks)
-    setAllBooks(uiOpts.books)
-    setTextures(uiOpts.textures)
-    setBorderTypes(uiOpts.borderTypes)
-    const defs = uiOpts.defaults
-
-    const byPack = uiOpts.cityIconTypesByPack
-    if (byPack) {
-      for (const pack of Object.keys(byPack)) {
-        cityIconTypesRequestByPack.set(pack, Promise.resolve(byPack[pack]))
-      }
+  // Helpers for initial UI population to keep handleInitialUiOpts concise
+  function populateCityIconTypes(byPack) {
+    if (!byPack) return
+    for (const pack of Object.keys(byPack)) {
+      cityIconTypesRequestByPack.set(pack, Promise.resolve(byPack[pack]))
     }
+  }
 
-    // Set sensible defaults for Random panel and selected books
-    const overrideBooks = Array.isArray(initialRandomOverrides.selectedBooks)
-      ? initialRandomOverrides.selectedBooks
-      : null
+  function computeInitialBooks(uiOpts) {
+    const overrideBooks = Array.isArray(initialRandomOverrides.selectedBooks) ? initialRandomOverrides.selectedBooks : null
     const validBooks = overrideBooks ? overrideBooks.filter((b) => uiOpts.books?.includes(b)) : null
     const initialBooks = validBooks && validBooks.length > 0 ? new Set(validBooks) : (Array.isArray(uiOpts.books) ? new Set(uiOpts.books) : new Set())
     booksLoadedRef.current = true
     setSelectedBooks(initialBooks)
+  }
 
-    const firstArtPack = Array.isArray(uiOpts.artPacks) && uiOpts.artPacks.length > 0 ? uiOpts.artPacks[0] : null
+  async function chooseArtPackAndLoad(uiOpts, defs) {
+    const determinePackAndPreferred = (uiOptsLocal, defsLocal) => {
+      const firstArtPack = Array.isArray(uiOptsLocal.artPacks) && uiOptsLocal.artPacks.length > 0 ? uiOptsLocal.artPacks[0] : null
+      const chosenPack = artPack ? artPack : (firstArtPack ? firstArtPack : 'nortantis')
+      const preferredCityDefault = defsLocal && (defsLocal.cityIconType ?? defsLocal.cityIconSetName) ? String(defsLocal.cityIconType ?? defsLocal.cityIconSetName) : cityIconType
+      return { chosenPack, firstArtPack, preferredCityDefault }
+    }
+
+    const { chosenPack, firstArtPack, preferredCityDefault } = determinePackAndPreferred(uiOpts, defs)
     if (!artPack && firstArtPack) setArtPack(firstArtPack)
-
-    const packToLoad = artPack ? artPack : (firstArtPack ? firstArtPack : 'nortantis')
-    const preferredCityDefault = defs && (defs.cityIconType ?? defs.cityIconSetName) ? String(defs.cityIconType ?? defs.cityIconSetName) : cityIconType
-    const types = await loadCityIconTypes(packToLoad)
+    const types = await loadCityIconTypes(chosenPack)
     handleCityIconTypesLoaded(types, preferredCityDefault)
+  }
 
-    // Merge backend i18n labels with frontend labels
-    const frontendLabels = await getFrontendLabels(requestLanguage)
-    const backendLabels = uiOpts.labels
-    // Merge frontend and backend labels without introducing inline fallbacks.
-    const mergedLabels = { ...frontendLabels }
-    if (backendLabels) Object.assign(mergedLabels, backendLabels)
-    // Do not normalize or map backend option names here — pass the
-    // backend-provided `options` object through exactly as received.
+  async function mergeAndSetUiI18n(uiOpts) {
+    const mergedLabels = await getMergedLabels(uiOpts)
     setUiI18n({ labels: mergedLabels, options: uiOpts.options })
+  }
+
+  async function getMergedLabels(uiOpts) {
+    const frontendLabels = await getFrontendLabels(requestLanguage)
+    const backendLabels = uiOpts?.labels
+    if (backendLabels) return { ...frontendLabels, ...backendLabels }
+    return frontendLabels
+  }
+
+  function setUiListsFromOptions(uiOpts) {
+    setArtPacks(uiOpts?.artPacks)
+    setAllBooks(uiOpts?.books)
+    setTextures(uiOpts?.textures)
+    setBorderTypes(uiOpts?.borderTypes)
+  }
+
+  function applyOptionDefaults(opts, defs) {
+    if (!opts) return
+    if (!backgroundType && Array.isArray(opts.backgroundTypes) && opts.backgroundTypes.length > 0) setBackgroundType(opts.backgroundTypes[0].value)
+    if (!finalLandColoringMethod && Array.isArray(opts.finalLandColoringMethods) && opts.finalLandColoringMethods.length > 0) setFinalLandColoringMethod(opts.finalLandColoringMethods[0].value)
+    if (!regionBoundaryStyle && Array.isArray(opts.lineStyles) && opts.lineStyles.length > 0) setRegionBoundaryStyle(opts.lineStyles[0].value)
+    if (defs) applyServerDefaults(defs, opts)
+  }
+
+  async function handleInitialUiOpts(uiOpts) {
+    setUiListsFromOptions(uiOpts)
+    const defs = uiOpts.defaults
+
+    populateCityIconTypes(uiOpts.cityIconTypesByPack)
+    computeInitialBooks(uiOpts)
+    await chooseArtPackAndLoad(uiOpts, defs)
+    await mergeAndSetUiI18n(uiOpts)
 
     // Apply server option defaults and backend `defaults` so UI resets to canonical backend values on load.
-    const opts = uiOpts.options
-    if (!backgroundType && Array.isArray(opts?.backgroundTypes) && opts.backgroundTypes.length > 0) {
-    setBackgroundType(opts.backgroundTypes[0].value)
-    }
-    if (!finalLandColoringMethod && Array.isArray(opts?.finalLandColoringMethods) && opts.finalLandColoringMethods.length > 0) {
-    setFinalLandColoringMethod(opts.finalLandColoringMethods[0].value)
-    }
-    if (!regionBoundaryStyle && Array.isArray(opts?.lineStyles) && opts.lineStyles.length > 0) {
-    setRegionBoundaryStyle(opts.lineStyles[0].value)
-    }
-    if (defs) applyServerDefaults(defs, opts)
+    applyOptionDefaults(uiOpts.options, defs)
 
     // Persist the raw backend defaults so we can later force-apply them to the UI once the settings appliers are available.
     lastUiDefaultsRef.current = uiOpts.defaults ? uiOpts.defaults : null
@@ -326,126 +341,68 @@ function GenerateForm({ uiLanguage = 'en' }) {
   const [borderTypes, setBorderTypes] = useState([])
   const [textureRef, setTextureRef] = useState(initialCustomize.textureRef)
   const [backgroundSeed, setBackgroundSeed] = useState(initialCustomize.backgroundSeed)
-  const [drawRegionBoundaries, setDrawRegionBoundaries] = useState(
-    typeof initialCustomize.drawRegionBoundaries === 'boolean' ? initialCustomize.drawRegionBoundaries : false
-  )
-  const [colorizeLand, setColorizeLand] = useState(
-    typeof initialCustomize.colorizeLand === 'boolean' ? initialCustomize.colorizeLand : false
-  )
-  const [colorizeOcean, setColorizeOcean] = useState(
-    typeof initialCustomize.colorizeOcean === 'boolean' ? initialCustomize.colorizeOcean : false
-  )
+  const [drawRegionBoundaries, setDrawRegionBoundaries] = useState(initialCustomize.drawRegionBoundaries)
+  const [colorizeLand, setColorizeLand] = useState(initialCustomize.colorizeLand)
+  const [colorizeOcean, setColorizeOcean] = useState(initialCustomize.colorizeOcean)
   const [oceanColorHex, setOceanColorHex] = useState(initialCustomize.oceanColorHex)
   const [landColorHex, setLandColorHex] = useState(initialCustomize.landColorHex)
   const [regionBoundaryStyle, setRegionBoundaryStyle] = useState(initialCustomize.regionBoundaryStyle)
-  const [regionBoundaryWidth, setRegionBoundaryWidth] = useState(
-    typeof initialCustomize.regionBoundaryWidth === 'number' ? initialCustomize.regionBoundaryWidth : 0
-  )
+  const [regionBoundaryWidth, setRegionBoundaryWidth] = useState(initialCustomize.regionBoundaryWidth)
   const [regionBoundaryColorHex, setRegionBoundaryColorHex] = useState(initialCustomize.regionBoundaryColorHex)
-  const [drawBorder, setDrawBorder] = useState(
-    typeof initialCustomize.drawBorder === 'boolean' ? initialCustomize.drawBorder : false
-  )
-  const [drawGridOverlay, setDrawGridOverlay] = useState(
-    typeof initialCustomize.drawGridOverlay === 'boolean' ? initialCustomize.drawGridOverlay : false
-  )
+  const [drawBorder, setDrawBorder] = useState(initialCustomize.drawBorder)
+  const [drawGridOverlay, setDrawGridOverlay] = useState(initialCustomize.drawGridOverlay)
   const [gridOverlayShape, setGridOverlayShape] = useState(initialCustomize.gridOverlayShape)
-  const [gridOverlayRowOrColCount, setGridOverlayRowOrColCount] = useState(
-    typeof initialCustomize.gridOverlayRowOrColCount === 'number' ? initialCustomize.gridOverlayRowOrColCount : 0
-  )
+  const [gridOverlayRowOrColCount, setGridOverlayRowOrColCount] = useState(initialCustomize.gridOverlayRowOrColCount)
   const [gridOverlayColorHex, setGridOverlayColorHex] = useState(initialCustomize.gridOverlayColorHex)
   const [gridOverlayXOffset, setGridOverlayXOffset] = useState(initialCustomize.gridOverlayXOffset)
   const [gridOverlayYOffset, setGridOverlayYOffset] = useState(initialCustomize.gridOverlayYOffset)
-  const [gridOverlayLineWidth, setGridOverlayLineWidth] = useState(
-    typeof initialCustomize.gridOverlayLineWidth === 'number' ? initialCustomize.gridOverlayLineWidth : 0
-  )
+  const [gridOverlayLineWidth, setGridOverlayLineWidth] = useState(initialCustomize.gridOverlayLineWidth)
   const [gridOverlayLayer, setGridOverlayLayer] = useState(initialCustomize.gridOverlayLayer)
-  const [drawVoronoiGridOverlayOnlyOnLand, setDrawVoronoiGridOverlayOnlyOnLand] = useState(
-    typeof initialCustomize.drawVoronoiGridOverlayOnlyOnLand === 'boolean' ? initialCustomize.drawVoronoiGridOverlayOnlyOnLand : false
-  )
+  const [drawVoronoiGridOverlayOnlyOnLand, setDrawVoronoiGridOverlayOnlyOnLand] = useState(initialCustomize.drawVoronoiGridOverlayOnlyOnLand)
   
   const [finalLandColoringMethod, setFinalLandColoringMethod] = useState(initialCustomize.finalLandColoringMethod)
   const [borderRef, setBorderRef] = useState(initialCustomize.borderRef)
-  const [borderWidth, setBorderWidth] = useState(
-    typeof initialCustomize.borderWidth === 'number' ? initialCustomize.borderWidth : 0
-  )
+  const [borderWidth, setBorderWidth] = useState(initialCustomize.borderWidth)
   const [borderPosition, setBorderPosition] = useState(initialCustomize.borderPosition)
   const [borderColorOption, setBorderColorOption] = useState(initialCustomize.borderColorOption)
   const [borderColorHex, setBorderColorHex] = useState(initialCustomize.borderColorHex)
-  const [frayedBorder, setFrayedBorder] = useState(
-    typeof initialCustomize.frayedBorder === 'boolean' ? initialCustomize.frayedBorder : false
-  )
-  const [frayedBorderBlurLevel, setFrayedBorderBlurLevel] = useState(
-    typeof initialCustomize.frayedBorderBlurLevel === 'number' ? initialCustomize.frayedBorderBlurLevel : 0
-  )
-  const [frayedBorderSize, setFrayedBorderSize] = useState(
-    typeof initialCustomize.frayedBorderSize === 'number' ? initialCustomize.frayedBorderSize : 0
-  )
+  const [frayedBorder, setFrayedBorder] = useState(initialCustomize.frayedBorder)
+  const [frayedBorderBlurLevel, setFrayedBorderBlurLevel] = useState(initialCustomize.frayedBorderBlurLevel)
+  const [frayedBorderSize, setFrayedBorderSize] = useState(initialCustomize.frayedBorderSize)
   const [frayedBorderSeed, setFrayedBorderSeed] = useState(initialCustomize.frayedBorderSeed)
-  const [drawGrunge, setDrawGrunge] = useState(
-    typeof initialCustomize.drawGrunge === 'boolean' ? initialCustomize.drawGrunge : false
-  )
+  const [drawGrunge, setDrawGrunge] = useState(initialCustomize.drawGrunge)
   
-  const [grungeWidth, setGrungeWidth] = useState(
-    typeof initialCustomize.grungeWidth === 'number' ? initialCustomize.grungeWidth : 0
-  )
+  const [grungeWidth, setGrungeWidth] = useState(initialCustomize.grungeWidth)
   const [frayedBorderColorHex, setFrayedBorderColorHex] = useState(initialCustomize.frayedBorderColorHex)
   const [lineStyle, setLineStyle] = useState(initialCustomize.lineStyle)
-  const [coastlineWidth, setCoastlineWidth] = useState(
-    typeof initialCustomize.coastlineWidth === 'number' ? initialCustomize.coastlineWidth : 0
-  )
+  const [coastlineWidth, setCoastlineWidth] = useState(initialCustomize.coastlineWidth)
   const [coastlineColorHex, setCoastlineColorHex] = useState(initialCustomize.coastlineColorHex)
-  const [coastShadingLevel, setCoastShadingLevel] = useState(
-    typeof initialCustomize.coastShadingLevel === 'number' ? initialCustomize.coastShadingLevel : 0
-  )
+  const [coastShadingLevel, setCoastShadingLevel] = useState(initialCustomize.coastShadingLevel)
   const [coastShadingColorHex, setCoastShadingColorHex] = useState(initialCustomize.coastShadingColorHex)
-  const [coastShadingAlpha, setCoastShadingAlpha] = useState(
-    typeof initialCustomize.coastShadingAlpha === 'number' ? initialCustomize.coastShadingAlpha : 0
-  )
-  const [oceanShadingAlpha, setOceanShadingAlpha] = useState(
-    typeof initialCustomize.oceanShadingAlpha === 'number' ? initialCustomize.oceanShadingAlpha : 0
-  )
-  const [oceanShadingLevel, setOceanShadingLevel] = useState(
-    typeof initialCustomize.oceanShadingLevel === 'number' ? initialCustomize.oceanShadingLevel : 0
-  )
+  const [coastShadingAlpha, setCoastShadingAlpha] = useState(initialCustomize.coastShadingAlpha)
+  const [oceanShadingAlpha, setOceanShadingAlpha] = useState(initialCustomize.oceanShadingAlpha)
+  const [oceanShadingLevel, setOceanShadingLevel] = useState(initialCustomize.oceanShadingLevel)
   const [oceanShadingColorHex, setOceanShadingColorHex] = useState(initialCustomize.oceanShadingColorHex)
   const [oceanWavesType, setOceanWavesType] = useState(initialCustomize.oceanWavesType)
-  const [oceanWavesLevel, setOceanWavesLevel] = useState(
-    typeof initialCustomize.oceanWavesLevel === 'number' ? initialCustomize.oceanWavesLevel : 0
-  )
+  const [oceanWavesLevel, setOceanWavesLevel] = useState(initialCustomize.oceanWavesLevel)
   const [oceanWavesColorHex, setOceanWavesColorHex] = useState(initialCustomize.oceanWavesColorHex)
-  const [oceanWavesAlpha, setOceanWavesAlpha] = useState(
-    typeof initialCustomize.oceanWavesAlpha === 'number' ? initialCustomize.oceanWavesAlpha : 0
-  )
-  const [concentricWaveCount, setConcentricWaveCount] = useState(
-    typeof initialCustomize.concentricWaveCount === 'number' ? initialCustomize.concentricWaveCount : 0
-  )
-  const [fadeConcentricWaves, setFadeConcentricWaves] = useState(
-    typeof initialCustomize.fadeConcentricWaves === 'boolean' ? initialCustomize.fadeConcentricWaves : false
-  )
-  const [jitterToConcentricWaves, setJitterToConcentricWaves] = useState(
-    typeof initialCustomize.jitterToConcentricWaves === 'boolean' ? initialCustomize.jitterToConcentricWaves : false
-  )
-  const [brokenLinesForConcentricWaves, setBrokenLinesForConcentricWaves] = useState(
-    typeof initialCustomize.brokenLinesForConcentricWaves === 'boolean' ? initialCustomize.brokenLinesForConcentricWaves : false
-  )
-  const [drawOceanEffectsInLakes, setDrawOceanEffectsInLakes] = useState(
-    typeof initialCustomize.drawOceanEffectsInLakes === 'boolean' ? initialCustomize.drawOceanEffectsInLakes : false
-  )
+  const [oceanWavesAlpha, setOceanWavesAlpha] = useState(initialCustomize.oceanWavesAlpha)
+  const [concentricWaveCount, setConcentricWaveCount] = useState(initialCustomize.concentricWaveCount)
+  const [fadeConcentricWaves, setFadeConcentricWaves] = useState(initialCustomize.fadeConcentricWaves)
+  const [jitterToConcentricWaves, setJitterToConcentricWaves] = useState(initialCustomize.jitterToConcentricWaves)
+  const [brokenLinesForConcentricWaves, setBrokenLinesForConcentricWaves] = useState(initialCustomize.brokenLinesForConcentricWaves)
+  const [drawOceanEffectsInLakes, setDrawOceanEffectsInLakes] = useState(initialCustomize.drawOceanEffectsInLakes)
   const [riverColorHex, setRiverColorHex] = useState(initialCustomize.riverColorHex)
-  const [drawRoads, setDrawRoads] = useState(
-    typeof initialCustomize.drawRoads === 'boolean' ? initialCustomize.drawRoads : false
-  )
+  const [drawRoads, setDrawRoads] = useState(initialCustomize.drawRoads)
   const [roadStyle, setRoadStyle] = useState(initialCustomize.roadStyle)
-  const [roadWidth, setRoadWidth] = useState(
-    typeof initialCustomize.roadWidth === 'number' ? initialCustomize.roadWidth : 0
-  )
+  const [roadWidth, setRoadWidth] = useState(initialCustomize.roadWidth)
   const [roadColorHex, setRoadColorHex] = useState(initialCustomize.roadColorHex)
-  const [mountainSize, setMountainSize] = useState(typeof initialCustomize.mountainSize === 'number' ? initialCustomize.mountainSize : 0)
-  const [hillSize, setHillSize] = useState(typeof initialCustomize.hillSize === 'number' ? initialCustomize.hillSize : 0)
-  const [duneSize, setDuneSize] = useState(typeof initialCustomize.duneSize === 'number' ? initialCustomize.duneSize : 0)
-  const [treeHeight, setTreeHeight] = useState(typeof initialCustomize.treeHeight === 'number' ? initialCustomize.treeHeight : 0)
-  const [citySize, setCitySize] = useState(typeof initialCustomize.citySize === 'number' ? initialCustomize.citySize : 0)
-  const [drawText, setDrawText] = useState(typeof initialCustomize.drawText === 'boolean' ? initialCustomize.drawText : false)
+  const [mountainSize, setMountainSize] = useState(initialCustomize.mountainSize)
+  const [hillSize, setHillSize] = useState(initialCustomize.hillSize)
+  const [duneSize, setDuneSize] = useState(initialCustomize.duneSize)
+  const [treeHeight, setTreeHeight] = useState(initialCustomize.treeHeight)
+  const [citySize, setCitySize] = useState(initialCustomize.citySize)
+  const [drawText, setDrawText] = useState(initialCustomize.drawText)
   const [titleFontFamily, setTitleFontFamily] = useState(initialCustomize.titleFontFamily)
   const [regionFontFamily, setRegionFontFamily] = useState(initialCustomize.regionFontFamily)
   const [mountainRangeFontFamily, setMountainRangeFontFamily] = useState(initialCustomize.mountainRangeFontFamily)
@@ -453,7 +410,7 @@ function GenerateForm({ uiLanguage = 'en' }) {
   const [citiesFontFamily, setCitiesFontFamily] = useState(initialCustomize.citiesFontFamily)
   const [riverFontFamily, setRiverFontFamily] = useState(initialCustomize.riverFontFamily)
   const [textColorHex, setTextColorHex] = useState(initialCustomize.textColorHex)
-  const [drawBoldBackground, setDrawBoldBackground] = useState(typeof initialCustomize.drawBoldBackground === 'boolean' ? initialCustomize.drawBoldBackground : false)
+  const [drawBoldBackground, setDrawBoldBackground] = useState(initialCustomize.drawBoldBackground)
   const [boldBackgroundColorHex, setBoldBackgroundColorHex] = useState(initialCustomize.boldBackgroundColorHex)
 
   // --- Shared state ---
@@ -644,209 +601,202 @@ function GenerateForm({ uiLanguage = 'en' }) {
 
   // Apply backend `defaults` to the UI using the existing setters.
   function applyServerDefaults(defs, opts) {
-    const setHex = (setter, value) => {
-      if (value) {
-        const h = colorToHex(value)
-        if (h) setter(h)
+    // Helper setters shared across appliers
+    const setHex = (setter, value) => { if (value) { const h = colorToHex(value); if (h) setter(h) } }
+    const setNumber = (setter, value) => { if (Number.isFinite(Number(value))) setter(Number(value)) }
+    const setString = (setter, value) => { if (value !== undefined && value !== null) setter(String(value)) }
+    const setBoolean = (setter, value) => { if (typeof value === 'boolean') setter(value) }
+
+    const applyBasicSettings = (defs, opts) => {
+      setNumber(setWorldSize, defs.worldSize)
+      setNumber(setRegionCount, defs.regionCount)
+      if (defs.cityProbability !== undefined && opts && opts.maxCityProbability !== undefined) {
+        setNumber(setCityFrequency, (Number(defs.cityProbability) / Number(opts.maxCityProbability)) * 100)
       }
-    }
-    const setNumber = (setter, value) => {
-      if (Number.isFinite(Number(value))) setter(Number(value))
-    }
-    const setString = (setter, value) => {
-      if (value !== undefined && value !== null) setter(String(value))
-    }
-    const setBoolean = (setter, value) => {
-      if (typeof value === 'boolean') setter(value)
+      setNumber(setFinalWidth, defs.generatedWidth)
+      setNumber(setFinalHeight, defs.generatedHeight)
+      setString(setMapLanguage, defs.mapLanguage)
+      setString(setDimension, defs.dimension)
+      setString(setLandShape, defs.landShape)
+      setString(setArtPack, defs.artPack)
+      setString(setCityIconType, defs.cityIconType ?? defs.cityIconSetName)
     }
 
-    setNumber(setWorldSize, defs.worldSize)
-    setNumber(setRegionCount, defs.regionCount)
-    if (defs.cityProbability !== undefined && opts.maxCityProbability !== undefined) {
-      setNumber(setCityFrequency, (Number(defs.cityProbability) / Number(opts.maxCityProbability)) * 100)
-    }
-    setNumber(setFinalWidth, defs.generatedWidth)
-    setNumber(setFinalHeight, defs.generatedHeight)
-    setString(setMapLanguage, defs.mapLanguage)
-    setString(setDimension, defs.dimension)
-    setString(setLandShape, defs.landShape)
-    setString(setArtPack, defs.artPack)
-    setString(setCityIconType, defs.cityIconType ?? defs.cityIconSetName)
-    setString(setBackgroundType, defs.backgroundType)
-    setString(setTextureRef, defs.textureRef)
-    setString(setBackgroundSeed, defs.backgroundRandomSeed)
-    setBoolean(setDrawRegionBoundaries, defs.drawRegionBoundaries)
-    setBoolean(setColorizeLand, defs.colorizeLand)
-    setBoolean(setColorizeOcean, defs.colorizeOcean)
-    setHex(setOceanColorHex, defs.oceanColor)
-    setHex(setLandColorHex, defs.landColor)
-    setHex(setRegionBoundaryColorHex, defs.regionBoundaryColor)
-    setNumber(setRegionBoundaryWidth, defs.regionBoundaryWidth)
-    setBoolean(setDrawBorder, defs.drawBorder)
-    setBoolean(setDrawGridOverlay, defs.drawGridOverlay)
-    setString(setGridOverlayShape, defs.gridOverlayShape)
-    setNumber(setGridOverlayRowOrColCount, defs.gridOverlayRowOrColCount)
-    setHex(setGridOverlayColorHex, defs.gridOverlayColor)
-    if (defs.gridOverlayXOffset !== undefined && defs.gridOverlayXOffset !== null) setGridOverlayXOffset(defs.gridOverlayXOffset)
-    if (defs.gridOverlayYOffset !== undefined && defs.gridOverlayYOffset !== null) setGridOverlayYOffset(defs.gridOverlayYOffset)
-    setNumber(setGridOverlayLineWidth, defs.gridOverlayLineWidth)
-    setString(setGridOverlayLayer, defs.gridOverlayLayer)
-    setBoolean(setDrawVoronoiGridOverlayOnlyOnLand, defs.drawVoronoiGridOverlayOnlyOnLand)
-    setString(setFinalLandColoringMethod, defs.finalLandColoringMethod)
-    if (typeof defs.drawRegionColors === 'boolean') {
-      const method = defs.drawRegionColors ? 'ColorPoliticalRegions' : 'SingleColor'
-      setString(setLandColoringMethod, method)
-      setString(setFinalLandColoringMethod, method)
-    }
-    setString(setBorderRef, defs.borderRef)
-    setNumber(setBorderWidth, defs.borderWidth)
-    setString(setBorderPosition, defs.borderPosition)
-    setString(setBorderColorOption, defs.borderColorOption)
-    setHex(setBorderColorHex, defs.borderColor)
-    setBoolean(setFrayedBorder, defs.frayedBorder)
-    setNumber(setFrayedBorderBlurLevel, defs.frayedBorderBlurLevel)
-    setNumber(setFrayedBorderSize, defs.frayedBorderSize)
-    setString(setFrayedBorderSeed, defs.frayedBorderSeed)
-    setBoolean(setDrawGrunge, defs.drawGrunge)
-    setNumber(setGrungeWidth, defs.grungeWidth)
-    setHex(setFrayedBorderColorHex, defs.frayedBorderColor)
-    setString(setLineStyle, defs.lineStyle)
-    setNumber(setCoastlineWidth, defs.coastlineWidth)
-    setHex(setCoastlineColorHex, defs.coastlineColor)
-    setNumber(setCoastShadingLevel, defs.coastShadingLevel)
-    setHex(setCoastShadingColorHex, defs.coastShadingColor)
-    // If an explicit alpha value isn't provided, derive it from the
-    // color string returned by the backend when possible.
-    if (defs.coastShadingAlpha !== undefined && defs.coastShadingAlpha !== null) {
-      setNumber(setCoastShadingAlpha, defs.coastShadingAlpha)
-    } else if (defs.coastShadingColor) {
-      const ch = parseColorChannels(defs.coastShadingColor)
-      if (ch && ch.a !== undefined && Number.isFinite(Number(ch.a))) setNumber(setCoastShadingAlpha, Number(ch.a))
-    }
-    // Ocean shading color/alpha: prefer explicit alpha, otherwise derive from color string
-    if (defs.oceanShadingAlpha !== undefined && defs.oceanShadingAlpha !== null) {
-      setNumber(setOceanShadingAlpha, defs.oceanShadingAlpha)
-    } else if (defs.oceanShadingColor) {
-      const ch = parseColorChannels(defs.oceanShadingColor)
-      if (ch && ch.a !== undefined && Number.isFinite(Number(ch.a))) setNumber(setOceanShadingAlpha, Number(ch.a))
-    }
-    setNumber(setOceanShadingLevel, defs.oceanShadingLevel)
-    setHex(setOceanShadingColorHex, defs.oceanShadingColor)
-    setString(setOceanWavesType, defs.oceanWavesType)
-    setNumber(setOceanWavesLevel, defs.oceanWavesLevel)
-    setHex(setOceanWavesColorHex, defs.oceanWavesColor)
-    if (defs.oceanWavesAlpha !== undefined && defs.oceanWavesAlpha !== null) {
-      setNumber(setOceanWavesAlpha, defs.oceanWavesAlpha)
-    } else if (defs.oceanWavesColor) {
-      const ch = parseColorChannels(defs.oceanWavesColor)
-      if (ch && ch.a !== undefined && Number.isFinite(Number(ch.a))) setNumber(setOceanWavesAlpha, Number(ch.a))
-    }
-    setNumber(setConcentricWaveCount, defs.concentricWaveCount)
-    setBoolean(setFadeConcentricWaves, defs.fadeConcentricWaves)
-    setBoolean(setJitterToConcentricWaves, defs.jitterToConcentricWaves)
-    setBoolean(setBrokenLinesForConcentricWaves, defs.brokenLinesForConcentricWaves)
-    setBoolean(setDrawOceanEffectsInLakes, defs.drawOceanEffectsInLakes)
-    setHex(setRiverColorHex, defs.riverColor)
-    setBoolean(setDrawRoads, defs.drawRoads)
-    // Handle roadStyle which may be an object {type, width} or a string.
-    if (typeof defs.roadStyle === 'object' && defs.roadStyle !== null) {
-      if (typeof defs.roadStyle.type === 'string') setString(setRoadStyle, defs.roadStyle.type)
-      if (Number.isFinite(Number(defs.roadStyle.width))) setNumber(setRoadWidth, Number(defs.roadStyle.width))
-    } else if (typeof defs.roadStyle === 'string') {
-      setString(setRoadStyle, defs.roadStyle)
-    }
-    if (Number.isFinite(Number(defs.roadWidth))) setNumber(setRoadWidth, defs.roadWidth)
-    setHex(setRoadColorHex, defs.roadColor)
-
-    // Sizes: backend may provide 'Scale' fields (mountainScale, hillScale, etc.)
-    // Convert those to UI slider values. Prefer explicit scale fields
-    // when present; otherwise use legacy numeric Size fields.
-    const convertScaleToSlider = (scale) => {
-      const s = Number(scale)
-      if (!Number.isFinite(s)) return undefined
-      const sliderValueFor1Scale = 5
-      const scaleMax = 3.0
-      const scaleMin = 0.5
-      const minScaleSliderValue = 1
-      const maxScaleSliderValue = 15
-      const v1Slope = (sliderValueFor1Scale - minScaleSliderValue) / (1.0 - scaleMin)
-      const v1YIntercept = sliderValueFor1Scale - v1Slope
-      const v2Slope = (maxScaleSliderValue - sliderValueFor1Scale) / (scaleMax - 1.0)
-      const v2YIntercept = sliderValueFor1Scale - v2Slope * 1.0
-      let v
-      if (s <= 1.0) {
-        v = v1Slope * s + v1YIntercept
-      } else {
-        v = v2Slope * s + v2YIntercept
+    const applyGridAndBorders = (defs) => {
+      setString(setBackgroundType, defs.backgroundType)
+      setString(setTextureRef, defs.textureRef)
+      setString(setBackgroundSeed, defs.backgroundRandomSeed)
+      setBoolean(setDrawRegionBoundaries, defs.drawRegionBoundaries)
+      setBoolean(setColorizeLand, defs.colorizeLand)
+      setBoolean(setColorizeOcean, defs.colorizeOcean)
+      setHex(setOceanColorHex, defs.oceanColor)
+      setHex(setLandColorHex, defs.landColor)
+      setHex(setRegionBoundaryColorHex, defs.regionBoundaryColor)
+      setNumber(setRegionBoundaryWidth, defs.regionBoundaryWidth)
+      setBoolean(setDrawBorder, defs.drawBorder)
+      setBoolean(setDrawGridOverlay, defs.drawGridOverlay)
+      setString(setGridOverlayShape, defs.gridOverlayShape)
+      setNumber(setGridOverlayRowOrColCount, defs.gridOverlayRowOrColCount)
+      setHex(setGridOverlayColorHex, defs.gridOverlayColor)
+      if (defs.gridOverlayXOffset !== undefined && defs.gridOverlayXOffset !== null) setGridOverlayXOffset(defs.gridOverlayXOffset)
+      if (defs.gridOverlayYOffset !== undefined && defs.gridOverlayYOffset !== null) setGridOverlayYOffset(defs.gridOverlayYOffset)
+      setNumber(setGridOverlayLineWidth, defs.gridOverlayLineWidth)
+      setString(setGridOverlayLayer, defs.gridOverlayLayer)
+      setBoolean(setDrawVoronoiGridOverlayOnlyOnLand, defs.drawVoronoiGridOverlayOnlyOnLand)
+      setString(setFinalLandColoringMethod, defs.finalLandColoringMethod)
+      if (typeof defs.drawRegionColors === 'boolean') {
+        const method = defs.drawRegionColors ? 'ColorPoliticalRegions' : 'SingleColor'
+        setString(setLandColoringMethod, method)
+        setString(setFinalLandColoringMethod, method)
       }
-      v = Math.round(v)
-      if (v < minScaleSliderValue) v = minScaleSliderValue
-      if (v > maxScaleSliderValue) v = maxScaleSliderValue
-      return v
+      setString(setBorderRef, defs.borderRef)
+      setNumber(setBorderWidth, defs.borderWidth)
+      setString(setBorderPosition, defs.borderPosition)
+      setString(setBorderColorOption, defs.borderColorOption)
+      setHex(setBorderColorHex, defs.borderColor)
+      setBoolean(setFrayedBorder, defs.frayedBorder)
+      setNumber(setFrayedBorderBlurLevel, defs.frayedBorderBlurLevel)
+      setNumber(setFrayedBorderSize, defs.frayedBorderSize)
+      setString(setFrayedBorderSeed, defs.frayedBorderSeed)
+      setBoolean(setDrawGrunge, defs.drawGrunge)
+      setNumber(setGrungeWidth, defs.grungeWidth)
+      setHex(setFrayedBorderColorHex, defs.frayedBorderColor)
+      setString(setLineStyle, defs.lineStyle)
+      setNumber(setCoastlineWidth, defs.coastlineWidth)
+      setHex(setCoastlineColorHex, defs.coastlineColor)
     }
 
-    try {
-      // mountain size
-      if (defs.mountainScale !== undefined && defs.mountainScale !== null && Number.isFinite(Number(defs.mountainScale))) {
-        const v = convertScaleToSlider(defs.mountainScale)
-        if (v !== undefined) setNumber(setMountainSize, v)
-      } else if (Number.isFinite(Number(defs.mountainSize))) {
-        setNumber(setMountainSize, defs.mountainSize)
+    const applyOceanAndRoads = (defs) => {
+      setNumber(setCoastShadingLevel, defs.coastShadingLevel)
+      setHex(setCoastShadingColorHex, defs.coastShadingColor)
+      if (defs.coastShadingAlpha !== undefined && defs.coastShadingAlpha !== null) {
+        setNumber(setCoastShadingAlpha, defs.coastShadingAlpha)
+      } else if (defs.coastShadingColor) {
+        const ch = parseColorChannels(defs.coastShadingColor)
+        if (ch && ch.a !== undefined && Number.isFinite(Number(ch.a))) setNumber(setCoastShadingAlpha, Number(ch.a))
       }
-      // hill size
-      if (defs.hillScale !== undefined && defs.hillScale !== null && Number.isFinite(Number(defs.hillScale))) {
-        const v = convertScaleToSlider(defs.hillScale)
-        if (v !== undefined) setNumber(setHillSize, v)
-      } else if (Number.isFinite(Number(defs.hillSize))) {
-        setNumber(setHillSize, defs.hillSize)
+      if (defs.oceanShadingAlpha !== undefined && defs.oceanShadingAlpha !== null) {
+        setNumber(setOceanShadingAlpha, defs.oceanShadingAlpha)
+      } else if (defs.oceanShadingColor) {
+        const ch = parseColorChannels(defs.oceanShadingColor)
+        if (ch && ch.a !== undefined && Number.isFinite(Number(ch.a))) setNumber(setOceanShadingAlpha, Number(ch.a))
       }
-      // dune size
-      if (defs.duneScale !== undefined && defs.duneScale !== null && Number.isFinite(Number(defs.duneScale))) {
-        const v = convertScaleToSlider(defs.duneScale)
-        if (v !== undefined) setNumber(setDuneSize, v)
-      } else if (Number.isFinite(Number(defs.duneSize))) {
-        setNumber(setDuneSize, defs.duneSize)
+      setNumber(setOceanShadingLevel, defs.oceanShadingLevel)
+      setHex(setOceanShadingColorHex, defs.oceanShadingColor)
+      setString(setOceanWavesType, defs.oceanWavesType)
+      setNumber(setOceanWavesLevel, defs.oceanWavesLevel)
+      setHex(setOceanWavesColorHex, defs.oceanWavesColor)
+      if (defs.oceanWavesAlpha !== undefined && defs.oceanWavesAlpha !== null) {
+        setNumber(setOceanWavesAlpha, defs.oceanWavesAlpha)
+      } else if (defs.oceanWavesColor) {
+        const ch = parseColorChannels(defs.oceanWavesColor)
+        if (ch && ch.a !== undefined && Number.isFinite(Number(ch.a))) setNumber(setOceanWavesAlpha, Number(ch.a))
       }
-      // tree height (special mapping)
-      if (defs.treeHeightScale !== undefined && defs.treeHeightScale !== null && Number.isFinite(Number(defs.treeHeightScale))) {
-        const s = Number(defs.treeHeightScale)
-        // forward mapping: treeScale = 0.1 + v * 0.05 -> inverse: v = (scale - 0.1)/0.05
-        let v = Math.round((s - 0.1) / 0.05)
-        if (v < 1) v = 1
-        if (v > 15) v = 15
-        setNumber(setTreeHeight, v)
-      } else if (Number.isFinite(Number(defs.treeHeight))) {
-        setNumber(setTreeHeight, defs.treeHeight)
+      setNumber(setConcentricWaveCount, defs.concentricWaveCount)
+      setBoolean(setFadeConcentricWaves, defs.fadeConcentricWaves)
+      setBoolean(setJitterToConcentricWaves, defs.jitterToConcentricWaves)
+      setBoolean(setBrokenLinesForConcentricWaves, defs.brokenLinesForConcentricWaves)
+      setBoolean(setDrawOceanEffectsInLakes, defs.drawOceanEffectsInLakes)
+      setHex(setRiverColorHex, defs.riverColor)
+      setBoolean(setDrawRoads, defs.drawRoads)
+      // Handle roadStyle which may be an object {type, width} or a string.
+      if (typeof defs.roadStyle === 'object' && defs.roadStyle !== null) {
+        if (typeof defs.roadStyle.type === 'string') setString(setRoadStyle, defs.roadStyle.type)
+        if (Number.isFinite(Number(defs.roadStyle.width))) setNumber(setRoadWidth, Number(defs.roadStyle.width))
+      } else if (typeof defs.roadStyle === 'string') {
+        setString(setRoadStyle, defs.roadStyle)
       }
-      // city size
-      if (defs.cityScale !== undefined && defs.cityScale !== null && Number.isFinite(Number(defs.cityScale))) {
-        const v = convertScaleToSlider(defs.cityScale)
-        if (v !== undefined) setNumber(setCitySize, v)
-      } else if (Number.isFinite(Number(defs.citySize))) {
-        setNumber(setCitySize, defs.citySize)
-      }
-    } catch (e) {
-      // GenerateForm: size mapping failed (debug suppressed)
+      if (Number.isFinite(Number(defs.roadWidth))) setNumber(setRoadWidth, defs.roadWidth)
+      setHex(setRoadColorHex, defs.roadColor)
     }
-    setBoolean(setDrawText, defs.drawText)
-    setString(setTitleFontFamily, defs.titleFontFamily)
-    setString(setRegionFontFamily, defs.regionFontFamily)
-    setString(setMountainRangeFontFamily, defs.mountainRangeFontFamily)
-    setString(setOtherMountainsFontFamily, defs.otherMountainsFontFamily)
-    setString(setCitiesFontFamily, defs.citiesFontFamily)
-    setString(setRiverFontFamily, defs.riverFontFamily)
-    setHex(setTextColorHex, defs.textColor)
-    setBoolean(setDrawBoldBackground, defs.drawBoldBackground)
-    setHex(setBoldBackgroundColorHex, defs.boldBackgroundColor)
 
-    const backendDefaultFont = (opts && opts.defaultFontFamily) ? opts.defaultFontFamily : (Array.isArray(opts.fonts) && opts.fonts.length > 0 ? opts.fonts[0] : null)
-    if (!titleFontFamily && backendDefaultFont) setTitleFontFamily(backendDefaultFont)
-    if (!regionFontFamily && backendDefaultFont) setRegionFontFamily(backendDefaultFont)
-    if (!mountainRangeFontFamily && backendDefaultFont) setMountainRangeFontFamily(backendDefaultFont)
-    if (!otherMountainsFontFamily && backendDefaultFont) setOtherMountainsFontFamily(backendDefaultFont)
-    if (!citiesFontFamily && backendDefaultFont) setCitiesFontFamily(backendDefaultFont)
-    if (!riverFontFamily && backendDefaultFont) setRiverFontFamily(backendDefaultFont)
-    if (Array.isArray(defs.books)) setSelectedBooks(new Set(defs.books))
+    const applySizeMappings = (defs) => {
+      const convertScaleToSlider = (scale) => {
+        const s = Number(scale)
+        if (!Number.isFinite(s)) return undefined
+        const sliderValueFor1Scale = 5
+        const scaleMax = 3.0
+        const scaleMin = 0.5
+        const minScaleSliderValue = 1
+        const maxScaleSliderValue = 15
+        const v1Slope = (sliderValueFor1Scale - minScaleSliderValue) / (1.0 - scaleMin)
+        const v1YIntercept = sliderValueFor1Scale - v1Slope
+        const v2Slope = (maxScaleSliderValue - sliderValueFor1Scale) / (scaleMax - 1.0)
+        const v2YIntercept = sliderValueFor1Scale - v2Slope * 1.0
+        let v
+        if (s <= 1.0) v = v1Slope * s + v1YIntercept
+        else v = v2Slope * s + v2YIntercept
+        v = Math.round(v)
+        if (v < minScaleSliderValue) v = minScaleSliderValue
+        if (v > maxScaleSliderValue) v = maxScaleSliderValue
+        return v
+      }
+      try {
+        if (defs.mountainScale !== undefined && defs.mountainScale !== null && Number.isFinite(Number(defs.mountainScale))) {
+          const v = convertScaleToSlider(defs.mountainScale)
+          if (v !== undefined) setNumber(setMountainSize, v)
+        } else if (Number.isFinite(Number(defs.mountainSize))) {
+          setNumber(setMountainSize, defs.mountainSize)
+        }
+        if (defs.hillScale !== undefined && defs.hillScale !== null && Number.isFinite(Number(defs.hillScale))) {
+          const v = convertScaleToSlider(defs.hillScale)
+          if (v !== undefined) setNumber(setHillSize, v)
+        } else if (Number.isFinite(Number(defs.hillSize))) {
+          setNumber(setHillSize, defs.hillSize)
+        }
+        if (defs.duneScale !== undefined && defs.duneScale !== null && Number.isFinite(Number(defs.duneScale))) {
+          const v = convertScaleToSlider(defs.duneScale)
+          if (v !== undefined) setNumber(setDuneSize, v)
+        } else if (Number.isFinite(Number(defs.duneSize))) {
+          setNumber(setDuneSize, defs.duneSize)
+        }
+        if (defs.treeHeightScale !== undefined && defs.treeHeightScale !== null && Number.isFinite(Number(defs.treeHeightScale))) {
+          const s = Number(defs.treeHeightScale)
+          let v = Math.round((s - 0.1) / 0.05)
+          if (v < 1) v = 1
+          if (v > 15) v = 15
+          setNumber(setTreeHeight, v)
+        } else if (Number.isFinite(Number(defs.treeHeight))) {
+          setNumber(setTreeHeight, defs.treeHeight)
+        }
+        if (defs.cityScale !== undefined && defs.cityScale !== null && Number.isFinite(Number(defs.cityScale))) {
+          const v = convertScaleToSlider(defs.cityScale)
+          if (v !== undefined) setNumber(setCitySize, v)
+        } else if (Number.isFinite(Number(defs.citySize))) {
+          setNumber(setCitySize, defs.citySize)
+        }
+      } catch (e) {
+        // size mapping failed silently
+      }
+    }
+
+    const applyTextAndFonts = (defs, opts) => {
+      setBoolean(setDrawText, defs.drawText)
+      setString(setTitleFontFamily, defs.titleFontFamily)
+      setString(setRegionFontFamily, defs.regionFontFamily)
+      setString(setMountainRangeFontFamily, defs.mountainRangeFontFamily)
+      setString(setOtherMountainsFontFamily, defs.otherMountainsFontFamily)
+      setString(setCitiesFontFamily, defs.citiesFontFamily)
+      setString(setRiverFontFamily, defs.riverFontFamily)
+      setHex(setTextColorHex, defs.textColor)
+      setBoolean(setDrawBoldBackground, defs.drawBoldBackground)
+      setHex(setBoldBackgroundColorHex, defs.boldBackgroundColor)
+      const backendDefaultFont = (opts && opts.defaultFontFamily) ? opts.defaultFontFamily : (Array.isArray(opts && opts.fonts) && opts.fonts.length > 0 ? opts.fonts[0] : null)
+      if (!titleFontFamily && backendDefaultFont) setTitleFontFamily(backendDefaultFont)
+      if (!regionFontFamily && backendDefaultFont) setRegionFontFamily(backendDefaultFont)
+      if (!mountainRangeFontFamily && backendDefaultFont) setMountainRangeFontFamily(backendDefaultFont)
+      if (!otherMountainsFontFamily && backendDefaultFont) setOtherMountainsFontFamily(backendDefaultFont)
+      if (!citiesFontFamily && backendDefaultFont) setCitiesFontFamily(backendDefaultFont)
+      if (!riverFontFamily && backendDefaultFont) setRiverFontFamily(backendDefaultFont)
+      if (Array.isArray(defs.books)) setSelectedBooks(new Set(defs.books))
+    }
+
+    // Delegate to smaller appliers
+    applyBasicSettings(defs, opts)
+    applyGridAndBorders(defs)
+    applyOceanAndRoads(defs)
+    applySizeMappings(defs)
+    applyTextAndFonts(defs, opts)
   }
 
   const updateRandomOverride = useCallback((key, value) => {
@@ -1621,61 +1571,57 @@ function GenerateForm({ uiLanguage = 'en' }) {
     const toast = makeProgressToastController()
 
     try {
-      // Build a compact random-block payload and POST directly to /api/generate
+      // Build, resolve, and request the generated map using small helpers
       toast.show('Preparing map settings...')
-      const isManual = (k) => Object.prototype.hasOwnProperty.call(randomOverrides, k)
-      const cfg = {
-        language: isManual('mapLanguage') ? (mapLanguage ? mapLanguage : undefined) : undefined,
-        randomSeed: isManual('randomSeed') ? (randomSeed ? Number(randomSeed) : undefined) : undefined,
-        artPack: isManual('artPack') ? (artPack ? artPack : undefined) : undefined,
-        dimension: isManual('dimension') ? (dimension ? dimension : undefined) : undefined,
-        worldSize: isManual('worldSize') ? worldSize : undefined,
-        landShape: isManual('landShape') ? (landShape ? landShape : undefined) : undefined,
-        regionCount: isManual('regionCount') ? regionCount : undefined,
-        drawRegionColors: isManual('landColoringMethod') ? (landColoringMethod ? (landColoringMethod === 'ColorPoliticalRegions') : undefined) : undefined,
-        cityFrequency: isManual('cityFrequency') ? cityFrequency : undefined,
-        // Preserve a manually-selected city icon set for the settings resolver
-        cityIconSetName: isManual('cityIconType') ? (cityIconType ? cityIconType : undefined) : undefined,
-        books: isManual('selectedBooks') ? (selectedBooks.size > 0 ? Array.from(selectedBooks) : undefined) : undefined,
+      const buildRandomCfg = () => {
+        const isManual = (k) => Object.prototype.hasOwnProperty.call(randomOverrides, k)
+        return {
+          language: isManual('mapLanguage') ? (mapLanguage ? mapLanguage : undefined) : undefined,
+          randomSeed: isManual('randomSeed') ? (randomSeed ? Number(randomSeed) : undefined) : undefined,
+          artPack: isManual('artPack') ? (artPack ? artPack : undefined) : undefined,
+          dimension: isManual('dimension') ? (dimension ? dimension : undefined) : undefined,
+          worldSize: isManual('worldSize') ? worldSize : undefined,
+          landShape: isManual('landShape') ? (landShape ? landShape : undefined) : undefined,
+          regionCount: isManual('regionCount') ? regionCount : undefined,
+          drawRegionColors: isManual('landColoringMethod') ? (landColoringMethod ? (landColoringMethod === 'ColorPoliticalRegions') : undefined) : undefined,
+          cityFrequency: isManual('cityFrequency') ? cityFrequency : undefined,
+          cityIconSetName: isManual('cityIconType') ? (cityIconType ? cityIconType : undefined) : undefined,
+          books: isManual('selectedBooks') ? (selectedBooks.size > 0 ? Array.from(selectedBooks) : undefined) : undefined,
+        }
       }
 
-      // First request: resolved settings (no image)
-      const settingsRes = await fetch(`${API_BASE}/generate-settings`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(cfg),
-      })
-      if (!settingsRes.ok) await handleResponseError(settingsRes)
-      // Server now returns the normalized .nort JSON directly as the body.
-      const nortContent = await settingsRes.text()
-      if (!nortContent) throw new Error('Server did not return settings content.')
-
-      // Apply returned settings to UI so controls reflect generated values
-      let parsedReturned = null
-      try {
-        parsedReturned = tryParse(nortContent)
-        if (parsedReturned) mergedSettingsRef.current = parsedReturned
-      } catch (e) {
-        // GenerateForm: failed to parse nortContent from handleRandom response (debug suppressed)
+      const fetchResolvedNort = async (cfg) => {
+        const settingsRes = await fetch(`${API_BASE}/generate-settings`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(cfg),
+        })
+        if (!settingsRes.ok) await handleResponseError(settingsRes)
+        const nortContent = await settingsRes.text()
+        if (!nortContent) throw new Error('Server did not return settings content.')
+        return nortContent
       }
-      try { appliersRef.current.applyMapSizeAndSeedSettings(mergedSettingsRef.current) } catch (e) { throw e }
-      try { appliersRef.current.applyBackgroundTypeSettings(mergedSettingsRef.current) } catch (e) { throw e }
 
-      // Now request final image by POSTing the returned .nort as FormData
+      const applyReturnedSettingsToUi = (nortContent) => {
+        try {
+          const parsed = tryParse(nortContent)
+          if (parsed) mergedSettingsRef.current = parsed
+        } catch (e) {
+          // Ignore parse errors
+        }
+        try { appliersRef.current.applyMapSizeAndSeedSettings(mergedSettingsRef.current) } catch (e) { throw e }
+        try { appliersRef.current.applyBackgroundTypeSettings(mergedSettingsRef.current) } catch (e) { throw e }
+      }
+
+      const cfg = buildRandomCfg()
+      const nortContent = await fetchResolvedNort(cfg)
+      applyReturnedSettingsToUi(nortContent)
+
+      // Now request final image by POSTing the returned .nort JSON
       toast.show('Generating random map...')
-      // If the UI specified a map language override, embed it into the
-      // returned settings JSON under the `language` field so the server
-      // consumes it from the .nort content rather than a separate form param.
-      if (parsedReturned && isManual('mapLanguage') && mapLanguage) {
-        parsedReturned.language = mapLanguage
-      }
-      // Ensure a manually-selected city icon type is preserved in the
-      // returned settings. The server and other appliers expect the
-      // legacy `cityIconSetName` field.
-      if (parsedReturned && isManual('cityIconType') && cityIconType) {
-        parsedReturned.cityIconSetName = cityIconType
-      }
-      // Send the returned .nort JSON as the raw request body (no wrapper).
+      const parsedReturned = tryParse(nortContent)
+      if (parsedReturned && Object.prototype.hasOwnProperty.call(randomOverrides, 'mapLanguage') && mapLanguage) parsedReturned.language = mapLanguage
+      if (parsedReturned && Object.prototype.hasOwnProperty.call(randomOverrides, 'cityIconType') && cityIconType) parsedReturned.cityIconSetName = cityIconType
       const bodyPayload = parsedReturned ? parsedReturned : tryParse(nortContent)
       await runGenerate({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(bodyPayload) }, 'random-map', { type: 'random', name: 'Random Map', nortContent }, 'preview', toast)
     } catch (err) {
@@ -1796,127 +1742,126 @@ function GenerateForm({ uiLanguage = 'en' }) {
   // Reused by buildNortContentRequest and random-map outgoing settings.
   function mergeUiIntoParsed(parsedSettings) {
     try {
-      // Handle background type flags
-      const bgFlags = {
-        'SolidColor': { solidColorBackground: true, generateBackgroundFromTexture: false, generateBackground: false },
-        'GeneratedFromTexture': { solidColorBackground: false, generateBackgroundFromTexture: true, generateBackground: false },
-      }
-      const flags = bgFlags[backgroundType] ? bgFlags[backgroundType] : { solidColorBackground: false, generateBackgroundFromTexture: false, generateBackground: true }
-      Object.assign(parsedSettings, flags)
-
-      // Resources
-      setResourceFromRef(parsedSettings, 'borderResource', borderRef)
-      setResourceFromRef(parsedSettings, 'backgroundTextureResource', textureRef)
-
-      // Background seed
-      if (backgroundSeed) parsedSettings.backgroundRandomSeed = Number(backgroundSeed)
-
-      // Top-level map/randomization fields
-      if (artPack) parsedSettings.artPack = artPack
-      if (typeof worldSize !== 'undefined') parsedSettings.worldSize = Number(worldSize)
-      if (landShape) parsedSettings.landShape = landShape
-      if (Number.isFinite(Number(regionCount))) parsedSettings.regionCount = Number(regionCount)
-      if (randomSeed) parsedSettings.randomSeed = Number(randomSeed)
-      if (selectedBooks && typeof selectedBooks === 'object' && typeof selectedBooks.size === 'number') parsedSettings.books = Array.from(selectedBooks).sort()
-
-      // Region boundary style & color
-      if (!parsedSettings.regionBoundaryStyle || typeof parsedSettings.regionBoundaryStyle !== 'object') parsedSettings.regionBoundaryStyle = {}
-      if (regionBoundaryStyle) parsedSettings.regionBoundaryStyle.type = regionBoundaryStyle
-      if (Number.isFinite(Number(regionBoundaryWidth))) parsedSettings.regionBoundaryStyle.width = Number(regionBoundaryWidth)
-      mergeColor(parsedSettings, 'regionBoundaryColor', regionBoundaryColorHex)
-
-      // Draw flags and colorization
-      parsedSettings.drawRegionBoundaries = Boolean(drawRegionBoundaries)
-      parsedSettings.colorizeLand = Boolean(colorizeLand)
-      parsedSettings.colorizeOcean = Boolean(colorizeOcean)
-      mergeColor(parsedSettings, 'oceanColor', oceanColorHex, 100, true)
-      mergeColor(parsedSettings, 'landColor', landColorHex, 100, true)
-
-      // Grid overlay settings
-      parsedSettings.drawGridOverlay = Boolean(drawGridOverlay)
-      if (gridOverlayShape) parsedSettings.gridOverlayShape = gridOverlayShape
-      if (Number.isFinite(Number(gridOverlayRowOrColCount))) parsedSettings.gridOverlayRowOrColCount = Number(gridOverlayRowOrColCount)
-      if (gridOverlayColorHex) {
-        const alpha = getGridOverlayAlpha()
-        parsedSettings.gridOverlayColor = hexToRgbaString(gridOverlayColorHex, alpha)
-      }
-      if (gridOverlayXOffset) parsedSettings.gridOverlayXOffset = gridOverlayXOffset
-      if (gridOverlayYOffset) parsedSettings.gridOverlayYOffset = gridOverlayYOffset
-      if (Number.isFinite(Number(gridOverlayLineWidth))) parsedSettings.gridOverlayLineWidth = Number(gridOverlayLineWidth)
-      if (gridOverlayLayer) parsedSettings.gridOverlayLayer = gridOverlayLayer
-      parsedSettings.drawVoronoiGridOverlayOnlyOnLand = Boolean(drawVoronoiGridOverlayOnlyOnLand)
-
-      // Land coloring / border settings
-      const resolvedLandMethod = resolveLandColoringMethod(parsedSettings.landColoringMethod)
-      if (resolvedLandMethod) parsedSettings.drawRegionColors = (resolvedLandMethod === 'ColorPoliticalRegions')
-      parsedSettings.borderWidth = Number(borderWidth)
-      parsedSettings.borderPosition = borderPosition
-      parsedSettings.borderColorOption = borderColorOption
-      mergeColor(parsedSettings, 'borderColor', borderColorHex)
-
-      // Frayed border / grunge
-      parsedSettings.frayedBorder = Boolean(frayedBorder)
-      if (Number.isFinite(Number(frayedBorderBlurLevel))) parsedSettings.frayedBorderBlurLevel = Number(frayedBorderBlurLevel)
-      if (Number.isFinite(Number(frayedBorderSize))) parsedSettings.frayedBorderSize = Number(frayedBorderSize)
-      if (frayedBorderSeed) parsedSettings.frayedBorderSeed = Number(frayedBorderSeed)
-      parsedSettings.drawGrunge = Boolean(drawGrunge)
-      if (Number.isFinite(Number(grungeWidth))) parsedSettings.grungeWidth = Number(grungeWidth)
-      mergeColor(parsedSettings, 'frayedBorderColor', frayedBorderColorHex)
-
-      // Line / coastline settings
-      if (lineStyle) parsedSettings.lineStyle = lineStyle
-      if (Number.isFinite(Number(coastlineWidth))) parsedSettings.coastlineWidth = Number(coastlineWidth)
-      mergeColor(parsedSettings, 'coastlineColor', coastlineColorHex)
-
-      // Coast shading
-      if (Number.isFinite(Number(coastShadingLevel))) parsedSettings.coastShadingLevel = Number(coastShadingLevel)
-      if (coastShadingColorHex) {
-        const opacityPercent = 100 - Number(coastShadingAlpha ? coastShadingAlpha : 0)
-        mergeColor(parsedSettings, 'coastShadingColor', coastShadingColorHex, opacityPercent, true)
+      // Break merge logic into focused helpers to reduce complexity
+      function applyBackgroundFlags() {
+        const bgFlags = {
+          SolidColor: { solidColorBackground: true, generateBackgroundFromTexture: false, generateBackground: false },
+          GeneratedFromTexture: { solidColorBackground: false, generateBackgroundFromTexture: true, generateBackground: false },
+        }
+        const flags = bgFlags[backgroundType] || { solidColorBackground: false, generateBackgroundFromTexture: false, generateBackground: true }
+        Object.assign(parsedSettings, flags)
       }
 
-      // Ocean shading / waves
-      if (Number.isFinite(Number(oceanShadingLevel))) parsedSettings.oceanShadingLevel = Number(oceanShadingLevel)
-      if (oceanShadingColorHex) {
-        const oceanOpacityPercent = 100 - Number(oceanShadingAlpha ? oceanShadingAlpha : 0)
-        mergeColor(parsedSettings, 'oceanShadingColor', oceanShadingColorHex, oceanOpacityPercent, true)
+      function applyResourcesAndTopLevel() {
+        setResourceFromRef(parsedSettings, 'borderResource', borderRef)
+        setResourceFromRef(parsedSettings, 'backgroundTextureResource', textureRef)
+        if (backgroundSeed) parsedSettings.backgroundRandomSeed = Number(backgroundSeed)
+        if (artPack) parsedSettings.artPack = artPack
+        if (typeof worldSize !== 'undefined') parsedSettings.worldSize = Number(worldSize)
+        if (landShape) parsedSettings.landShape = landShape
+        if (Number.isFinite(Number(regionCount))) parsedSettings.regionCount = Number(regionCount)
+        if (randomSeed) parsedSettings.randomSeed = Number(randomSeed)
+        if (selectedBooks && typeof selectedBooks === 'object' && typeof selectedBooks.size === 'number') parsedSettings.books = Array.from(selectedBooks).sort()
       }
-      if (oceanWavesType) parsedSettings.oceanEffect = oceanWavesType
-      if (Number.isFinite(Number(oceanWavesLevel))) parsedSettings.oceanWavesLevel = Number(oceanWavesLevel)
-      parsedSettings.concentricWaveCount = getConcentricWaveCount()
-      parsedSettings.fadeConcentricWaves = Boolean(fadeConcentricWaves)
-      parsedSettings.jitterToConcentricWaves = parseBooleanWithDefault(jitterToConcentricWaves, mergedSettingsRef, 'jitterToConcentricWaves', jitterToConcentricWaves)
-      parsedSettings.brokenLinesForConcentricWaves = parseBooleanWithDefault(brokenLinesForConcentricWaves, mergedSettingsRef, 'brokenLinesForConcentricWaves', brokenLinesForConcentricWaves)
-      if (oceanWavesColorHex) {
-        const opacityPercent = 100 - Number(oceanWavesAlpha ? oceanWavesAlpha : 0)
-        mergeColor(parsedSettings, 'oceanWavesColor', oceanWavesColorHex, opacityPercent, true)
+
+      function applyGridAndColoring() {
+        if (!parsedSettings.regionBoundaryStyle || typeof parsedSettings.regionBoundaryStyle !== 'object') parsedSettings.regionBoundaryStyle = {}
+        if (regionBoundaryStyle) parsedSettings.regionBoundaryStyle.type = regionBoundaryStyle
+        if (Number.isFinite(Number(regionBoundaryWidth))) parsedSettings.regionBoundaryStyle.width = Number(regionBoundaryWidth)
+        mergeColor(parsedSettings, 'regionBoundaryColor', regionBoundaryColorHex)
+        parsedSettings.drawRegionBoundaries = Boolean(drawRegionBoundaries)
+        parsedSettings.colorizeLand = Boolean(colorizeLand)
+        parsedSettings.colorizeOcean = Boolean(colorizeOcean)
+        mergeColor(parsedSettings, 'oceanColor', oceanColorHex, 100, true)
+        mergeColor(parsedSettings, 'landColor', landColorHex, 100, true)
+        parsedSettings.drawGridOverlay = Boolean(drawGridOverlay)
+        if (gridOverlayShape) parsedSettings.gridOverlayShape = gridOverlayShape
+        if (Number.isFinite(Number(gridOverlayRowOrColCount))) parsedSettings.gridOverlayRowOrColCount = Number(gridOverlayRowOrColCount)
+        if (gridOverlayColorHex) {
+          const alpha = getGridOverlayAlpha()
+          parsedSettings.gridOverlayColor = hexToRgbaString(gridOverlayColorHex, alpha)
+        }
+        if (gridOverlayXOffset) parsedSettings.gridOverlayXOffset = gridOverlayXOffset
+        if (gridOverlayYOffset) parsedSettings.gridOverlayYOffset = gridOverlayYOffset
+        if (Number.isFinite(Number(gridOverlayLineWidth))) parsedSettings.gridOverlayLineWidth = Number(gridOverlayLineWidth)
+        if (gridOverlayLayer) parsedSettings.gridOverlayLayer = gridOverlayLayer
+        parsedSettings.drawVoronoiGridOverlayOnlyOnLand = Boolean(drawVoronoiGridOverlayOnlyOnLand)
+        const resolvedLandMethod = resolveLandColoringMethod(parsedSettings.landColoringMethod)
+        if (resolvedLandMethod) parsedSettings.drawRegionColors = resolvedLandMethod === 'ColorPoliticalRegions'
       }
-      parsedSettings.drawOceanEffectsInLakes = Boolean(drawOceanEffectsInLakes)
 
-      // River
-      mergeColor(parsedSettings, 'riverColor', riverColorHex)
-
-      // Roads
-      parsedSettings.drawRoads = Boolean(drawRoads)
-      if (roadStyle) {
-        parsedSettings.roadStyle = { type: roadStyle, width: Number.isFinite(Number(roadWidth)) ? Number(roadWidth) : undefined }
-      } else if (Number.isFinite(Number(roadWidth))) {
-        parsedSettings.roadStyle = { width: Number(roadWidth) }
+      function applyBordersFrayedAndGrunge() {
+        parsedSettings.borderWidth = Number(borderWidth)
+        parsedSettings.borderPosition = borderPosition
+        parsedSettings.borderColorOption = borderColorOption
+        mergeColor(parsedSettings, 'borderColor', borderColorHex)
+        parsedSettings.frayedBorder = Boolean(frayedBorder)
+        if (Number.isFinite(Number(frayedBorderBlurLevel))) parsedSettings.frayedBorderBlurLevel = Number(frayedBorderBlurLevel)
+        if (Number.isFinite(Number(frayedBorderSize))) parsedSettings.frayedBorderSize = Number(frayedBorderSize)
+        if (frayedBorderSeed) parsedSettings.frayedBorderSeed = Number(frayedBorderSeed)
+        parsedSettings.drawGrunge = Boolean(drawGrunge)
+        if (Number.isFinite(Number(grungeWidth))) parsedSettings.grungeWidth = Number(grungeWidth)
+        mergeColor(parsedSettings, 'frayedBorderColor', frayedBorderColorHex)
       }
-      mergeColor(parsedSettings, 'roadColor', roadColorHex)
 
-      // Scales and sizes
-      if (Number.isFinite(Number(mountainSize))) parsedSettings.mountainScale = scaleSliderValue(mountainSize)
-      if (Number.isFinite(Number(hillSize))) parsedSettings.hillScale = scaleSliderValue(hillSize)
-      if (Number.isFinite(Number(duneSize))) parsedSettings.duneScale = scaleSliderValue(duneSize)
-      if (Number.isFinite(Number(treeHeight))) parsedSettings.treeHeightScale = 0.1 + Number(treeHeight) * 0.05
-      if (Number.isFinite(Number(citySize))) parsedSettings.cityScale = scaleSliderValue(citySize)
+      function applyCoastOceanAndWaves() {
+        if (lineStyle) parsedSettings.lineStyle = lineStyle
+        if (Number.isFinite(Number(coastlineWidth))) parsedSettings.coastlineWidth = Number(coastlineWidth)
+        mergeColor(parsedSettings, 'coastlineColor', coastlineColorHex)
+        if (Number.isFinite(Number(coastShadingLevel))) parsedSettings.coastShadingLevel = Number(coastShadingLevel)
+        if (coastShadingColorHex) {
+          const opacityPercent = 100 - Number(coastShadingAlpha ? coastShadingAlpha : 0)
+          mergeColor(parsedSettings, 'coastShadingColor', coastShadingColorHex, opacityPercent, true)
+        }
+        if (Number.isFinite(Number(oceanShadingLevel))) parsedSettings.oceanShadingLevel = Number(oceanShadingLevel)
+        if (oceanShadingColorHex) {
+          const oceanOpacityPercent = 100 - Number(oceanShadingAlpha ? oceanShadingAlpha : 0)
+          mergeColor(parsedSettings, 'oceanShadingColor', oceanShadingColorHex, oceanOpacityPercent, true)
+        }
+        if (oceanWavesType) parsedSettings.oceanEffect = oceanWavesType
+        if (Number.isFinite(Number(oceanWavesLevel))) parsedSettings.oceanWavesLevel = Number(oceanWavesLevel)
+        parsedSettings.concentricWaveCount = getConcentricWaveCount()
+        parsedSettings.fadeConcentricWaves = Boolean(fadeConcentricWaves)
+        parsedSettings.jitterToConcentricWaves = parseBooleanWithDefault(jitterToConcentricWaves, mergedSettingsRef, 'jitterToConcentricWaves', jitterToConcentricWaves)
+        parsedSettings.brokenLinesForConcentricWaves = parseBooleanWithDefault(brokenLinesForConcentricWaves, mergedSettingsRef, 'brokenLinesForConcentricWaves', brokenLinesForConcentricWaves)
+        if (oceanWavesColorHex) {
+          const opacityPercent = 100 - Number(oceanWavesAlpha ? oceanWavesAlpha : 0)
+          mergeColor(parsedSettings, 'oceanWavesColor', oceanWavesColorHex, opacityPercent, true)
+        }
+        parsedSettings.drawOceanEffectsInLakes = Boolean(drawOceanEffectsInLakes)
+        mergeColor(parsedSettings, 'riverColor', riverColorHex)
+      }
 
-      // Text and bold background
-      parsedSettings.drawText = Boolean(drawText)
-      mergeColor(parsedSettings, 'textColor', textColorHex)
-      parsedSettings.drawBoldBackground = Boolean(drawBoldBackground)
-      mergeColor(parsedSettings, 'boldBackgroundColor', boldBackgroundColorHex)
+      function applyRoadsAndScales() {
+        parsedSettings.drawRoads = Boolean(drawRoads)
+        if (roadStyle) {
+          parsedSettings.roadStyle = { type: roadStyle, width: Number.isFinite(Number(roadWidth)) ? Number(roadWidth) : undefined }
+        } else if (Number.isFinite(Number(roadWidth))) {
+          parsedSettings.roadStyle = { width: Number(roadWidth) }
+        }
+        mergeColor(parsedSettings, 'roadColor', roadColorHex)
+        if (Number.isFinite(Number(mountainSize))) parsedSettings.mountainScale = scaleSliderValue(mountainSize)
+        if (Number.isFinite(Number(hillSize))) parsedSettings.hillScale = scaleSliderValue(hillSize)
+        if (Number.isFinite(Number(duneSize))) parsedSettings.duneScale = scaleSliderValue(duneSize)
+        if (Number.isFinite(Number(treeHeight))) parsedSettings.treeHeightScale = 0.1 + Number(treeHeight) * 0.05
+        if (Number.isFinite(Number(citySize))) parsedSettings.cityScale = scaleSliderValue(citySize)
+      }
+
+      function applyTextAndBackground() {
+        parsedSettings.drawText = Boolean(drawText)
+        mergeColor(parsedSettings, 'textColor', textColorHex)
+        parsedSettings.drawBoldBackground = Boolean(drawBoldBackground)
+        mergeColor(parsedSettings, 'boldBackgroundColor', boldBackgroundColorHex)
+      }
+
+      // Execute helpers
+      applyBackgroundFlags()
+      applyResourcesAndTopLevel()
+      applyGridAndColoring()
+      applyBordersFrayedAndGrunge()
+      applyCoastOceanAndWaves()
+      applyRoadsAndScales()
+      applyTextAndBackground()
     } catch (e) {
       // GenerateForm: merge of UI values failed (debug suppressed)
     }

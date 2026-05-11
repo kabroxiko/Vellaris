@@ -105,6 +105,34 @@ export function createSettingsAppliers(setters, currentValues = {}) {
       }
     }
 
+    // Helper: apply a color value that may be an rgba string (preferred)
+    // or a fallback hex. If an rgba string is provided, extract the
+    // color hex and alpha percent and set both values via setters.
+    function applyColorWithAlpha(rgbaOrNull, fallbackHex, setHexSetter, setAlphaSetter, alphaInvert = true) {
+      if (rgbaOrNull) {
+        const hex = colorToHex(rgbaOrNull)
+        if (hex) setIfChanged(setHexSetter, (setHexSetter.name || 'colorHex'), hex)
+        try {
+          const alphaPercent = colorToAlphaPercent(rgbaOrNull, 100)
+          const alphaValue = alphaInvert ? 100 - alphaPercent : alphaPercent
+          setIfChanged(setAlphaSetter, (setAlphaSetter.name || 'alpha'), Number(alphaValue))
+        } catch (e) {
+          // ignore alpha parsing errors
+        }
+        return
+      }
+      if (fallbackHex) {
+        setIfChanged(setHexSetter, (setHexSetter.name || 'colorHex'), fallbackHex)
+      }
+    }
+
+    // Helper: map a scale/size value using the provided mapper and apply via setter
+    function applyScaleSetting(val, setter, keyName, mapper) {
+      if (!Number.isFinite(Number(val))) return
+      const v = mapper(val)
+      if (v !== undefined) setIfChanged(setter, keyName, v)
+    }
+
   return {
     applyMapSizeAndSeedSettings(settings) {
       recordCall('applyMapSizeAndSeedSettings')
@@ -287,17 +315,7 @@ export function createSettingsAppliers(setters, currentValues = {}) {
       // Prefer numeric RGBA fields from backend (always use rgba when present).
       // suppressed verbose coast shading debug logs
 
-      if (settings.coastShadingColor) {
-        const coastShadingHex = colorToHex(settings.coastShadingColor)
-        if (coastShadingHex) setIfChanged(setCoastShadingColorHex, 'coastShadingColorHex', coastShadingHex)
-        const opacityPercent = colorToAlphaPercent(settings.coastShadingColor, 100)
-        setIfChanged(setCoastShadingAlpha, 'coastShadingAlpha', 100 - opacityPercent)
-      } else {
-        // Fallback: use any UI-provided hex/alpha helpers if backend rgba absent
-        const fallbackHex = settings.coastShadingColorHex || null
-        if (fallbackHex) setIfChanged(setCoastShadingColorHex, 'coastShadingColorHex', fallbackHex)
-        if (Number.isFinite(Number(settings.coastShadingAlpha))) setIfChanged(setCoastShadingAlpha, 'coastShadingAlpha', Number(settings.coastShadingAlpha))
-      }
+      applyColorWithAlpha(settings.coastShadingColor, settings.coastShadingColorHex || null, setCoastShadingColorHex, setCoastShadingAlpha, true)
     },
 
     applyGridOverlaySettings(settings) {
@@ -350,16 +368,7 @@ export function createSettingsAppliers(setters, currentValues = {}) {
           setIfChanged(setOceanShadingLevel, 'oceanShadingLevel', Number(settings.oceanShadingLevel))
       // suppressed verbose ocean shading debug logs
       // Prefer numeric RGBA fields from backend (always use rgba when present).
-      if (settings.oceanShadingColor) {
-        const oceanShadingHex = colorToHex(settings.oceanShadingColor)
-        if (oceanShadingHex) setIfChanged(setOceanShadingColorHex, 'oceanShadingColorHex', oceanShadingHex)
-        const oceanOpacityPercent = colorToAlphaPercent(settings.oceanShadingColor, 100)
-        setIfChanged(setOceanShadingAlpha, 'oceanShadingAlpha', 100 - oceanOpacityPercent)
-      } else {
-        const fallbackHex = settings.oceanShadingColorHex || null
-        if (fallbackHex) setIfChanged(setOceanShadingColorHex, 'oceanShadingColorHex', fallbackHex)
-        // Do not read settings.oceanShadingAlpha: alpha must be encoded in oceanShadingColor
-      }
+      applyColorWithAlpha(settings.oceanShadingColor, settings.oceanShadingColorHex || null, setOceanShadingColorHex, setOceanShadingAlpha, true)
       // Prefer the newer `oceanWavesType` field, but fall back to the
       // legacy `oceanEffect` when present so uploaded .nort files that
       // contain `oceanEffect` still update the UI correctly.
@@ -454,32 +463,11 @@ export function createSettingsAppliers(setters, currentValues = {}) {
       // Reuse the module-level helper implementations for conversion
       // from scale to slider values (avoid duplicate implementations).
 
-      const ms = settings.mountainScale ?? settings.mountainSize
-      const hs = settings.hillScale ?? settings.hillSize
-      const ds = settings.duneScale ?? settings.duneSize
-      const ts = settings.treeHeightScale ?? settings.treeHeight
-      const cs = settings.cityScale ?? settings.citySize
-
-      if (Number.isFinite(Number(ms))) {
-        const v = inverseGetSliderFromScale(ms)
-        if (v !== undefined) setIfChanged(setMountainSize, 'mountainSize', v)
-      }
-      if (Number.isFinite(Number(hs))) {
-        const v = inverseGetSliderFromScale(hs)
-        if (v !== undefined) setIfChanged(setHillSize, 'hillSize', v)
-      }
-      if (Number.isFinite(Number(ds))) {
-        const v = inverseGetSliderFromScale(ds)
-        if (v !== undefined) setIfChanged(setDuneSize, 'duneSize', v)
-      }
-      if (Number.isFinite(Number(ts))) {
-        const v = inverseGetTreeHeightSliderFromScale(ts)
-        if (v !== undefined) setIfChanged(setTreeHeight, 'treeHeight', v)
-      }
-      if (Number.isFinite(Number(cs))) {
-        const v = inverseGetSliderFromScale(cs)
-        if (v !== undefined) setIfChanged(setCitySize, 'citySize', v)
-      }
+      applyScaleSetting(settings.mountainScale ?? settings.mountainSize, setMountainSize, 'mountainSize', inverseGetSliderFromScale)
+      applyScaleSetting(settings.hillScale ?? settings.hillSize, setHillSize, 'hillSize', inverseGetSliderFromScale)
+      applyScaleSetting(settings.duneScale ?? settings.duneSize, setDuneSize, 'duneSize', inverseGetSliderFromScale)
+      applyScaleSetting(settings.treeHeightScale ?? settings.treeHeight, setTreeHeight, 'treeHeight', inverseGetTreeHeightSliderFromScale)
+      applyScaleSetting(settings.cityScale ?? settings.citySize, setCitySize, 'citySize', inverseGetSliderFromScale)
     },
   }
 }
