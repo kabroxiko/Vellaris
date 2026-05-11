@@ -8,18 +8,14 @@ const queue = []
 
 function makeKey(payload) {
   // keep key small and deterministic — include only relevant fields
-  try {
-    const keyObj = {
-      width: payload.width || payload.previewWidth || 0,
-      height: payload.height || payload.previewHeight || 0,
-      type: payload.type || payload.background || null,
-      artPack: payload.artPack || null,
-      cityIconType: payload.cityIconType || null,
-    }
-    return JSON.stringify(keyObj)
-  } catch (e) {
-    throw e
+  const keyObj = {
+    width: payload.width || payload.previewWidth || 0,
+    height: payload.height || payload.previewHeight || 0,
+    type: payload.type || payload.background || null,
+    artPack: payload.artPack || null,
+    cityIconType: payload.cityIconType || null,
   }
+  return JSON.stringify(keyObj)
 }
 
 function evictIfNeeded() {
@@ -30,11 +26,7 @@ function evictIfNeeded() {
     const k = it.value
     const v = cache.get(k)
     if (v?.objectUrl) {
-      try {
         URL.revokeObjectURL(v.objectUrl)
-      } catch (e) {
-        throw e
-      }
     }
     cache.delete(k)
   }
@@ -56,11 +48,7 @@ function releaseSlot() {
   if (queue.length > 0) {
     const r = queue.shift()
     active++
-    try {
-      r()
-    } catch (e) {
-      throw e
-    }
+    r()
   }
 }
 
@@ -122,9 +110,7 @@ function preload(payload) {
   const key = makeKey(payload)
   if (cache.has(key) || pending.has(key)) return
   const ctrl = new AbortController()
-  const p = get(payload, ctrl.signal).catch((err) => {
-    throw err
-  })
+  const p = get(payload, ctrl.signal)
   // store pending so concurrent preloads share work
   pending.set(key, p)
 }

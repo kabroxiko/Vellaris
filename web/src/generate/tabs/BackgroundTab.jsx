@@ -305,8 +305,8 @@ export default function BackgroundTab(props) {
             disabled={!drawGridOverlay}
           >
             {emptyComboOption}
-            {gridOverlayOffsets && gridOverlayOffsets.length === 0 ? null : null}
-            {gridOverlayShapes && gridOverlayShapes.map((item) => (
+            {gridOverlayOffsets?.length === 0 ? null : null}
+            {gridOverlayShapes?.map((item) => (
               <option key={item.value} value={item.value}>
                 {item.label}
               </option>

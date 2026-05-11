@@ -12,8 +12,8 @@ function findTitle(parsed) {
     : null
   if (!Array.isArray(textList)) return null
   for (const t of textList) {
-    const tType = t && (t.type || t.typeName || t.Type)
-    const tText = t && (t.text || t.value || t.Text)
+    const tType = t?.type || t?.typeName || t?.Type
+    const tText = t?.text || t?.value || t?.Text
     if (tType === 'Title' && typeof tText === 'string' && tText.trim()) return tText.trim()
   }
   return null

@@ -52,7 +52,7 @@ export async function handleResponseError(res) {
   let txt = await res.text()
   try {
     const j = tryParseJson(txt)
-    txt = (j && j.message) || txt
+    txt = (j?.message) || txt
   } catch (e) {
     const condensed = txt.replaceAll(/\s+/g, ' ').trim()
     txt = condensed ? condensed.slice(0, 400) : 'No response body'

@@ -1,6 +1,5 @@
 package nortantis;
 
-import nortantis.platform.Color;
 import org.json.simple.JSONObject;
 
 import java.io.Serializable;

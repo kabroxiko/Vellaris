@@ -77,13 +77,9 @@ export default function useGenerate({ apiBase, handleResponseError, base64ToBlob
       const copy = { ...data }
       delete copy.imageBase64
       const nortContent = serializeNortObject(copy)
-      try {
-        const parsed = tryParse(nortContent)
-        if (parsed) {
-          // caller may manage merged settings
-        }
-      } catch (e) {
-        throw e
+      const parsed = tryParse(nortContent)
+      if (parsed) {
+        // caller may manage merged settings
       }
       downloadNortContent(nortContent, baseName)
       handleSuccessRef.current?.(null, baseName, source, nortContent)
@@ -99,12 +95,10 @@ export default function useGenerate({ apiBase, handleResponseError, base64ToBlob
       const toast = externalToast ?? makeProgressToastController()
       try {
         if (!externalToast) toast.show(outputMode === 'nort-only' ? 'Preparing settings...' : 'Generating map..')
-        try {
-          const body = requestOptions.body
-          if (outputMode === 'nort-only' && body && typeof FormData !== 'undefined' && body instanceof FormData) {
-            body.append('returnSettings', 'true')
-          }
-        } catch (e) { throw e }
+        const body = requestOptions.body
+        if (outputMode === 'nort-only' && body && typeof FormData !== 'undefined' && body instanceof FormData) {
+          body.append('returnSettings', 'true')
+        }
 
         let res = await fetch(`${apiBase}/generate`, requestOptions)
         if (!res.ok) await handleResponseError(res)

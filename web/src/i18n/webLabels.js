@@ -10,11 +10,7 @@ export async function getFrontendLabels(language) {
   const safeCode = allowed.has(code) ? code : 'en'
   if (safeCode === 'en') return { ...enLabels }
 
-  try {
-    const module = await import(/* @vite-ignore */ `./labels/${safeCode}.js`)
-    const localized = module && module.default ? module.default : {}
-    return { ...enLabels, ...localized }
-  } catch (e) {
-    throw e
-  }
+  const module = await import(/* @vite-ignore */ `./labels/${safeCode}.js`)
+  const localized = module?.default ?? {}
+  return { ...enLabels, ...localized }
 }

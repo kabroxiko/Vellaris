@@ -39,7 +39,7 @@ export function ToastContainer() {
       const toast = { id, message, type, duration, dismissible, working, createdAt: now }
       addToast(toast)
 
-      if (duration && duration > 0) {
+      if (duration > 0) {
         setTimeout(() => removeToastById(id), duration)
       }
       return id

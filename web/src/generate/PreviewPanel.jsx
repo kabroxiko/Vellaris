@@ -7,7 +7,7 @@ export default function PreviewPanel({ preview, handleFileInput, onDrop, openPre
     <div className="preview-panel">
       <div className="upload-group">
         <FileUploadButton
-          onFileSelect={(file) => handleFileInput && handleFileInput({ target: { files: [file] } })}
+          onFileSelect={(file) => handleFileInput?.({ target: { files: [file] } })}
           onDrop={onDrop}
           ariaLabel="Upload settings file"
           chooseLabel="Choose file"

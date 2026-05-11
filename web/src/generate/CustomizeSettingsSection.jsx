@@ -78,7 +78,7 @@ function hsbToRgb(h, s, v) {
 // Colorize a bitmap to the specified color. Hoisted to module scope
 // so it can be reused and to satisfy Sonar rule S7721.
 async function colorizeBitmap(sourceBitmap, colorHex, w, h, previewFieldsLocal, opts = {}) {
-  const alg = (previewFieldsLocal && String(previewFieldsLocal.backgroundType || '').toLowerCase().includes('fractal')) ? 'algorithm2' : 'algorithm3'
+  const alg = String(previewFieldsLocal?.backgroundType || '').toLowerCase().includes('fractal') ? 'algorithm2' : 'algorithm3'
   const hsb = hexToHSB(colorHex)
   const tmp = document.createElement('canvas')
   tmp.width = w
@@ -112,6 +112,126 @@ async function colorizeBitmap(sourceBitmap, colorHex, w, h, previewFieldsLocal, 
   }
   tctx.putImageData(imd, 0, 0)
   return await createImageBitmap(tmp)
+}
+
+// Utility: convert hex color to rgba object {r,g,b,a}
+function hexToRgba(hex, transparencyPercent = 0) {
+  if (!hex) return { r: 0, g: 0, b: 0, a: 1 }
+  const h = hex.replace(/^#/, '')
+  if (!/^[0-9a-fA-F]{6}$/.test(h)) return { r: 0, g: 0, b: 0, a: 1 }
+  const r = Number.parseInt(h.substring(0, 2), 16)
+  const g = Number.parseInt(h.substring(2, 4), 16)
+  const b = Number.parseInt(h.substring(4, 6), 16)
+  const opacity = 1 - (Number(transparencyPercent || 0) / 100)
+  return { r, g, b, a: Math.max(0, Math.min(1, opacity)) }
+}
+
+function rgbaToHex(col) {
+  const r = Math.round(col.r || 0)
+  const g = Math.round(col.g || 0)
+  const b = Math.round(col.b || 0)
+  return (
+    '#'+
+    r.toString(16).padStart(2, '0')+
+    g.toString(16).padStart(2, '0')+
+    b.toString(16).padStart(2, '0')
+  )
+}
+
+// Retry fetch helper (hoisted)
+async function doFetchWithRetries(url, opts = {}, attempts = 3, delayMs = 300) {
+  for (let i = 0; i < attempts; i++) {
+    try {
+      const resp = await fetch(url, opts)
+      if (!resp.ok) throw new Error('Non-OK response')
+      return resp
+    } catch (err) {
+      if (i === attempts - 1) throw err
+      if (opts.signal?.aborted) throw err
+      await new Promise((r) => setTimeout(r, delayMs))
+    }
+  }
+}
+
+// Helper to darken/lighten hex color (hoisted)
+function shadeColor(hex, percent) {
+  const h = hex.replace(/^#/, '')
+  const num = Number.parseInt(h, 16)
+  let r = (num >> 16) + percent
+  let g = ((num >> 8) & 0x00ff) + percent
+  let b = (num & 0x0000ff) + percent
+  r = Math.max(0, Math.min(255, r))
+  g = Math.max(0, Math.min(255, g))
+  b = Math.max(0, Math.min(255, b))
+  return '#' + (r << 16 | g << 8 | b).toString(16).padStart(6, '0')
+}
+
+function hexWithAlpha(hex, alpha) {
+  const h = hex.replace(/^#/, '')
+  if (!/^[0-9a-fA-F]{6}$/.test(h)) return `rgba(194,184,145,${alpha})`
+  const r = Number.parseInt(h.substring(0, 2), 16)
+  const g = Number.parseInt(h.substring(2, 4), 16)
+  const b = Number.parseInt(h.substring(4, 6), 16)
+  return `rgba(${r},${g},${b},${alpha})`
+}
+
+// Helper: create canvas and context from an ImageBitmap (hoisted)
+function makeCanvasForBitmap(imgBitmap) {
+  const w = imgBitmap.width
+  const h = imgBitmap.height
+  const canvas = document.createElement('canvas')
+  canvas.width = w
+  canvas.height = h
+  const ctx = canvas.getContext('2d')
+  return { canvas, ctx, w, h }
+}
+
+// Helper: draw the background and inset box (hoisted)
+function drawBackgroundAndInset(ctx, img, w, h, x, y, boxW, boxH) {
+  ctx.save()
+  try {
+    ctx.drawImage(img, 0, 0, w, h)
+    ctx.fillStyle = 'rgba(255,255,255,0.04)'
+    ctx.fillRect(x - 2, y - 2, boxW + 4, boxH + 4)
+  } finally {
+    ctx.restore()
+  }
+}
+
+// Helper: draw the island shape and fill with either pattern or color (hoisted)
+function drawIslandShape(ctx, rng, cx, cy, baseRadius, xRadius, yRadius, boxW, boxH, x, y, landBitmap, displayBitmap, imgBitmap) {
+  const points = 32
+  const jitterX = Math.max(6, Math.round(xRadius * 0.18))
+  const jitterY = Math.max(6, Math.round(yRadius * 0.18))
+  ctx.beginPath()
+  for (let i = 0; i < points; i++) {
+    const a = (i / points) * Math.PI * 2
+    const rx = xRadius + (rng() - 0.5) * jitterX
+    const ry = yRadius + (rng() - 0.5) * jitterY
+    const px = cx + Math.round(Math.cos(a) * rx)
+    const py = cy + Math.round(Math.sin(a) * ry)
+    if (i === 0) ctx.moveTo(px, py)
+    else ctx.lineTo(px, py)
+  }
+  ctx.closePath()
+
+  const landColor = '#c2b891'
+  const pattern = ctx.createPattern(landBitmap || displayBitmap || imgBitmap, 'repeat')
+  if (pattern) {
+    ctx.save()
+    ctx.clip()
+    ctx.fillStyle = pattern
+    ctx.fillRect(x, y, boxW, boxH)
+    ctx.globalCompositeOperation = 'source-over'
+    ctx.strokeStyle = 'rgba(255,255,240,0.55)'
+    ctx.lineWidth = Math.max(1, Math.round(baseRadius * 0.03))
+    ctx.lineJoin = 'round'
+    ctx.stroke()
+    ctx.restore()
+  } else {
+    ctx.fillStyle = landColor
+    ctx.fill()
+  }
 }
 
 export default function CustomizeSettingsSection({ values, handlers, options, ui }) {
@@ -383,18 +503,10 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
   // Compose a mini island preview from a neutral base Blob. Exported at
   // component scope so color controls can trigger a local recomposition
   // without initiating a new network fetch.
-
-  // Helper: create canvas and context from an ImageBitmap
-  function makeCanvasForBitmap(imgBitmap) {
-    const w = imgBitmap.width
-    const h = imgBitmap.height
-    const canvas = document.createElement('canvas')
-    canvas.width = w
-    canvas.height = h
-    const ctx = canvas.getContext('2d')
-    return { canvas, ctx, w, h }
-  }
-
+  // use hoisted `makeCanvasForBitmap`, `drawBackgroundAndInset` and
+  // `drawIslandShape`. The only in-component helper we keep is
+  // `prepareBitmaps` because it references component-level preview fields
+  // and color flags.
   // Helper: prepare display and land bitmaps (colorized variants)
   async function prepareBitmaps(imgBitmap, w, h, opts = {}) {
     const processed = { displayBitmap: imgBitmap, landBitmap: imgBitmap }
@@ -410,56 +522,6 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
       processed.landBitmap = await colorizeBitmap(imgBitmap, useLandColorHex, w, h, previewFields, opts)
     }
     return processed
-  }
-
-  // Helper: draw the background and inset box
-  function drawBackgroundAndInset(ctx, img, w, h, x, y, boxW, boxH) {
-    ctx.save()
-    try {
-      ctx.drawImage(img, 0, 0, w, h)
-      ctx.fillStyle = 'rgba(255,255,255,0.04)'
-      ctx.fillRect(x - 2, y - 2, boxW + 4, boxH + 4)
-    } finally {
-      ctx.restore()
-    }
-  }
-
-  // Helper: draw the island shape and fill with either pattern or color
-  function drawIslandShape(ctx, rng, cx, cy, baseRadius, xRadius, yRadius, boxW, boxH, x, y, landBitmap, displayBitmap, imgBitmap) {
-    const points = 32
-    const jitterX = Math.max(6, Math.round(xRadius * 0.18))
-    const jitterY = Math.max(6, Math.round(yRadius * 0.18))
-    ctx.beginPath()
-    for (let i = 0; i < points; i++) {
-      const a = (i / points) * Math.PI * 2
-      const rx = xRadius + (rng() - 0.5) * jitterX
-      const ry = yRadius + (rng() - 0.5) * jitterY
-      const px = cx + Math.round(Math.cos(a) * rx)
-      const py = cy + Math.round(Math.sin(a) * ry)
-      if (i === 0) ctx.moveTo(px, py)
-      else ctx.lineTo(px, py)
-    }
-    ctx.closePath()
-
-    const landColor = '#c2b891'
-    const pattern = ctx.createPattern(landBitmap || displayBitmap || imgBitmap, 'repeat')
-    if (pattern) {
-      ctx.save()
-      ctx.clip()
-      ctx.fillStyle = pattern
-      ctx.fillRect(x, y, boxW, boxH)
-      ctx.globalCompositeOperation = 'source-over'
-      ctx.strokeStyle = 'rgba(255,255,240,0.55)'
-      ctx.lineWidth = Math.max(1, Math.round(baseRadius * 0.03))
-      ctx.lineJoin = 'round'
-      ctx.stroke()
-      ctx.restore()
-    } else {
-      ctx.fillStyle = landColor
-      ctx.fill()
-    }
-    ctx.lineWidth = 1
-    ctx.stroke()
   }
 
   async function composeMiniIslandFromBlob(sourceBlob, opts = {}) {
@@ -515,12 +577,10 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
   // Use a filtered preview key so color toggles/values DO NOT trigger
   // the background preview. We only want texture/background changes
   // (and other visual parameters) to trigger backend fetches.
-    const previewTriggerKey = useMemo(() => {
+  const previewTriggerKey = useMemo(() => {
     const { colorizeLand, colorizeOcean, landColorHex, oceanColorHex, ...rest } = previewFields || {}
     return JSON.stringify(rest)
   }, [
-    // include the specific previewFields members we care about so React
-    // invalidation still works but color state changes are ignored.
     previewFields?.backgroundType,
     previewFields?.textureRef,
     previewFields?.backgroundSeed,
@@ -664,7 +724,7 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
         candidates.push({ width: 520, height: 170, type: 'GeneratedFromTexture', artPack: t.artPack, cityIconType: t.name })
       })
     }
-    const fractal = Array.isArray(backgroundTypes) ? backgroundTypes.find((b) => b && b.value && String(b.value).toLowerCase().includes('fractal')) : null
+    const fractal = Array.isArray(backgroundTypes) ? backgroundTypes.find((b) => b?.value && String(b.value).toLowerCase().includes('fractal')) : null
     if (fractal) candidates.push({ width: 520, height: 170, type: fractal.value })
     else candidates.push({ width: 520, height: 170, type: 'Fractal' })
 
@@ -677,14 +737,14 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
   const borderColorOptions = backendOptions?.borderColorOptions
   const lineStyles = backendOptions?.lineStyles
   const oceanWaveTypes = backendOptions?.oceanWaveTypes
-  const concentricWaveValue = Array.isArray(oceanWaveTypes) ? oceanWaveTypes.find(o => o && o.value && /Concentric/i.test(o.value))?.value : undefined
-  const rippleWaveValue = Array.isArray(oceanWaveTypes) ? oceanWaveTypes.find(o => o && o.value && /Ripple|Ripples/i.test(o.value))?.value : undefined
-  const noneWaveValue = Array.isArray(oceanWaveTypes) ? oceanWaveTypes.find(o => o && o.value && /^(None|No|NoEffect|NoneWaves)$/i.test(o.value))?.value : undefined
+  const concentricWaveValue = Array.isArray(oceanWaveTypes) ? oceanWaveTypes.find(o => o?.value && /Concentric/i.test(o.value))?.value : undefined
+  const rippleWaveValue = Array.isArray(oceanWaveTypes) ? oceanWaveTypes.find(o => o?.value && /Ripple|Ripples/i.test(o.value))?.value : undefined
+  const noneWaveValue = Array.isArray(oceanWaveTypes) ? oceanWaveTypes.find(o => o?.value && /^(None|No|NoEffect|NoneWaves)$/i.test(o.value))?.value : undefined
   const translateLabel = (key) => {
-    const has = labels && Object.prototype.hasOwnProperty.call(labels, key) && labels[key]
+    const has = Object.prototype.hasOwnProperty.call(labels ?? {}, key) && labels[key]
     const txt = has ? labels[key] : null
-    const baseKey = (!txt && key && key.endsWith('.label')) ? key.substring(0, key.length - '.label'.length) : null
-    const alternate = baseKey && labels && Object.prototype.hasOwnProperty.call(labels, baseKey) ? labels[baseKey] : null
+    const baseKey = (!txt && key?.endsWith('.label')) ? key.substring(0, key.length - '.label'.length) : null
+    const alternate = baseKey && Object.prototype.hasOwnProperty.call(labels ?? {}, baseKey) ? labels[baseKey] : null
     const value = txt || alternate || key
     // If the translation contains literal <br> tags, return React nodes
     if (typeof value === 'string' && /<br\s*\/?\>/i.test(value)) {
@@ -736,28 +796,9 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
   }
 
   // Small helpers to convert between hex and rgba used by the picker.
-  function hexToRgba(hex, transparencyPercent = 0) {
-    if (!hex) return { r: 0, g: 0, b: 0, a: 1 }
-    const h = hex.replace(/^#/, '')
-    if (!/^[0-9a-fA-F]{6}$/.test(h)) return { r: 0, g: 0, b: 0, a: 1 }
-    const r = Number.parseInt(h.substring(0, 2), 16)
-    const g = Number.parseInt(h.substring(2, 4), 16)
-    const b = Number.parseInt(h.substring(4, 6), 16)
-    const opacity = 1 - (Number(transparencyPercent || 0) / 100)
-    return { r, g, b, a: Math.max(0, Math.min(1, opacity)) }
-  }
+  // (moved to module scope; use the hoisted versions)
 
-  function rgbaToHex(col) {
-    const r = Math.round(col.r || 0)
-    const g = Math.round(col.g || 0)
-    const b = Math.round(col.b || 0)
-    return (
-      '#' +
-      r.toString(16).padStart(2, '0') +
-      g.toString(16).padStart(2, '0') +
-      b.toString(16).padStart(2, '0')
-    )
-  }
+  // use hoisted `rgbaToHex` helper to satisfy S7721
 
   const [showCoastPicker, setShowCoastPicker] = useState(false)
   const [showGridPicker, setShowGridPicker] = useState(false)
@@ -1018,25 +1059,12 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
           Object.assign(payload, currentSource.payload)
         }
 
-        if (!payload.cityIconType && previewFields && previewFields.cityIconType) {
+        if (!payload.cityIconType && previewFields?.cityIconType) {
           payload.cityIconType = previewFields.cityIconType
         }
 
         // Retry fetch a few times to handle transient network changes (ERR_NETWORK_CHANGED)
-        async function doFetchWithRetries(url, opts, attempts = 3, delayMs = 300) {
-          for (let i = 0; i < attempts; i++) {
-            try {
-              const resp = await fetch(url, opts)
-              if (!resp.ok) throw new Error('Non-OK response')
-              return resp
-            } catch (err) {
-              if (i === attempts - 1) throw err
-              // If aborted, rethrow immediately
-              if (opts.signal && opts.signal.aborted) throw err
-              await new Promise((r) => setTimeout(r, delayMs))
-            }
-          }
-        }
+        // Use hoisted `doFetchWithRetries` helper
 
         let blob = null
         // Use the background base cache to preload and fetch small neutral
@@ -1052,27 +1080,7 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
 
         
 
-        // Helper to darken/lighten hex color
-        function shadeColor(hex, percent) {
-          const h = hex.replace(/^#/, '')
-          const num = Number.parseInt(h, 16)
-          let r = (num >> 16) + percent
-          let g = ((num >> 8) & 0x00ff) + percent
-          let b = (num & 0x0000ff) + percent
-          r = Math.max(0, Math.min(255, r))
-          g = Math.max(0, Math.min(255, g))
-          b = Math.max(0, Math.min(255, b))
-          return '#' + (r << 16 | g << 8 | b).toString(16).padStart(6, '0')
-        }
-
-        function hexWithAlpha(hex, alpha) {
-          const h = hex.replace(/^#/, '')
-          if (!/^[0-9a-fA-F]{6}$/.test(h)) return `rgba(194,184,145,${alpha})`
-          const r = Number.parseInt(h.substring(0, 2), 16)
-          const g = Number.parseInt(h.substring(2, 4), 16)
-          const b = Number.parseInt(h.substring(4, 6), 16)
-          return `rgba(${r},${g},${b},${alpha})`
-        }
+        // Use hoisted `shadeColor` and `hexWithAlpha` helpers
 
         const processedBlob = await composeMiniIslandFromBlob(blob)
         const url = URL.createObjectURL(processedBlob || blob)

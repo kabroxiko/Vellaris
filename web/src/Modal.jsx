@@ -52,11 +52,7 @@ export default function Modal({ open, onClose, children }) {
         img.style.userSelect = 'none'
         img.style.touchAction = 'none'
         // Prevent iOS Safari image dragging
-        try {
-          img.style.webkitUserDrag = 'none'
-        } catch (e) {
-          throw e
-        }
+        img.style.webkitUserDrag = 'none'
         // Prevent native image dragging which interferes with pointer-drag panning
         const onDragStart = (ev) => ev.preventDefault()
         img.addEventListener('dragstart', onDragStart)
@@ -321,67 +317,19 @@ export default function Modal({ open, onClose, children }) {
         globalThis.addEventListener('resize', onResize)
 
         const cleanupImg = () => {
-          try {
-            container.removeEventListener('wheel', onWheel)
-          } catch (e) {
-            throw e
-          }
-          try {
-            container.removeEventListener('pointerdown', onPointerDown)
-          } catch (e) {
-            throw e
-          }
-          try {
-            container.removeEventListener('pointercancel', onPointerUp)
-          } catch (e) {
-            throw e
-          }
-          try {
-            img.removeEventListener('pointerdown', onPointerDown)
-          } catch (e) {
-            throw e
-          }
-          try {
-            img.removeEventListener('pointercancel', onPointerUp)
-          } catch (e) {
-            throw e
-          }
-          try {
-            img.removeEventListener('dragstart', onDragStart)
-          } catch (e) {
-            throw e
-          }
-          try {
-            globalThis.removeEventListener('pointermove', onPointerMove)
-          } catch (e) {
-            throw e
-          }
-          try {
-            globalThis.removeEventListener('pointerup', onPointerUp)
-          } catch (e) {
-            throw e
-          }
-          try {
-            globalThis.removeEventListener('resize', onResize)
-          } catch (e) {
-            throw e
-          }
-          try {
-            cancelAnimationFrame(rafId)
-          } catch (e) {
-            throw e
-          }
+          container.removeEventListener('wheel', onWheel)
+          container.removeEventListener('pointerdown', onPointerDown)
+          container.removeEventListener('pointercancel', onPointerUp)
+          img.removeEventListener('pointerdown', onPointerDown)
+          img.removeEventListener('pointercancel', onPointerUp)
+          img.removeEventListener('dragstart', onDragStart)
+          globalThis.removeEventListener('pointermove', onPointerMove)
+          globalThis.removeEventListener('pointerup', onPointerUp)
+          globalThis.removeEventListener('resize', onResize)
+          cancelAnimationFrame(rafId)
           // restore styles
-          try {
-            modalEl.style.width = ''
-          } catch (e) {
-            throw e
-          }
-          try {
-            container.style.height = ''
-          } catch (e) {
-            throw e
-          }
+          modalEl.style.width = ''
+          container.style.height = ''
         }
 
         modalEl.__cleanupImg = cleanupImg
@@ -394,19 +342,11 @@ export default function Modal({ open, onClose, children }) {
       globalThis.removeEventListener('keydown', handleKey)
       const modalEl = modalRef.current
       if (modalEl?.__cleanupImg) {
-        try {
-          modalEl.__cleanupImg()
-        } catch (e) {
-          throw e
-        }
+        modalEl.__cleanupImg()
         delete modalEl.__cleanupImg
       }
       // close the native dialog if open
-      try {
-        if (typeof modalEl?.close === 'function' && modalEl?.open) modalEl.close()
-      } catch (e) {
-        throw e
-      }
+      if (typeof modalEl?.close === 'function' && modalEl?.open) modalEl.close()
     }
   }, [open, onClose])
 

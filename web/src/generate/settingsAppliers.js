@@ -50,38 +50,25 @@ export function createSettingsAppliers(setters, currentValues = {}) {
   // Per-applier instrumentation: record creation and calls.
   const applierId = `applier-${Date.now()}-${Math.random().toString(36).slice(2,8)}`
   const createdStack = (new Error('applier-created')).stack
-    try {
-      applierCallCache.set(applierId, { createdAt: Date.now(), createdStack, calls: [] })
-      if (typeof globalThis !== 'undefined') globalThis.__applierCallCache = applierCallCache
-    } catch (e) {
-      console.error('applierCallCache assignment failed', e)
-    }
+  applierCallCache.set(applierId, { createdAt: Date.now(), createdStack, calls: [] })
+  if (typeof globalThis !== 'undefined') globalThis.__applierCallCache = applierCallCache
 
     function recordCall(name) {
-      try {
-        const info = applierCallCache.get(applierId) || { createdAt: Date.now(), createdStack, calls: [] }
-        const entry = { name, ts: Date.now(), stack: (new Error()).stack }
-        info.calls.push(entry)
-        applierCallCache.set(applierId, info)
-      } catch (e) {
-        console.error('recordCall failed', e)
-      }
+      const info = applierCallCache.get(applierId) || { createdAt: Date.now(), createdStack, calls: [] }
+      const entry = { name, ts: Date.now(), stack: (new Error()).stack }
+      info.calls.push(entry)
+      applierCallCache.set(applierId, info)
     }
 
     function setIfChanged(setter, key, newValue) {
-      try {
-        const oldValue = currentValues ? currentValues[key] : undefined
-        // Normalize numbers vs strings where reasonable
-        if (typeof newValue === 'number' || (typeof newValue === 'string' && !Number.isNaN(Number(newValue)))) {
-          const nOld = Number(oldValue)
-          const nNew = Number(newValue)
-          if (Number.isFinite(nOld) && Number.isFinite(nNew) && Object.is(nOld, nNew)) return
-        }
-        if (Object.is(oldValue, newValue)) return
-      } catch (e) {
-        console.error('setIfChanged: comparison failed', e)
-        // fall through to attempt setter
+      const oldValue = currentValues ? currentValues[key] : undefined
+      // Normalize numbers vs strings where reasonable
+      if (typeof newValue === 'number' || (typeof newValue === 'string' && !Number.isNaN(Number(newValue)))) {
+        const nOld = Number(oldValue)
+        const nNew = Number(newValue)
+        if (Number.isFinite(nOld) && Number.isFinite(nNew) && Object.is(nOld, nNew)) return
       }
+      if (Object.is(oldValue, newValue)) return
       // Guard against invalid setter references (e.g., undefined or non-function)
       if (typeof setter !== 'function') {
         // setter is not a function (debug suppressed)
@@ -95,13 +82,9 @@ export function createSettingsAppliers(setters, currentValues = {}) {
       } catch (e) {
         console.error(`setter failed for ${key}`, e)
         // attempt a string fallback if possible
-        try {
-          recordCall(`set:${key}:string-fallback`)
-          if (typeof setter === 'function') setter(String(newValue))
-          recordCall(`set:${key}:string-fallback-done`)
-        } catch (e2) {
-          console.error(`setter string fallback failed for ${key}`, e2)
-        }
+        recordCall(`set:${key}:string-fallback`)
+        if (typeof setter === 'function') setter(String(newValue))
+        recordCall(`set:${key}:string-fallback-done`)
       }
     }
 
@@ -112,13 +95,9 @@ export function createSettingsAppliers(setters, currentValues = {}) {
       if (rgbaOrNull) {
         const hex = colorToHex(rgbaOrNull)
         if (hex) setIfChanged(setHexSetter, (setHexSetter.name || 'colorHex'), hex)
-        try {
-          const alphaPercent = colorToAlphaPercent(rgbaOrNull, 100)
-          const alphaValue = alphaInvert ? 100 - alphaPercent : alphaPercent
-          setIfChanged(setAlphaSetter, (setAlphaSetter.name || 'alpha'), Number(alphaValue))
-        } catch (e) {
-          // ignore alpha parsing errors
-        }
+        const alphaPercent = colorToAlphaPercent(rgbaOrNull, 100)
+        const alphaValue = alphaInvert ? 100 - alphaPercent : alphaPercent
+        setIfChanged(setAlphaSetter, (setAlphaSetter.name || 'alpha'), Number(alphaValue))
         return
       }
       if (fallbackHex) {
