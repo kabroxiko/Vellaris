@@ -196,6 +196,121 @@ function TextureSelect({ emptyComboOption, textures, hasTextures, showTextureOpt
   )
 }
 
+function GridShapeSelect({ translateLabel, gatedControlValue, emptyComboOption, gridOverlayShape, setGridOverlayShape, drawGridOverlay, gridOverlayShapes }) {
+  return (
+    <>
+      <label htmlFor="grid-shape-input">{translateLabel('theme.shape.label')}</label>
+      <select
+        id="grid-shape-input"
+        value={gatedControlValue(gridOverlayShape)}
+        onChange={(e) => setGridOverlayShape(e.target.value)}
+        disabled={!drawGridOverlay}
+      >
+        {emptyComboOption}
+        {gridOverlayShapes?.map((item) => (
+          <option key={item.value} value={item.value}>
+            {item.label}
+          </option>
+        ))}
+      </select>
+    </>
+  )
+}
+
+function GridRowsControl({ translateLabel, isVerticalHex, drawGridOverlay, isVoronoi, gatedControlValue, gridOverlayRowOrColCount, setGridOverlayRowOrColCount }) {
+  return (
+    <>
+      <label htmlFor="grid-rows-input" className={drawGridOverlay && !isVoronoi ? '' : 'is-disabled'}>
+        {isVerticalHex ? translateLabel('theme.columns.label') : translateLabel('theme.rows.label')}
+      </label>
+      <div className="slider-row">
+        <input
+          id="grid-rows-input"
+          type="range"
+          min={4}
+          max={64}
+          step={1}
+          value={gridOverlayRowOrColCount}
+          onChange={(e) => setGridOverlayRowOrColCount(Number(e.target.value))}
+          disabled={!(drawGridOverlay && !isVoronoi)}
+        />
+        <span className="slider-value">{gridOverlayRowOrColCount}</span>
+      </div>
+    </>
+  )
+}
+
+function GridLineWidthControl({ translateLabel, drawGridOverlay, gridOverlayLineWidth, setGridOverlayLineWidth }) {
+  return (
+    <>
+      <label htmlFor="grid-linewidth-input">{translateLabel('theme.lineWidth.label')}</label>
+      <div className="slider-row">
+        <input
+          id="grid-linewidth-input"
+          type="range"
+          min={1}
+          max={10}
+          step={1}
+          value={gridOverlayLineWidth}
+          onChange={(e) => setGridOverlayLineWidth(Number(e.target.value))}
+          disabled={!drawGridOverlay}
+        />
+        <span className="slider-value">{gridOverlayLineWidth}</span>
+      </div>
+    </>
+  )
+}
+
+function GridOffsetsSelects({ translateLabel, drawGridOverlay, isVoronoi, gatedControlValue, gridOverlayXOffset, setGridOverlayXOffset, gridOverlayYOffset, setGridOverlayYOffset, gridOverlayOffsets, emptyComboOption }) {
+  return (
+    <>
+      <label htmlFor="grid-xoffset-input" className={drawGridOverlay && !isVoronoi ? '' : 'is-disabled'}>{translateLabel('theme.xOffset.label')}</label>
+      <select id="grid-xoffset-input" value={gatedControlValue(gridOverlayXOffset)} onChange={(e) => setGridOverlayXOffset(e.target.value)} disabled={!(drawGridOverlay && !isVoronoi)}>
+        {emptyComboOption}
+        {Array.isArray(gridOverlayOffsets) ? gridOverlayOffsets.map((item) => (
+          <option key={item.value} value={item.value}>{item.label}</option>
+        )) : null}
+      </select>
+
+      <label htmlFor="grid-yoffset-input" className={drawGridOverlay && !isVoronoi ? '' : 'is-disabled'}>{translateLabel('theme.yOffset.label')}</label>
+      <select id="grid-yoffset-input" value={gatedControlValue(gridOverlayYOffset)} onChange={(e) => setGridOverlayYOffset(e.target.value)} disabled={!(drawGridOverlay && !isVoronoi)}>
+        {emptyComboOption}
+        {Array.isArray(gridOverlayOffsets) ? gridOverlayOffsets.map((item) => (
+          <option key={item.value} value={item.value}>{item.label}</option>
+        )) : null}
+      </select>
+    </>
+  )
+}
+
+function GridVoronoiToggle({ translateLabel, drawGridOverlay, isVoronoi, drawVoronoiGridOverlayOnlyOnLand, setDrawVoronoiGridOverlayOnlyOnLand }) {
+  return (
+    <label className={`checkbox-label${drawGridOverlay && isVoronoi ? '' : ' is-disabled'}`}>
+      <input
+        type="checkbox"
+        checked={drawVoronoiGridOverlayOnlyOnLand}
+        onChange={(e) => setDrawVoronoiGridOverlayOnlyOnLand(e.target.checked)}
+        disabled={!(drawGridOverlay && isVoronoi)}
+      />
+      <span>{translateLabel('theme.onlyOnLand')}</span>
+    </label>
+  )
+}
+
+function GridLayerSelect({ translateLabel, gatedControlValue, emptyComboOption, gridOverlayLayer, setGridOverlayLayer, drawGridOverlay, gridOverlayLayers }) {
+  return (
+    <>
+      <label htmlFor="grid-layer-input">{translateLabel('theme.layer.label')}</label>
+      <select id="grid-layer-input" value={gatedControlValue(gridOverlayLayer)} onChange={(e) => setGridOverlayLayer(e.target.value)} disabled={!drawGridOverlay}>
+        {emptyComboOption}
+        {Array.isArray(gridOverlayLayers) ? gridOverlayLayers.map((item) => (
+          <option key={item.value} value={item.value}>{item.label}</option>
+        )) : null}
+      </select>
+    </>
+  )
+}
+
 function GridOverlayControls({
   translateLabel,
   gatedControlValue,
@@ -226,118 +341,63 @@ function GridOverlayControls({
   gridOverlayLayer,
   setGridOverlayLayer,
 }) {
-  const GridShapeSelect = () => (
-    <>
-      <label htmlFor="grid-shape-input">{translateLabel('theme.shape.label')}</label>
-      <select
-        id="grid-shape-input"
-        value={gatedControlValue(gridOverlayShape)}
-        onChange={(e) => setGridOverlayShape(e.target.value)}
-        disabled={!drawGridOverlay}
-      >
-        {emptyComboOption}
-        {gridOverlayShapes?.map((item) => (
-          <option key={item.value} value={item.value}>
-            {item.label}
-          </option>
-        ))}
-      </select>
-    </>
-  )
-
-  const GridRowsControl = () => (
-    <>
-      <label htmlFor="grid-rows-input" className={drawGridOverlay && !isVoronoi ? '' : 'is-disabled'}>
-        {isVerticalHex ? translateLabel('theme.columns.label') : translateLabel('theme.rows.label')}
-      </label>
-      <div className="slider-row">
-        <input
-          id="grid-rows-input"
-          type="range"
-          min={4}
-          max={64}
-          step={1}
-          value={gridOverlayRowOrColCount}
-          onChange={(e) => setGridOverlayRowOrColCount(Number(e.target.value))}
-          disabled={!(drawGridOverlay && !isVoronoi)}
-        />
-        <span className="slider-value">{gridOverlayRowOrColCount}</span>
-      </div>
-    </>
-  )
-
-  const GridLineWidthControl = () => (
-    <>
-      <label htmlFor="grid-linewidth-input">{translateLabel('theme.lineWidth.label')}</label>
-      <div className="slider-row">
-        <input
-          id="grid-linewidth-input"
-          type="range"
-          min={1}
-          max={10}
-          step={1}
-          value={gridOverlayLineWidth}
-          onChange={(e) => setGridOverlayLineWidth(Number(e.target.value))}
-          disabled={!drawGridOverlay}
-        />
-        <span className="slider-value">{gridOverlayLineWidth}</span>
-      </div>
-    </>
-  )
-
-  const GridOffsetsSelects = () => (
-    <>
-      <label htmlFor="grid-xoffset-input" className={drawGridOverlay && !isVoronoi ? '' : 'is-disabled'}>{translateLabel('theme.xOffset.label')}</label>
-      <select id="grid-xoffset-input" value={gatedControlValue(gridOverlayXOffset)} onChange={(e) => setGridOverlayXOffset(e.target.value)} disabled={!(drawGridOverlay && !isVoronoi)}>
-        {emptyComboOption}
-        {Array.isArray(gridOverlayOffsets) ? gridOverlayOffsets.map((item) => (
-          <option key={item.value} value={item.value}>{item.label}</option>
-        )) : null}
-      </select>
-
-      <label htmlFor="grid-yoffset-input" className={drawGridOverlay && !isVoronoi ? '' : 'is-disabled'}>{translateLabel('theme.yOffset.label')}</label>
-      <select id="grid-yoffset-input" value={gatedControlValue(gridOverlayYOffset)} onChange={(e) => setGridOverlayYOffset(e.target.value)} disabled={!(drawGridOverlay && !isVoronoi)}>
-        {emptyComboOption}
-        {Array.isArray(gridOverlayOffsets) ? gridOverlayOffsets.map((item) => (
-          <option key={item.value} value={item.value}>{item.label}</option>
-        )) : null}
-      </select>
-    </>
-  )
-
-  const GridVoronoiToggle = () => (
-    <label className={`checkbox-label${drawGridOverlay && isVoronoi ? '' : ' is-disabled'}`}>
-      <input
-        type="checkbox"
-        checked={drawVoronoiGridOverlayOnlyOnLand}
-        onChange={(e) => setDrawVoronoiGridOverlayOnlyOnLand(e.target.checked)}
-        disabled={!(drawGridOverlay && isVoronoi)}
-      />
-      <span>{translateLabel('theme.onlyOnLand')}</span>
-    </label>
-  )
-
-  const GridLayerSelect = () => (
-    <>
-      <label htmlFor="grid-layer-input">{translateLabel('theme.layer.label')}</label>
-      <select id="grid-layer-input" value={gatedControlValue(gridOverlayLayer)} onChange={(e) => setGridOverlayLayer(e.target.value)} disabled={!drawGridOverlay}>
-        {emptyComboOption}
-        {Array.isArray(gridOverlayLayers) ? gridOverlayLayers.map((item) => (
-          <option key={item.value} value={item.value}>{item.label}</option>
-        )) : null}
-      </select>
-    </>
-  )
+  
 
   return (
     <div className={`control-group${drawGridOverlay ? '' : ' is-disabled'}`} style={drawGridOverlay ? undefined : { opacity: 0.5, pointerEvents: 'none' }}>
-      <GridShapeSelect />
-      <GridRowsControl />
-      <GridLineWidthControl />
+      <GridShapeSelect
+        translateLabel={translateLabel}
+        gatedControlValue={gatedControlValue}
+        emptyComboOption={emptyComboOption}
+        gridOverlayShape={gridOverlayShape}
+        setGridOverlayShape={setGridOverlayShape}
+        drawGridOverlay={drawGridOverlay}
+        gridOverlayShapes={gridOverlayShapes}
+      />
+      <GridRowsControl
+        translateLabel={translateLabel}
+        isVerticalHex={isVerticalHex}
+        drawGridOverlay={drawGridOverlay}
+        isVoronoi={isVoronoi}
+        gatedControlValue={gatedControlValue}
+        gridOverlayRowOrColCount={gridOverlayRowOrColCount}
+        setGridOverlayRowOrColCount={setGridOverlayRowOrColCount}
+      />
+      <GridLineWidthControl
+        translateLabel={translateLabel}
+        drawGridOverlay={drawGridOverlay}
+        gridOverlayLineWidth={gridOverlayLineWidth}
+        setGridOverlayLineWidth={setGridOverlayLineWidth}
+      />
       {renderColorControl({ id: 'grid-color', label: translateLabel('theme.color.label'), hexValue: gridOverlayColorHex, onHexChange: setGridOverlayColorHex, showState: showGridPicker, setShowState: setShowGridPicker, disabled: !drawGridOverlay })}
-      <GridOffsetsSelects />
-      <GridVoronoiToggle />
-      <GridLayerSelect />
+      <GridOffsetsSelects
+        translateLabel={translateLabel}
+        drawGridOverlay={drawGridOverlay}
+        isVoronoi={isVoronoi}
+        gatedControlValue={gatedControlValue}
+        gridOverlayXOffset={gridOverlayXOffset}
+        setGridOverlayXOffset={setGridOverlayXOffset}
+        gridOverlayYOffset={gridOverlayYOffset}
+        setGridOverlayYOffset={setGridOverlayYOffset}
+        gridOverlayOffsets={gridOverlayOffsets}
+        emptyComboOption={emptyComboOption}
+      />
+      <GridVoronoiToggle
+        translateLabel={translateLabel}
+        drawGridOverlay={drawGridOverlay}
+        isVoronoi={isVoronoi}
+        drawVoronoiGridOverlayOnlyOnLand={drawVoronoiGridOverlayOnlyOnLand}
+        setDrawVoronoiGridOverlayOnlyOnLand={setDrawVoronoiGridOverlayOnlyOnLand}
+      />
+      <GridLayerSelect
+        translateLabel={translateLabel}
+        gatedControlValue={gatedControlValue}
+        emptyComboOption={emptyComboOption}
+        gridOverlayLayer={gridOverlayLayer}
+        setGridOverlayLayer={setGridOverlayLayer}
+        drawGridOverlay={drawGridOverlay}
+        gridOverlayLayers={gridOverlayLayers}
+      />
     </div>
   )
 }
@@ -678,4 +738,151 @@ BackgroundTab.propTypes = {
   drawVoronoiGridOverlayOnlyOnLand: PropTypes.bool,
   setDrawVoronoiGridOverlayOnlyOnLand: PropTypes.func,
   landColoringMethods: PropTypes.array,
+  backgroundPreviewUrl: PropTypes.string,
+}
+
+RegionBoundaryControls.propTypes = {
+  translateLabel: PropTypes.func,
+  gatedControlValue: PropTypes.func,
+  emptyComboOption: PropTypes.node,
+  strokeTypes: PropTypes.array,
+  drawRegionBoundaries: PropTypes.bool,
+  regionBoundaryStyle: PropTypes.string,
+  setRegionBoundaryStyle: PropTypes.func,
+  regionBoundaryWidth: PropTypes.number,
+  setRegionBoundaryWidth: PropTypes.func,
+  regionBoundaryColorHex: PropTypes.string,
+  setRegionBoundaryColorHex: PropTypes.func,
+  showRegionBoundaryPicker: PropTypes.bool,
+  setShowRegionBoundaryPicker: PropTypes.func,
+  renderColorControl: PropTypes.func,
+}
+
+LandColorControls.propTypes = {
+  translateLabel: PropTypes.func,
+  gatedControlValue: PropTypes.func,
+  emptyComboOption: PropTypes.node,
+  renderColorControl: PropTypes.func,
+  colorizeLand: PropTypes.bool,
+  finalLandColoringMethod: PropTypes.string,
+  setFinalLandColoringMethod: PropTypes.func,
+  landColorHex: PropTypes.string,
+  setLandColorHex: PropTypes.func,
+  showLandPicker: PropTypes.bool,
+  setShowLandPicker: PropTypes.func,
+  notifyManualChange: PropTypes.func,
+  recomposeUsingLastBase: PropTypes.func,
+  landColoringMethods: PropTypes.array,
+}
+
+OceanColorControls.propTypes = {
+  translateLabel: PropTypes.func,
+  renderColorControl: PropTypes.func,
+  colorizeOcean: PropTypes.bool,
+  oceanColorHex: PropTypes.string,
+  setOceanColorHex: PropTypes.func,
+  showOceanPicker: PropTypes.bool,
+  setShowOceanPicker: PropTypes.func,
+  notifyManualChange: PropTypes.func,
+  recomposeUsingLastBase: PropTypes.func,
+}
+
+TextureSelect.propTypes = {
+  emptyComboOption: PropTypes.node,
+  textures: PropTypes.array,
+  hasTextures: PropTypes.bool,
+  showTextureOptions: PropTypes.bool,
+  translateLabel: PropTypes.func,
+  gatedControlValue: PropTypes.func,
+  textureRef: PropTypes.string,
+  setTextureRef: PropTypes.func,
+}
+
+GridOverlayControls.propTypes = {
+  translateLabel: PropTypes.func,
+  gatedControlValue: PropTypes.func,
+  emptyComboOption: PropTypes.node,
+  renderColorControl: PropTypes.func,
+  gridOverlayShape: PropTypes.string,
+  setGridOverlayShape: PropTypes.func,
+  drawGridOverlay: PropTypes.bool,
+  isVoronoi: PropTypes.bool,
+  isVerticalHex: PropTypes.bool,
+  gridOverlayRowOrColCount: PropTypes.number,
+  setGridOverlayRowOrColCount: PropTypes.func,
+  gridOverlayLineWidth: PropTypes.number,
+  setGridOverlayLineWidth: PropTypes.func,
+  gridOverlayColorHex: PropTypes.string,
+  setGridOverlayColorHex: PropTypes.func,
+  showGridPicker: PropTypes.bool,
+  setShowGridPicker: PropTypes.func,
+  gridOverlayOffsets: PropTypes.array,
+  gridOverlayXOffset: PropTypes.string,
+  setGridOverlayXOffset: PropTypes.func,
+  gridOverlayYOffset: PropTypes.string,
+  setGridOverlayYOffset: PropTypes.func,
+  drawVoronoiGridOverlayOnlyOnLand: PropTypes.bool,
+  setDrawVoronoiGridOverlayOnlyOnLand: PropTypes.func,
+  gridOverlayShapes: PropTypes.array,
+  gridOverlayLayers: PropTypes.array,
+  gridOverlayLayer: PropTypes.string,
+  setGridOverlayLayer: PropTypes.func,
+}
+
+GridShapeSelect.propTypes = {
+  translateLabel: PropTypes.func,
+  gatedControlValue: PropTypes.func,
+  emptyComboOption: PropTypes.node,
+  gridOverlayShape: PropTypes.string,
+  setGridOverlayShape: PropTypes.func,
+  drawGridOverlay: PropTypes.bool,
+  gridOverlayShapes: PropTypes.array,
+}
+
+GridRowsControl.propTypes = {
+  translateLabel: PropTypes.func,
+  isVerticalHex: PropTypes.bool,
+  drawGridOverlay: PropTypes.bool,
+  isVoronoi: PropTypes.bool,
+  gatedControlValue: PropTypes.func,
+  gridOverlayRowOrColCount: PropTypes.number,
+  setGridOverlayRowOrColCount: PropTypes.func,
+}
+
+GridLineWidthControl.propTypes = {
+  translateLabel: PropTypes.func,
+  drawGridOverlay: PropTypes.bool,
+  gridOverlayLineWidth: PropTypes.number,
+  setGridOverlayLineWidth: PropTypes.func,
+}
+
+GridOffsetsSelects.propTypes = {
+  translateLabel: PropTypes.func,
+  drawGridOverlay: PropTypes.bool,
+  isVoronoi: PropTypes.bool,
+  gatedControlValue: PropTypes.func,
+  gridOverlayXOffset: PropTypes.string,
+  setGridOverlayXOffset: PropTypes.func,
+  gridOverlayYOffset: PropTypes.string,
+  setGridOverlayYOffset: PropTypes.func,
+  gridOverlayOffsets: PropTypes.array,
+  emptyComboOption: PropTypes.node,
+}
+
+GridVoronoiToggle.propTypes = {
+  translateLabel: PropTypes.func,
+  drawGridOverlay: PropTypes.bool,
+  isVoronoi: PropTypes.bool,
+  drawVoronoiGridOverlayOnlyOnLand: PropTypes.bool,
+  setDrawVoronoiGridOverlayOnlyOnLand: PropTypes.func,
+}
+
+GridLayerSelect.propTypes = {
+  translateLabel: PropTypes.func,
+  gatedControlValue: PropTypes.func,
+  emptyComboOption: PropTypes.node,
+  gridOverlayLayer: PropTypes.string,
+  setGridOverlayLayer: PropTypes.func,
+  drawGridOverlay: PropTypes.bool,
+  gridOverlayLayers: PropTypes.array,
 }

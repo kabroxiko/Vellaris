@@ -130,7 +130,7 @@ export default function BorderTab(props) {
             disabled={!drawBorder}
           >
             {emptyComboOption}
-            <option value="">{translateLabel('theme.borderColor.title')}</option>
+            
             {Array.isArray(borderTypes) ? borderTypes.map((borderType) => {
               const ref = `${borderType.artPack}|${borderType.name}`
               return (

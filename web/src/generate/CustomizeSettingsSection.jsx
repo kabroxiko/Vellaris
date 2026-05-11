@@ -239,6 +239,66 @@ function drawIslandShape(ctx, rng, cx, cy, baseRadius, xRadius, yRadius, boxW, b
   }
 }
 
+// Modal styles for color picker (hoisted)
+const modalBackdropStyle = {
+  position: 'fixed',
+  left: 0,
+  top: 0,
+  right: 0,
+  bottom: 0,
+  background: 'rgba(0,0,0,0.4)',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  zIndex: 2000,
+}
+
+const modalContentStyle = {
+  background: '#fff',
+  padding: 12,
+  borderRadius: 6,
+  boxShadow: '0 6px 24px rgba(0,0,0,0.3)',
+}
+
+async function fetchPreviewBlob(payload, controller) {
+  // kick off a background preload (non-blocking)
+  backgroundBaseCache.preload(payload)
+  // await cached or in-flight fetch
+  const blob = await backgroundBaseCache.get(payload, controller?.signal)
+  return blob
+}
+
+function ColorPickerModal({ open, onClose, children }) {
+  const innerRef = React.useRef(null)
+  React.useEffect(() => {
+    if (!open) return undefined
+    const onKey = (e) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKey)
+    // focus first focusable element inside modal for accessibility
+    if (innerRef.current) {
+      const btn = innerRef.current.querySelector('button, [tabindex], input, [role="button"]')
+      if (btn && typeof btn.focus === 'function') btn.focus()
+    }
+    return () => document.removeEventListener('keydown', onKey)
+  }, [open, onClose])
+
+  if (!open) return null
+  return (
+    <div style={modalBackdropStyle} onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
+      <div ref={innerRef} style={modalContentStyle} role="dialog" aria-modal="true" onMouseDown={(e) => e.stopPropagation()}>
+        {children}
+      </div>
+    </div>
+  )
+}
+
+ColorPickerModal.propTypes = {
+  open: PropTypes.bool,
+  onClose: PropTypes.func,
+  children: PropTypes.node,
+}
+
+
 export default function CustomizeSettingsSection({ values, handlers, options, ui }) {
 
   const [activeTab, setActiveTab] = useState('background')
@@ -625,13 +685,7 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     return payload
   }
 
-  async function fetchPreviewBlob(payload, controller) {
-    // kick off a background preload (non-blocking)
-    backgroundBaseCache.preload(payload)
-    // await cached or in-flight fetch
-    const blob = await backgroundBaseCache.get(payload, controller.signal)
-    return blob
-  }
+  
 
   async function setPreviewFromBlob(blob) {
     lastBaseBlobRef.current = blob
@@ -830,14 +884,14 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
   const rippleWaveValue = Array.isArray(oceanWaveTypes) ? oceanWaveTypes.find(o => o?.value && /Ripple|Ripples/i.test(o.value))?.value : undefined
   const noneWaveValue = Array.isArray(oceanWaveTypes) ? oceanWaveTypes.find(o => o?.value && /^(None|No|NoEffect|NoneWaves)$/i.test(o.value))?.value : undefined
   const translateLabel = (key) => {
-    const has = Object.prototype.hasOwnProperty.call(labels ?? {}, key) && labels[key]
+    const has = Object.hasOwn(labels ?? {}, key) && labels[key]
     const txt = has ? labels[key] : null
     const baseKey = (!txt && key?.endsWith('.label')) ? key.substring(0, key.length - '.label'.length) : null
-    const alternate = baseKey && Object.prototype.hasOwnProperty.call(labels ?? {}, baseKey) ? labels[baseKey] : null
+    const alternate = baseKey && Object.hasOwn(labels ?? {}, baseKey) ? labels[baseKey] : null
     const value = txt || alternate || key
     // If the translation contains literal <br> tags, return React nodes
-    if (typeof value === 'string' && /<br\s*\/?\>/i.test(value)) {
-      const parts = value.split(/<br\s*\/?\>/i)
+    if (typeof value === 'string' && /<br\s*\/?>/i.test(value)) {
+      const parts = value.split(/<br\s*\/?>/i)
       return parts.flatMap((p, i) => (i === parts.length - 1 ? [p] : [p, React.createElement('br', { key: i })]))
     }
     return value
@@ -873,8 +927,8 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     let t = String(s)
     t = t.replace(/^\s*<html>\s*/i, '').replace(/\s*<\/html>\s*$/i, '')
     // If there are <br> tags, convert to React nodes with breaks
-    if (/<br\s*\/?\>/i.test(t)) {
-      const parts = t.split(/<br\s*\/?\>/i)
+    if (/<br\s*\/?>/i.test(t)) {
+      const parts = t.split(/<br\s*\/?>/i)
       return parts.flatMap((p, i) => (i === parts.length - 1 ? [p] : [p, React.createElement('br', { key: i })]))
     }
     // Otherwise strip any other HTML tags
@@ -1091,10 +1145,18 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
   ])
 
     function renderColorControl({ id, label, hexValue, onHexChange, alphaValue, onAlphaChange, disabled, showState, setShowState, swatchStyle, onClose, swatchReplacement }) {
-      const openerClick = (e) => { if (!disabled) setShowState(true) }
-      const openerKey = (e) => { if ((e.key === 'Enter' || e.key === ' ') && !disabled) { e.preventDefault(); setShowState(true) } }
+      const openerClick = (e) => {
+        if (disabled) return
+        if (typeof setShowState === 'function') setShowState(true)
+      }
+      const openerKey = (e) => {
+        if ((e.key === 'Enter' || e.key === ' ') && !disabled) {
+          e.preventDefault()
+          if (typeof setShowState === 'function') setShowState(true)
+        }
+      }
       const closePicker = () => {
-        setShowState(false)
+        if (typeof setShowState === 'function') setShowState(false)
         if (typeof onClose === 'function') onClose()
       }
       return (
@@ -1104,14 +1166,14 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
             {swatchReplacement ? (
               <div className="disabled-color-replacement">{swatchReplacement}</div>
             ) : (
-              <div
-                role="button"
-                tabIndex={disabled ? -1 : 0}
+              <button
+                type="button"
                 aria-label={`Open ${label} color picker`}
-                aria-disabled={disabled ? 'true' : 'false'}
+                disabled={disabled}
                 onClick={openerClick}
                 onKeyDown={openerKey}
-                  style={{
+                style={{
+                  display: 'inline-block',
                   flex: '1 1 auto',
                   minWidth: 48,
                   height: 28,
@@ -1126,8 +1188,8 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
             )}
           </div>
           {showState && (
-            <div style={modalBackdropStyle} onClick={closePicker}>
-                <div style={modalContentStyle} onClick={(e) => e.stopPropagation()}>
+            <ColorPickerModal open={showState} onClose={closePicker}>
+              <>
                 <RgbaColorPicker
                   color={hexToRgba(hexValue, alphaValue || 0)}
                   onChange={(col) => {
@@ -1139,12 +1201,12 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
                   }}
                 />
                 <div style={{ marginTop: 8, display: 'flex', justifyContent: 'flex-end' }}>
-                    <button type="button" onClick={closePicker}>
+                  <button type="button" onClick={closePicker}>
                     Close
                   </button>
                 </div>
-              </div>
-            </div>
+              </>
+            </ColorPickerModal>
           )}
         </>
       )
@@ -1395,7 +1457,7 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
 
   const backgroundKeys = [
     'translateLabel', 'gatedControlValue', 'emptyComboOption', 'renderColorControl', 'notifyManualChange', 'recomposeUsingLastBase', 'textures', 'backgroundTypes', 'strokeTypes', 'landColoringMethods',
-    'backgroundType','setBackgroundType','showTextureOptions','hasTextures','textureRef','setTextureRef','drawRegionBoundaries','setDrawRegionBoundaries','regionBoundaryStyle','setRegionBoundaryStyle','regionBoundaryWidth','setRegionBoundaryWidth','regionBoundaryColorHex','setRegionBoundaryColorHex','showRegionBoundaryPicker','setShowRegionBoundaryPicker','colorizeLand','setColorizeLand','finalLandColoringMethod','setFinalLandColoringMethod','landColorHex','setLandColorHex','showLandPicker','setShowLandPicker','colorizeOcean','setColorizeOcean','showOceanPicker','setShowOceanPicker','oceanColorHex','setOceanColorHex','backgroundSeed','sanitizeSeedValue','setBackgroundSeed','drawGridOverlay','setDrawGridOverlay','gridOverlayShape','setGridOverlayShape','gridOverlayRowOrColCount','setGridOverlayRowOrColCount','gridOverlayLineWidth','setGridOverlayLineWidth','gridOverlayColorHex','setGridOverlayColorHex','gridOverlayOffsets','gridOverlayXOffset','setGridOverlayXOffset','gridOverlayYOffset','setGridOverlayYOffset','gridOverlayLayers','gridOverlayLayer','setGridOverlayLayer','backgroundPreviewUrl','gridOverlayShapes','drawVoronoiGridOverlayOnlyOnLand','setDrawVoronoiGridOverlayOnlyOnLand'
+    'backgroundType','setBackgroundType','showTextureOptions','hasTextures','textureRef','setTextureRef','drawRegionBoundaries','setDrawRegionBoundaries','regionBoundaryStyle','setRegionBoundaryStyle','regionBoundaryWidth','setRegionBoundaryWidth','regionBoundaryColorHex','setRegionBoundaryColorHex','showRegionBoundaryPicker','setShowRegionBoundaryPicker','colorizeLand','setColorizeLand','finalLandColoringMethod','setFinalLandColoringMethod','landColorHex','setLandColorHex','showLandPicker','setShowLandPicker','colorizeOcean','setColorizeOcean','showOceanPicker','setShowOceanPicker','oceanColorHex','setOceanColorHex','backgroundSeed','sanitizeSeedValue','setBackgroundSeed','drawGridOverlay','setDrawGridOverlay','gridOverlayShape','setGridOverlayShape','gridOverlayRowOrColCount','setGridOverlayRowOrColCount','gridOverlayLineWidth','setGridOverlayLineWidth','gridOverlayColorHex','setGridOverlayColorHex','showGridPicker','setShowGridPicker','gridOverlayOffsets','gridOverlayXOffset','setGridOverlayXOffset','gridOverlayYOffset','setGridOverlayYOffset','gridOverlayLayers','gridOverlayLayer','setGridOverlayLayer','backgroundPreviewUrl','gridOverlayShapes','drawVoronoiGridOverlayOnlyOnLand','setDrawVoronoiGridOverlayOnlyOnLand'
   ]
 
   const borderKeys = [
@@ -1517,5 +1579,7 @@ CustomizeSettingsSection.propTypes = {
   options: PropTypes.object.isRequired,
   ui: PropTypes.shape({
     loading: PropTypes.bool.isRequired,
+    customizationDirty: PropTypes.bool,
+    hasGeneratedOnce: PropTypes.bool,
   }).isRequired,
 }
