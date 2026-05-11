@@ -678,6 +678,52 @@ function GenerateForm({ uiLanguage = 'en' }) {
     const setString = (setter, value) => { if (value !== undefined && value !== null) setter(String(value)) }
     const setBoolean = (setter, value) => { if (typeof value === 'boolean') setter(value) }
 
+    // Helper to set alpha either from explicit alpha value or by parsing color channels
+    const setAlphaFromValueOrColor = (alphaVal, colorVal, setter) => {
+      if (alphaVal !== undefined && alphaVal !== null) {
+        setter(alphaVal)
+        return
+      }
+      if (colorVal) {
+        const ch = parseColorChannels(colorVal)
+        if (ch?.a !== undefined && Number.isFinite(Number(ch.a))) setter(Number(ch.a))
+      }
+    }
+
+    // Convert a scale (e.g. 0.5-3) to the UI slider range [1..15]
+    const convertScaleToSlider = (scale) => {
+      const s = Number(scale)
+      if (!Number.isFinite(s)) return undefined
+      const sliderValueFor1Scale = 5
+      const scaleMax = 3
+      const scaleMin = 0.5
+      const minScaleSliderValue = 1
+      const maxScaleSliderValue = 15
+      const v1Slope = (sliderValueFor1Scale - minScaleSliderValue) / (1 - scaleMin)
+      const v1YIntercept = sliderValueFor1Scale - v1Slope
+      const v2Slope = (maxScaleSliderValue - sliderValueFor1Scale) / (scaleMax - 1)
+      const v2YIntercept = sliderValueFor1Scale - v2Slope * 1
+      let v
+      if (s <= 1) v = v1Slope * s + v1YIntercept
+      else v = v2Slope * s + v2YIntercept
+      v = Math.round(v)
+      if (v < minScaleSliderValue) v = minScaleSliderValue
+      if (v > maxScaleSliderValue) v = maxScaleSliderValue
+      return v
+    }
+
+    // Handle flexible roadStyle formats and color/width properties
+    const applyRoadStyleHelper = (defs) => {
+      if (typeof defs.roadStyle === 'object' && defs.roadStyle !== null) {
+        if (typeof defs.roadStyle.type === 'string') setString(setRoadStyle, defs.roadStyle.type)
+        if (Number.isFinite(Number(defs.roadStyle.width))) setNumber(setRoadWidth, Number(defs.roadStyle.width))
+      } else if (typeof defs.roadStyle === 'string') {
+        setString(setRoadStyle, defs.roadStyle)
+      }
+      if (Number.isFinite(Number(defs.roadWidth))) setNumber(setRoadWidth, defs.roadWidth)
+      setHex(setRoadColorHex, defs.roadColor)
+    }
+
     const applyBasicSettings = (defs, opts) => {
       setNumber(setWorldSize, defs.worldSize)
       setNumber(setRegionCount, defs.regionCount)
@@ -740,29 +786,14 @@ function GenerateForm({ uiLanguage = 'en' }) {
     const applyOceanAndRoads = (defs) => {
       setNumber(setCoastShadingLevel, defs.coastShadingLevel)
       setHex(setCoastShadingColorHex, defs.coastShadingColor)
-      if (defs.coastShadingAlpha !== undefined && defs.coastShadingAlpha !== null) {
-        setNumber(setCoastShadingAlpha, defs.coastShadingAlpha)
-      } else if (defs.coastShadingColor) {
-        const ch = parseColorChannels(defs.coastShadingColor)
-        if (ch?.a !== undefined && Number.isFinite(Number(ch.a))) setNumber(setCoastShadingAlpha, Number(ch.a))
-      }
-      if (defs.oceanShadingAlpha !== undefined && defs.oceanShadingAlpha !== null) {
-        setNumber(setOceanShadingAlpha, defs.oceanShadingAlpha)
-      } else if (defs.oceanShadingColor) {
-        const ch = parseColorChannels(defs.oceanShadingColor)
-        if (ch?.a !== undefined && Number.isFinite(Number(ch.a))) setNumber(setOceanShadingAlpha, Number(ch.a))
-      }
+      setAlphaFromValueOrColor(defs.coastShadingAlpha, defs.coastShadingColor, setNumber.bind(null, setCoastShadingAlpha))
+      setAlphaFromValueOrColor(defs.oceanShadingAlpha, defs.oceanShadingColor, setNumber.bind(null, setOceanShadingAlpha))
       setNumber(setOceanShadingLevel, defs.oceanShadingLevel)
       setHex(setOceanShadingColorHex, defs.oceanShadingColor)
       setString(setOceanWavesType, defs.oceanWavesType)
       setNumber(setOceanWavesLevel, defs.oceanWavesLevel)
       setHex(setOceanWavesColorHex, defs.oceanWavesColor)
-      if (defs.oceanWavesAlpha !== undefined && defs.oceanWavesAlpha !== null) {
-        setNumber(setOceanWavesAlpha, defs.oceanWavesAlpha)
-      } else if (defs.oceanWavesColor) {
-        const ch = parseColorChannels(defs.oceanWavesColor)
-        if (ch?.a !== undefined && Number.isFinite(Number(ch.a))) setNumber(setOceanWavesAlpha, Number(ch.a))
-      }
+      setAlphaFromValueOrColor(defs.oceanWavesAlpha, defs.oceanWavesColor, setNumber.bind(null, setOceanWavesAlpha))
       setNumber(setConcentricWaveCount, defs.concentricWaveCount)
       setBoolean(setFadeConcentricWaves, defs.fadeConcentricWaves)
       setBoolean(setJitterToConcentricWaves, defs.jitterToConcentricWaves)
@@ -770,56 +801,23 @@ function GenerateForm({ uiLanguage = 'en' }) {
       setBoolean(setDrawOceanEffectsInLakes, defs.drawOceanEffectsInLakes)
       setHex(setRiverColorHex, defs.riverColor)
       setBoolean(setDrawRoads, defs.drawRoads)
-      // Handle roadStyle which may be an object {type, width} or a string.
-      if (typeof defs.roadStyle === 'object' && defs.roadStyle !== null) {
-        if (typeof defs.roadStyle.type === 'string') setString(setRoadStyle, defs.roadStyle.type)
-        if (Number.isFinite(Number(defs.roadStyle.width))) setNumber(setRoadWidth, Number(defs.roadStyle.width))
-      } else if (typeof defs.roadStyle === 'string') {
-        setString(setRoadStyle, defs.roadStyle)
+      applyRoadStyleHelper(defs)
+    }
+
+    // Apply a scale-or-size mapping for standard elements
+    const applyScaleOrSize = (scaleProp, sizeProp, setter) => {
+      if (defs[scaleProp] !== undefined && defs[scaleProp] !== null && Number.isFinite(Number(defs[scaleProp]))) {
+        const v = convertScaleToSlider(defs[scaleProp])
+        if (v !== undefined) setter(v)
+      } else if (Number.isFinite(Number(defs[sizeProp]))) {
+        setter(defs[sizeProp])
       }
-      if (Number.isFinite(Number(defs.roadWidth))) setNumber(setRoadWidth, defs.roadWidth)
-      setHex(setRoadColorHex, defs.roadColor)
     }
 
     const applySizeMappings = (defs) => {
-      const convertScaleToSlider = (scale) => {
-        const s = Number(scale)
-        if (!Number.isFinite(s)) return undefined
-        const sliderValueFor1Scale = 5
-        const scaleMax = 3
-        const scaleMin = 0.5
-        const minScaleSliderValue = 1
-        const maxScaleSliderValue = 15
-        const v1Slope = (sliderValueFor1Scale - minScaleSliderValue) / (1 - scaleMin)
-        const v1YIntercept = sliderValueFor1Scale - v1Slope
-        const v2Slope = (maxScaleSliderValue - sliderValueFor1Scale) / (scaleMax - 1)
-        const v2YIntercept = sliderValueFor1Scale - v2Slope * 1
-        let v
-        if (s <= 1) v = v1Slope * s + v1YIntercept
-        else v = v2Slope * s + v2YIntercept
-        v = Math.round(v)
-        if (v < minScaleSliderValue) v = minScaleSliderValue
-        if (v > maxScaleSliderValue) v = maxScaleSliderValue
-        return v
-      }
-        if (defs.mountainScale !== undefined && defs.mountainScale !== null && Number.isFinite(Number(defs.mountainScale))) {
-          const v = convertScaleToSlider(defs.mountainScale)
-          if (v !== undefined) setNumber(setMountainSize, v)
-        } else if (Number.isFinite(Number(defs.mountainSize))) {
-          setNumber(setMountainSize, defs.mountainSize)
-        }
-        if (defs.hillScale !== undefined && defs.hillScale !== null && Number.isFinite(Number(defs.hillScale))) {
-          const v = convertScaleToSlider(defs.hillScale)
-          if (v !== undefined) setNumber(setHillSize, v)
-        } else if (Number.isFinite(Number(defs.hillSize))) {
-          setNumber(setHillSize, defs.hillSize)
-        }
-        if (defs.duneScale !== undefined && defs.duneScale !== null && Number.isFinite(Number(defs.duneScale))) {
-          const v = convertScaleToSlider(defs.duneScale)
-          if (v !== undefined) setNumber(setDuneSize, v)
-        } else if (Number.isFinite(Number(defs.duneSize))) {
-          setNumber(setDuneSize, defs.duneSize)
-        }
+        applyScaleOrSize('mountainScale', 'mountainSize', (v) => setNumber(setMountainSize, v))
+        applyScaleOrSize('hillScale', 'hillSize', (v) => setNumber(setHillSize, v))
+        applyScaleOrSize('duneScale', 'duneSize', (v) => setNumber(setDuneSize, v))
         if (defs.treeHeightScale !== undefined && defs.treeHeightScale !== null && Number.isFinite(Number(defs.treeHeightScale))) {
           const s = Number(defs.treeHeightScale)
           let v = Math.round((s - 0.1) / 0.05)
@@ -829,13 +827,8 @@ function GenerateForm({ uiLanguage = 'en' }) {
         } else if (Number.isFinite(Number(defs.treeHeight))) {
           setNumber(setTreeHeight, defs.treeHeight)
         }
-        if (defs.cityScale !== undefined && defs.cityScale !== null && Number.isFinite(Number(defs.cityScale))) {
-          const v = convertScaleToSlider(defs.cityScale)
-          if (v !== undefined) setNumber(setCitySize, v)
-        } else if (Number.isFinite(Number(defs.citySize))) {
-          setNumber(setCitySize, defs.citySize)
-        }
- 
+        applyScaleOrSize('cityScale', 'citySize', (v) => setNumber(setCitySize, v))
+
     }
 
     const applyTextAndFonts = (defs, opts) => {
@@ -849,15 +842,18 @@ function GenerateForm({ uiLanguage = 'en' }) {
       setHex(setTextColorHex, defs.textColor)
       setBoolean(setDrawBoldBackground, defs.drawBoldBackground)
       setHex(setBoldBackgroundColorHex, defs.boldBackgroundColor)
-      let backendDefaultFont = null
-      if (opts?.defaultFontFamily) backendDefaultFont = opts.defaultFontFamily
-      else if (Array.isArray(opts?.fonts) && opts.fonts.length > 0) backendDefaultFont = opts.fonts[0]
-      if (!titleFontFamily && backendDefaultFont) setTitleFontFamily(backendDefaultFont)
-      if (!regionFontFamily && backendDefaultFont) setRegionFontFamily(backendDefaultFont)
-      if (!mountainRangeFontFamily && backendDefaultFont) setMountainRangeFontFamily(backendDefaultFont)
-      if (!otherMountainsFontFamily && backendDefaultFont) setOtherMountainsFontFamily(backendDefaultFont)
-      if (!citiesFontFamily && backendDefaultFont) setCitiesFontFamily(backendDefaultFont)
-      if (!riverFontFamily && backendDefaultFont) setRiverFontFamily(backendDefaultFont)
+      const backendDefaultFont = opts?.defaultFontFamily ?? (Array.isArray(opts?.fonts) && opts.fonts.length > 0 ? opts.fonts[0] : null)
+      if (backendDefaultFont) {
+        const fontSetters = [
+          [titleFontFamily, setTitleFontFamily],
+          [regionFontFamily, setRegionFontFamily],
+          [mountainRangeFontFamily, setMountainRangeFontFamily],
+          [otherMountainsFontFamily, setOtherMountainsFontFamily],
+          [citiesFontFamily, setCitiesFontFamily],
+          [riverFontFamily, setRiverFontFamily],
+        ]
+        fontSetters.forEach(([current, setter]) => { if (!current) setter(backendDefaultFont) })
+      }
       if (Array.isArray(defs.books)) setSelectedBooks(new Set(defs.books))
     }
 
@@ -867,6 +863,17 @@ function GenerateForm({ uiLanguage = 'en' }) {
     applyOceanAndRoads(defs)
     applySizeMappings(defs)
     applyTextAndFonts(defs, opts)
+  }
+
+  // Generate from a .nort JSON string by POSTing it to the generate endpoint.
+  // Hoisted to component scope so callers outside `applyServerDefaults` can use it.
+  const generateFromNortContent = async (nortContent, toast) => {
+    toast.show('Generating random map...')
+    const parsedReturned = tryParse(nortContent)
+    if (parsedReturned && Object.prototype.hasOwnProperty.call(randomOverrides, 'mapLanguage') && mapLanguage) parsedReturned.language = mapLanguage
+    if (parsedReturned && Object.prototype.hasOwnProperty.call(randomOverrides, 'cityIconType') && cityIconType) parsedReturned.cityIconSetName = cityIconType
+    const bodyPayload = parsedReturned ?? tryParse(nortContent)
+    await runGenerate({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(bodyPayload) }, 'random-map', { type: 'random', name: 'Random Map', nortContent }, 'preview', toast)
   }
 
   const updateRandomOverride = useCallback((key, value) => {
@@ -1591,71 +1598,65 @@ function GenerateForm({ uiLanguage = 'en' }) {
     }
   }
 
+  // Build the random configuration payload from current UI state and manual overrides
+  const buildRandomCfg = () => {
+    const isManual = (k) => Object.prototype.hasOwnProperty.call(randomOverrides, k)
+    const cfg = {}
+    if (isManual('mapLanguage')) cfg.language = mapLanguage
+    if (isManual('randomSeed')) cfg.randomSeed = randomSeed ? Number(randomSeed) : undefined
+    if (isManual('artPack')) cfg.artPack = artPack
+    if (isManual('dimension')) cfg.dimension = dimension
+    if (isManual('worldSize')) cfg.worldSize = worldSize
+    if (isManual('landShape')) cfg.landShape = landShape
+    if (isManual('regionCount')) cfg.regionCount = regionCount
+    if (isManual('landColoringMethod')) cfg.drawRegionColors = landColoringMethod ? (landColoringMethod === 'ColorPoliticalRegions') : undefined
+    if (isManual('cityFrequency')) cfg.cityFrequency = cityFrequency
+    if (isManual('cityIconType')) cfg.cityIconSetName = cityIconType
+    if (isManual('selectedBooks')) {
+      if (selectedBooks.size > 0) cfg.books = Array.from(selectedBooks)
+    }
+    return cfg
+  }
+
+  const fetchResolvedNort = async (cfg) => {
+    const settingsRes = await fetch(`${API_BASE}/generate-settings`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(cfg),
+    })
+    if (!settingsRes.ok) await handleResponseError(settingsRes)
+    const resolvedTxt = await settingsRes.text()
+    return resolvedTxt
+  }
+  const applyReturnedSettingsToUi = (nortContent) => {
+    const parsed = tryParse(nortContent)
+    if (parsed) mergedSettingsRef.current = parsed
+    appliersRef.current.applyMapSizeAndSeedSettings(mergedSettingsRef.current)
+    appliersRef.current.applyBackgroundTypeSettings(mergedSettingsRef.current)
+  }
+
   async function handleRandomMap(evt) {
     evt.preventDefault()
     setError(null)
     setLoading(true)
     const toast = makeProgressToastController()
-
-    try {
-      // Build, resolve, and request the generated map using small helpers
-      toast.show('Preparing map settings...')
-        const buildRandomCfg = () => {
-          const isManual = (k) => Object.prototype.hasOwnProperty.call(randomOverrides, k)
-          const cfg = {}
-          if (isManual('mapLanguage')) cfg.language = mapLanguage ?? undefined
-          if (isManual('randomSeed')) cfg.randomSeed = randomSeed ? Number(randomSeed) : undefined
-          if (isManual('artPack')) cfg.artPack = artPack ?? undefined
-          if (isManual('dimension')) cfg.dimension = dimension ?? undefined
-          if (isManual('worldSize')) cfg.worldSize = worldSize
-          if (isManual('landShape')) cfg.landShape = landShape ?? undefined
-          if (isManual('regionCount')) cfg.regionCount = regionCount
-          if (isManual('landColoringMethod')) cfg.drawRegionColors = landColoringMethod ? (landColoringMethod === 'ColorPoliticalRegions') : undefined
-          if (isManual('cityFrequency')) cfg.cityFrequency = cityFrequency
-          if (isManual('cityIconType')) cfg.cityIconSetName = cityIconType ?? undefined
-          if (isManual('selectedBooks')) {
-            if (selectedBooks.size > 0) cfg.books = Array.from(selectedBooks)
-          }
-          return cfg
-        }
-
-      const fetchResolvedNort = async (cfg) => {
-        const settingsRes = await fetch(`${API_BASE}/generate-settings`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(cfg),
-        })
-        if (!settingsRes.ok) await handleResponseError(settingsRes)
-        const nortContent = await settingsRes.text()
-        if (!nortContent) throw new Error('Server did not return settings content.')
-        return nortContent
-      }
-
-      const applyReturnedSettingsToUi = (nortContent) => {
-        const parsed = tryParse(nortContent)
-        if (parsed) mergedSettingsRef.current = parsed
-        appliersRef.current.applyMapSizeAndSeedSettings(mergedSettingsRef.current)
-        appliersRef.current.applyBackgroundTypeSettings(mergedSettingsRef.current)
-      }
-
-      const cfg = buildRandomCfg()
-      const nortContent = await fetchResolvedNort(cfg)
-      applyReturnedSettingsToUi(nortContent)
-
-      // Now request final image by POSTing the returned .nort JSON
-      toast.show('Generating random map...')
-      const parsedReturned = tryParse(nortContent)
-      if (parsedReturned && Object.prototype.hasOwnProperty.call(randomOverrides, 'mapLanguage') && mapLanguage) parsedReturned.language = mapLanguage
-      if (parsedReturned && Object.prototype.hasOwnProperty.call(randomOverrides, 'cityIconType') && cityIconType) parsedReturned.cityIconSetName = cityIconType
-      const bodyPayload = parsedReturned ?? tryParse(nortContent)
-      await runGenerate({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(bodyPayload) }, 'random-map', { type: 'random', name: 'Random Map', nortContent }, 'preview', toast)
-    } catch (err) {
+    await doRandomMap(toast).catch((err) => {
       setError(err.message)
       globalThis.showToast?.(err.message, { type: 'error', duration: 6000 })
-    } finally {
+    }).finally(() => {
       setLoading(false)
       toast.hide()
-    }
+    })
+  }
+
+  const doRandomMap = async (toast) => {
+    // Build, resolve, and request the generated map using small helpers
+    toast.show('Preparing map settings...')
+    const cfg = buildRandomCfg()
+    const nortContent = await fetchResolvedNort(cfg)
+    applyReturnedSettingsToUi(nortContent)
+    // Now request final image by POSTing the returned .nort JSON
+    await generateFromNortContent(nortContent, toast)
   }
 
   function resolveLandColoringMethod(fallbackMethod) {

@@ -199,7 +199,7 @@ function drawBackgroundAndInset(ctx, img, w, h, x, y, boxW, boxH) {
 }
 
 // Helper: draw the island shape and fill with either pattern or color (hoisted)
-function drawIslandShape(ctx, rng, cx, cy, baseRadius, xRadius, yRadius, boxW, boxH, x, y, landBitmap, displayBitmap, imgBitmap) {
+function drawIslandShape(ctx, rng, cx, cy, baseRadius, xRadius, yRadius, boxW, boxH, x, y, landBitmap, displayBitmap, imgBitmap, coastlineWidth = undefined, coastlineColorHex = undefined) {
   const points = 32
   const jitterX = Math.max(6, Math.round(xRadius * 0.18))
   const jitterY = Math.max(6, Math.round(yRadius * 0.18))
@@ -217,16 +217,21 @@ function drawIslandShape(ctx, rng, cx, cy, baseRadius, xRadius, yRadius, boxW, b
 
   const landColor = '#c2b891'
   const pattern = ctx.createPattern(landBitmap || displayBitmap || imgBitmap, 'repeat')
-  if (pattern) {
+    if (pattern) {
     ctx.save()
     ctx.clip()
     ctx.fillStyle = pattern
     ctx.fillRect(x, y, boxW, boxH)
     ctx.globalCompositeOperation = 'source-over'
-    ctx.strokeStyle = 'rgba(255,255,240,0.55)'
-    ctx.lineWidth = Math.max(1, Math.round(baseRadius * 0.03))
-    ctx.lineJoin = 'round'
-    ctx.stroke()
+    // Draw coastline stroke only when a positive coastline width is provided.
+    const computedDefaultWidth = Math.max(1, Math.round(baseRadius * 0.03))
+    const strokeW = (typeof coastlineWidth === 'number') ? coastlineWidth : computedDefaultWidth
+    if (strokeW > 0) {
+      ctx.strokeStyle = coastlineColorHex ? hexWithAlpha(coastlineColorHex, 100) : 'rgba(255,255,240,0.55)'
+      ctx.lineWidth = strokeW
+      ctx.lineJoin = 'round'
+      ctx.stroke()
+    }
     ctx.restore()
   } else {
     ctx.fillStyle = landColor
@@ -512,14 +517,21 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     const processed = { displayBitmap: imgBitmap, landBitmap: imgBitmap }
     const useColorizeOcean = (typeof opts.colorizeOcean === 'boolean') ? opts.colorizeOcean : colorizeOcean
     const useOceanColorHex = opts.oceanColorHex || oceanColorHex
+    const SEPPIA_HEX = '#C8A082'
     if (useColorizeOcean && useOceanColorHex) {
       processed.displayBitmap = await colorizeBitmap(imgBitmap, useOceanColorHex, w, h, previewFields, opts)
+    } else {
+      // When ocean colorization is disabled, render the preview with a sepia tone
+      processed.displayBitmap = await colorizeBitmap(imgBitmap, SEPPIA_HEX, w, h, previewFields, opts)
     }
 
     const useColorizeLand = (typeof opts.colorizeLand === 'boolean') ? opts.colorizeLand : colorizeLand
     const useLandColorHex = opts.landColorHex || landColorHex
     if (useColorizeLand && useLandColorHex) {
       processed.landBitmap = await colorizeBitmap(imgBitmap, useLandColorHex, w, h, previewFields, opts)
+    } else {
+      // When land colorization is disabled, render the preview land with a sepia tone
+      processed.landBitmap = await colorizeBitmap(imgBitmap, SEPPIA_HEX, w, h, previewFields, opts)
     }
     return processed
   }
@@ -546,9 +558,89 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     const xRadius = Math.round(baseRadius * 1.45)
     const yRadius = baseRadius
 
-    drawIslandShape(ctx, rng, cx, cy, baseRadius, xRadius, yRadius, boxW, boxH, x, y, landBitmap, displayBitmap, imgBitmap)
+    drawIslandShape(
+      ctx,
+      rng,
+      cx,
+      cy,
+      baseRadius,
+      xRadius,
+      yRadius,
+      boxW,
+      boxH,
+      x,
+      y,
+      landBitmap,
+      displayBitmap,
+      imgBitmap,
+      // pass coastline settings from previewFields so preview can show no coastline
+      previewFields?.coastlineWidth,
+      previewFields?.coastlineColorHex,
+    )
 
     return await new Promise((resolve) => canvas.toBlob(resolve))
+  }
+  // Build a minimal payload for the background preview request.
+  function pickDefaultTexture() {
+    if (cityIconTypesByPack && Object.keys(cityIconTypesByPack).length > 0) {
+      const firstPack = Object.keys(cityIconTypesByPack)[0]
+      const firstTypes = cityIconTypesByPack[firstPack]
+      if (Array.isArray(firstTypes) && firstTypes.length > 0) return { artPack: firstPack, cityIconType: firstTypes[0] }
+    }
+    if (Array.isArray(textures) && textures.length > 0) {
+      const t = textures[0]
+      return { artPack: t.artPack, cityIconType: t.name }
+    }
+    return {}
+  }
+
+  function resolveRawTextureRef(rawRef) {
+    if (!rawRef) return {}
+    if (String(rawRef).includes('|') && Array.isArray(textures) && textures.length > 0) {
+      const ref = String(rawRef)
+      const found = textures.find((tt) => `${tt.artPack}|${tt.name}` === ref)
+      if (found) return { artPack: found.artPack, cityIconType: found.name }
+      const [ap, nm] = ref.split('|', 2)
+      return { artPack: ap, cityIconType: nm }
+    }
+    return { cityIconType: rawRef }
+  }
+
+  function buildPreviewPayload() {
+    const normalizedPreviewFields = {}
+    const payload = Object.assign({ width: 520, height: 170 }, normalizedPreviewFields)
+    payload.type = previewFields.backgroundType === undefined ? null : previewFields.backgroundType
+    const bg = payload.type
+    if (bg === 'GeneratedFromTexture' || (typeof bg === 'string' && bg.toLowerCase().includes('texture'))) {
+      const rawRef = previewFields.textureRef
+      const isEmpty = rawRef === undefined || rawRef === null || String(rawRef).trim() === ''
+      if (isEmpty) {
+        Object.assign(payload, pickDefaultTexture())
+      } else {
+        Object.assign(payload, resolveRawTextureRef(rawRef))
+      }
+    }
+    if (currentSource?.type === 'random' && currentSource?.payload) Object.assign(payload, currentSource.payload)
+    if (!payload.cityIconType && previewFields?.cityIconType) payload.cityIconType = previewFields.cityIconType
+    return payload
+  }
+
+  async function fetchPreviewBlob(payload, controller) {
+    // kick off a background preload (non-blocking)
+    backgroundBaseCache.preload(payload)
+    // await cached or in-flight fetch
+    const blob = await backgroundBaseCache.get(payload, controller.signal)
+    return blob
+  }
+
+  async function setPreviewFromBlob(blob) {
+    lastBaseBlobRef.current = blob
+    const processedBlob = await composeMiniIslandFromBlob(blob)
+    const url = URL.createObjectURL(processedBlob || blob)
+    setBackgroundPreviewUrl((previous) => {
+      if (previous) URL.revokeObjectURL(previous)
+      return url
+    })
   }
   // expose existing local render helpers to the tab components so they
   // can reuse the current implementations without duplicating logic.
@@ -979,111 +1071,9 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     // request is sent with the fully-settled state.
     let timerId = setTimeout(async () => {
       if (controller.signal.aborted) return
-        // Build a minimal preview payload. If the user has an explicit
-        // `nortContent` source, send only that JSON plus preview dimensions
-        // and light overrides. Avoid sending duplicated UI-only fields that
-        // are already included inside `nortContent`.
-        // Build a payload containing the explicit previewFields so the
-        // server receives the full set of visual parameters regardless of
-        // whether we also have a nortContent source. If the current source
-        // is a random payload, merge it on top of these fields so the
-        // resolver's canonical values take precedence.
-        // Only send the minimal background controls that affect the
-        // background preview (as shown in the screenshot): draw region
-        // boundaries, color land flag and land color, color ocean flag and
-        // ocean color. Keep preview dimensions.
-        // We don't send the `colorizeLand` boolean flag to the preview API.
-        // Only include `landColorHex` when land coloring is enabled.
-        // We intentionally avoid sending color overrides to the backend
-        // — the client will apply land/ocean tinting locally to the neutral
-        // base image to reduce API calls and server load.
-        const normalizedPreviewFields = {}
-
-        const payload = Object.assign({ width: 520, height: 170 }, normalizedPreviewFields)
-
-        // Include a `background` key (server expects this name). When the
-        // background is a texture-based generation, also include the
-        // `Texture` field so the server can resolve the texture reference.
-        payload.type = previewFields.backgroundType === undefined ? null : previewFields.backgroundType
-        const bg = payload.type
-        if (
-          bg === 'GeneratedFromTexture' ||
-          (typeof bg === 'string' && bg.toLowerCase().includes('texture'))
-        ) {
-          // If the user hasn't explicitly selected a texture yet, prefer
-          // the first available texture from the server-provided list so
-          // enabling texture immediately produces a sensible preview.
-          const rawRef = previewFields.textureRef
-          const isEmpty = rawRef === undefined || rawRef === null || String(rawRef).trim() === ''
-          if (isEmpty) {
-            // Prefer canonical city icon lists from UI options
-            if (cityIconTypesByPack && Object.keys(cityIconTypesByPack).length > 0) {
-              const firstPack = Object.keys(cityIconTypesByPack)[0]
-              const firstTypes = cityIconTypesByPack[firstPack]
-              if (Array.isArray(firstTypes) && firstTypes.length > 0) {
-                payload.artPack = firstPack
-                payload.cityIconType = firstTypes[0]
-              }
-            }
-            // Fallback: use textures list if available
-            if ((!payload.cityIconType || !payload.artPack) && Array.isArray(textures) && textures.length > 0) {
-              const t = textures[0]
-              payload.artPack = t.artPack
-              payload.cityIconType = t.name
-            }
-          } else {
-            // Resolve selection against known `textures` entries to avoid string parsing when possible
-            if (String(rawRef).includes('|') && Array.isArray(textures) && textures.length > 0) {
-              const ref = String(rawRef)
-              const found = textures.find((tt) => `${tt.artPack}|${tt.name}` === ref)
-              if (found) {
-                payload.artPack = found.artPack
-                payload.cityIconType = found.name
-              } else {
-                // last-resort: parse the combined ref
-                const [ap, nm] = ref.split('|', 2)
-                payload.artPack = ap
-                payload.cityIconType = nm
-              }
-            } else {
-              payload.cityIconType = isEmpty ? null : rawRef
-            }
-          }
-        }
-
-        if (hasRandomPayloadSource) {
-          Object.assign(payload, currentSource.payload)
-        }
-
-        if (!payload.cityIconType && previewFields?.cityIconType) {
-          payload.cityIconType = previewFields.cityIconType
-        }
-
-        // Retry fetch a few times to handle transient network changes (ERR_NETWORK_CHANGED)
-        // Use hoisted `doFetchWithRetries` helper
-
-        let blob = null
-        // Use the background base cache to preload and fetch small neutral
-        // background images for client-side tinting. Falls back to
-        // `/background-preview` if the base endpoint isn't available.
-          // kick off a background preload (non-blocking)
-          backgroundBaseCache.preload(payload)
-          // await cached or in-flight fetch
-          blob = await backgroundBaseCache.get(payload, controller.signal)
-
-        // store last fetched neutral base so color-only changes can recompose locally
-        lastBaseBlobRef.current = blob
-
-        
-
-        // Use hoisted `shadeColor` and `hexWithAlpha` helpers
-
-        const processedBlob = await composeMiniIslandFromBlob(blob)
-        const url = URL.createObjectURL(processedBlob || blob)
-        setBackgroundPreviewUrl((previous) => {
-          if (previous) URL.revokeObjectURL(previous)
-          return url
-        })
+      const payload = buildPreviewPayload()
+      const blob = await fetchPreviewBlob(payload, controller)
+      await setPreviewFromBlob(blob)
     }, 100)
 
     return () => {
@@ -1289,6 +1279,7 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
       setDrawBorder,
       drawRegionBoundaries,
       setDrawRegionBoundaries,
+      regionBoundaryWidth,
       setRegionBoundaryStyle,
       setRegionBoundaryWidth,
       setRegionBoundaryColorHex,
