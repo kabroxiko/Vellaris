@@ -80,16 +80,16 @@ function parseBooleanWithDefault(value, mergedRef, priorKey, uiValue) {
 }
 
 // Helper: scale value with linear interpolation
-function scaleSliderValue(sliderValue, sliderValueFor1Scale = 5, scaleMin = 0.5, scaleMax = 3.0) {
+function scaleSliderValue(sliderValue, sliderValueFor1Scale = 5, scaleMin = 0.5, scaleMax = 3) {
   const v = Number(sliderValue)
   if (!Number.isFinite(v)) return undefined
   const minSlider = 1, maxSlider = 15
   if (v <= sliderValueFor1Scale) {
-    const slope = (sliderValueFor1Scale - minSlider) / (1.0 - scaleMin)
+    const slope = (sliderValueFor1Scale - minSlider) / (1 - scaleMin)
     return (v - (sliderValueFor1Scale - slope)) / slope
   } else {
-    const slope = (maxSlider - sliderValueFor1Scale) / (scaleMax - 1.0)
-    return (v - (sliderValueFor1Scale - slope * 1.0)) / slope
+    const slope = (maxSlider - sliderValueFor1Scale) / (scaleMax - 1)
+    return (v - (sliderValueFor1Scale - slope * 1)) / slope
   }
 }
 
@@ -108,11 +108,9 @@ function deriveNortFilenameFromContent(nortContent) {
   if (typeof nortContent === 'string') parsed = tryParse(nortContent)
   else parsed = nortContent
   if (!parsed?.edits) return null
-  const textList = Array.isArray(parsed.edits?.textEdits)
-    ? parsed.edits.textEdits
-    : Array.isArray(parsed.edits?.text)
-    ? parsed.edits.text
-    : null
+  let textList = null
+  if (Array.isArray(parsed.edits?.textEdits)) textList = parsed.edits.textEdits
+  else if (Array.isArray(parsed.edits?.text)) textList = parsed.edits.text
   if (!Array.isArray(textList)) return null
   for (const t of textList) {
     const tType = t?.type || t?.typeName || t?.Type
@@ -125,8 +123,8 @@ function deriveNortFilenameFromContent(nortContent) {
 function sanitizeFilenameBase(name, fallback) {
   let s = String(name)
   s = s.trim()
-  s = s.replace(/[\\/:*?"<>|]+/g, '-')
-  s = s.replace(/\s+/g, '-')
+  s = s.replaceAll(/[\\/:*?"<>|]+/g, '-')
+  s = s.replaceAll(/\s+/g, '-')
   if (s) return s
   return fallback ?? 'vellaris-map'
 }
@@ -320,18 +318,21 @@ function GenerateForm({ uiLanguage = 'en' }) {
   function computeInitialBooks(uiOpts) {
     const overrideBooks = Array.isArray(initialRandomOverrides.selectedBooks) ? initialRandomOverrides.selectedBooks : null
     const validBooks = overrideBooks ? overrideBooks.filter((b) => uiOpts.books?.includes(b)) : null
-    const initialBooks = (validBooks?.length > 0) ? new Set(validBooks) : (Array.isArray(uiOpts?.books) ? new Set(uiOpts.books) : new Set())
+    let initialBooks
+    if (validBooks?.length > 0) initialBooks = new Set(validBooks)
+    else if (Array.isArray(uiOpts?.books)) initialBooks = new Set(uiOpts.books)
+    else initialBooks = new Set()
     booksLoadedRef.current = true
     setSelectedBooks(initialBooks)
   }
 
   async function chooseArtPackAndLoad(uiOpts, defs) {
-    const determinePackAndPreferred = (uiOptsLocal, defsLocal) => {
+      const determinePackAndPreferred = (uiOptsLocal, defsLocal) => {
         const firstArtPack = Array.isArray(uiOptsLocal.artPacks) && uiOptsLocal.artPacks.length > 0 ? uiOptsLocal.artPacks[0] : null
         const chosenPack = artPack ?? firstArtPack ?? 'nortantis'
         const preferredCityDefault = defsLocal ? String(defsLocal.cityIconType ?? defsLocal.cityIconSetName ?? cityIconType) : cityIconType
-      return { chosenPack, firstArtPack, preferredCityDefault }
-    }
+        return { chosenPack, firstArtPack, preferredCityDefault }
+      }
 
     const { chosenPack, firstArtPack, preferredCityDefault } = determinePackAndPreferred(uiOpts, defs)
     if (!artPack && firstArtPack) setArtPack(firstArtPack)
@@ -785,16 +786,16 @@ function GenerateForm({ uiLanguage = 'en' }) {
         const s = Number(scale)
         if (!Number.isFinite(s)) return undefined
         const sliderValueFor1Scale = 5
-        const scaleMax = 3.0
+        const scaleMax = 3
         const scaleMin = 0.5
         const minScaleSliderValue = 1
         const maxScaleSliderValue = 15
-        const v1Slope = (sliderValueFor1Scale - minScaleSliderValue) / (1.0 - scaleMin)
+        const v1Slope = (sliderValueFor1Scale - minScaleSliderValue) / (1 - scaleMin)
         const v1YIntercept = sliderValueFor1Scale - v1Slope
-        const v2Slope = (maxScaleSliderValue - sliderValueFor1Scale) / (scaleMax - 1.0)
-        const v2YIntercept = sliderValueFor1Scale - v2Slope * 1.0
+        const v2Slope = (maxScaleSliderValue - sliderValueFor1Scale) / (scaleMax - 1)
+        const v2YIntercept = sliderValueFor1Scale - v2Slope * 1
         let v
-        if (s <= 1.0) v = v1Slope * s + v1YIntercept
+        if (s <= 1) v = v1Slope * s + v1YIntercept
         else v = v2Slope * s + v2YIntercept
         v = Math.round(v)
         if (v < minScaleSliderValue) v = minScaleSliderValue
@@ -848,7 +849,9 @@ function GenerateForm({ uiLanguage = 'en' }) {
       setHex(setTextColorHex, defs.textColor)
       setBoolean(setDrawBoldBackground, defs.drawBoldBackground)
       setHex(setBoldBackgroundColorHex, defs.boldBackgroundColor)
-      const backendDefaultFont = (opts?.defaultFontFamily) ? opts.defaultFontFamily : (Array.isArray(opts?.fonts) && opts.fonts.length > 0 ? opts.fonts[0] : null)
+      let backendDefaultFont = null
+      if (opts?.defaultFontFamily) backendDefaultFont = opts.defaultFontFamily
+      else if (Array.isArray(opts?.fonts) && opts.fonts.length > 0) backendDefaultFont = opts.fonts[0]
       if (!titleFontFamily && backendDefaultFont) setTitleFontFamily(backendDefaultFont)
       if (!regionFontFamily && backendDefaultFont) setRegionFontFamily(backendDefaultFont)
       if (!mountainRangeFontFamily && backendDefaultFont) setMountainRangeFontFamily(backendDefaultFont)
@@ -1010,14 +1013,7 @@ function GenerateForm({ uiLanguage = 'en' }) {
     },
     [updateRandomOverride]
   )
-  async function refreshUiForSeed(value) {
-    const uiOpts = await loadUiOptions(requestLanguage)
-    if (!uiOpts) return
-    setArtPacks(uiOpts.artPacks)
-    setAllBooks(uiOpts.books)
-    setTextures(uiOpts.textures)
-    setBorderTypes(uiOpts.borderTypes)
-  }
+  
 
   const handleRegionCountChange = useCallback(
     (value) => {
@@ -1331,7 +1327,9 @@ function GenerateForm({ uiLanguage = 'en' }) {
     // Ensure font family controls are initialized to backend canonical
     // default if available.
     const opts = uiI18n.options
-    const backendDefaultFont = opts?.defaultFontFamily ? opts.defaultFontFamily : (Array.isArray(opts?.fonts) && opts.fonts.length > 0 ? opts.fonts[0] : null)
+    let backendDefaultFont = null
+    if (opts?.defaultFontFamily) backendDefaultFont = opts.defaultFontFamily
+    else if (Array.isArray(opts?.fonts) && opts.fonts.length > 0) backendDefaultFont = opts.fonts[0]
     if (backendDefaultFont) {
       setTitleFontFamily(backendDefaultFont)
       setRegionFontFamily(backendDefaultFont)
@@ -1541,9 +1539,14 @@ function GenerateForm({ uiLanguage = 'en' }) {
     const parsed = tryParse(nortContent)
     if (parsed) mergedSettingsRef.current = parsed
     downloadNortContent(nortContent, baseName)
+    let derivedName
+    if (source?.name) derivedName = source.name
+    else if (fileName) derivedName = fileName
+    else derivedName = 'Generated settings'
+
     setCurrentSource({
       type: 'nort-content',
-      name: source?.name ? source.name : (fileName ? fileName : 'Generated settings'),
+      name: derivedName,
       nortContent,
       originType: source?.type,
     })
@@ -1597,22 +1600,24 @@ function GenerateForm({ uiLanguage = 'en' }) {
     try {
       // Build, resolve, and request the generated map using small helpers
       toast.show('Preparing map settings...')
-      const buildRandomCfg = () => {
-        const isManual = (k) => Object.prototype.hasOwnProperty.call(randomOverrides, k)
-        return {
-          language: isManual('mapLanguage') ? (mapLanguage ?? undefined) : undefined,
-          randomSeed: isManual('randomSeed') ? (randomSeed ? Number(randomSeed) : undefined) : undefined,
-          artPack: isManual('artPack') ? (artPack ?? undefined) : undefined,
-          dimension: isManual('dimension') ? (dimension ?? undefined) : undefined,
-          worldSize: isManual('worldSize') ? worldSize : undefined,
-          landShape: isManual('landShape') ? (landShape ?? undefined) : undefined,
-          regionCount: isManual('regionCount') ? regionCount : undefined,
-          drawRegionColors: isManual('landColoringMethod') ? (landColoringMethod ? (landColoringMethod === 'ColorPoliticalRegions') : undefined) : undefined,
-          cityFrequency: isManual('cityFrequency') ? cityFrequency : undefined,
-          cityIconSetName: isManual('cityIconType') ? (cityIconType ?? undefined) : undefined,
-          books: isManual('selectedBooks') ? (selectedBooks.size > 0 ? Array.from(selectedBooks) : undefined) : undefined,
+        const buildRandomCfg = () => {
+          const isManual = (k) => Object.prototype.hasOwnProperty.call(randomOverrides, k)
+          const cfg = {}
+          if (isManual('mapLanguage')) cfg.language = mapLanguage ?? undefined
+          if (isManual('randomSeed')) cfg.randomSeed = randomSeed ? Number(randomSeed) : undefined
+          if (isManual('artPack')) cfg.artPack = artPack ?? undefined
+          if (isManual('dimension')) cfg.dimension = dimension ?? undefined
+          if (isManual('worldSize')) cfg.worldSize = worldSize
+          if (isManual('landShape')) cfg.landShape = landShape ?? undefined
+          if (isManual('regionCount')) cfg.regionCount = regionCount
+          if (isManual('landColoringMethod')) cfg.drawRegionColors = landColoringMethod ? (landColoringMethod === 'ColorPoliticalRegions') : undefined
+          if (isManual('cityFrequency')) cfg.cityFrequency = cityFrequency
+          if (isManual('cityIconType')) cfg.cityIconSetName = cityIconType ?? undefined
+          if (isManual('selectedBooks')) {
+            if (selectedBooks.size > 0) cfg.books = Array.from(selectedBooks)
+          }
+          return cfg
         }
-      }
 
       const fetchResolvedNort = async (cfg) => {
         const settingsRes = await fetch(`${API_BASE}/generate-settings`, {

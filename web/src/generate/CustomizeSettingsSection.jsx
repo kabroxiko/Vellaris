@@ -627,9 +627,6 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     setLandColorHex,
     setOceanColorHex,
     setBackgroundSeed,
-    setFinalSeed,
-    setFinalWidth,
-    setFinalHeight,
     setDrawRegionBoundaries,
     setDrawBorder,
     setDrawGridOverlay,
@@ -761,7 +758,7 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     // Simple replacement for {0}, {1} placeholders
     let out = txt
     args.forEach((a, i) => {
-      out = out.replace(new RegExp(`\\{${i}\\}`, 'g'), String(a))
+      out = out.replaceAll(new RegExp(`\\{${i}\\}`, 'g'), String(a))
     })
     return out
   }
@@ -789,9 +786,9 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
       return parts.flatMap((p, i) => (i === parts.length - 1 ? [p] : [p, React.createElement('br', { key: i })]))
     }
     // Otherwise strip any other HTML tags
-    t = t.replace(/<[^>]*>/g, '')
-    t = t.replace(/''/g, "'")
-    t = t.replace(/\s+/g, ' ').trim()
+    t = t.replaceAll(/<[^>]*>/g, '')
+    t = t.replaceAll("''", "'")
+    t = t.replaceAll(/\s+/g, ' ').trim()
     return t
   }
 
@@ -941,7 +938,6 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
   }, [fontFields])
 
   useEffect(() => {
-    const hasNortContentSource = Boolean(currentSource?.nortContent)
     const hasRandomPayloadSource = Boolean(
       currentSource?.type === 'random' && currentSource?.payload
     )
@@ -1361,6 +1357,7 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
       setTextColorHex,
       setDrawBoldBackground,
       setBoldBackgroundColorHex,
+      handleFontOptionClick,
       // picker visibility state
       showCoastPicker,
       setShowCoastPicker,

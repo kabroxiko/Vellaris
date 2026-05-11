@@ -5,11 +5,9 @@ import { tryParseJson as tryParse } from './helpers'
 // Find a Title entry in a parsed .nort `edits` structure, if present.
 function findTitle(parsed) {
   if (!parsed || !parsed.edits) return null
-  const textList = Array.isArray(parsed.edits.textEdits)
-    ? parsed.edits.textEdits
-    : Array.isArray(parsed.edits.text)
-    ? parsed.edits.text
-    : null
+  let textList = null
+  if (Array.isArray(parsed.edits.textEdits)) textList = parsed.edits.textEdits
+  else if (Array.isArray(parsed.edits.text)) textList = parsed.edits.text
   if (!Array.isArray(textList)) return null
   for (const t of textList) {
     const tType = t?.type || t?.typeName || t?.Type
@@ -71,7 +69,7 @@ export function downloadNortContent(nortContent, baseName) {
     pretty = typeof nortContent === 'string' ? nortContent : JSON.stringify(nortContent)
   }
   // sanitize filenameBase
-  filenameBase = String(filenameBase).trim().replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, '-') || 'generated-settings'
+  filenameBase = String(filenameBase).trim().replaceAll(/[\\/:*?"<>|]+/g, '-').replaceAll(/\s+/g, '-') || 'generated-settings'
   const filename = `${filenameBase}.nort`
   const blob = new Blob([pretty], { type: 'application/json;charset=utf-8' })
   const url = URL.createObjectURL(blob)
