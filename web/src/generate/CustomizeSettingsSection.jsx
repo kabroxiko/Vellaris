@@ -996,9 +996,7 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
   }
 
   // debug helper removed
-  const emptyComboOption = hasCustomizationSource ? null : (
-    <option value=""></option>
-  )
+  const emptyComboOption = () => (hasCustomizationSource ? null : (<option value="" />))
 
   const fontFields = useMemo(
     () => [

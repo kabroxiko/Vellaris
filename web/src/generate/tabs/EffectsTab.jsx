@@ -94,7 +94,7 @@ export default function EffectsTab(props) {
           value={gatedControlValue(lineStyle)}
           onChange={(e) => setLineStyle(e.target.value)}
         >
-          {emptyComboOption}
+          {emptyComboOption()}
             {Array.isArray(lineStyles)
             ? lineStyles.map((item) => {
                 if (item?.value === undefined) return null
@@ -209,7 +209,7 @@ export default function EffectsTab(props) {
           value={gatedControlValue(oceanWavesType)}
           onChange={(e) => setOceanWavesType(e.target.value)}
         >
-          {emptyComboOption}
+          {emptyComboOption()}
           {Array.isArray(oceanWaveTypes)
             ? oceanWaveTypes.map((item) => {
                 if (item?.value === undefined) return null
@@ -319,7 +319,7 @@ export default function EffectsTab(props) {
             onChange={(e) => setRoadStyle(e.target.value)}
             disabled={!drawRoads}
           >
-            {emptyComboOption}
+            {emptyComboOption()}
             {Array.isArray(strokeTypes) && strokeTypes.length > 0
               ? strokeTypes.map((item) => {
                   if (item?.value === undefined) return null
