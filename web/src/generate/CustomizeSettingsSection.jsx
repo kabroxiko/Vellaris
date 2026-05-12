@@ -98,12 +98,11 @@ async function colorizeBitmap(sourceBitmap, colorHex, w, h, previewFieldsLocal, 
       const I = hsb[2] * 255
       const overlay = ((I / 255) * (I + (2 * level) * (255 - I))) / 255
       resultLevel = overlay
+    } else if (hsb[2] < 0.5) {
+      resultLevel = level * (hsb[2] * 2)
     } else {
-      if (hsb[2] < 0.5) resultLevel = level * (hsb[2] * 2)
-      else {
-        const range = (1 - hsb[2]) * 2
-        resultLevel = range * level + (1 - range)
-      }
+      const range = (1 - hsb[2]) * 2
+      resultLevel = range * level + (1 - range)
     }
     const [rC, gC, bC] = hsbToRgb(hsb[0], hsb[1], resultLevel)
     data[i] = Math.round((1 - preserveTexture) * rC + preserveTexture * r0)
@@ -276,21 +275,33 @@ function ColorPickerModal({ open, onClose, children }) {
     if (!open) return undefined
     const onKey = (e) => { if (e.key === 'Escape') onClose() }
     document.addEventListener('keydown', onKey)
+    const onMouseDown = (e) => {
+      if (innerRef.current && !innerRef.current.contains?.(e.target)) onClose()
+    }
+    document.addEventListener('mousedown', onMouseDown)
     // focus first focusable element inside modal for accessibility
     if (innerRef.current) {
       const btn = innerRef.current.querySelector('button, [tabindex], input, [role="button"]')
       if (btn && typeof btn.focus === 'function') btn.focus()
     }
-    return () => document.removeEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.removeEventListener('mousedown', onMouseDown)
+    }
   }, [open, onClose])
 
   if (!open) return null
   return (
-    <div style={modalBackdropStyle} onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
-      <div ref={innerRef} style={modalContentStyle} role="dialog" aria-modal="true" onMouseDown={(e) => e.stopPropagation()}>
+    <dialog
+      ref={innerRef}
+      style={modalBackdropStyle}
+      open
+      onCancel={(e) => { e.preventDefault(); onClose() }}
+    >
+      <div style={modalContentStyle}>
         {children}
       </div>
-    </div>
+    </dialog>
   )
 }
 
@@ -669,19 +680,20 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
   }
 
   function buildPreviewPayload() {
-    const payload = Object.assign({ width: 520, height: 170 }, previewFields)
-    payload.type = previewFields.backgroundType === undefined ? null : previewFields.backgroundType
+    let payload = { width: 520, height: 170 }
+    if (previewFields) payload = { ...payload, ...previewFields }
+    payload.type = previewFields?.backgroundType === undefined ? null : previewFields.backgroundType
     const bg = payload.type
     if (bg === 'GeneratedFromTexture' || (typeof bg === 'string' && bg.toLowerCase().includes('texture'))) {
-      const rawRef = previewFields.textureRef
+      const rawRef = previewFields?.textureRef
       const isEmpty = rawRef === undefined || rawRef === null || String(rawRef).trim() === ''
       if (isEmpty) {
-        Object.assign(payload, pickDefaultTexture())
+        payload = { ...payload, ...pickDefaultTexture() }
       } else {
-        Object.assign(payload, resolveRawTextureRef(rawRef))
+        payload = { ...payload, ...resolveRawTextureRef(rawRef) }
       }
     }
-    if (currentSource?.type === 'random' && currentSource?.payload) Object.assign(payload, currentSource.payload)
+    if (currentSource?.type === 'random' && currentSource?.payload) payload = { ...payload, ...currentSource.payload }
     if (!payload.cityIconType && previewFields?.cityIconType) payload.cityIconType = previewFields.cityIconType
     return payload
   }
@@ -891,7 +903,8 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     const alternate = baseKey && Object.hasOwn(labels ?? {}, baseKey) ? labels[baseKey] : null
     const value = txt || alternate || key
     // If the translation contains literal <br> tags, return React nodes
-      if (typeof value === 'string' && /<br\s*\/?>/i.test(value)) {
+      // Guard against extremely long inputs to avoid expensive regex operations
+      if (typeof value === 'string' && value.length <= 2000 && /<br\s*\/?>/i.test(value)) {
         const parts = value.split(/<br\s*\/?>/i)
         return parts.flatMap((p) => (p === parts.at(-1) ? [p] : [p, React.createElement('br', { key: `br-${String(p).slice(0,20)}` })]))
     }
@@ -905,7 +918,7 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     // Simple replacement for {0}, {1} placeholders
     let out = txt
     args.forEach((a, i) => {
-      out = out.replaceAll(new RegExp(`\\{${i}\\}`, 'g'), String(a))
+      out = out.replaceAll(new RegExp(String.raw`\{${i}\}`, 'g'), String(a))
     })
     return out
   }
@@ -926,6 +939,8 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     if (typeof s !== 'string') return s
     // Remove surrounding <html> wrappers and preserve <br> as line breaks
     let t = String(s)
+    const MAX_SANITIZE_LENGTH = 2000
+    if (t.length > MAX_SANITIZE_LENGTH) t = t.slice(0, MAX_SANITIZE_LENGTH)
     t = t.replace(/^\s*<html>\s*/i, '').replace(/\s*<\/html>\s*$/i, '')
     // If there are <br> tags, convert to React nodes with breaks
     if (/<br\s*\/?>/i.test(t)) {
@@ -996,7 +1011,7 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
   }
 
   // debug helper removed
-  const emptyComboOption = () => (hasCustomizationSource ? null : (<option value="" />))
+  const emptyComboOption = hasCustomizationSource ? null : (<option value="" />)
 
   const fontFields = useMemo(
     () => [

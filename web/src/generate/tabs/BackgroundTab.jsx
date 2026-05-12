@@ -31,7 +31,7 @@ function RegionBoundaryControls({
         onChange={(e) => setRegionBoundaryStyle(e.target.value)}
         disabled={!drawRegionBoundaries}
       >
-        {emptyComboOption()}
+        {emptyComboOption}
         {strokeTypes.map((item) => (
           <option key={item.value} value={item.value}>
             {item.label}
@@ -99,7 +99,7 @@ function LandColorControls({
         onChange={(e) => setFinalLandColoringMethod(e.target.value)}
         disabled={!colorizeLand}
       >
-        {emptyComboOption()}
+        {emptyComboOption}
         {Array.isArray(landColoringMethods)
           ? landColoringMethods
               .filter((item) => item?.value)
@@ -177,7 +177,7 @@ function TextureSelect({ emptyComboOption, textures, hasTextures, showTextureOpt
         onChange={(e) => setTextureRef(e.target.value)}
         disabled={!showTextureOptions || !hasTextures}
       >
-        {emptyComboOption()}
+        {emptyComboOption}
         {!hasTextures && (
           <option value="" disabled>
             {translateLabel('ui.texture.noneAvailable')}
@@ -206,7 +206,7 @@ function GridShapeSelect({ translateLabel, gatedControlValue, emptyComboOption, 
         onChange={(e) => setGridOverlayShape(e.target.value)}
         disabled={!drawGridOverlay}
       >
-        {emptyComboOption()}
+        {emptyComboOption}
         {gridOverlayShapes?.map((item) => (
           <option key={item.value} value={item.value}>
             {item.label}
@@ -266,7 +266,7 @@ function GridOffsetsSelects({ translateLabel, drawGridOverlay, isVoronoi, gatedC
     <>
       <label htmlFor="grid-xoffset-input" className={drawGridOverlay && !isVoronoi ? '' : 'is-disabled'}>{translateLabel('theme.xOffset.label')}</label>
       <select id="grid-xoffset-input" value={gatedControlValue(gridOverlayXOffset)} onChange={(e) => setGridOverlayXOffset(e.target.value)} disabled={!(drawGridOverlay && !isVoronoi)}>
-        {emptyComboOption()}
+        {emptyComboOption}
         {Array.isArray(gridOverlayOffsets) ? gridOverlayOffsets.map((item) => (
           <option key={item.value} value={item.value}>{item.label}</option>
         )) : null}
@@ -274,7 +274,7 @@ function GridOffsetsSelects({ translateLabel, drawGridOverlay, isVoronoi, gatedC
 
       <label htmlFor="grid-yoffset-input" className={drawGridOverlay && !isVoronoi ? '' : 'is-disabled'}>{translateLabel('theme.yOffset.label')}</label>
       <select id="grid-yoffset-input" value={gatedControlValue(gridOverlayYOffset)} onChange={(e) => setGridOverlayYOffset(e.target.value)} disabled={!(drawGridOverlay && !isVoronoi)}>
-        {emptyComboOption()}
+        {emptyComboOption}
         {Array.isArray(gridOverlayOffsets) ? gridOverlayOffsets.map((item) => (
           <option key={item.value} value={item.value}>{item.label}</option>
         )) : null}
@@ -302,7 +302,7 @@ function GridLayerSelect({ translateLabel, gatedControlValue, emptyComboOption, 
     <>
       <label htmlFor="grid-layer-input">{translateLabel('theme.layer.label')}</label>
       <select id="grid-layer-input" value={gatedControlValue(gridOverlayLayer)} onChange={(e) => setGridOverlayLayer(e.target.value)} disabled={!drawGridOverlay}>
-        {emptyComboOption()}
+        {emptyComboOption}
         {Array.isArray(gridOverlayLayers) ? gridOverlayLayers.map((item) => (
           <option key={item.value} value={item.value}>{item.label}</option>
         )) : null}
@@ -489,7 +489,7 @@ export default function BackgroundTab(props) {
           value={gatedControlValue(backgroundType)}
           onChange={(e) => setBackgroundType(e.target.value)}
         >
-          {emptyComboOption()}
+          {emptyComboOption}
           {backgroundTypes.map((item) => (
             <option key={item.value} value={item.value}>
               {item.label}

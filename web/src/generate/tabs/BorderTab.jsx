@@ -44,7 +44,7 @@ function SelectList({ id, label, value, onChange, disabled, emptyComboOption, it
     <>
       <label htmlFor={id}>{label}</label>
       <select id={id} value={value} onChange={(e) => onChange(e.target.value)} disabled={disabled}>
-        {emptyComboOption()}
+        {emptyComboOption}
         {Array.isArray(items) ? items.map((item, idx) => renderItem(item, idx)) : null}
       </select>
     </>
@@ -129,7 +129,7 @@ export default function BorderTab(props) {
             onChange={(e) => setBorderRef(e.target.value)}
             disabled={!drawBorder}
           >
-            {emptyComboOption()}
+            {emptyComboOption}
             
             {Array.isArray(borderTypes) ? borderTypes.map((borderType) => {
               const ref = `${borderType.artPack}|${borderType.name}`

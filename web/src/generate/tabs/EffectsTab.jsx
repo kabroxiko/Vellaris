@@ -94,7 +94,7 @@ export default function EffectsTab(props) {
           value={gatedControlValue(lineStyle)}
           onChange={(e) => setLineStyle(e.target.value)}
         >
-          {emptyComboOption()}
+          {emptyComboOption}
             {Array.isArray(lineStyles)
             ? lineStyles.map((item) => {
                 if (item?.value === undefined) return null
@@ -176,15 +176,17 @@ export default function EffectsTab(props) {
 
         {(() => {
           const shouldReplace = finalLandColoringMethod === 'ColorPoliticalRegions'
-          let swatchReplacement = undefined
+          let swatchReplacement
           if (shouldReplace) {
             let txt = translateLabel('theme.coastShadingColor.disabled')
+            const MAX_SANITIZE_LENGTH = 2000
+            if (typeof txt === 'string' && txt.length > MAX_SANITIZE_LENGTH) txt = txt.slice(0, MAX_SANITIZE_LENGTH)
             if (typeof txt === 'string') {
               txt = txt.replaceAll(/<[^>]*>/g, '')
               txt = txt.replaceAll("''", "'")
             }
             const methodLabel = translateLabel(`LandColoringMethod.${finalLandColoringMethod}`)
-            if (typeof txt === 'string' && txt.indexOf('{0}') >= 0) txt = txt.replace('{0}', methodLabel)
+            if (typeof txt === 'string' && txt.includes('{0}')) txt = txt.replace('{0}', methodLabel)
             swatchReplacement = txt
           }
           return renderColorControl({
@@ -209,7 +211,7 @@ export default function EffectsTab(props) {
           value={gatedControlValue(oceanWavesType)}
           onChange={(e) => setOceanWavesType(e.target.value)}
         >
-          {emptyComboOption()}
+          {emptyComboOption}
           {Array.isArray(oceanWaveTypes)
             ? oceanWaveTypes.map((item) => {
                 if (item?.value === undefined) return null
@@ -264,7 +266,7 @@ export default function EffectsTab(props) {
             <span className="slider-value">{concentricWaveCount}</span>
           </div>
 
-          <label className={`section-subheading ${oceanWavesType === concentricWaveValue ? '' : 'is-disabled'}`} style={{ marginTop: '0.5rem' }}>Style options:</label>
+          <h4 className={`section-subheading ${oceanWavesType === concentricWaveValue ? '' : 'is-disabled'}`} style={{ marginTop: '0.5rem' }}>Style options:</h4>
 
           <div className="style-options">
             <label className={`checkbox-label ${oceanWavesType === concentricWaveValue ? '' : 'is-disabled'}`}>
@@ -319,7 +321,7 @@ export default function EffectsTab(props) {
             onChange={(e) => setRoadStyle(e.target.value)}
             disabled={!drawRoads}
           >
-            {emptyComboOption()}
+            {emptyComboOption}
             {Array.isArray(strokeTypes) && strokeTypes.length > 0
               ? strokeTypes.map((item) => {
                   if (item?.value === undefined) return null

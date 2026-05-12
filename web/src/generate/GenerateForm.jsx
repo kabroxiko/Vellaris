@@ -241,8 +241,8 @@ function exposeSettingsForDebugging(parsedSettings) {
     if (typeof globalThis !== 'undefined') {
       globalThis.__lastMergedParsedSettings = parsedSettings
     }
-  } catch (dbg) {
-    safeDebugLog('buildNortContentRequest', 'set __lastMergedParsedSettings failed', dbg)
+  } catch (error_) {
+    safeDebugLog('buildNortContentRequest', 'set __lastMergedParsedSettings failed', error_)
   }
 }
 
@@ -1470,9 +1470,9 @@ function GenerateForm({ uiLanguage = 'en' }) {
     // override for `randomSeed`.
     // Fill the Random Seed input with the backend-provided canonical
     // seed when present so the UI reflects the generated preset.
-    const seedVal = defs?.randomSeed !== undefined && defs.randomSeed !== null ? String(defs.randomSeed) : ''
+    const seedVal = defs?.randomSeed == null ? '' : String(defs.randomSeed)
     setRandomSeed(seedVal)
-    updateRandomOverride('randomSeed', seedVal ? seedVal : null)
+    updateRandomOverride('randomSeed', seedVal || null)
 
     // Ensure font family controls are initialized to backend canonical
     // default if available.

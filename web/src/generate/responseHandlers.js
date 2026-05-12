@@ -4,7 +4,7 @@ import { tryParseJson as tryParse } from './helpers'
 
 // Find a Title entry in a parsed .nort `edits` structure, if present.
 function findTitle(parsed) {
-  if (!parsed || !parsed.edits) return null
+  if (!parsed?.edits) return null
   let textList = null
   if (Array.isArray(parsed.edits.textEdits)) textList = parsed.edits.textEdits
   else if (Array.isArray(parsed.edits.text)) textList = parsed.edits.text

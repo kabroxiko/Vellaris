@@ -48,17 +48,29 @@ function inverseGetTreeHeightSliderFromScale(scale) {
 export function createSettingsAppliers(setters, currentValues = {}) {
 
   // Per-applier instrumentation: record creation and calls.
-  const applierId = `applier-${Date.now()}-${Math.random().toString(36).slice(2,8)}`
+  const randomPart = (() => {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function')
+      return crypto.randomUUID().replaceAll('-', '').slice(0, 8)
+    if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+      const arr = new Uint8Array(6)
+      crypto.getRandomValues(arr)
+      return Array.from(arr, (b) => b.toString(36).padStart(2, '0')).join('').slice(0, 8)
+    }
+    throw new Error('crypto unavailable: randomPart requires crypto.randomUUID or crypto.getRandomValues')
+  })()
+  const applierId = `applier-${Date.now()}-${randomPart}`
   const createdStack = (new Error('applier-created')).stack
   applierCallCache.set(applierId, { createdAt: Date.now(), createdStack, calls: [] })
-  if (typeof globalThis !== 'undefined') globalThis.__applierCallCache = applierCallCache
-
-    function recordCall(name) {
-      const info = applierCallCache.get(applierId) || { createdAt: Date.now(), createdStack, calls: [] }
-      const entry = { name, ts: Date.now(), stack: (new Error(`applier:${name}`)).stack }
-      info.calls.push(entry)
-      applierCallCache.set(applierId, info)
+    if (typeof globalThis !== 'undefined') {
+      globalThis.__applierCallCache = applierCallCache
     }
+
+      const recordCall = (name) => {
+        const info = applierCallCache.get(applierId) || { createdAt: Date.now(), createdStack, calls: [] }
+        const entry = { name, ts: Date.now(), stack: (new Error(`applier:${name}`)).stack }
+        info.calls.push(entry)
+        applierCallCache.set(applierId, info)
+      }
 
     function setIfChanged(setter, key, newValue) {
       const oldValue = currentValues ? currentValues[key] : undefined

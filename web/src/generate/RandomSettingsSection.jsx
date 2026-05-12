@@ -1,7 +1,5 @@
 import React from 'react'
 import PropTypes from 'prop-types'
-import FileUploadButton from './FileUploadButton'
-
 const MAP_LANGUAGE_OPTIONS = [
   { value: 'en', label: 'English' },
   { value: 'es', label: 'Español' },
