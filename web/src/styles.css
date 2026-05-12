@@ -445,14 +445,12 @@ header {
   border-radius: 5px;
   padding: 6px 8px;
   background: rgba(255, 255, 255, 0.6);
-}
-/* ensure children stretch to full width */
-.books-list {
   align-items: stretch;
 }
 .book-item {
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   gap: 6px;
   font-size: 12px;
   cursor: pointer;
@@ -476,9 +474,6 @@ header {
   min-width: 0;
 }
 
-.books-list .book-item {
-  justify-content: flex-start;
-}
 .fields-grid input[type='number'],
 .fields-grid input[type='text'],
 .fields-grid input[type='range'],
