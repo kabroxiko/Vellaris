@@ -175,6 +175,10 @@ header {
   flex-direction: column;
   gap: 12px;
 }
+/* Ensure checkbox labels in the Fonts tab match other control labels (13px) */
+.customize-fonts-panel .checkbox-label {
+  font-size: 13px;
+}
 .customize-font-grid {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
