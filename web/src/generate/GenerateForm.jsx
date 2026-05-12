@@ -16,7 +16,7 @@ const uiOptionsCache = new Map()
 function serializeNortObject(obj) {
   function sortRec(v) {
     if (v && typeof v === 'object' && !Array.isArray(v)) {
-      const keys = Object.keys(v).sort()
+      const keys = Object.keys(v).sort((a, b) => String(a).localeCompare(String(b)))
       const out = {}
       for (const k of keys) out[k] = sortRec(v[k])
       return out
@@ -83,7 +83,7 @@ function applyResourcesAndTopLevelHoisted(parsedSettings, ctx) {
   if (landShape) parsedSettings.landShape = landShape
   if (Number.isFinite(Number(regionCount))) parsedSettings.regionCount = Number(regionCount)
   if (randomSeed) parsedSettings.randomSeed = Number(randomSeed)
-  if (selectedBooks && typeof selectedBooks === 'object' && typeof selectedBooks.size === 'number') parsedSettings.books = Array.from(selectedBooks).sort()
+  if (selectedBooks && typeof selectedBooks === 'object' && typeof selectedBooks.size === 'number') parsedSettings.books = Array.from(selectedBooks).sort((a, b) => String(a).localeCompare(String(b)))
 }
 
 function applyGridAndColoringHoisted(parsedSettings, ctx) {
