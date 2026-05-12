@@ -14,9 +14,9 @@ const API_BASE = import.meta.env.VITE_API_BASE || '/api'
 function hexToHSB(hex) {
   const hh = String(hex || '').replace(/^#/, '')
   if (!/^[0-9a-fA-F]{6}$/.test(hh)) return [0, 0, 0]
-  const r = Number.parseInt(hh.substring(0,2),16)/255
-  const g = Number.parseInt(hh.substring(2,4),16)/255
-  const b = Number.parseInt(hh.substring(4,6),16)/255
+  const r = Number.parseInt(hh.slice(0,2),16)/255
+  const g = Number.parseInt(hh.slice(2,4),16)/255
+  const b = Number.parseInt(hh.slice(4,6),16)/255
   const max = Math.max(r,g,b)
   const min = Math.min(r,g,b)
   const delta = max - min
@@ -119,9 +119,9 @@ function hexToRgba(hex, transparencyPercent = 0) {
   if (!hex) return { r: 0, g: 0, b: 0, a: 1 }
   const h = hex.replace(/^#/, '')
   if (!/^[0-9a-fA-F]{6}$/.test(h)) return { r: 0, g: 0, b: 0, a: 1 }
-  const r = Number.parseInt(h.substring(0, 2), 16)
-  const g = Number.parseInt(h.substring(2, 4), 16)
-  const b = Number.parseInt(h.substring(4, 6), 16)
+  const r = Number.parseInt(h.slice(0, 2), 16)
+  const g = Number.parseInt(h.slice(2, 4), 16)
+  const b = Number.parseInt(h.slice(4, 6), 16)
   const opacity = 1 - (Number(transparencyPercent || 0) / 100)
   return { r, g, b, a: Math.max(0, Math.min(1, opacity)) }
 }
@@ -169,9 +169,9 @@ function shadeColor(hex, percent) {
 function hexWithAlpha(hex, alpha) {
   const h = hex.replace(/^#/, '')
   if (!/^[0-9a-fA-F]{6}$/.test(h)) return `rgba(194,184,145,${alpha})`
-  const r = Number.parseInt(h.substring(0, 2), 16)
-  const g = Number.parseInt(h.substring(2, 4), 16)
-  const b = Number.parseInt(h.substring(4, 6), 16)
+  const r = Number.parseInt(h.slice(0, 2), 16)
+  const g = Number.parseInt(h.slice(2, 4), 16)
+  const b = Number.parseInt(h.slice(4, 6), 16)
   return `rgba(${r},${g},${b},${alpha})`
 }
 
