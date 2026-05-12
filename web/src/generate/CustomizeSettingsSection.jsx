@@ -935,22 +935,53 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
   }
 
   const sanitizeTranslation = (s) => {
-    if (!s) return s
-    if (typeof s !== 'string') return s
+    if (!s) { return s }
+    if (typeof s !== 'string') { return s }
     // Remove surrounding <html> wrappers and preserve <br> as line breaks
     let t = String(s)
-    const MAX_SANITIZE_LENGTH = 2000
-    if (t.length > MAX_SANITIZE_LENGTH) t = t.slice(0, MAX_SANITIZE_LENGTH)
-    t = t.replace(/^\s*<html>\s*/i, '').replace(/\s*<\/html>\s*$/i, '')
+      const MAX_SANITIZE_LENGTH = 2000
+      if (t.length > MAX_SANITIZE_LENGTH) t = t.slice(0, MAX_SANITIZE_LENGTH)
+
+      // Strip an optional surrounding <html>...</html> wrapper using
+      // a linear-time scanner to avoid regex backtracking risks.
+      const stripHtmlWrapper = (str) => {
+        let start = 0
+        let end = str.length
+        while (start < end && /\s/.test(str.charAt(start))) start++
+        while (end > start && /\s/.test(str.charAt(end - 1))) end--
+        if (end - start >= 6 && str.substring(start, start + 6).toLowerCase() === '<html>') {
+          start += 6
+          while (start < end && /\s/.test(str.charAt(start))) start++
+        }
+        if (end - start >= 7 && str.substring(end - 7, end).toLowerCase() === '</html>') {
+          end -= 7
+          while (end > start && /\s/.test(str.charAt(end - 1))) end--
+        }
+        return str.substring(start, end)
+      }
+      t = stripHtmlWrapper(t)
     // If there are <br> tags, convert to React nodes with breaks
     if (/<br\s*\/?>/i.test(t)) {
       const parts = t.split(/<br\s*\/?>/i)
       return parts.flatMap((p) => (p === parts.at(-1) ? [p] : [p, React.createElement('br', { key: `br-${String(p).slice(0,20)}` })]))
     }
     // Otherwise strip any other HTML tags
-    t = t.replaceAll(/<[^>]*>/g, '')
-    t = t.replaceAll("''", "'")
-    t = t.replaceAll(/\s+/g, ' ').trim()
+      // Otherwise strip any other HTML tags using a linear scanner
+      const removeTags = (str) => {
+        let out = ''
+        let inTag = false
+        for (let i = 0; i < str.length; i++) {
+          const ch = str.charAt(i)
+          if (!inTag) {
+            if (ch === '<') inTag = true
+            else out += ch
+          } else if (ch === '>') inTag = false
+        }
+        return out
+      }
+      t = removeTags(t)
+      t = t.replaceAll("''", "'")
+      t = t.replaceAll(/\s+/g, ' ').trim()
     return t
   }
 

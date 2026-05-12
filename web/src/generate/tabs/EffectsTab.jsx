@@ -182,7 +182,23 @@ export default function EffectsTab(props) {
             const MAX_SANITIZE_LENGTH = 2000
             if (typeof txt === 'string' && txt.length > MAX_SANITIZE_LENGTH) txt = txt.slice(0, MAX_SANITIZE_LENGTH)
             if (typeof txt === 'string') {
-              txt = txt.replaceAll(/<[^>]*>/g, '')
+              // Remove HTML tags using a linear-time scanner to avoid ReDoS
+              const removeTags = (s) => {
+                let out = ''
+                let inTag = false
+                for (let i = 0; i < s.length; i++) {
+                  const ch = s.charAt(i)
+                  if (!inTag) {
+                    if (ch === '<') {
+                      inTag = true
+                    } else {
+                      out += ch
+                    }
+                  } else if (ch === '>') inTag = false
+                }
+                return out
+              }
+              txt = removeTags(txt)
               txt = txt.replaceAll("''", "'")
             }
             const methodLabel = translateLabel(`LandColoringMethod.${finalLandColoringMethod}`)

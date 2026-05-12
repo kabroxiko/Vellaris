@@ -58,3 +58,4 @@ web/public/*.png
 web/public/*.ico
 dist/
 .scannerwork
+.env
