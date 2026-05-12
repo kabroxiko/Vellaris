@@ -669,8 +669,7 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
   }
 
   function buildPreviewPayload() {
-    const normalizedPreviewFields = {}
-    const payload = Object.assign({ width: 520, height: 170 }, normalizedPreviewFields)
+    const payload = Object.assign({ width: 520, height: 170 }, previewFields)
     payload.type = previewFields.backgroundType === undefined ? null : previewFields.backgroundType
     const bg = payload.type
     if (bg === 'GeneratedFromTexture' || (typeof bg === 'string' && bg.toLowerCase().includes('texture'))) {
@@ -888,7 +887,7 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
   const translateLabel = (key) => {
     const has = Object.hasOwn(labels ?? {}, key) && labels[key]
     const txt = has ? labels[key] : null
-    const baseKey = (!txt && key?.endsWith('.label')) ? key.substring(0, key.length - '.label'.length) : null
+    const baseKey = (!txt && key?.endsWith('.label')) ? key.slice(0, -'.label'.length) : null
     const alternate = baseKey && Object.hasOwn(labels ?? {}, baseKey) ? labels[baseKey] : null
     const value = txt || alternate || key
     // If the translation contains literal <br> tags, return React nodes
@@ -1141,6 +1140,8 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
         if (typeof setShowState === 'function') setShowState(false)
         if (typeof onClose === 'function') onClose()
       }
+      const computedSwatchStyle = swatchStyle ?? {}
+
       return (
         <>
           <label htmlFor={`${id}`} className={disabled ? 'is-disabled' : ''}>{label}</label>

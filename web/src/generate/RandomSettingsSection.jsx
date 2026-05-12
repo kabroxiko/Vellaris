@@ -87,7 +87,7 @@ export default function RandomSettingsSection({ values, handlers, options, ui })
             <fieldset className="books-widget">
               <legend>{translateLabel('textTool.booksForText.label')}</legend>
               {Array.isArray(allBooks) && allBooks.length > 0 ? (
-                <>
+                <div className="books-wrapper">
                   <div className="books-actions">
                     <button type="button" onClick={() => setSelectedBooks(new Set(Array.isArray(allBooks) ? allBooks : []))}>
                       {translateLabel('books.checkAll')}
@@ -113,7 +113,7 @@ export default function RandomSettingsSection({ values, handlers, options, ui })
                       </label>
                     )) : null}
                   </div>
-                </>
+                </div>
               ) : (
                 <div className="disabled-note">{translateLabel('textTool.booksForText.none')}</div>
               )}
