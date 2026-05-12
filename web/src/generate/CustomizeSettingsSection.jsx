@@ -187,7 +187,8 @@ function makeCanvasForBitmap(imgBitmap) {
 }
 
 // Helper: draw the background and inset box (hoisted)
-function drawBackgroundAndInset(ctx, img, w, h, x, y, boxW, boxH) {
+function drawBackgroundAndInset(opts) {
+  const { ctx, img, w, h, x, y, boxW, boxH } = opts || {}
   ctx.save()
   try {
     ctx.drawImage(img, 0, 0, w, h)
@@ -199,7 +200,8 @@ function drawBackgroundAndInset(ctx, img, w, h, x, y, boxW, boxH) {
 }
 
 // Helper: draw the island shape and fill with either pattern or color (hoisted)
-function drawIslandShape(ctx, rng, cx, cy, baseRadius, xRadius, yRadius, boxW, boxH, x, y, landBitmap, displayBitmap, imgBitmap, coastlineWidth = undefined, coastlineColorHex = undefined) {
+function drawIslandShape(opts) {
+  const { ctx, rng, cx, cy, baseRadius, xRadius, yRadius, boxW, boxH, x, y, landBitmap, displayBitmap, imgBitmap, coastlineWidth = undefined, coastlineColorHex = undefined } = opts || {}
   const points = 32
   const jitterX = Math.max(6, Math.round(xRadius * 0.18))
   const jitterY = Math.max(6, Math.round(yRadius * 0.18))
@@ -610,7 +612,7 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
 
     const { displayBitmap, landBitmap } = await prepareBitmaps(imgBitmap, w, h, opts)
 
-    drawBackgroundAndInset(ctx, displayBitmap, w, h, x, y, boxW, boxH)
+    drawBackgroundAndInset({ ctx, img: displayBitmap, w, h, x, y, boxW, boxH })
 
     const cx = x + Math.round(boxW * 0.5)
     const cy = y + Math.round(boxH * 0.5)
@@ -618,7 +620,7 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     const xRadius = Math.round(baseRadius * 1.45)
     const yRadius = baseRadius
 
-    drawIslandShape(
+    drawIslandShape({
       ctx,
       rng,
       cx,
@@ -634,9 +636,9 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
       displayBitmap,
       imgBitmap,
       // pass coastline settings from previewFields so preview can show no coastline
-      previewFields?.coastlineWidth,
-      previewFields?.coastlineColorHex,
-    )
+      coastlineWidth: previewFields?.coastlineWidth,
+      coastlineColorHex: previewFields?.coastlineColorHex,
+    })
 
     return await new Promise((resolve) => canvas.toBlob(resolve))
   }
@@ -890,9 +892,9 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     const alternate = baseKey && Object.hasOwn(labels ?? {}, baseKey) ? labels[baseKey] : null
     const value = txt || alternate || key
     // If the translation contains literal <br> tags, return React nodes
-    if (typeof value === 'string' && /<br\s*\/?>/i.test(value)) {
-      const parts = value.split(/<br\s*\/?>/i)
-      return parts.flatMap((p, i) => (i === parts.length - 1 ? [p] : [p, React.createElement('br', { key: i })]))
+      if (typeof value === 'string' && /<br\s*\/?>/i.test(value)) {
+        const parts = value.split(/<br\s*\/?>/i)
+        return parts.flatMap((p) => (p === parts.at(-1) ? [p] : [p, React.createElement('br', { key: `br-${String(p).slice(0,20)}` })]))
     }
     return value
   }
@@ -929,7 +931,7 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     // If there are <br> tags, convert to React nodes with breaks
     if (/<br\s*\/?>/i.test(t)) {
       const parts = t.split(/<br\s*\/?>/i)
-      return parts.flatMap((p, i) => (i === parts.length - 1 ? [p] : [p, React.createElement('br', { key: i })]))
+      return parts.flatMap((p) => (p === parts.at(-1) ? [p] : [p, React.createElement('br', { key: `br-${String(p).slice(0,20)}` })]))
     }
     // Otherwise strip any other HTML tags
     t = t.replaceAll(/<[^>]*>/g, '')
@@ -956,26 +958,6 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
   const [showRoadPicker, setShowRoadPicker] = useState(false)
   const [showTextColorPicker, setShowTextColorPicker] = useState(false)
   const [showBoldBackgroundPicker, setShowBoldBackgroundPicker] = useState(false)
-
-  const modalBackdropStyle = {
-    position: 'fixed',
-    left: 0,
-    top: 0,
-    right: 0,
-    bottom: 0,
-    background: 'rgba(0,0,0,0.4)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 2000,
-  }
-
-  const modalContentStyle = {
-    background: '#fff',
-    padding: 12,
-    borderRadius: 6,
-    boxShadow: '0 6px 24px rgba(0,0,0,0.3)',
-  }
   // Notify parent that the user manually changed a customization control.
   // The parent decides whether to mark the UI as dirty (only after
   // the first successful generation) and therefore disable downloads.

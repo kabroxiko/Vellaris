@@ -55,7 +55,7 @@ export function createSettingsAppliers(setters, currentValues = {}) {
 
     function recordCall(name) {
       const info = applierCallCache.get(applierId) || { createdAt: Date.now(), createdStack, calls: [] }
-      const entry = { name, ts: Date.now(), stack: (new Error()).stack }
+      const entry = { name, ts: Date.now(), stack: (new Error(`applier:${name}`)).stack }
       info.calls.push(entry)
       applierCallCache.set(applierId, info)
     }

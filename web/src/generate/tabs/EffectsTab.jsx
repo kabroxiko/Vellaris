@@ -145,7 +145,6 @@ export default function EffectsTab(props) {
           <span className="slider-value">{Math.round(coastShadingLevel)}</span>
         </div>
 
-        <>
           <label htmlFor="coast-shading-alpha-input">{translateLabel('theme.coastShadingTransparency.label')}</label>
           <div className="slider-row">
             <input
@@ -160,7 +159,6 @@ export default function EffectsTab(props) {
             />
             <span className="slider-value">{Math.round(coastShadingAlpha)}</span>
           </div>
-        </>
 
         <label htmlFor="ocean-shading-level-input">{translateLabel('theme.oceanShadingWidth.label')}</label>
         <div className="slider-row">
@@ -224,7 +222,6 @@ export default function EffectsTab(props) {
             : null}
         </select>
 
-        <>
           <label htmlFor="ocean-waves-level-input" className={oceanWavesType === concentricWaveValue ? 'is-disabled' : ''}>{translateLabel('theme.waveWidth.label')}</label>
           <div className="slider-row">
             <input
@@ -239,7 +236,6 @@ export default function EffectsTab(props) {
             />
             <span className="slider-value">{Math.round(oceanWavesLevel)}</span>
           </div>
-        </>
 
         {renderColorControl({
           id: 'ocean-waves-color',
@@ -253,7 +249,6 @@ export default function EffectsTab(props) {
           disabled: oceanWavesType === noneWaveValue,
         })}
 
-        <>
           <label htmlFor="concentric-wave-count" className={oceanWavesType === concentricWaveValue ? '' : 'is-disabled'}>{translateLabel('theme.waveCount.label')}</label>
           <div className="slider-row">
             <input
@@ -287,7 +282,6 @@ export default function EffectsTab(props) {
               <span>{translateLabel('theme.brokenLines.label')}</span>
             </label>
           </div>
-        </>
 
         <label className="checkbox-label">
           <input

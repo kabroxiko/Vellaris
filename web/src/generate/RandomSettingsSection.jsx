@@ -52,7 +52,7 @@ export default function RandomSettingsSection({ values, handlers, options, ui })
     const v = labels?.[key] || key
     if (typeof v === 'string' && /<br\s*\/?>/i.test(v)) {
       const parts = v.split(/<br\s*\/?>/i)
-      return parts.flatMap((p, i) => (i === parts.length - 1 ? [p] : [p, React.createElement('br', { key: i })]))
+      return parts.flatMap((p) => (p === parts.at(-1) ? [p] : [p, React.createElement('br', { key: `br-${String(p).slice(0,20)}` })]))
     }
     return v
   }
