@@ -77,7 +77,7 @@ function hsbToRgb(h, s, v) {
 
 // Colorize a bitmap to the specified color. Hoisted to module scope
 // so it can be reused and to satisfy Sonar rule S7721.
-async function colorizeBitmap(sourceBitmap, colorHex, w, h, previewFieldsLocal, opts = {}) {
+async function colorizeBitmap(sourceBitmap, colorHex, w, h, previewFieldsLocal, opts) {
   const alg = String(previewFieldsLocal?.backgroundType || '').toLowerCase().includes('fractal') ? 'algorithm2' : 'algorithm3'
   const hsb = hexToHSB(colorHex)
   const tmp = document.createElement('canvas')
@@ -87,7 +87,7 @@ async function colorizeBitmap(sourceBitmap, colorHex, w, h, previewFieldsLocal, 
   tctx.drawImage(sourceBitmap, 0, 0, w, h)
   const imd = tctx.getImageData(0, 0, w, h)
   const data = imd.data
-  const preserveTexture = (typeof opts.preserveTexture === 'number') ? Math.max(0, Math.min(1, opts.preserveTexture)) : 0.02
+  const preserveTexture = (typeof opts?.preserveTexture === 'number') ? Math.max(0, Math.min(1, opts.preserveTexture)) : 0.02
   for (let i = 0; i < data.length; i += 4) {
     const r0 = data[i]
     const g0 = data[i+1]
@@ -139,7 +139,7 @@ function rgbaToHex(col) {
 }
 
 // Retry fetch helper (hoisted)
-async function doFetchWithRetries(url, opts = {}, attempts = 3, delayMs = 300) {
+async function doFetchWithRetries(url, opts, attempts = 3, delayMs = 300) {
   for (let i = 0; i < attempts; i++) {
     try {
       const resp = await fetch(url, opts)
@@ -147,7 +147,7 @@ async function doFetchWithRetries(url, opts = {}, attempts = 3, delayMs = 300) {
       return resp
     } catch (err) {
       if (i === attempts - 1) throw err
-      if (opts.signal?.aborted) throw err
+      if (opts?.signal?.aborted) throw err
       await new Promise((r) => setTimeout(r, delayMs))
     }
   }
@@ -575,10 +575,10 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
   // `prepareBitmaps` because it references component-level preview fields
   // and color flags.
   // Helper: prepare display and land bitmaps (colorized variants)
-  async function prepareBitmaps(imgBitmap, w, h, opts = {}) {
+  async function prepareBitmaps(imgBitmap, w, h, opts) {
     const processed = { displayBitmap: imgBitmap, landBitmap: imgBitmap }
-    const useColorizeOcean = (typeof opts.colorizeOcean === 'boolean') ? opts.colorizeOcean : colorizeOcean
-    const useOceanColorHex = opts.oceanColorHex || oceanColorHex
+    const useColorizeOcean = (typeof opts?.colorizeOcean === 'boolean') ? opts.colorizeOcean : colorizeOcean
+    const useOceanColorHex = opts?.oceanColorHex || oceanColorHex
     const SEPPIA_HEX = '#C8A082'
     if (useColorizeOcean && useOceanColorHex) {
       processed.displayBitmap = await colorizeBitmap(imgBitmap, useOceanColorHex, w, h, previewFields, opts)
@@ -587,8 +587,8 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
       processed.displayBitmap = await colorizeBitmap(imgBitmap, SEPPIA_HEX, w, h, previewFields, opts)
     }
 
-    const useColorizeLand = (typeof opts.colorizeLand === 'boolean') ? opts.colorizeLand : colorizeLand
-    const useLandColorHex = opts.landColorHex || landColorHex
+    const useColorizeLand = (typeof opts?.colorizeLand === 'boolean') ? opts.colorizeLand : colorizeLand
+    const useLandColorHex = opts?.landColorHex || landColorHex
     if (useColorizeLand && useLandColorHex) {
       processed.landBitmap = await colorizeBitmap(imgBitmap, useLandColorHex, w, h, previewFields, opts)
     } else {
@@ -598,7 +598,7 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     return processed
   }
 
-  async function composeMiniIslandFromBlob(sourceBlob, opts = {}) {
+  async function composeMiniIslandFromBlob(sourceBlob, opts) {
     const imgBitmap = await createImageBitmap(sourceBlob)
     const { canvas, ctx, w, h } = makeCanvasForBitmap(imgBitmap)
 
@@ -710,7 +710,7 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     triggerPreviewRefresh()
   }
 
-  async function recomposeUsingLastBase(opts = {}) {
+  async function recomposeUsingLastBase(opts) {
     if (!lastBaseBlobRef.current) return
     const processed = await composeMiniIslandFromBlob(lastBaseBlobRef.current, opts)
     const url = URL.createObjectURL(processed || lastBaseBlobRef.current)
