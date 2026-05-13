@@ -12,8 +12,6 @@ import {
   hsbToRgb,
   hexToRgba,
   rgbaToHex,
-  doFetchWithRetries,
-  shadeColor,
   hexWithAlpha,
 } from './sharedHelpers'
   

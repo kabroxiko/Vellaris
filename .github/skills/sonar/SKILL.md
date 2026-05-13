@@ -65,6 +65,21 @@ Limitations and Safety
 - Hotspots API calls require additional Sonar permissions. If the token lacks hotspot access, the skill will report the error and stop the hotspot step.
 - The skill favors conservative, reversible edits. If a safe textual replacement cannot be determined, the skill will surface the finding and recommend a manual review.
 
+No-workaround policy
+---------------------
+- Repairs prepared or applied by the skill MUST NOT be workaround or fallback code. The assistant will only propose edits that directly address the flagged problem (root-cause fixes) via deterministic, semantics-preserving textual substitutions. The skill will not propose or apply changes that alter program flow to hide, suppress, or sidestep the underlying issue (for example: adding silent `try/catch` wrappers that swallow errors, inserting feature flags or configuration toggles to bypass checks, or replacing logic with alternative behavior that merely avoids the problematic code path).
+- If a safe, root-cause textual fix cannot be determined, the skill will skip automated repair and surface the finding for manual review. To allow non-root-cause edits (workarounds) you must explicitly opt in by passing `--allow-workarounds` (not the default).
+
+Fallback-removal policy
+------------------------
+- When an issue is detected in code that implements a "fallback" behavior (for example, functions or variables with names containing `fallback`, `attemptFallback`, `tryFallback`, or clearly-documented fallback render/compat branches), the skill will attempt to produce a conservative repair that removes or reduces the fallback only when a deterministic, root-cause substitution is available.
+- Detection heuristics: the skill will mark an issue as involving a fallback when the MCP issue's `component`/`message` or source context contains common fallback identifiers (e.g. `fallback`, `attemptFallbackRender`, `fallbackMethod`, `Fallback`, `*_fallback`, or explicit comments like "Fallback:"). This heuristic is conservative and used only to classify candidates for fallback-removal suggestions.
+- Repair strategy for fallback issues:
+	- If the underlying cause can be deterministically fixed (for example, replace a missing validation with an explicit check or remove an unnecessary secondary code path that duplicates but weakens a primary implementation), the skill will propose that root-cause edit as a per-file patch.
+	- If the fallback merely masks an upstream failure (for example, a network retry that hides an authentication error), and no safe automated fix can be inferred, the skill will NOT apply a workaround-removal patch. Instead it will surface a human-review suggestion describing the risk of the fallback and recommended remediation steps.
+	- The skill will never transform a fallback into a new silent-failure path (e.g., replacing logic with an empty `catch {}`) or insert toggles to bypass checks.
+- Opt-out and explicit control: pass `--no-fallback-removal` to disable any automatic attempts to remove fallbacks. To perform non-root-cause edits that intentionally remove a fallback without a deterministic fix, pass `--allow-workarounds` together with an explicit confirmation (not recommended).
+
 Examples
 --------
 - `/sonar scan` — run analysis and list unresolved issues.
@@ -85,3 +100,29 @@ Implementation guidance for integrators
 --------------------------------------
 - The assistant will use the workspace MCP functions when available. Integrators should ensure the MCP exposes these operations to the assistant: `mcp_sonarqube_search_sonar_issues_in_projects`, `mcp_sonarqube_search_security_hotspots`, `sonarqube_analyze_file`, `sonarqube_exclude_from_analysis`, and `sonarqube_analyze_file`/`analyze_file_list` helpers.
 - If the MCP does not support full-server scan triggering, the skill will fall back to invoking `sonarqube_analyze_file` on the modified files and then re-query issues.
+
+Duplicate-code repair
+---------------------
+- Purpose: provide a conservative, automated helper to reduce textual duplication detected by Sonar (e.g., duplication rules such as S3863). The skill aims to propose small, reversible refactors that extract identical code snippets into a single shared helper and replace occurrences with safe calls or imports.
+- Invocation: `/sonar repair --duplication [--rule <ruleKey>] [--min-lines N] [--extract-shared] [--dry-run] [--limit N]`.
+	- `--duplication` : run duplication-focused repair across the configured project(s).
+	- `--rule <ruleKey>` : optional, restrict to a specific duplication rule (defaults to commonly-used duplication rules if omitted).
+	- `--min-lines N` : minimum identical lines to consider for extraction (default: 5).
+	- `--extract-shared` : when provided, the skill will prepare patches that create a new shared helper module (or reuse an existing one) and replace identical occurrences with imports.
+	- `--dry-run` : do not apply patches; only present proposed patches.
+	- `--limit N` : limit number of duplication groups to process (default: 10).
+- Detection and safety heuristics:
+	- The skill will only propose automated extraction when the duplicated snippets are textually identical (ignoring whitespace and comments) and self-contained: they reference only local variables or global symbols that are identical across all occurrences or accept a deterministic parameterization (same parameter names or can be renamed safely).
+	- The assistant analyzes free variables within the snippet. If the snippet depends on surrounding lexical scope (closures, `this`, module-private symbols) in incompatible ways, the skill will not propose an automated extraction — it will surface the duplication for manual review instead.
+	- The skill avoids cross-language or cross-module API changes. No semi-automatic renames of external API identifiers will be performed.
+- Repair strategy when `--extract-shared` is used:
+	- Create a new shared module under a suggested path (for example `web/src/generate/sharedHelpers.js`) if a suitable existing module is not found.
+	- Extract the duplicated snippet as a named function or constant with a deterministic, descriptive name (the assistant will suggest a name and allow edits before applying patches).
+	- Replace each occurrence with an import and a call to the new helper, adding explicit parameterization for local variables where required.
+	- Group edits by file and present a per-file patch summary for confirmation before applying any edits.
+- Conservative defaults:
+	- The skill requires `--extract-shared` to perform extraction changes; without it, it will only report duplication groups and suggest manual refactors.
+	- `--dry-run` is recommended for large-scale duplication repairs to review patches before applying.
+- Post-edit actions:
+	- After applying patches, the skill will call `sonarqube_analyze_file` (or `analyze_file_list`) on modified files and re-query issues to confirm the duplication is resolved.
+	- As always, the skill will not commit or push changes; it produces patches for maintainers to review and commit.

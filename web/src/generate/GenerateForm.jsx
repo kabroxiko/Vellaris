@@ -6,10 +6,8 @@ import { base64ToBlob, formatColorString, colorToHex, parseColorChannels } from 
 import { selectCityIconType, fetchJson, handleResponseError, tryParseJson as tryParse } from './helpers'
 import { downloadNortContent } from './responseHandlers'
 import {
-  parseHexColor,
   hexToRgbaString,
   sanitizeFilenameBase,
-  readResponseBytesWithProgress,
   deriveNortFilenameFromContent,
   makeProgressToastController,
 } from './sharedHelpers'

@@ -190,7 +190,19 @@ export function findTitle(parsed) {
 export function deriveNortFilenameFromContent(nortContent) {
   let parsed = null
   if (typeof nortContent === 'string') {
-    try { parsed = JSON.parse(nortContent) } catch (e) { parsed = null }
+    try {
+      parsed = JSON.parse(nortContent)
+    } catch (e) {
+      // Handle parse error explicitly instead of swallowing it silently.
+      // This keeps behavior deterministic while preserving the original
+      // fallback of returning null when content isn't valid JSON.
+      // Sonar rule javascript:S2486 requires handling the exception.
+      // Log at debug level so maintainers can inspect parse failures.
+      /* eslint-disable no-console */
+      console.warn('deriveNortFilenameFromContent: JSON.parse failed', e)
+      /* eslint-enable no-console */
+      parsed = null
+    }
   } else parsed = nortContent
   if (!parsed?.edits) return null
   let textList = null
