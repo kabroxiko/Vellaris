@@ -103,26 +103,22 @@ Implementation guidance for integrators
 
 Duplicate-code repair
 ---------------------
-- Purpose: provide a conservative, automated helper to reduce textual duplication detected by Sonar (e.g., duplication rules such as S3863). The skill aims to propose small, reversible refactors that extract identical code snippets into a single shared helper and replace occurrences with safe calls or imports.
-- Invocation: `/sonar repair --duplication [--rule <ruleKey>] [--min-lines N] [--extract-shared] [--dry-run] [--limit N]`.
-	- `--duplication` : run duplication-focused repair across the configured project(s).
-	- `--rule <ruleKey>` : optional, restrict to a specific duplication rule (defaults to commonly-used duplication rules if omitted).
-	- `--min-lines N` : minimum identical lines to consider for extraction (default: 5).
-	- `--extract-shared` : when provided, the skill will prepare patches that create a new shared helper module (or reuse an existing one) and replace identical occurrences with imports.
-	- `--dry-run` : do not apply patches; only present proposed patches.
-	- `--limit N` : limit number of duplication groups to process (default: 10).
-- Detection and safety heuristics:
-	- The skill will only propose automated extraction when the duplicated snippets are textually identical (ignoring whitespace and comments) and self-contained: they reference only local variables or global symbols that are identical across all occurrences or accept a deterministic parameterization (same parameter names or can be renamed safely).
-	- The assistant analyzes free variables within the snippet. If the snippet depends on surrounding lexical scope (closures, `this`, module-private symbols) in incompatible ways, the skill will not propose an automated extraction — it will surface the duplication for manual review instead.
-	- The skill avoids cross-language or cross-module API changes. No semi-automatic renames of external API identifiers will be performed.
-- Repair strategy when `--extract-shared` is used:
-	- Create a new shared module under a suggested path (for example `web/src/generate/sharedHelpers.js`) if a suitable existing module is not found.
-	- Extract the duplicated snippet as a named function or constant with a deterministic, descriptive name (the assistant will suggest a name and allow edits before applying patches).
-	- Replace each occurrence with an import and a call to the new helper, adding explicit parameterization for local variables where required.
-	- Group edits by file and present a per-file patch summary for confirmation before applying any edits.
-- Conservative defaults:
-	- The skill requires `--extract-shared` to perform extraction changes; without it, it will only report duplication groups and suggest manual refactors.
-	- `--dry-run` is recommended for large-scale duplication repairs to review patches before applying.
-- Post-edit actions:
-	- After applying patches, the skill will call `sonarqube_analyze_file` (or `analyze_file_list`) on modified files and re-query issues to confirm the duplication is resolved.
-	- As always, the skill will not commit or push changes; it produces patches for maintainers to review and commit.
+- Purpose: offer conservative, reversible suggestions to reduce textual duplication detected by Sonar's duplication engine using the MCP duplication APIs. This is intended for small, local duplicated helpers or identical blocks that can be safely consolidated without deep semantic analysis.
+Command: `/sonar repair-duplicates [--min-lines N] [--limit M] [--consolidate-module <path>]`
+	- `--min-lines N` — only consider duplicated blocks of at least N lines (default: 8).
+	- `--limit M` — limit the number of duplicate locations processed (default: 20).
+	- `--consolidate-module <path>` — optional path (relative to project root) where the assistant should extract shared helpers. If omitted, the assistant will select a sensible consolidation location.
+
+How it works (MCP + AI)
+	- The assistant will call the MCP duplication API (`mcp_sonarqube_search_duplicated_files`) to discover duplicated files and duplicated blocks. The MCP returns authoritative per-block locations (component file path plus start/end line numbers) which the assistant uses as repair targets.
+	- For each duplicated-block candidate (up to `--limit`), the assistant will:
+		- Fetch the exact source fragment for each reported location using the MCP-provided start/end lines and surrounding context.
+		- Normalize formatting and verify the fragments are semantically equivalent under conservative heuristics (whitespace/formatting differences allowed, but differing free-variable usage or statements that reference distinct local scope will disqualify automatic repair).
+		- Use the assistant's AI code-generation capability to synthesize a WorkspaceEdit-style patch that extracts the duplicated logic into the chosen consolidation module and replaces each occurrence with an import and thin delegating wrapper where needed. The AI input includes the original fragments, filenames, surrounding context, and a strict instruction to produce behavior-preserving, minimal edits only.
+		- Validate the generated patch syntactically (basic parsing) and skip the candidate if validation fails or produces uncertainty markers.
+	- The assistant will automatically apply validated, conservative patches to the working tree (no interactive dry-run or manual confirmation) and then call `sonarqube_analyze_file` (or `analyze_file_list`) to re-analyze modified files.
+
+Safety and constraints
+	- Duplicate-code repair is intentionally conservative: it avoids changing program behavior, will not inline or reorder code in ways that change execution, and will not produce non-deterministic runtime changes.
+	- The assistant will not fix duplication by adding fallback or workaround logic; it will perform only root-cause consolidations or skip automation when unsafe.
+	- Because duplication findings have no rule key, the assistant treats duplication as a separate repair category and relies on MCP block locations plus conservative AI synthesis rather than rule-based quick-fixes.
