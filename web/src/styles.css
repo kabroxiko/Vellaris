@@ -306,6 +306,15 @@ header {
   width: 220px;
   min-width: 220px;
 }
+
+/* Section subheadings used inside fields columns should visually match labels */
+.section-subheading {
+  display: block;
+  font-size: 13px;
+  margin: 0;
+  font-weight: 400;
+  color: inherit;
+}
 .fields-column input[type='number'],
 .fields-column input[type='text'],
 .fields-column select {

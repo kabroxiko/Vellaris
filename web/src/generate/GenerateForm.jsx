@@ -648,19 +648,21 @@ function GenerateForm({ uiLanguage = 'en' }) {
     boldBackgroundColorHex,
   ]
 
-  // Debug: log when key border/grunge state values change so we can
-  // confirm setters updated the React state.
-  useEffect(() => {
-    // state-change: border/grunge (debug suppressed)
-  }, [borderWidth, grungeWidth, drawGrunge])
-
-  useEffect(() => {
-    localStorage.setItem(RANDOM_OVERRIDES_STORAGE_KEY, JSON.stringify(randomOverrides))
-  }, [randomOverrides])
-
-  // Persist Customize panel values so they are restored on next load
-  useEffect(() => {
-    persistCustomizeOverrides({
+  // Collect all current customize-related values into a single object so
+  // multiple call-sites can reuse the same shape without duplicating lists.
+  function collectCustomizeValues() {
+    return {
+      finalWidth,
+      finalHeight,
+      finalSeed,
+      randomSeed,
+      artPack,
+      landShape,
+      regionCount,
+      worldSize,
+      cityIconType,
+      selectedBooks,
+      dimension,
       backgroundType,
       textureRef,
       backgroundSeed,
@@ -674,6 +676,7 @@ function GenerateForm({ uiLanguage = 'en' }) {
       regionBoundaryColorHex,
       drawBorder,
       drawGridOverlay,
+      landColoringMethod,
       finalLandColoringMethod,
       borderRef,
       borderWidth,
@@ -693,17 +696,13 @@ function GenerateForm({ uiLanguage = 'en' }) {
       coastShadingLevel,
       coastShadingColorHex,
       coastShadingAlpha,
-      oceanShadingAlpha,
       oceanShadingLevel,
+      oceanShadingAlpha,
       oceanShadingColorHex,
       oceanWavesType,
       oceanWavesLevel,
-      oceanWavesColorHex,
       oceanWavesAlpha,
-      concentricWaveCount,
-      fadeConcentricWaves,
-      jitterToConcentricWaves,
-      brokenLinesForConcentricWaves,
+      oceanWavesColorHex,
       drawOceanEffectsInLakes,
       riverColorHex,
       drawRoads,
@@ -725,7 +724,22 @@ function GenerateForm({ uiLanguage = 'en' }) {
       textColorHex,
       drawBoldBackground,
       boldBackgroundColorHex,
-    })
+    }
+  }
+
+  // Debug: log when key border/grunge state values change so we can
+  // confirm setters updated the React state.
+  useEffect(() => {
+    // state-change: border/grunge (debug suppressed)
+  }, [borderWidth, grungeWidth, drawGrunge])
+
+  useEffect(() => {
+    localStorage.setItem(RANDOM_OVERRIDES_STORAGE_KEY, JSON.stringify(randomOverrides))
+  }, [randomOverrides])
+
+  // Persist Customize panel values so they are restored on next load
+  useEffect(() => {
+    persistCustomizeOverrides(collectCustomizeValues())
   }, customizeDeps)
 
   // Load UI option labels and resource lists on mount so the Customize
@@ -1197,79 +1211,7 @@ function GenerateForm({ uiLanguage = 'en' }) {
         setDrawBoldBackground,
         setBoldBackgroundColorHex,
       },
-      {
-        // current values used for idempotent setter comparisons
-        finalWidth,
-        finalHeight,
-        finalSeed,
-        randomSeed,
-        artPack,
-        landShape,
-        regionCount,
-        worldSize,
-        cityIconType,
-        selectedBooks,
-        dimension,
-        backgroundType,
-        textureRef,
-        backgroundSeed,
-        drawRegionBoundaries,
-        colorizeLand,
-        colorizeOcean,
-        oceanColorHex,
-        landColorHex,
-        regionBoundaryColorHex,
-        drawBorder,
-        drawGridOverlay,
-        landColoringMethod,
-        finalLandColoringMethod,
-        borderRef,
-        borderWidth,
-        borderPosition,
-        borderColorOption,
-        borderColorHex,
-        frayedBorder,
-        frayedBorderBlurLevel,
-        frayedBorderSize,
-        frayedBorderSeed,
-        drawGrunge,
-        grungeWidth,
-        frayedBorderColorHex,
-        lineStyle,
-        coastlineWidth,
-        coastlineColorHex,
-        coastShadingLevel,
-        coastShadingColorHex,
-        coastShadingAlpha,
-        oceanShadingLevel,
-        oceanShadingAlpha,
-        oceanShadingColorHex,
-        oceanWavesType,
-        oceanWavesLevel,
-        oceanWavesAlpha,
-        oceanWavesColorHex,
-        drawOceanEffectsInLakes,
-        riverColorHex,
-        drawRoads,
-        roadStyle,
-        roadWidth,
-        roadColorHex,
-        mountainSize,
-        hillSize,
-        duneSize,
-        treeHeight,
-        citySize,
-        drawText,
-        titleFontFamily,
-        regionFontFamily,
-        mountainRangeFontFamily,
-        otherMountainsFontFamily,
-        citiesFontFamily,
-        riverFontFamily,
-        textColorHex,
-        drawBoldBackground,
-        boldBackgroundColorHex,
-      }),
+      collectCustomizeValues()),
     customizeDeps
   ) // setters from useState are stable references
 
