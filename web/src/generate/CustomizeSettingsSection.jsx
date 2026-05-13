@@ -1184,7 +1184,6 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
         if (typeof setShowState === 'function') setShowState(false)
         if (typeof onClose === 'function') onClose()
       }
-      const computedSwatchStyle = swatchStyle ?? {}
 
       return (
         <>
@@ -1209,7 +1208,7 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
                   cursor: disabled ? 'default' : 'pointer',
                   opacity: disabled ? 0.5 : 1,
                   pointerEvents: disabled ? 'none' : undefined,
-                  ...(swatchStyle || {}),
+                  ...(swatchStyle),
                 }}
               />
             )}
@@ -1477,7 +1476,7 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
   const pick = (obj, keys) => {
     const out = {}
     for (const k of keys) {
-      if (Object.prototype.hasOwnProperty.call(obj, k)) out[k] = obj[k]
+      if (Object.hasOwn(obj, k)) out[k] = obj[k]
     }
     return out
   }
