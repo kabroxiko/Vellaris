@@ -5,8 +5,17 @@ import RandomSettingsSection from './RandomSettingsSection'
 import { base64ToBlob, formatColorString, colorToHex, parseColorChannels } from './utils'
 import { selectCityIconType, fetchJson, handleResponseError, tryParseJson as tryParse } from './helpers'
 import { downloadNortContent } from './responseHandlers'
+import {
+  parseHexColor,
+  hexToRgbaString,
+  sanitizeFilenameBase,
+  readResponseBytesWithProgress,
+  deriveNortFilenameFromContent,
+  makeProgressToastController,
+} from './sharedHelpers'
 import { createSettingsAppliers } from './settingsAppliers'
 import { getFrontendLabels } from '../i18n/webLabels'
+import useGenerate from './hooks/useGenerate'
 const API_BASE = import.meta?.env?.VITE_API_BASE || '/api'
 const RANDOM_OVERRIDES_STORAGE_KEY = 'vellaris-random-manual-overrides'
 const CUSTOMIZE_OVERRIDES_STORAGE_KEY = 'vellaris-customize-overrides'
@@ -35,22 +44,7 @@ function populateCityIconTypes(byPack) {
   }
 }
 
-// Helper: parse hex color to RGB tuple or return null (hoisted)
-function parseHexColor(hexStr) {
-  if (!hexStr) return null
-  const hex = hexStr.replace(/^#/, '')
-  if (!/^[0-9a-fA-F]{6}$/.test(hex)) return null
-  return {
-    r: Number.parseInt(hex.slice(0, 2), 16),
-    g: Number.parseInt(hex.slice(2, 4), 16),
-    b: Number.parseInt(hex.slice(4, 6), 16),
-  }
-}
-
-function hexToRgbaString(hexStr, alpha = 255) {
-  const rgb = parseHexColor(hexStr)
-  return rgb ? `${rgb.r},${rgb.g},${rgb.b},${alpha}` : hexStr
-}
+// color helpers imported from sharedHelpers
 
 function mergeColor(parsedSettings, key, hexStr, opacityPercent = 100, useFormatter = false) {
   if (!hexStr) return
@@ -246,31 +240,7 @@ function exposeSettingsForDebugging(parsedSettings) {
   }
 }
 
-function deriveNortFilenameFromContent(nortContent) {
-  let parsed = null
-  if (typeof nortContent === 'string') parsed = tryParse(nortContent)
-  else parsed = nortContent
-  if (!parsed?.edits) return null
-  let textList = null
-  if (Array.isArray(parsed.edits?.textEdits)) textList = parsed.edits.textEdits
-  else if (Array.isArray(parsed.edits?.text)) textList = parsed.edits.text
-  if (!Array.isArray(textList)) return null
-  for (const t of textList) {
-    const tType = t?.type || t?.typeName || t?.Type
-    const tText = t?.text || t?.value || t?.Text
-    if (tType === 'Title' && typeof tText === 'string' && tText.trim()) return tText.trim()
-  }
-  return null
-}
-
-function sanitizeFilenameBase(name, fallback) {
-  let s = String(name)
-  s = s.trim()
-  s = s.replaceAll(/[\\/:*?"<>|]+/g, '-')
-  s = s.replaceAll(/\s+/g, '-')
-  if (s) return s
-  return fallback ?? 'vellaris-map'
-}
+// deriveNortFilenameFromContent and sanitizeFilenameBase provided by sharedHelpers
 
 function safeDebugLog(functionName, message, error) {
   // debug suppressed
@@ -389,52 +359,9 @@ function loadCityIconTypes(pack) {
   }
   return cityIconTypesRequestByPack.get(pack)
 }
-async function readResponseBytesWithProgress(res, onDownloadingStarted) {
-  const reader = res.body?.getReader?.()
-  onDownloadingStarted?.()
+// readResponseBytesWithProgress imported from sharedHelpers
 
-  if (!reader) {
-    return new Uint8Array(await res.arrayBuffer())
-  }
-
-  let loaded = 0
-  const chunks = []
-
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) break
-    if (value) {
-      chunks.push(value)
-      loaded += value.length
-    }
-  }
-
-  const merged = new Uint8Array(loaded)
-  let offset = 0
-  for (const chunk of chunks) {
-    merged.set(chunk, offset)
-    offset += chunk.length
-  }
-  return merged
-}
-
-function makeProgressToastController() {
-  let progressToastId = null
-  const show = (message) => {
-    if (progressToastId) globalThis.hideToast?.(progressToastId)
-    progressToastId =
-      globalThis.showToast?.(message, {
-        type: 'info',
-        duration: 0,
-        dismissible: false,
-        working: true,
-      }) ?? null
-  }
-  const hide = () => {
-    if (progressToastId) globalThis.hideToast?.(progressToastId)
-  }
-  return { show, hide }
-}
+// use shared makeProgressToastController from sharedHelpers
 
 // Small debug hook: logs selected UI values when appliers have run.
 function usePostApplierLogger(lastApplierRunRef, deps = []) {
@@ -641,6 +568,9 @@ function GenerateForm({ uiLanguage = 'en' }) {
   const lastUiDefaultsRef = useRef(null)
   // In-memory canonical merged settings received from server (random/file/or generate)
   const mergedSettingsRef = useRef(null)
+  const handleSuccessRef = useRef(null)
+
+  const runGenerate = useGenerate({ apiBase: API_BASE, handleResponseError, base64ToBlob, downloadNortContent, tryParse, serializeNortObject, handleSuccessRef, setError, setLoading })
 
   // Log applied settings after appliers run (hook must be called at top-level)
   usePostApplierLogger(lastApplierRunRef, [
@@ -1662,84 +1592,12 @@ function GenerateForm({ uiLanguage = 'en' }) {
     setHasGeneratedOnce(true)
     setCustomizationDirty(false)
   }
+  // expose handleSuccess to the generate hook
+  handleSuccessRef.current = handleSuccess
 
-  async function processGenerateResponse(bytes, contentType, outputMode, baseName, source) {
-    if (!contentType.includes('application/json')) {
-      if (outputMode === 'nort-only')
-        throw new Error('Server returned image bytes; expected settings content.')
-      handleSuccess(new Blob([bytes], { type: contentType ?? 'image/png' }), baseName, source)
-      return
-    }
-    const decoded = new TextDecoder('utf-8').decode(bytes)
-    const data = tryParse(decoded)
-    if (!data || typeof data !== 'object') throw new Error('Invalid JSON response from server')
-    if (outputMode !== 'nort-only') {
-      const imageBase64 = data.imageBase64
-      // Build nortContent by serializing the returned settings object without imageBase64
-      const copy = { ...data }
-      delete copy.imageBase64
-      const nortContent = serializeNortObject(copy)
-      handleSuccess(base64ToBlob(imageBase64, 'image/png'), baseName, source, nortContent)
-      return
-    }
-    // nort-only: server still returns merged settings object with imageBase64; extract nort JSON
-    const copy = { ...data }
-    delete copy.imageBase64
-    const nortContent = serializeNortObject(copy)
-    const parsed = tryParse(nortContent)
-    if (parsed) mergedSettingsRef.current = parsed
-    downloadNortContent(nortContent, baseName)
-    let derivedName
-    if (source?.name) derivedName = source.name
-    else if (fileName) derivedName = fileName
-    else derivedName = 'Generated settings'
+  // processGenerateResponse and runGenerate are provided by the `useGenerate` hook.
 
-    setCurrentSource({
-      type: 'nort-content',
-      name: derivedName,
-      nortContent,
-      originType: source?.type,
-    })
-    globalThis.showToast?.('Settings file downloaded', { type: 'success', duration: 3000 })
-  }
-
-  async function runGenerate(requestOptions, baseName, source, outputMode = 'preview', externalToast = null) {
-    setError(null)
-    setLoading(true)
-    const toast = externalToast ?? makeProgressToastController()
-
-    // no-op: instrumentation removed
-
-    try {
-      if (!externalToast) toast.show(outputMode === 'nort-only' ? 'Preparing settings...' : 'Generating map..')
-      // FormData debug removed
-
-      // If caller requested `nort-only`, ask server to return merged
-      // settings alongside the image as JSON.
-      const body = requestOptions.body
-      if (outputMode === 'nort-only' && body && typeof FormData !== 'undefined' && body instanceof FormData) {
-        body.append('returnSettings', 'true')
-      }
-
-      let res = await fetch(`${API_BASE}/generate`, requestOptions)
-      if (!res.ok) await handleResponseError(res)
-      const contentType = res.headers.get('content-type') ?? ''
-      const bytes = await readResponseBytesWithProgress(res, () => {
-        toast.show(outputMode === 'nort-only' ? 'Downloading settings...' : 'Downloading map...')
-      })
-      await processGenerateResponse(bytes, contentType, outputMode, baseName, source)
-    } catch (err) {
-      setError(err.message)
-      try {
-        globalThis.showToast?.(err.message, { type: 'error', duration: 6000 })
-      } catch (e) {
-        console.warn('showToast failed', e)
-      }
-    } finally {
-      setLoading(false)
-      if (!externalToast) toast.hide()
-    }
-  }
+  // `runGenerate` is provided by the `useGenerate` hook above.
 
   // Build the random configuration payload from current UI state and manual overrides
   const buildRandomCfg = () => {

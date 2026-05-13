@@ -1,60 +1,10 @@
 import { useCallback } from 'react'
+import { makeProgressToastController, readResponseBytesWithProgress } from '../sharedHelpers'
 
-function makeProgressToastController() {
-  let progressToastId = null
-  const show = (message) => {
-    try {
-      if (progressToastId) globalThis.hideToast?.(progressToastId)
-      progressToastId =
-        globalThis.showToast?.(message, {
-          type: 'info',
-          duration: 0,
-          dismissible: false,
-          working: true,
-        }) ?? null
-    } catch (e) {
-      console.warn('showToast failed', e)
-    }
-  }
-  const hide = () => {
-    try {
-      if (progressToastId) globalThis.hideToast?.(progressToastId)
-    } catch (e) {
-      console.warn('hideToast failed', e)
-    }
-  }
-  return { show, hide }
-}
+// use shared makeProgressToastController from sharedHelpers
 
 export default function useGenerate({ apiBase, handleResponseError, base64ToBlob, downloadNortContent, tryParse, serializeNortObject, handleSuccessRef, setError, setLoading }) {
-  const readResponseBytesWithProgress = useCallback(async (res, onDownloadingStarted) => {
-    const reader = res.body?.getReader?.()
-    onDownloadingStarted?.()
-
-    if (!reader) {
-      return new Uint8Array(await res.arrayBuffer())
-    }
-
-    let loaded = 0
-    const chunks = []
-
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-      if (value) {
-        chunks.push(value)
-        loaded += value.length
-      }
-    }
-
-    const merged = new Uint8Array(loaded)
-    let offset = 0
-    for (const chunk of chunks) {
-      merged.set(chunk, offset)
-      offset += chunk.length
-    }
-    return merged
-  }, [])
+  // use shared readResponseBytesWithProgress from sharedHelpers
 
   const processGenerateResponse = useCallback(
     async (bytes, contentType, outputMode, baseName, source) => {

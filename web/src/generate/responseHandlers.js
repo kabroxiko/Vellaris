@@ -1,50 +1,9 @@
 import { base64ToBlob } from './utils'
 import { tryParseJson as tryParse } from './helpers'
+import { findTitle } from './sharedHelpers'
 
 
-// Find a Title entry in a parsed .nort `edits` structure, if present.
-function findTitle(parsed) {
-  if (!parsed?.edits) return null
-  let textList = null
-  if (Array.isArray(parsed.edits.textEdits)) textList = parsed.edits.textEdits
-  else if (Array.isArray(parsed.edits.text)) textList = parsed.edits.text
-  if (!Array.isArray(textList)) return null
-  for (const t of textList) {
-    const tType = t?.type || t?.typeName || t?.Type
-    const tText = t?.text || t?.value || t?.Text
-    if (tType === 'Title' && typeof tText === 'string' && tText.trim()) return tText.trim()
-  }
-  return null
-}
-
-export async function readResponseBytesWithProgress(res, onDownloadingStarted) {
-  const reader = res.body?.getReader?.()
-  onDownloadingStarted?.()
-
-  if (!reader) {
-    return new Uint8Array(await res.arrayBuffer())
-  }
-
-  let loaded = 0
-  const chunks = []
-
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) break
-    if (value) {
-      chunks.push(value)
-      loaded += value.length
-    }
-  }
-
-  const merged = new Uint8Array(loaded)
-  let offset = 0
-  for (const chunk of chunks) {
-    merged.set(chunk, offset)
-    offset += chunk.length
-  }
-  return merged
-}
+// `findTitle` and `readResponseBytesWithProgress` are provided by sharedHelpers
 
 export function downloadNortContent(nortContent, baseName) {
   // Helpers to keep complexity low

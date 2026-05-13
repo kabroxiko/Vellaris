@@ -6,74 +6,21 @@ import BackgroundTab from './tabs/BackgroundTab'
 import BorderTab from './tabs/BorderTab'
 import EffectsTab from './tabs/EffectsTab'
 import FontsTab from './tabs/FontsTab'
+import {
+  hexToHSB,
+  mulberry32,
+  hsbToRgb,
+  hexToRgba,
+  rgbaToHex,
+  doFetchWithRetries,
+  shadeColor,
+  hexWithAlpha,
+} from './sharedHelpers'
   
 
 const API_BASE = import.meta.env.VITE_API_BASE || '/api'
 
-// Utility: convert hex color to HSB triplet [h (0..1), s (0..1), b (0..1)]
-function hexToHSB(hex) {
-  const hh = String(hex || '').replace(/^#/, '')
-  if (!/^[0-9a-fA-F]{6}$/.test(hh)) return [0, 0, 0]
-  const r = Number.parseInt(hh.slice(0,2),16)/255
-  const g = Number.parseInt(hh.slice(2,4),16)/255
-  const b = Number.parseInt(hh.slice(4,6),16)/255
-  const max = Math.max(r,g,b)
-  const min = Math.min(r,g,b)
-  const delta = max - min
-  let hue = 0
-  if (delta !== 0) {
-    if (max === r) hue = ((g - b) / delta) % 6
-    else if (max === g) hue = ((b - r) / delta) + 2
-    else hue = ((r - g) / delta) + 4
-    hue = hue * 60
-    if (hue < 0) hue += 360
-  }
-  const sat = max === 0 ? 0 : delta / max
-  const bri = max
-  return [hue/360, sat, bri]
-}
-
-// RNG helper (Mulberry32) — hoisted to module scope to reduce nested functions
-function mulberry32(a) {
-  return function() {
-    let t = (a += 0x6d2b79f5)
-    t = Math.imul(t ^ (t >>> 15), t | 1)
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
-  }
-}
-
-// Utility: convert HSB to RGB triplet [R,G,B]
-function hsbToRgb(h, s, v) {
-  const hh = (h * 360)
-  const c = v * s
-  const x = c * (1 - Math.abs(((hh/60) % 2) - 1))
-  const m = v - c
-  let r1=0,g1=0,b1=0
-  if (hh >= 0 && hh < 60) {
-    r1 = c
-    g1 = x
-  } else if (hh < 120) {
-    r1 = x
-    g1 = c
-  } else if (hh < 180) {
-    g1 = c
-    b1 = x
-  } else if (hh < 240) {
-    g1 = x
-    b1 = c
-  } else if (hh < 300) {
-    r1 = x
-    b1 = c
-  } else {
-    r1 = c
-    b1 = x
-  }
-  const R = Math.round((r1 + m) * 255)
-  const G = Math.round((g1 + m) * 255)
-  const B = Math.round((b1 + m) * 255)
-  return [R,G,B]
-}
+// color/HSB helpers imported from sharedHelpers
 
 // Colorize a bitmap to the specified color. Hoisted to module scope
 // so it can be reused and to satisfy Sonar rule S7721.
@@ -113,66 +60,12 @@ async function colorizeBitmap(sourceBitmap, colorHex, w, h, previewFieldsLocal, 
   return await createImageBitmap(tmp)
 }
 
-// Utility: convert hex color to rgba object {r,g,b,a}
-function hexToRgba(hex, transparencyPercent = 0) {
-  if (!hex) return { r: 0, g: 0, b: 0, a: 1 }
-  const h = hex.replace(/^#/, '')
-  if (!/^[0-9a-fA-F]{6}$/.test(h)) return { r: 0, g: 0, b: 0, a: 1 }
-  const r = Number.parseInt(h.slice(0, 2), 16)
-  const g = Number.parseInt(h.slice(2, 4), 16)
-  const b = Number.parseInt(h.slice(4, 6), 16)
-  const opacity = 1 - (Number(transparencyPercent || 0) / 100)
-  return { r, g, b, a: Math.max(0, Math.min(1, opacity)) }
-}
+// hexToRgba/rgbaToHex imported from sharedHelpers
 
-function rgbaToHex(col) {
-  const r = Math.round(col.r || 0)
-  const g = Math.round(col.g || 0)
-  const b = Math.round(col.b || 0)
-  return (
-    '#'+
-    r.toString(16).padStart(2, '0')+
-    g.toString(16).padStart(2, '0')+
-    b.toString(16).padStart(2, '0')
-  )
-}
-
-// Retry fetch helper (hoisted)
-async function doFetchWithRetries(url, opts, attempts = 3, delayMs = 300) {
-  for (let i = 0; i < attempts; i++) {
-    try {
-      const resp = await fetch(url, opts)
-      if (!resp.ok) throw new Error('Non-OK response')
-      return resp
-    } catch (err) {
-      if (i === attempts - 1) throw err
-      if (opts?.signal?.aborted) throw err
-      await new Promise((r) => setTimeout(r, delayMs))
-    }
-  }
-}
+// doFetchWithRetries imported from sharedHelpers
 
 // Helper to darken/lighten hex color (hoisted)
-function shadeColor(hex, percent) {
-  const h = hex.replace(/^#/, '')
-  const num = Number.parseInt(h, 16)
-  let r = (num >> 16) + percent
-  let g = ((num >> 8) & 0x00ff) + percent
-  let b = (num & 0x0000ff) + percent
-  r = Math.max(0, Math.min(255, r))
-  g = Math.max(0, Math.min(255, g))
-  b = Math.max(0, Math.min(255, b))
-  return '#' + (r << 16 | g << 8 | b).toString(16).padStart(6, '0')
-}
-
-function hexWithAlpha(hex, alpha) {
-  const h = hex.replace(/^#/, '')
-  if (!/^[0-9a-fA-F]{6}$/.test(h)) return `rgba(194,184,145,${alpha})`
-  const r = Number.parseInt(h.slice(0, 2), 16)
-  const g = Number.parseInt(h.slice(2, 4), 16)
-  const b = Number.parseInt(h.slice(4, 6), 16)
-  return `rgba(${r},${g},${b},${alpha})`
-}
+// shadeColor and hexWithAlpha imported from sharedHelpers
 
 // Helper: create canvas and context from an ImageBitmap (hoisted)
 function makeCanvasForBitmap(imgBitmap) {
