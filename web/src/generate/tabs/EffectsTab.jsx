@@ -282,11 +282,11 @@ export default function EffectsTab(props) {
             <span className="slider-value">{concentricWaveCount}</span>
           </div>
 
-          <h4 className={`section-subheading ${oceanWavesType === concentricWaveValue ? '' : 'is-disabled'}`} style={{ marginTop: '0.5rem' }}>Style options:</h4>
+          <label htmlFor="fade-concentric-waves-checkbox" className={`section-subheading ${oceanWavesType === concentricWaveValue ? '' : 'is-disabled'}`} style={{ marginTop: '0.5rem' }}>Style options:</label>
 
           <div className="style-options">
             <label className={`checkbox-label ${oceanWavesType === concentricWaveValue ? '' : 'is-disabled'}`}>
-              <input type="checkbox" checked={fadeConcentricWaves} onChange={(e) => setFadeConcentricWaves(e.target.checked)} disabled={oceanWavesType !== concentricWaveValue} />
+              <input id="fade-concentric-waves-checkbox" type="checkbox" checked={fadeConcentricWaves} onChange={(e) => setFadeConcentricWaves(e.target.checked)} disabled={oceanWavesType !== concentricWaveValue} />
               <span>{translateLabel('theme.fadeOuterWaves.label')}</span>
             </label>
 
