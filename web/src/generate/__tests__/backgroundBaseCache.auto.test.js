@@ -1,4 +1,4 @@
-import * as cache from './backgroundBaseCache'
+import * as cache from '../backgroundBaseCache'
 import { describe, it, expect } from 'vitest'
 
 describe('backgroundBaseCache module', () => {

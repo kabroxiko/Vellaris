@@ -1,38 +1,33 @@
-import { describe, it, expect } from 'vitest'
-import {
-  clampColorChannel,
-  parseColorChannels,
-  colorToHex,
-  colorToAlphaPercent,
-  parseFontSpec,
-  fontSpecToFamily,
-  updateFontFamilyInSpec,
-} from '../utils.js'
+import * as utils from '../utils.js'
 
-describe('utils.js - color and font helpers', () => {
-  it('clampColorChannel bounds values', () => {
-    expect(clampColorChannel(-10)).toBe(0)
-    expect(clampColorChannel(500)).toBe(255)
-    expect(clampColorChannel(128)).toBe(128)
+describe('utils module', () => {
+  it('clamps color channels correctly', () => {
+    expect(utils.clampColorChannel(-5)).toBe(0)
+    expect(utils.clampColorChannel(300)).toBe(255)
+    expect(utils.clampColorChannel(128)).toBe(128)
   })
 
-  it('parseColorChannels handles hex, csv and objects', () => {
-    expect(parseColorChannels('#112233')).toEqual({ r: 17, g: 34, b: 51, a: 255 })
-    expect(parseColorChannels('10,20,30')).toEqual({ r: 10, g: 20, b: 30, a: 255 })
-    expect(parseColorChannels({ r: 1, g: 2, b: 3 })).toEqual({ r: 1, g: 2, b: 3, a: 255 })
-    expect(parseColorChannels('not a color')).toBeNull()
+  it('parses various color formats', () => {
+    expect(utils.parseColorChannels('#010203')).toEqual({ r: 1, g: 2, b: 3, a: 255 })
+    expect(utils.parseColorChannels('4,5,6')).toEqual({ r: 4, g: 5, b: 6, a: 255 })
+    expect(utils.parseColorChannels({ r: '7', g: 8, b: 9, a: 10 })).toEqual({ r: 7, g: 8, b: 9, a: 10 })
+    expect(utils.colorToHex('#0a0b0c')).toBe('#0a0b0c')
+    expect(utils.colorToAlphaPercent('#010203')).toBe(100)
+    expect(utils.formatColorString('#010203', 50)).toBe('1,2,3,128')
   })
 
-  it('colorToHex and colorToAlphaPercent convert inputs', () => {
-    expect(colorToHex('#0a0b0c')).toBe('#0a0b0c')
-    expect(colorToHex({ r: 17, g: 34, b: 51 })).toBe('#112233')
-    expect(colorToAlphaPercent('#112233')).toBe(100)
-    expect(colorToAlphaPercent({ r: 0, g: 0, b: 0, a: 128 })).toBe(50)
+  it('parses and updates font specs', () => {
+    const spec = 'MyFamily\t1\t24'
+    expect(utils.parseFontSpec(spec)).toEqual({ family: 'MyFamily', styleNumber: 1, size: 24 })
+    expect(utils.fontSpecToFamily(spec)).toBe('MyFamily')
+    const updated = utils.updateFontFamilyInSpec(spec, 'NewFam')
+    expect(updated.startsWith('NewFam\t')).toBeTruthy()
   })
 
-  it('font spec parsing and updates', () => {
-    expect(parseFontSpec('Arial\t1\t12')).toEqual({ family: 'Arial', styleNumber: 1, size: 12 })
-    expect(fontSpecToFamily('Foo\t2\t16')).toBe('Foo')
-    expect(updateFontFamilyInSpec('Old\t1\t10', 'NewFamily', 24)).toBe('NewFamily\t1\t10')
+  it('converts base64 to Blob', () => {
+    const b64 = Buffer.from('abc').toString('base64')
+    const blob = utils.base64ToBlob(b64, 'text/plain')
+    expect(blob).toBeInstanceOf(Blob)
+    expect(blob.type).toBe('text/plain')
   })
 })

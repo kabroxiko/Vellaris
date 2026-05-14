@@ -1,4 +1,4 @@
-import FileUploadButton from './FileUploadButton'
+import FileUploadButton from '../FileUploadButton'
 import { describe, it, expect } from 'vitest'
 
 describe('FileUploadButton module', () => {

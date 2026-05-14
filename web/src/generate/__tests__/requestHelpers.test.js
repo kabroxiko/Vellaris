@@ -1,4 +1,4 @@
-import { buildFormDataFromParsedJson, buildFormDataFromFormData } from './requestHelpers'
+import { buildFormDataFromParsedJson, buildFormDataFromFormData } from '../requestHelpers'
 import { describe, it, expect } from 'vitest'
 
 describe('requestHelpers', () => {

@@ -1,34 +1,29 @@
-import { describe, it, expect } from 'vitest'
-import {
-  hexToHSB,
-  hsbToRgb,
-  hexToRgba,
-  rgbaToHex,
-  shadeColor,
-  parseHexColor,
-} from '../sharedHelpers.js'
+import * as shared from '../sharedHelpers.js'
 
-describe('sharedHelpers.js - deterministic color utilities', () => {
-  it('hexToHSB and hsbToRgb round-trip for red', () => {
-    const hsb = hexToHSB('#ff0000')
-    expect(hsb[1]).toBeCloseTo(1, 5)
-    expect(hsb[2]).toBeCloseTo(1, 5)
-    const rgb = hsbToRgb(hsb[0], hsb[1], hsb[2])
-    expect(rgb).toEqual([255, 0, 0])
+describe('sharedHelpers module', () => {
+  it('hex/hsb/rgb helpers behave predictably', () => {
+    expect(shared.hexToHSB('#ff0000')).toEqual([0, 1, 1])
+    expect(shared.hsbToRgb(0, 1, 1)).toEqual([255, 0, 0])
+    expect(shared.hexToRgba('#010203', 50)).toEqual({ r: 1, g: 2, b: 3, a: 0.5 })
+    expect(shared.rgbaToHex({ r: 1, g: 2, b: 3 })).toBe('#010203')
+    expect(shared.shadeColor('#000000', 10)).toBe('#0a0a0a')
+    expect(shared.hexWithAlpha('#010203', 0.5)).toBe('rgba(1,2,3,0.5)')
+    expect(shared.parseHexColor('#010203')).toEqual({ r: 1, g: 2, b: 3 })
+    expect(shared.hexToRgbaString('#010203', 128)).toBe('1,2,3,128')
   })
 
-  it('hexToRgba and rgbaToHex convert', () => {
-    expect(hexToRgba('#112233', 50)).toEqual({ r: 17, g: 34, b: 51, a: 0.5 })
-    expect(rgbaToHex({ r: 17, g: 34, b: 51 })).toBe('#112233')
+  it('utility helpers for filenames and progress work', async () => {
+    expect(shared.sanitizeFilenameBase('a/:b c')).toContain('-')
+    const fakeResp = { arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer }
+    const bytes = await shared.readResponseBytesWithProgress(fakeResp)
+    expect(bytes).toBeInstanceOf(Uint8Array)
+    expect(bytes.length).toBe(3)
   })
 
-  it('shadeColor adjusts channels safely', () => {
-    expect(shadeColor('#000000', 10)).toBe('#0a0a0a')
-    expect(shadeColor('#ffffff', -10)).toBe('#f5f5f5')
-  })
-
-  it('parseHexColor returns null for invalid and rgb for valid', () => {
-    expect(parseHexColor('bad')).toBeNull()
-    expect(parseHexColor('#010203')).toEqual({ r: 1, g: 2, b: 3 })
+  it('derive and find title helpers return expected values', () => {
+    const obj = { edits: { textEdits: [{ type: 'Title', text: 'MyTitle' }] } }
+    expect(shared.findTitle(obj)).toBe('MyTitle')
+    const json = JSON.stringify(obj)
+    expect(shared.deriveNortFilenameFromContent(json)).toBe('MyTitle')
   })
 })

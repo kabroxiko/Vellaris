@@ -1,4 +1,4 @@
-import Toast from './Toast'
+import Toast from '../Toast'
 import { describe, it, expect } from 'vitest'
 
 describe('Toast module', () => {

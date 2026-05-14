@@ -1,6 +1,6 @@
 import React from 'react'
 import { render, fireEvent } from '@testing-library/react'
-import FileUploadButton from './FileUploadButton'
+import FileUploadButton from '../FileUploadButton'
 import { describe, it, expect, vi } from 'vitest'
 
 describe('FileUploadButton', () => {

@@ -1,6 +1,6 @@
 import React from 'react'
 import { render, screen, waitFor } from '@testing-library/react'
-import ToastContainer from './Toast'
+import ToastContainer from '../Toast'
 import { describe, it, expect } from 'vitest'
 
 describe('ToastContainer', () => {

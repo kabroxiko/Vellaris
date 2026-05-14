@@ -1,6 +1,6 @@
 import React from 'react'
 import { render, fireEvent } from '@testing-library/react'
-import PreviewPanel from './PreviewPanel'
+import PreviewPanel from '../PreviewPanel'
 import { describe, it, expect, vi } from 'vitest'
 
 describe('PreviewPanel', () => {

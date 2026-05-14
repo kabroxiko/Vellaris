@@ -1,4 +1,4 @@
-import * as helpers from './helpers'
+import * as helpers from '../helpers'
 import { describe, it, expect } from 'vitest'
 
 describe('helpers module', () => {

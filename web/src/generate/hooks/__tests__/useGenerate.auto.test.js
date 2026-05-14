@@ -1,4 +1,4 @@
-import * as useGenerate from './useGenerate'
+import * as useGenerate from '../useGenerate'
 import { describe, it, expect } from 'vitest'
 
 describe('useGenerate module', () => {

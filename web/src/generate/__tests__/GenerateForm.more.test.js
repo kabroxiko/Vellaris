@@ -5,7 +5,7 @@ import {
   applyBackgroundFlagsHoisted,
   setResourceFromRef,
   parseBooleanWithDefault,
-} from './GenerateForm.jsx'
+} from '../GenerateForm.jsx'
 
 describe('GenerateForm additional helpers', () => {
   beforeEach(() => {

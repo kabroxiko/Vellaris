@@ -1,4 +1,4 @@
-import * as requestHelpers from './requestHelpers'
+import * as requestHelpers from '../requestHelpers'
 import { describe, it, expect } from 'vitest'
 
 describe('requestHelpers module', () => {

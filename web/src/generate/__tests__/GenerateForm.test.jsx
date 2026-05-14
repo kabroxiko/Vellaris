@@ -1,4 +1,4 @@
-import * as GenerateFormModule from './GenerateForm.jsx'
+import * as GenerateFormModule from '../GenerateForm.jsx'
 
 describe('GenerateForm module', () => {
   it('imports without throwing and exports something', () => {

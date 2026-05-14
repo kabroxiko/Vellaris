@@ -1,4 +1,4 @@
-import PreviewPanel from './PreviewPanel'
+import PreviewPanel from '../PreviewPanel'
 import { describe, it, expect } from 'vitest'
 
 describe('PreviewPanel module', () => {

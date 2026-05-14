@@ -1,6 +1,6 @@
 import React from 'react'
 import { render, screen, fireEvent } from '@testing-library/react'
-import Modal from './Modal.jsx'
+import Modal from '../Modal.jsx'
 
 describe('Modal component', () => {
   it('renders when open and calls onClose on Escape', () => {

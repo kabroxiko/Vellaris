@@ -10,7 +10,7 @@ import {
   loadRandomOverrides,
   loadCustomizeOverrides,
   loadUiOptions,
-} from './GenerateForm.jsx'
+} from '../GenerateForm.jsx'
 
 describe('GenerateForm pure helpers', () => {
   it('applyBackgroundFlagsHoisted sets flags for SolidColor', () => {
@@ -103,7 +103,7 @@ describe('GenerateForm helpers', () => {
   it('loadUiOptions calls fetchJson and caches result', async () => {
     const mock = vi.fn().mockResolvedValue({ options: { ok: true } })
     // patch helpers.fetchJson by mocking module import via dynamic import
-    const helpers = await import('./helpers')
+    const helpers = await import('../helpers')
     vi.spyOn(helpers, 'fetchJson').mockImplementation(mock)
 
     const a = await loadUiOptions('en')
