@@ -244,6 +244,27 @@ function safeDebugLog(functionName, message, error) {
   // debug suppressed
 }
 
+// Pure helpers (module scope) — extracted so they can be unit tested.
+function computeGridOverlayAlpha(origColor, uiGridOverlayColorHex) {
+  if (!origColor) return 255
+  const origHex = colorToHex(origColor)
+  if (origHex && uiGridOverlayColorHex && origHex.toLowerCase() === String(uiGridOverlayColorHex).toLowerCase()) {
+    const ch = parseColorChannels(origColor)
+    if (ch?.a !== undefined && Number.isFinite(Number(ch.a))) return Number(ch.a)
+  }
+  return 255
+}
+
+function computeConcentricWaveCount(origCount, uiConcentricWaveCount) {
+  const uiCountNum = Number(uiConcentricWaveCount)
+  if (typeof origCount === 'number' && (!Number.isFinite(uiCountNum) || uiCountNum === 0)) {
+    return origCount
+  } else if (Number.isFinite(uiCountNum)) {
+    return uiCountNum
+  }
+  return Number.isFinite(Number(uiConcentricWaveCount)) ? Number(uiConcentricWaveCount) : undefined
+}
+
 // `tryParse` is imported from shared helpers to centralize parsing logic.
 
 // Build the customize-panel payload from a values object.
@@ -1553,27 +1574,15 @@ function GenerateForm({ uiLanguage = 'en' }) {
   // exposeSettingsForDebugging) to satisfy S7721
   // Helper: preserve grid overlay alpha from prior settings if color unchanged
   function getGridOverlayAlpha() {
-    const origColor = mergedSettingsRef?.current?.gridOverlayColor
-    if (!origColor) return 255
-    const origHex = colorToHex(origColor)
-    if (origHex?.toLowerCase() === gridOverlayColorHex.toLowerCase()) {
-      const ch = parseColorChannels(origColor)
-      if (ch?.a !== undefined && Number.isFinite(Number(ch.a))) return Number(ch.a)
-    }
-    return 255
+    return computeGridOverlayAlpha(mergedSettingsRef?.current?.gridOverlayColor, gridOverlayColorHex)
   }
 
   // Helper: handle wave count preservation
   function getConcentricWaveCount() {
-    const origCount = mergedSettingsRef?.current?.concentricWaveCount
-    const uiCountNum = Number(concentricWaveCount)
-    if (typeof origCount === 'number' && (!Number.isFinite(uiCountNum) || uiCountNum === 0)) {
-      return origCount
-    } else if (Number.isFinite(uiCountNum)) {
-      return uiCountNum
-    }
-    return Number.isFinite(Number(concentricWaveCount)) ? Number(concentricWaveCount) : undefined
+    return computeConcentricWaveCount(mergedSettingsRef?.current?.concentricWaveCount, concentricWaveCount)
   }
+
+  
 
   // Merge current UI theme/visual settings into a parsed settings object.
   // Reused by buildNortContentRequest and random-map outgoing settings.
@@ -1983,7 +1992,7 @@ export default GenerateForm
 // Named exports for tests
 export { serializeNortObject, scaleSliderValue, loadRandomOverrides, loadCustomizeOverrides, loadUiOptions }
 // Additional exports for testing
-export { buildCustomizePayload, persistCustomizeOverrides, applyBackgroundFlagsHoisted, setResourceFromRef, parseBooleanWithDefault }
+export { buildCustomizePayload, persistCustomizeOverrides, applyBackgroundFlagsHoisted, setResourceFromRef, parseBooleanWithDefault, computeGridOverlayAlpha, computeConcentricWaveCount }
 // Export additional hoisted appliers for unit testing
 export { applyResourcesAndTopLevelHoisted, applyGridAndColoringHoisted, applyBordersFrayedAndGrungeHoisted, applyCoastOceanAndWavesHoisted, applyRoadsAndScalesHoisted, applyTextAndBackgroundHoisted }
 

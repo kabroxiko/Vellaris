@@ -25,7 +25,7 @@ describe('GenerateForm coast/ocean, text/background, and resources appliers', ()
       oceanWavesColorHex: '#112233',
       drawOceanEffectsInLakes: true,
       riverColorHex: '#445566',
-      parseBooleanWithDefault: (v) => Boolean(v),
+      parseBooleanWithDefault: Boolean,
       mergedSettingsRef: { current: {} },
     }
 
