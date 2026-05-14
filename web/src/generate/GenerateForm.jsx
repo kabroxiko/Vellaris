@@ -759,6 +759,7 @@ function GenerateForm({ uiLanguage = 'en' }) {
     setUiLoaded(true)
   }
 
+
   // Apply backend `defaults` to the UI using the existing setters.
   function applyServerDefaults(defs, opts) {
     // Helper setters shared across appliers
@@ -1978,6 +1979,13 @@ function GenerateForm({ uiLanguage = 'en' }) {
 }
 
 export default GenerateForm
+
+// Named exports for tests
+export { serializeNortObject, scaleSliderValue, loadRandomOverrides, loadCustomizeOverrides, loadUiOptions }
+// Additional exports for testing
+export { buildCustomizePayload, persistCustomizeOverrides, applyBackgroundFlagsHoisted, setResourceFromRef, parseBooleanWithDefault }
+// Export additional hoisted appliers for unit testing
+export { applyResourcesAndTopLevelHoisted, applyGridAndColoringHoisted, applyBordersFrayedAndGrungeHoisted, applyCoastOceanAndWavesHoisted, applyRoadsAndScalesHoisted, applyTextAndBackgroundHoisted }
 
 GenerateForm.propTypes = {
   uiLanguage: PropTypes.string,

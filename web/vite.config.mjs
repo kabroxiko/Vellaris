@@ -41,5 +41,14 @@ export default defineConfig(({ mode, command }) => {
           }
         : undefined,
     },
+    test: {
+      environment: 'jsdom',
+      globals: true,
+      coverage: {
+        provider: 'v8',
+        reporter: ['lcov', 'text'],
+        reportsDirectory: 'coverage'
+      }
+    }
   }
 })

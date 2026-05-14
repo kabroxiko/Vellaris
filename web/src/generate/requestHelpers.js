@@ -28,3 +28,5 @@ function buildFormDataFromFormData(original) {
   }
   return form
 }
+
+export { appendOptionalField, buildFormDataFromParsedJson, buildFormDataFromFormData }

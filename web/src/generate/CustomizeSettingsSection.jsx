@@ -131,6 +131,77 @@ function drawIslandShape(opts) {
   }
 }
 
+// Module-scoped prepare and compose helpers so they can be unit-tested
+// independently of the React component's closure.
+async function prepareBitmapsModule(imgBitmap, w, h, opts = {}, previewFields = {}, defaults = {}) {
+  const processed = { displayBitmap: imgBitmap, landBitmap: imgBitmap }
+  const useColorizeOcean = (typeof opts?.colorizeOcean === 'boolean') ? opts.colorizeOcean : defaults.colorizeOcean
+  const useOceanColorHex = opts?.oceanColorHex || defaults.oceanColorHex
+  const SEPPIA_HEX = '#C8A082'
+  if (useColorizeOcean && useOceanColorHex) {
+    processed.displayBitmap = await colorizeBitmap(imgBitmap, useOceanColorHex, w, h, previewFields, opts)
+  } else {
+    processed.displayBitmap = await colorizeBitmap(imgBitmap, SEPPIA_HEX, w, h, previewFields, opts)
+  }
+
+  const useColorizeLand = (typeof opts?.colorizeLand === 'boolean') ? opts.colorizeLand : defaults.colorizeLand
+  const useLandColorHex = opts?.landColorHex || defaults.landColorHex
+  if (useColorizeLand && useLandColorHex) {
+    processed.landBitmap = await colorizeBitmap(imgBitmap, useLandColorHex, w, h, previewFields, opts)
+  } else {
+    processed.landBitmap = await colorizeBitmap(imgBitmap, SEPPIA_HEX, w, h, previewFields, opts)
+  }
+  return processed
+}
+
+async function composeMiniIslandFromBlobModule(sourceBlob, opts = {}, previewFields = {}, defaults = {}, overrides = {}) {
+  const imgBitmap = await createImageBitmap(sourceBlob)
+  const makeCanvas = overrides.makeCanvasForBitmap || makeCanvasForBitmap
+  const doPrepare = overrides.prepareBitmaps || prepareBitmapsModule
+  const doDrawBackground = overrides.drawBackgroundAndInset || drawBackgroundAndInset
+  const doDrawIsland = overrides.drawIslandShape || drawIslandShape
+  const { canvas, ctx, w, h } = makeCanvas(imgBitmap)
+
+  const boxW = Math.round(w * 0.45)
+  const boxH = Math.round(h * 0.45)
+  const x = Math.round((w - boxW) / 2)
+  const y = Math.round((h - boxH) / 2)
+
+  const seed = Number(previewFields.backgroundSeed) || Date.now()
+  const rng = mulberry32(seed & 0xffffffff)
+
+  const { displayBitmap, landBitmap } = await doPrepare(imgBitmap, w, h, opts, previewFields, defaults)
+
+  doDrawBackground({ ctx, img: displayBitmap, w, h, x, y, boxW, boxH })
+
+  const cx = x + Math.round(boxW * 0.5)
+  const cy = y + Math.round(boxH * 0.5)
+  const baseRadius = Math.round(Math.min(boxW, boxH) * 0.48)
+  const xRadius = Math.round(baseRadius * 1.45)
+  const yRadius = baseRadius
+
+  doDrawIsland({
+    ctx,
+    rng,
+    cx,
+    cy,
+    baseRadius,
+    xRadius,
+    yRadius,
+    boxW,
+    boxH,
+    x,
+    y,
+    landBitmap,
+    displayBitmap,
+    imgBitmap,
+    coastlineWidth: previewFields?.coastlineWidth,
+    coastlineColorHex: previewFields?.coastlineColorHex,
+  })
+
+  return await new Promise((resolve) => canvas.toBlob(resolve))
+}
+
 // Modal styles for color picker (hoisted)
 const modalBackdropStyle = {
   position: 'fixed',
@@ -200,6 +271,20 @@ ColorPickerModal.propTypes = {
   open: PropTypes.bool,
   onClose: PropTypes.func,
   children: PropTypes.node,
+}
+
+// Export module-scope helpers for unit testing of hoisted functions.
+export {
+  colorizeBitmap,
+  makeCanvasForBitmap,
+  drawBackgroundAndInset,
+  drawIslandShape,
+  prepareBitmapsModule,
+  composeMiniIslandFromBlobModule,
+  modalBackdropStyle,
+  modalContentStyle,
+  fetchPreviewBlob,
+  ColorPickerModal,
 }
 
 

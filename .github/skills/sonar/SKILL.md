@@ -31,11 +31,32 @@ Commands and Flags
 - `/sonar repair --rule <ruleKey> [--limit N]` — prepare suggested, reversible textual patches for the first `N` unresolved issues matching `ruleKey` (defaults to `N=10`) via MCP queries. The assistant will list targeted issues, propose per-file patches, and ask for confirmation before applying any edits.
 - `/sonar --hotspots` — explicitly fetch hotspots via the MCP hotspots method (`mcp_sonarqube_search_security_hotspots`).
 - `--no-hotspots` — opt out of automatic hotspots fallback when an issues search returns no results.
+ - `/sonar coverage [--threshold PERCENT] [--limit N]` — query coverage via MCP, list files below `--threshold` (default 80%), generate conservative test scaffolds for uncovered functions up to `--limit` files.
 
 What the skill returns
 ----------------------
 - For issues: `component`, `textRange`, `message`, `rule`, `severity`, and `quickFixAvailable` (when the MCP provides it).
 - For hotspots: `key`, `component`, `line`, `message`, `status`, and `ruleKey`.
+
+ Coverage support
+ ----------------
+ - Purpose: help maintainers identify low-coverage files and automatically generate real, deterministic unit tests (not scaffolds) for safely testable code paths.
+ - `/sonar coverage` behavior:
+ 	- call `mcp_sonarqube_search_files_by_coverage` to find files with coverage below the provided `--threshold` (default 80%).
+ 	- for each target file (up to `--limit`): call `mcp_sonarqube_get_file_coverage_details` to obtain precise uncovered line ranges and branch info.
+ 	- analyze the source to identify exported or top-level pure functions and deterministic entry points that can be safely unit-tested (avoid complex integration points, external network calls, or native code).
+ 	- Synthesize deterministic test files that import the module, call functions with simple deterministic inputs, and assert explicit expected results or structural properties derived from static analysis or documented behavior.
+ 	- The skill will NOT generate one-off scaffolding or snapshot-style tests as an automated default. If the assistant cannot determine safe, deterministic assertions for a target area, it will skip generating a test file and instead present a concise proposal describing what a maintainer must verify or how to refactor the code to enable deterministic testing.
+ 	- prepare WorkspaceEdit-style patches containing the new test files under the project's test layout (respecting existing conventions) and present a per-file summary for interactive confirmation before writing files.
+ 	- after applying confirmed test patches, call `sonarqube_analyze_file` (or `analyze_file_list` if available) via the MCP to re-run analysis on the modified files and report updated coverage measures.
+
+ Notes and safety rules for test generation
+ ----------------------------------------
+ - The assistant will only generate deterministic, assertion-based tests that validate explicit behavior using pure inputs and stable outputs. Tests must be real unit tests (no placeholder scaffolds).
+ - The assistant will not create snapshot-style tests or one-off scaffolding as an automated outcome. Snapshot tests may be suggested only as a documented manual option in the proposal phase and only with explicit maintainer approval.
+ - The skill will not modify production code solely to make it easier to test. When a small, safe refactor is required to enable deterministic testing (for example, extracting a pure helper), the assistant will propose the refactor as a separate patch and request confirmation before applying it.
+ - Generated tests are always presented as WorkspaceEdit-style patches for maintainer review; the assistant will never commit or push them without explicit approval.
+
 
 Repair Assistance
 Repair-by-rule behavior
@@ -99,6 +120,8 @@ Notes for Maintainers
 Implementation guidance for integrators
 --------------------------------------
 - The assistant will use the workspace MCP functions when available. Integrators should ensure the MCP exposes these operations to the assistant: `mcp_sonarqube_search_sonar_issues_in_projects`, `mcp_sonarqube_search_security_hotspots`, `sonarqube_analyze_file`, `sonarqube_exclude_from_analysis`, and `sonarqube_analyze_file`/`analyze_file_list` helpers.
+ - The assistant will use the workspace MCP functions when available. Integrators should ensure the MCP exposes these operations to the assistant: `mcp_sonarqube_search_sonar_issues_in_projects`, `mcp_sonarqube_search_security_hotspots`, `sonarqube_analyze_file`, `sonarqube_exclude_from_analysis`, and `sonarqube_analyze_file`/`analyze_file_list` helpers.
+ - For coverage functionality, integrators should also expose: `mcp_sonarqube_search_files_by_coverage`, `mcp_sonarqube_get_file_coverage_details`, and `mcp_sonarqube_get_component_measures` so the assistant can list low-coverage files and fetch per-file uncovered line ranges required to generate targeted tests.
 - If the MCP does not support full-server scan triggering, the skill will fall back to invoking `sonarqube_analyze_file` on the modified files and then re-query issues.
 
 Duplicate-code repair

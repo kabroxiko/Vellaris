@@ -1,0 +1,44 @@
+import React from 'react'
+import { render, screen } from '@testing-library/react'
+import EffectsTab from '../tabs/EffectsTab'
+
+describe('EffectsTab swatchReplacement', () => {
+  it('passes sanitized swatchReplacement when finalLandColoringMethod is ColorPoliticalRegions', () => {
+    const renderColorControl = (opts) => <div data-swatch={opts.swatchReplacement}>{opts.label}</div>
+    const translateLabel = (k) => {
+      if (k === 'theme.coastShadingColor.disabled') return '<b>Disabled {0}</b>'
+      if (k === 'LandColoringMethod.ColorPoliticalRegions') return 'Political'
+      return k
+    }
+
+    const props = {
+      translateLabel,
+      gatedControlValue: (v) => v,
+      emptyComboOption: null,
+      renderColorControl,
+      finalLandColoringMethod: 'ColorPoliticalRegions',
+      oceanShadingLevel: 1,
+      oceanShadingColorHex: '#112233',
+      oceanShadingAlpha: 10,
+      showOceanPicker: false,
+      oceanWaveTypes: [],
+      oceanWavesType: null,
+      concentricWaveValue: 'concentric',
+      noneWaveValue: 'none',
+      oceanWavesLevel: 0,
+      oceanWavesAlpha: 0,
+      oceanWavesColorHex: '#000000',
+      showOceanWavesPicker: false,
+      coastShadingLevel: 0,
+      coastShadingAlpha: 0,
+      coastlineWidth: 0,
+      coastlineColorHex: '#000',
+    }
+
+    render(<EffectsTab {...props} />)
+
+    const el = screen.getByText('theme.oceanShadingColor.label')
+    // element has data-swatch with sanitized replacement containing 'Political'
+    expect(el.getAttribute('data-swatch')).toContain('Political')
+  })
+})
