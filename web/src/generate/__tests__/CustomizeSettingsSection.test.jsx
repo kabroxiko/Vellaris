@@ -36,7 +36,7 @@ function makeProps(overrides = {}) {
   }
   const options = {
     textures: [],
-    i18n: { labels: {}, options: { tabs: [ { id: 'background', label: 'Background' }, { id: 'border', label: 'Border' }, { id: 'effects', label: 'Effects' }, { id: 'fonts', label: 'Fonts' } ], fonts: [] } },
+    i18n: { labels: undefined, options: { tabs: [ { id: 'background', label: 'Background' }, { id: 'border', label: 'Border' }, { id: 'effects', label: 'Effects' }, { id: 'fonts', label: 'Fonts' } ], fonts: [] } },
     borderTypes: [],
   }
   const ui = { loading: false, customizationDirty: false, hasGeneratedOnce: false }
