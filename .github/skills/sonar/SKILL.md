@@ -18,6 +18,8 @@ Prerequisites
 Behavior Overview
 -----------------
 - `scan` action: asks the SonarQube MCP to run or schedule analysis. When a full server scan is not available, the skill will invoke targeted file analysis via `sonarqube_analyze_file` for modified files.
+ - Default interactive policy: the skill defaults to autonomous operation and will not offer interactive options unless strictly necessary to resolve ambiguity, request maintainer decisions, or propose non-trivial refactors. When user input is required the assistant will ask a single concise question rather than present multiple options.
+ - `scan` action: asks the SonarQube MCP to run or schedule analysis. When a full server scan is not available, the skill will invoke targeted file analysis via `sonarqube_analyze_file` for modified files.
 - `query` action: uses the MCP `mcp_sonarqube_search_sonar_issues_in_projects` call to list issues for given `projectKeys`, `rules`, or explicit `issue` keys. By default the query uses `resolved=false`.
 - `hotspots` action: uses the MCP `mcp_sonarqube_search_security_hotspots` call to list Security Hotspots.
 - Fallback behavior: if an issues query returns zero results, the skill will (by default) call the Hotspots MCP call to surface security hotspots that are not represented as regular issues. Pass `--no-hotspots` to disable this fallback.
@@ -32,23 +34,28 @@ Commands and Flags
 - `/sonar --hotspots` — explicitly fetch hotspots via the MCP hotspots method (`mcp_sonarqube_search_security_hotspots`).
 - `--no-hotspots` — opt out of automatic hotspots fallback when an issues search returns no results.
  - `/sonar coverage [--threshold PERCENT] [--limit N]` — query coverage via MCP, list files below `--threshold` (default 80%), generate conservative test scaffolds for uncovered functions up to `--limit` files.
+ - `/sonar coverage [--threshold PERCENT] [--limit N]` — query coverage via MCP, list files below `--threshold` (default 80%), and (by default) operate autonomously to generate and apply deterministic unit tests until the workspace-wide coverage meets or exceeds the threshold (default 80%) or the `--limit` of files has been processed. The skill will only pause for explicit confirmation in strictly necessary situations (ambiguous assertions, required refactors, or unsafe edits).
 
 What the skill returns
 ----------------------
 - For issues: `component`, `textRange`, `message`, `rule`, `severity`, and `quickFixAvailable` (when the MCP provides it).
 - For hotspots: `key`, `component`, `line`, `message`, `status`, and `ruleKey`.
 
- Coverage support
- ----------------
- - Purpose: help maintainers identify low-coverage files and automatically generate real, deterministic unit tests (not scaffolds) for safely testable code paths.
- - `/sonar coverage` behavior:
+Coverage support
+----------------
+- Purpose: help maintainers identify low-coverage files and automatically generate real, deterministic unit tests (not scaffolds) for safely testable code paths.
+- `/sonar coverage` behavior (autonomous by default):
  	- call `mcp_sonarqube_search_files_by_coverage` to find files with coverage below the provided `--threshold` (default 80%).
- 	- for each target file (up to `--limit`): call `mcp_sonarqube_get_file_coverage_details` to obtain precise uncovered line ranges and branch info.
+ 	- for each candidate file (respecting `--limit`), call `mcp_sonarqube_get_file_coverage_details` to obtain uncovered line ranges and branch info.
  	- analyze the source to identify exported or top-level pure functions and deterministic entry points that can be safely unit-tested (avoid complex integration points, external network calls, or native code).
- 	- Synthesize deterministic test files that import the module, call functions with simple deterministic inputs, and assert explicit expected results or structural properties derived from static analysis or documented behavior.
- 	- The skill will NOT generate one-off scaffolding or snapshot-style tests as an automated default. If the assistant cannot determine safe, deterministic assertions for a target area, it will skip generating a test file and instead present a concise proposal describing what a maintainer must verify or how to refactor the code to enable deterministic testing.
- 	- prepare WorkspaceEdit-style patches containing the new test files under the project's test layout (respecting existing conventions) and present a per-file summary for interactive confirmation before writing files.
- 	- after applying confirmed test patches, call `sonarqube_analyze_file` (or `analyze_file_list` if available) via the MCP to re-run analysis on the modified files and report updated coverage measures.
+ 	- synthesize deterministic test files that import the module, invoke functions with deterministic inputs, and assert explicit expected results or stable structural properties derived from static analysis or documented behavior.
+ 	- apply generated test files directly (write WorkspaceEdit-style patches into the working tree) and re-run per-file analysis via `sonarqube_analyze_file` (or `analyze_file_list`) to update coverage; repeat iteratively until the workspace coverage reaches the `--threshold` (default 80%) or no further safe, testable targets are found.
+ 	- the skill will only prompt for a maintainer decision when strictly necessary: ambiguous assertion choices, tests that require non-trivial refactors, or potential unsafe edits. In such cases the assistant will ask a single concise question and pause.
+ 	- the skill will NOT create commits, pushes, or pull requests; it will write test files to the workspace for maintainers to review and commit with their normal workflows.
+
+Notes on conservative behavior:
+	- The assistant will NOT generate snapshot-style or placeholder scaffolding tests by default. When a safe, deterministic assertion cannot be inferred, the assistant will either skip the target or propose a brief, explicit refactor patch and request confirmation before applying it.
+	- Small, safe refactors required to enable deterministic testing (for example, extracting a pure helper) will be proposed as separate patches and require explicit confirmation before application.
 
  Notes and safety rules for test generation
  ----------------------------------------
@@ -82,7 +89,7 @@ Notes on Hotspots fallback
 Limitations and Safety
 ----------------------
 - Not a full refactoring tool: no complex program analysis or cross-file semantic refactors.
-- Does not push commits or modify remote branches; produces patches for maintainer review.
+- Does not push commits or modify remote branches; produces WorkspaceEdit-style patches for maintainer review and will not commit, stage, push, or create pull requests on behalf of the maintainer.
 - Hotspots API calls require additional Sonar permissions. If the token lacks hotspot access, the skill will report the error and stop the hotspot step.
 - The skill favors conservative, reversible edits. If a safe textual replacement cannot be determined, the skill will surface the finding and recommend a manual review.
 
@@ -114,7 +121,7 @@ Troubleshooting
 
 Notes for Maintainers
 ---------------------
-- Review patches locally before committing. The skill intentionally avoids automatic commits or pushes.
+- Review patches locally. The skill will not commit, stage, push, or create pull requests, and it will not offer or suggest doing so. Use your normal workflows to commit or open PRs.
 - If you want the skill to always include hotspots in queries, use `--hotspots` explicitly; automatic fallback occurs only when an issues query returns zero results.
 
 Implementation guidance for integrators

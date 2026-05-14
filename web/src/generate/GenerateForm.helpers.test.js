@@ -6,7 +6,11 @@ import {
   scaleSliderValue,
   buildCustomizePayload,
   persistCustomizeOverrides,
-} from './GenerateForm'
+  serializeNortObject,
+  loadRandomOverrides,
+  loadCustomizeOverrides,
+  loadUiOptions,
+} from './GenerateForm.jsx'
 
 describe('GenerateForm pure helpers', () => {
   it('applyBackgroundFlagsHoisted sets flags for SolidColor', () => {
@@ -61,14 +65,6 @@ describe('GenerateForm pure helpers', () => {
     expect(p.drawRoads).toBe(true)
   })
 })
-import { vi, expect } from 'vitest'
-import {
-  serializeNortObject,
-  scaleSliderValue,
-  loadRandomOverrides,
-  loadCustomizeOverrides,
-  loadUiOptions,
-} from './GenerateForm.jsx'
 
 describe('GenerateForm helpers', () => {
   beforeEach(() => {
@@ -100,8 +96,8 @@ describe('GenerateForm helpers', () => {
     localStorage.setItem('vellaris-customize-overrides', JSON.stringify({ baz: 1 }))
     const r = loadRandomOverrides()
     const c = loadCustomizeOverrides()
-    expect(r && r.foo).toBe('bar')
-    expect(c && c.baz).toBe(1)
+    expect(r?.foo).toBe('bar')
+    expect(c?.baz).toBe(1)
   })
 
   it('loadUiOptions calls fetchJson and caches result', async () => {
