@@ -40,7 +40,7 @@ function makeProps(overrides = {}) {
     borderTypes: [],
   }
   const ui = { loading: false, customizationDirty: false, hasGeneratedOnce: false }
-  return { values: { ...baseValues, ...overrides.values }, handlers: { ...handlers, ...(overrides.handlers || {}) }, options: { ...options, ...(overrides.options || {}) }, ui: { ...ui, ...(overrides.ui || {}) } }
+  return { values: { ...baseValues, ...overrides.values }, handlers: { ...handlers, ...(overrides.handlers) }, options: { ...options, ...(overrides.options) }, ui: { ...ui, ...(overrides.ui) } }
 }
 
 describe('CustomizeSettingsSection', () => {

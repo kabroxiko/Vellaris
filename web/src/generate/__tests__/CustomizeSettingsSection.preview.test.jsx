@@ -15,7 +15,7 @@ vi.mock('../backgroundBaseCache', () => {
 
 // Mock BackgroundTab to expose recomposeUsingLastBase via a button
 vi.mock('../tabs/BackgroundTab', () => ({
-  default: (props) => React.createElement('div', { 'data-testid': 'bg-tab' }, React.createElement('button', { 'data-testid': 'recompose-btn', onClick: () => props.recomposeUsingLastBase && props.recomposeUsingLastBase() }, 'Recompose')),
+  default: (props) => React.createElement('div', { 'data-testid': 'bg-tab' }, React.createElement('button', { 'data-testid': 'recompose-btn', onClick: () => props?.recomposeUsingLastBase() }, 'Recompose')),
 }))
 // Keep other tabs simple
 vi.mock('../tabs/BorderTab', () => ({ default: (props) => React.createElement('div', { 'data-testid': 'border-tab' }, 'BORDER') }))
@@ -53,7 +53,7 @@ function makeProps(overrides = {}) {
     borderTypes: [],
   }
   const ui = { loading: false, customizationDirty: false, hasGeneratedOnce: false }
-  return { values: { ...baseValues, ...overrides.values }, handlers: { ...handlers, ...(overrides.handlers || {}) }, options: { ...options, ...(overrides.options || {}) }, ui: { ...ui, ...(overrides.ui || {}) } }
+  return { values: { ...baseValues, ...overrides.values }, handlers: { ...handlers, ...(overrides.handlers ) }, options: { ...options, ...(overrides.options ) }, ui: { ...ui, ...(overrides.ui) } }
 }
 
 describe('CustomizeSettingsSection preview lifecycle', () => {

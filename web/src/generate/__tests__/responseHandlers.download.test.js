@@ -10,7 +10,6 @@ beforeEach(() => {
 describe('downloadNortContent', () => {
   it('creates an anchor and triggers download for JSON string with title', () => {
       const appendSpy = vi.spyOn(document.body, 'appendChild')
-      const removeSpy = vi.spyOn(HTMLElement.prototype, 'remove')
       const originalCreate = document.createElement.bind(document)
       const createElSpy = vi.spyOn(document, 'createElement')
       // Mock anchor element behavior without recursion

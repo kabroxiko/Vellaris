@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { prepareBitmapsModule, composeMiniIslandFromBlobModule } from '../CustomizeSettingsSection'
-import * as cs from '../CustomizeSettingsSection'
 
 describe('prepareBitmapsModule and composeMiniIslandFromBlobModule', () => {
   beforeEach(() => {
@@ -32,9 +31,10 @@ describe('prepareBitmapsModule and composeMiniIslandFromBlobModule', () => {
       lineJoin: null,
       stroke: () => {},
     }
+    const originalCreate = document.createElement.bind(document)
     vi.spyOn(document, 'createElement').mockImplementation((tag) => {
       if (tag === 'canvas') return { width: 8, height: 8, getContext: () => mockCtx }
-      return document.createElement.__proto__.call(document, tag)
+      return originalCreate(tag)
     })
     // stub createImageBitmap used by colorizeBitmap
     vi.stubGlobal('createImageBitmap', async (c) => 'MOCK_BITMAP')

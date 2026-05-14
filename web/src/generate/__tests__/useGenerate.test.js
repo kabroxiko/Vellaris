@@ -9,6 +9,7 @@ vi.mock('../sharedHelpers', () => ({
 }))
 
 import useGenerate from '../hooks/useGenerate.js'
+import PropTypes from 'prop-types'
 
 function TestHarness({ deps, call }) {
   const runGenerate = useGenerate(deps)
@@ -16,6 +17,11 @@ function TestHarness({ deps, call }) {
     call(runGenerate)
   }, [runGenerate])
   return null
+}
+
+TestHarness.propTypes = {
+  deps: PropTypes.object,
+  call: PropTypes.func,
 }
 
 describe('useGenerate runGenerate branches', () => {
@@ -104,7 +110,7 @@ describe('useGenerate runGenerate branches', () => {
     readResponseBytesWithProgress.mockResolvedValueOnce(new Uint8Array([1]))
 
     const handleResponseError = vi.fn(async () => { throw new Error('failed') })
-    global.fetch = vi.fn(async () => ({ ok: false }))
+    globalThis.fetch = vi.fn(async () => ({ ok: false }))
 
     const setError = vi.fn()
     const deps = {

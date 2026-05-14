@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { makeCanvasForBitmap, drawBackgroundAndInset, drawIslandShape } from '../CustomizeSettingsSection'
 
 describe('CustomizeSettingsSection hoisted helpers', () => {
@@ -25,7 +25,7 @@ describe('CustomizeSettingsSection hoisted helpers', () => {
     expect(calls[0]).toBe('save')
     expect(calls.some(c => Array.isArray(c) && c[0] === 'drawImage')).toBeTruthy()
     expect(calls.some(c => Array.isArray(c) && c[0] === 'fillRect')).toBeTruthy()
-    expect(calls[calls.length - 1]).toBe('restore')
+    expect(calls.at(-1)).toBe('restore')
   })
 
   it('drawIslandShape creates a pattern and strokes when coastline present', () => {
@@ -73,6 +73,6 @@ describe('CustomizeSettingsSection hoisted helpers', () => {
     drawIslandShape(opts)
     expect(called.some(c => Array.isArray(c) && c[0] === 'createPattern')).toBeTruthy()
     // stroke should be called because computedDefaultWidth >=1
-    expect(called.some(c => c === 'stroke')).toBeTruthy()
+    expect(called.includes('stroke')).toBeTruthy()
   })
 })

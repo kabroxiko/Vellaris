@@ -1,4 +1,4 @@
-import React, { useRef } from 'react'
+import React from 'react'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { describe, it, expect, vi } from 'vitest'
 import useGenerate from '../hooks/useGenerate'
@@ -75,7 +75,7 @@ describe('useGenerate additional flows', () => {
     fireEvent.click(screen.getByText('RunNort'))
     await new Promise((r) => setTimeout(r, 10))
     expect(setError).toHaveBeenCalled()
-    const lastCall = setError.mock.calls[setError.mock.calls.length - 1]
+    const lastCall = setError.mock.calls.at(-1)
     const msg = lastCall ? lastCall[0] : null
     expect(String(msg)).toMatch(/Server returned image bytes/)
   })
