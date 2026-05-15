@@ -479,6 +479,7 @@ export default function BackgroundTab(props) {
   const isVoronoi = String((gridOverlayShape || '')).toLowerCase().includes('voronoi')
   const lowerShape = String(gridOverlayShape || '').toLowerCase()
   const isVerticalHex = lowerShape.includes('vertical')
+  const canToggleColorize = String(backgroundType || '') === 'GeneratedFromTexture'
 
   return (
     <div className="fields-grid two-col-layout">
@@ -535,11 +536,13 @@ export default function BackgroundTab(props) {
         />
 
         <div />
-        <label className="checkbox-label">
+        <label className={`checkbox-label${!canToggleColorize ? ' is-disabled' : ''}`}>
           <input
             type="checkbox"
             checked={colorizeLand}
+            disabled={!canToggleColorize}
             onChange={(e) => {
+              if (!canToggleColorize) return
               const v = e.target.checked
               setColorizeLand(v)
               notifyManualChange()
@@ -571,11 +574,13 @@ export default function BackgroundTab(props) {
         />
 
         <div />
-        <label className="checkbox-label">
+        <label className={`checkbox-label${!canToggleColorize ? ' is-disabled' : ''}`}>
           <input
             type="checkbox"
             checked={colorizeOcean}
+            disabled={!canToggleColorize}
             onChange={(e) => {
+              if (!canToggleColorize) return
               const v = e.target.checked
               setColorizeOcean(v)
               notifyManualChange()

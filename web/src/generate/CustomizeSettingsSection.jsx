@@ -1191,6 +1191,7 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
       ...previewFields,
       // Explicit setters/handlers (not part of previewFields)
       setTextureRef: handlers.setTextureRef,
+      setBackgroundType: handlers.setBackgroundType,
       setDrawBorder: handlers.setDrawBorder,
       setDrawRegionBoundaries: handlers.setDrawRegionBoundaries,
       setRegionBoundaryStyle: handlers.setRegionBoundaryStyle,
