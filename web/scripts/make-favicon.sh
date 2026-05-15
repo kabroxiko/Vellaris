@@ -4,22 +4,62 @@ set -e
 # Generates favicon files from ../.. (repo root) vellaris.svg
 # Outputs to web/public/
 
-ROOT_DIR="$(cd "$(dirname "$0")/.." >/dev/null && pwd -P)/.."
-SVG="$ROOT_DIR/vellaris.svg"
+ROOT_DIR="$(cd "$(dirname "$0")/.." >/dev/null && pwd -P)"
+# Require vellaris.svg to live in the repository-level assets/ folder
+SVG="$ROOT_DIR/assets/vellaris.svg"
 OUT_DIR="$(cd "$(dirname "$0")/.." >/dev/null && pwd -P)/public"
 
-# Prefer repo-root vellaris.svg, but fall back to web/public/vellaris.svg if present
+# Require repo-root vellaris.svg (no fallback)
 if [ ! -f "$SVG" ]; then
-  ALT="$OUT_DIR/vellaris.svg"
-  if [ -f "$ALT" ]; then
-    SVG="$ALT"
-  else
-    echo "Error: vellaris.svg not found. Place vellaris.svg at repo root or web/public." >&2
-    exit 2
+  echo "Error: vellaris.svg not found at $SVG. Place vellaris.svg in assets/ at the repository root." >&2
+  exit 2
+fi
+
+# Ensure output directory exists (needed for stored hash file)
+mkdir -p "$OUT_DIR"
+
+# Compute SVG hash (portable): try shasum, sha256sum, then openssl
+SVG_HASH=""
+if command -v shasum >/dev/null 2>&1; then
+  SVG_HASH=$(shasum -a 256 "$SVG" | awk '{print $1}')
+elif command -v sha256sum >/dev/null 2>&1; then
+  SVG_HASH=$(sha256sum "$SVG" | awk '{print $1}')
+elif command -v openssl >/dev/null 2>&1; then
+  SVG_HASH=$(openssl dgst -sha256 "$SVG" | awk '{print $2}')
+fi
+
+# If hash computed and unchanged from last run, skip regenerating files
+HASH_FILE="$OUT_DIR/.vellaris.svg.hash"
+if [ -n "$SVG_HASH" ] && [ -f "$HASH_FILE" ]; then
+  OLD_HASH=$(cat "$HASH_FILE" 2>/dev/null || echo "")
+  if [ "$SVG_HASH" = "$OLD_HASH" ]; then
+    echo "vellaris.svg unchanged; skipping favicon generation."
+    exit 0
   fi
 fi
 
-mkdir -p "$OUT_DIR"
+# If we couldn't compute a hash, conservatively skip generation when
+# all expected output files exist and are newer than the SVG (no-op).
+if [ -z "$SVG_HASH" ]; then
+  ALL_NEWER=true
+  for s in $SIZES; do
+    OUT_PNG="$OUT_DIR/favicon-${s}.png"
+    if [ ! -f "$OUT_PNG" ] || [ ! "$OUT_PNG" -nt "$SVG" ]; then
+      ALL_NEWER=false
+      break
+    fi
+  done
+  if [ "$ALL_NEWER" = true ]; then
+    OUT_ICO="$OUT_DIR/favicon.ico"
+    APPLE="$OUT_DIR/apple-touch-icon.png"
+    ANDROID_192="$OUT_DIR/android-chrome-192x192.png"
+    ANDROID_512="$OUT_DIR/android-chrome-512x512.png"
+    if [ -f "$OUT_ICO" ] && [ "$OUT_ICO" -nt "$SVG" ] && [ -f "$APPLE" ] && [ "$APPLE" -nt "$SVG" ] && [ -f "$ANDROID_192" ] && [ "$ANDROID_192" -nt "$SVG" ] && [ -f "$ANDROID_512" ] && [ "$ANDROID_512" -nt "$SVG" ]; then
+      echo "ImageMagick hash unavailable; outputs newer than SVG; skipping generation."
+      exit 0
+    fi
+  fi
+fi
 
 # Use magick if available, otherwise convert
 if command -v magick >/dev/null 2>&1; then
@@ -63,4 +103,9 @@ ANDROID_512="$OUT_DIR/android-chrome-512x512.png"
 "$IM_CMD" "$SVG" -background none -density 512 -resize 512x512 "$ANDROID_512"
 
 echo "Favicons generated in $OUT_DIR"
+
+# Update stored hash if available
+if [ -n "$SVG_HASH" ]; then
+  echo "$SVG_HASH" > "$HASH_FILE"
+fi
 exit 0

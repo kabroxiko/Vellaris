@@ -125,18 +125,23 @@ public class MapApiServer
 		try
 		{
 			app.start(8080);
-			try
-			{
-				latch.await();
-			}
-			catch (InterruptedException ie)
-			{
-				Thread.currentThread().interrupt();
-			}
+			awaitLatch(latch);
 		}
 		catch (Exception e)
 		{
 			Logger.println("Error running server: " + e);
+		}
+	}
+
+	private static void awaitLatch(CountDownLatch latch)
+	{
+		try
+		{
+			latch.await();
+		}
+		catch (InterruptedException ie)
+		{
+			Thread.currentThread().interrupt();
 		}
 	}
 
