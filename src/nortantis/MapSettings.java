@@ -246,10 +246,10 @@ public class MapSettings implements Serializable
 	}
 
 	/**
-	 * Construct MapSettings directly from a JSON string (no temp file).
-	 * Throws RuntimeException on parse/validation failure.
+	 * Construct MapSettings directly from a JSON string (no temp file). Throws RuntimeException on parse/validation failure.
 	 */
-	public static MapSettings fromJson(String json) {
+	public static MapSettings fromJson(String json)
+	{
 		MapSettings settings = new MapSettings();
 		settings.parseFromJson(json);
 		return settings;
@@ -354,7 +354,8 @@ public class MapSettings implements Serializable
 
 		root.put("version", version);
 		root.put("randomSeed", randomSeed);
-		if (language != null) root.put("language", language);
+		if (language != null)
+			root.put("language", language);
 		root.put("resolution", resolution);
 		root.put("coastShadingLevel", coastShadingLevel);
 		root.put("oceanWavesLevel", oceanWavesLevel);
@@ -814,7 +815,8 @@ public class MapSettings implements Serializable
 		coastShadingLevel = asInt(root.get("coastShadingLevel"));
 
 		concentricWaveCount = asInt(root.get("concentricWaveCount"));
-		if (root.containsKey("language")) {
+		if (root.containsKey("language"))
+		{
 			language = (String) root.get("language");
 		}
 		if (root.containsKey("fadeConcentricWaves"))

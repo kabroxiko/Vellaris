@@ -305,7 +305,8 @@ public class SettingsGenerator
 		}
 
 		// Ensure a default language is present for generated settings
-		if (settings.language == null || settings.language.isEmpty()) {
+		if (settings.language == null || settings.language.isEmpty())
+		{
 			settings.language = "en";
 		}
 

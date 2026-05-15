@@ -22,9 +22,10 @@ import nortantis.platform.ImageType;
 import nortantis.platform.PlatformFactory;
 import nortantis.platform.awt.AwtFactory;
 import nortantis.util.Logger;
- 
-import spark.Request;
-import spark.Response;
+
+import io.javalin.Javalin;
+import io.javalin.http.Context;
+import java.util.concurrent.CountDownLatch;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -33,6 +34,7 @@ import java.awt.image.BufferedImage;
 import java.util.Base64;
 import java.util.List;
 import java.util.Random;
+import java.security.SecureRandom;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.LinkedHashMap;
@@ -45,7 +47,7 @@ import javax.imageio.ImageWriter;
 import javax.imageio.stream.ImageOutputStream;
 import java.nio.file.Path;
 
-import static spark.Spark.*;
+// Replaced Spark Java handlers with Javalin
 
 /**
  * Small HTTP API to generate random or .nort maps. POST /generate - body JSON: { "nortFile": "path.nort", "width":2000, "height":1200,
@@ -55,8 +57,8 @@ public class MapApiServer
 {
 
 	private static final Gson gson = new Gson();
-    
-	private static final Random SHARED_RANDOM = new Random();
+
+	private static final Random SHARED_RANDOM = new SecureRandom();
 	private static final String CONTENT_TYPE_JSON = "application/json";
 	private static final String CONTENT_TYPE_PNG = "image/png";
 	private static final String PNG_FORMAT_NAME = "png";
@@ -65,63 +67,124 @@ public class MapApiServer
 
 	public static void main(String[] args)
 	{
-		port(8080);
-		setupCors();
-		get("/api/health", (req, res) -> "ok");
+		CountDownLatch latch = new CountDownLatch(1);
 
-		// Simple resource list endpoints (removed)
-
-		get("/api/ui-options", MapApiServer::handleUiOptions);
-
-		post("/api/generate-settings", MapApiServer::handleGenerateSettings);
-		post("/api/generate", MapApiServer::handleGenerate);
-		post("/api/background-base", MapApiServer::handleBackgroundBase);
-
-		exception(Exception.class, (exception, req, res) ->
+		// Create and configure the Javalin app (Javalin 7 requires routes be
+		// declared inside the config.routes block passed to create)
+		Javalin app = Javalin.create(config ->
 		{
-			Logger.println("Unhandled API exception: " + exception);
-			res.type(CONTENT_TYPE_JSON);
-			res.status(500);
-			res.body(gson.toJson(new ApiResponse(false, "Unhandled exception: " + formatExceptionMessage(exception), null, null)));
+			// Basic CORS handling equivalent to previous implementation
+			config.routes.options("/*", ctx ->
+			{
+				String accessControlRequestHeaders = ctx.header("Access-Control-Request-Headers");
+				if (accessControlRequestHeaders != null)
+				{
+					ctx.header("Access-Control-Allow-Headers", accessControlRequestHeaders);
+				}
+				String accessControlRequestMethod = ctx.header("Access-Control-Request-Method");
+				if (accessControlRequestMethod != null)
+				{
+					ctx.header("Access-Control-Allow-Methods", accessControlRequestMethod);
+				}
+				ctx.result("OK");
+			});
+
+			config.routes.before(ctx -> ctx.header("Access-Control-Allow-Origin", "*"));
+
+			config.routes.get("/api/health", ctx -> ctx.result("ok"));
+
+			// Simple resource list endpoints (removed)
+			config.routes.get("/api/ui-options", ctx -> ctx.result(String.valueOf(handleUiOptions(ctx))));
+
+			config.routes.post("/api/generate-settings", ctx -> ctx.result(String.valueOf(handleGenerateSettings(ctx))));
+			config.routes.post("/api/generate", ctx -> ctx.result(String.valueOf(handleGenerate(ctx))));
+			config.routes.post("/api/background-base", MapApiServer::handleBackgroundBase);
+
+			config.routes.exception(Exception.class, (e, ctx) ->
+			{
+				Logger.println("Unhandled API exception: " + e);
+				ctx.contentType(CONTENT_TYPE_JSON);
+				ctx.status(500);
+				ctx.result(gson.toJson(new ApiResponse(false, "Unhandled exception: " + formatExceptionMessage(e), null, null)));
+			});
 		});
 
-		init();
+		// Shutdown hook stops the app and signals the latch
+		Runtime.getRuntime().addShutdownHook(new Thread(() ->
+		{
+			try
+			{
+				app.stop();
+			}
+			finally
+			{
+				latch.countDown();
+			}
+		}));
+
+		try
+		{
+			app.start(8080);
+			try
+			{
+				latch.await();
+			}
+			catch (InterruptedException ie)
+			{
+				Thread.currentThread().interrupt();
+			}
+		}
+		catch (Exception e)
+		{
+			Logger.println("Error running server: " + e);
+		}
 	}
 
 	// Extracted helper to reduce cognitive complexity in handleBackgroundBase.
 	// Builds params, generates the background image and writes the PNG to the
 	// response output stream. Returns the generated Image for the caller to
 	// close/cleanup when appropriate.
-	private static Image generateBaseImageAndWriteResponse(Request req, Response res) throws java.io.IOException {
+	private static Image generateBaseImageAndWriteResponse(Context ctx) throws java.io.IOException
+	{
 		int width = -1;
 		int height = -1;
 		String type = null;
 		String cityIconType = null;
 		String artPack = null;
 
-		try {
+		try
+		{
 			@SuppressWarnings("unchecked")
-			Map<String, Object> raw = gson.fromJson(req.body(), Map.class);
-			if (raw != null) {
+			Map<String, Object> raw = gson.fromJson(ctx.body(), Map.class);
+			if (raw != null)
+			{
 				Integer w = parseInteger(raw.get("width"));
 				Integer h = parseInteger(raw.get("height"));
-				if (w != null) width = w;
-				if (h != null) height = h;
+				if (w != null)
+					width = w;
+				if (h != null)
+					height = h;
 				Object t = raw.get("type");
-				if (t != null) type = String.valueOf(t);
+				if (t != null)
+					type = String.valueOf(t);
 				Object ap = raw.get("artPack");
-				if (ap != null) artPack = String.valueOf(ap);
+				if (ap != null)
+					artPack = String.valueOf(ap);
 				Object cit = raw.get("cityIconType");
-				if (cit != null) cityIconType = String.valueOf(cit);
+				if (cit != null)
+					cityIconType = String.valueOf(cit);
 			}
-		} catch (RuntimeException ignore) {
+		}
+		catch (RuntimeException ignore)
+		{
 			// If mapping fails, fall through with defaults
 		}
 
-		if (width <= 0 || height <= 0) {
-			res.type(CONTENT_TYPE_JSON);
-			res.status(400);
-			res.body(gson.toJson(new ApiResponse(false, "Missing required fields: width and height must be positive integers", null, null)));
+		if (width <= 0 || height <= 0)
+		{
+			ctx.contentType(CONTENT_TYPE_JSON);
+			ctx.status(400);
+			ctx.result(gson.toJson(new ApiResponse(false, "Missing required fields: width and height must be positive integers", null, null)));
 			return null;
 		}
 
@@ -129,18 +192,24 @@ public class MapApiServer
 		// will use defaults or fall back to a solid background.
 		Image baseImage = generateBackgroundBaseImage(width, height, type, cityIconType, artPack);
 		BufferedImage buffered = nortantis.platform.awt.AwtFactory.unwrap(baseImage);
-		res.type(CONTENT_TYPE_PNG);
-		res.status(200);
-		writeCompressedPng(buffered, res.raw().getOutputStream());
-		res.raw().getOutputStream().flush();
+		// Write compressed PNG into memory then set as result to avoid
+		// directly depending on servlet response APIs.
+		try (ByteArrayOutputStream baos = new ByteArrayOutputStream())
+		{
+			writeCompressedPng(buffered, baos);
+			baos.flush();
+			ctx.contentType(CONTENT_TYPE_PNG);
+			ctx.status(200);
+			ctx.result(baos.toByteArray());
+		}
 		return baseImage;
 	}
 
-	private static Object handleGenerateSettings(Request req, Response res)
+	private static Object handleGenerateSettings(Context ctx)
 	{
 		// request header logging removed
 
-		GenerationRequestContext grc = prepareGenerationRequest(req, res, true);
+		GenerationRequestContext grc = prepareGenerationRequest(ctx, true);
 		if (grc == null)
 		{
 			return gson.toJson(new ApiResponse(false, MSG_FAILED_TO_PARSE_CONFIG, null, null));
@@ -164,8 +233,54 @@ public class MapApiServer
 
 		// Return the canonical normalized .nort JSON directly as the response body
 		// (clients expect raw .nort content, not a wrapper object).
-		res.type(CONTENT_TYPE_JSON);
+		ctx.contentType(CONTENT_TYPE_JSON);
 		return normalizedJson;
+	}
+
+	private static Object handleUiOptions(Context ctx)
+	{
+		ctx.contentType(CONTENT_TYPE_JSON);
+		String requestedLanguage = ctx.queryParam("uiLanguage");
+		applyRequestLanguage(requestedLanguage);
+
+		// Ensure a platform implementation is available before any classes
+		// that depend on PlatformFactory (e.g. Color) are initialized.
+		PlatformFactory.setInstance(new AwtFactory());
+
+		// Build the standard UI options/labels. Deterministic seed
+		// support removed — defaults are always generated fresh.
+		Map<String, Object> ui = buildWebUiOptions();
+
+		// Also include resource lists so the frontend can fetch a single
+		// endpoint for all initial UI state (art packs, books, textures,
+		// border types, and city icon groups per art pack).
+		try
+		{
+			List<String> artPacks = Assets.listArtPacks(false);
+			ui.put("artPacks", artPacks);
+
+			ui.put("books", SettingsGenerator.getAllBooks());
+
+			ui.put("textures", namedResourcesToList(Assets.listBackgroundTexturesForAllArtPacks(null)));
+
+			ui.put("borderTypes", namedResourcesToList(Assets.listAllBorderTypes(null)));
+
+			// City icon groups per art pack (may be empty for some packs)
+			Map<String, List<String>> cityIconTypesByPack = new LinkedHashMap<>();
+			PlatformFactory.setInstance(new AwtFactory());
+			for (String pack : artPacks)
+			{
+				cityIconTypesByPack.put(pack, getCityIconTypesForPack(pack));
+			}
+			ui.put("cityIconTypesByPack", cityIconTypesByPack);
+		}
+		catch (RuntimeException e)
+		{
+			// If resource enumeration fails, still return UI options.
+			Logger.println("Failed to enumerate UI resources: " + e.getMessage());
+		}
+
+		return gson.toJson(ui);
 	}
 
 	private static String formatExceptionMessage(Exception exception)
@@ -184,76 +299,93 @@ public class MapApiServer
 		return exception.getClass().getSimpleName() + " - " + message;
 	}
 
-	private static Object handleGenerate(Request req, Response res)
+	private static Object handleGenerate(Context ctx)
 	{
 		// request header logging removed
 
-		GenerationRequestContext grc = prepareGenerationRequest(req, res, false);
+		GenerationRequestContext grc = prepareGenerationRequest(ctx, false);
 		if (grc == null)
 		{
 			return gson.toJson(new ApiResponse(false, MSG_FAILED_TO_PARSE_CONFIG, null, null));
 		}
 
-		try {
-			return executeGenerationAndReturn(grc, res);
-		} finally {
+		try
+		{
+			return executeGenerationAndReturn(grc, ctx);
+		}
+		finally
+		{
 			// Do not modify or restore global UI language here; map generation
 			// must not depend on or mutate UserPreferences.language.
 		}
 	}
 
-	private static Object executeGenerationAndReturn(GenerationRequestContext grc, Response res) {
-		GenerationContext ctx = grc.ctx;
+	private static Object executeGenerationAndReturn(GenerationRequestContext grc, Context ctx)
+	{
+		GenerationContext genCtx = grc.ctx;
 		MapSettings requestSettings = grc.settings;
 
-		if (requestSettings != null && requestSettings.language != null && !requestSettings.language.isEmpty()) {
-			ctx.settings.language = requestSettings.language;
+		if (requestSettings != null && requestSettings.language != null && !requestSettings.language.isEmpty())
+		{
+			genCtx.settings.language = requestSettings.language;
 		}
 
 		// Use the MapSettings language for translations during generation
 		// without mutating global UserPreferences (safe for concurrent API use).
 		boolean appliedLanguage = false;
-		if (requestSettings != null && requestSettings.language != null && !requestSettings.language.isEmpty()) {
+		if (requestSettings != null && requestSettings.language != null && !requestSettings.language.isEmpty())
+		{
 			Translation.initializeWithLanguage(requestSettings.language);
 			appliedLanguage = true;
 		}
 
-        
 		Integer gw = (requestSettings != null && requestSettings.generatedWidth > 0) ? Integer.valueOf(requestSettings.generatedWidth) : null;
 		Integer gh = (requestSettings != null && requestSettings.generatedHeight > 0) ? Integer.valueOf(requestSettings.generatedHeight) : null;
-		GenerationResult generation = generateMap(ctx.settings, gw, gh);
-		if (generation.image == null) {
+		GenerationResult generation = generateMap(genCtx.settings, gw, gh);
+		if (generation.image == null)
+		{
 			// restore translation state (re-initialize from UserPreferences)
-			if (appliedLanguage) {
+			if (appliedLanguage)
+			{
 				Translation.initialize();
 			}
-			res.status(500);
+			ctx.status(500);
 			return gson.toJson(new ApiResponse(false, generation.errorMessage, null, null));
 		}
 
 		Image img = generation.image;
-		try {
-			return produceResponseFromImage(img, ctx, res);
-		} finally {
+		try
+		{
+			return produceResponseFromImage(img, genCtx, ctx);
+		}
+		finally
+		{
 			img.close();
-			if (appliedLanguage) {
+			if (appliedLanguage)
+			{
 				Translation.initialize();
 			}
 		}
 	}
 
 	// Helper to handle image -> JSON response conversion with centralized exception handling
-	private static Object produceResponseFromImage(Image img, GenerationContext ctx, Response res) {
-		try {
+	private static Object produceResponseFromImage(Image img, GenerationContext genCtx, Context ctx)
+	{
+		try
+		{
 			BufferedImage buf = nortantis.platform.awt.AwtFactory.unwrap(img);
-			return returnJsonResponse(buf, ctx.settings, res);
-		} catch (java.io.IOException ioe) {
+			return returnJsonResponse(buf, genCtx.settings, ctx);
+		}
+		catch (java.io.IOException ioe)
+		{
 			Logger.println("returnJsonResponse I/O failed: " + ioe);
-			res.status(500);
+			ctx.status(500);
 			return gson.toJson(new ApiResponse(false, "Failed to produce JSON response: " + ioe.getClass().getSimpleName() + (ioe.getMessage() != null ? (" - " + ioe.getMessage()) : ""), null, null));
-		} catch (RuntimeException re) {
+		}
+		catch (RuntimeException re)
+		{
 			Logger.println("returnJsonResponse failed: " + re);
-			res.status(500);
+			ctx.status(500);
 			return gson.toJson(new ApiResponse(false, "Failed to produce JSON response: " + re.getClass().getSimpleName() + (re.getMessage() != null ? (" - " + re.getMessage()) : ""), null, null));
 		}
 	}
@@ -267,12 +399,12 @@ public class MapApiServer
 
 		for (Locale locale : Translation.getSupportedLocales())
 		{
-				if (locale.getLanguage().equals(uiLanguage))
-				{
-					UserPreferences.getInstance().language = uiLanguage;
-					Translation.initialize();
-					return;
-				}
+			if (locale.getLanguage().equals(uiLanguage))
+			{
+				UserPreferences.getInstance().language = uiLanguage;
+				Translation.initialize();
+				return;
+			}
 		}
 	}
 
@@ -281,9 +413,12 @@ public class MapApiServer
 		Map<String, Object> options = new LinkedHashMap<>();
 		populateStandardOptions(options);
 
-		try {
+		try
+		{
 			enumerateFonts(options);
-		} catch (java.awt.HeadlessException | SecurityException e) {
+		}
+		catch (java.awt.HeadlessException | SecurityException e)
+		{
 			// ignore font enumeration failures
 		}
 
@@ -294,58 +429,70 @@ public class MapApiServer
 
 		Map<String, Object> result = new LinkedHashMap<>();
 		result.put("options", options);
-		if (!labels.isEmpty()) result.put("labels", labels);
+		if (!labels.isEmpty())
+			result.put("labels", labels);
 
 		addDefaults(result);
 
 		return result;
 	}
 
-	private static void populateStandardOptions(Map<String, Object> options) {
-		options.put("tabs", List.of(option("background", tr("theme.tab.background")), option("border", tr("theme.tab.border")),
-				option("effects", tr("theme.tab.effects")), option("fonts", tr("theme.tab.fonts"))));
+	private static void populateStandardOptions(Map<String, Object> options)
+	{
+		options.put("tabs", List.of(option("background", tr("theme.tab.background")), option("border", tr("theme.tab.border")), option("effects", tr("theme.tab.effects")),
+				option("fonts", tr("theme.tab.fonts"))));
 		options.put("dimensions", List.of(option("Square", tr("GeneratedDimension.Square")), option("Sixteen_by_9", tr("GeneratedDimension.Sixteen_by_9")),
 				option("Golden_Ratio", tr("GeneratedDimension.Golden_Ratio"))));
-		options.put("landShapes", List.of(option("Continents", tr("LandShape.Continents")), option("Inland_Sea", tr("LandShape.Inland_Sea")),
-				option("Scattered", tr("LandShape.Scattered"))));
-		options.put("landColoringMethods", List.of(option("SingleColor", tr("LandColoringMethod.SingleColor")),
-				option("ColorPoliticalRegions", tr("LandColoringMethod.ColorPoliticalRegions"))));
-		options.put("backgroundTypes", List.of(option("FractalNoise", tr("theme.background.fractalNoise")),
-				option("GeneratedFromTexture", tr("theme.background.generatedFromTexture")), option("SolidColor", tr("theme.background.solidColor"))));
-		options.put("strokeTypes", List.of(option("Solid", tr("StrokeType.Solid")), option("Dashes", tr("StrokeType.Dashes")),
-				option("Rounded_Dashes", tr("StrokeType.Rounded_Dashes")), option("Dots", tr("StrokeType.Dots"))));
+		options.put("landShapes", List.of(option("Continents", tr("LandShape.Continents")), option("Inland_Sea", tr("LandShape.Inland_Sea")), option("Scattered", tr("LandShape.Scattered"))));
+		options.put("landColoringMethods", List.of(option("SingleColor", tr("LandColoringMethod.SingleColor")), option("ColorPoliticalRegions", tr("LandColoringMethod.ColorPoliticalRegions"))));
+		options.put("backgroundTypes", List.of(option("FractalNoise", tr("theme.background.fractalNoise")), option("GeneratedFromTexture", tr("theme.background.generatedFromTexture")),
+				option("SolidColor", tr("theme.background.solidColor"))));
+		options.put("strokeTypes", List.of(option("Solid", tr("StrokeType.Solid")), option("Dashes", tr("StrokeType.Dashes")), option("Rounded_Dashes", tr("StrokeType.Rounded_Dashes")),
+				option("Dots", tr("StrokeType.Dots"))));
 		options.put("borderPositions", List.of(option("Outside_map", tr("BorderPosition.Outside_map")), option("Over_map", tr("BorderPosition.Over_map"))));
 		options.put("borderColorOptions", List.of(option("Ocean_color", tr("BorderColorOption.Ocean_color")), option("Choose_color", tr("BorderColorOption.Choose_color"))));
 		options.put("lineStyles", List.of(option("Jagged", tr("theme.lineStyle.jagged")), option("Splines", tr("theme.lineStyle.splines")),
 				option("SplinesWithSmoothedCoastlines", tr("theme.lineStyle.splinesSmoothed"))));
-		options.put("oceanWaveTypes", List.of(option("ConcentricWaves", tr("theme.waveType.concentricWaves")), option("Ripples", tr("theme.waveType.ripples")),
-				option("None", tr("theme.waveType.none"))));
+		options.put("oceanWaveTypes",
+				List.of(option("ConcentricWaves", tr("theme.waveType.concentricWaves")), option("Ripples", tr("theme.waveType.ripples")), option("None", tr("theme.waveType.none"))));
 	}
 
-	private static void populateGridOptions(Map<String, Object> options) {
-		options.put("gridOverlayShapes", List.of(option("Horizontal_hexes", tr("GridOverlayShape.Horizontal_hexes")), option("Vertical_hexes", tr("GridOverlayShape.Vertical_hexes")), option("Squares", tr("GridOverlayShape.Squares")), option("Voronoi_polygons", tr("GridOverlayShape.Voronoi_polygons"))));
-		options.put("gridOverlayOffsets", List.of(option("zero", tr("GridOverlayOffset.zero")), option("quarter", tr("GridOverlayOffset.quarter")), option("half", tr("GridOverlayOffset.half")), option("threeQuarters", tr("GridOverlayOffset.threeQuarters"))));
+	private static void populateGridOptions(Map<String, Object> options)
+	{
+		options.put("gridOverlayShapes", List.of(option("Horizontal_hexes", tr("GridOverlayShape.Horizontal_hexes")), option("Vertical_hexes", tr("GridOverlayShape.Vertical_hexes")),
+				option("Squares", tr("GridOverlayShape.Squares")), option("Voronoi_polygons", tr("GridOverlayShape.Voronoi_polygons"))));
+		options.put("gridOverlayOffsets", List.of(option("zero", tr("GridOverlayOffset.zero")), option("quarter", tr("GridOverlayOffset.quarter")), option("half", tr("GridOverlayOffset.half")),
+				option("threeQuarters", tr("GridOverlayOffset.threeQuarters"))));
 		options.put("gridOverlayLayers", List.of(option("Under_icons", tr("GridOverlayLayer.Under_icons")), option("Over_icons", tr("GridOverlayLayer.Over_icons"))));
 	}
 
-	private static void enumerateFonts(Map<String, Object> options) {
+	private static void enumerateFonts(Map<String, Object> options)
+	{
 		java.awt.GraphicsEnvironment ge = java.awt.GraphicsEnvironment.getLocalGraphicsEnvironment();
 		String[] families = ge.getAvailableFontFamilyNames();
 
 		java.util.List<String> hardcoded = new java.util.ArrayList<>();
 		String osName = System.getProperty("os.name", "").toLowerCase();
-		if (osName.contains("mac")) {
+		if (osName.contains("mac"))
+		{
 			java.util.Collections.addAll(hardcoded, "Apple Chancery", "Trajan Pro", "Optima", "Palatino", "Hoefler Text", "Garamond", "Times New Roman", "Georgia", "Baskerville");
-		} else if (osName.contains("win")) {
+		}
+		else if (osName.contains("win"))
+		{
 			java.util.Collections.addAll(hardcoded, "Trajan Pro", "Garamond", "Times New Roman", "Palatino Linotype", "Book Antiqua", "Georgia", "Century Schoolbook");
-		} else {
+		}
+		else
+		{
 			java.util.Collections.addAll(hardcoded, "EB Garamond", "Libre Baskerville", "Gentium", "DejaVu Serif", "Cardo", "Cinzel", "Cormorant Garamond", "FreeSerif");
 		}
 
 		java.util.List<String> filtered = new java.util.ArrayList<>();
-		for (String desired : hardcoded) {
-			for (String inst : families) {
-				if (inst.equalsIgnoreCase(desired)) {
+		for (String desired : hardcoded)
+		{
+			for (String inst : families)
+			{
+				if (inst.equalsIgnoreCase(desired))
+				{
 					filtered.add(inst);
 					break;
 				}
@@ -353,24 +500,32 @@ public class MapApiServer
 		}
 
 		options.put("fonts", filtered);
-		if (!filtered.isEmpty()) options.put("defaultFontFamily", filtered.get(0));
+		if (!filtered.isEmpty())
+			options.put("defaultFontFamily", filtered.get(0));
 	}
 
-	private static Map<String, String> loadLabels() {
+	private static Map<String, String> loadLabels()
+	{
 		Map<String, String> labels = new LinkedHashMap<>();
-		try {
+		try
+		{
 			ResourceBundle bundle = ResourceBundle.getBundle("nortantis.swing.translation.messages", Translation.getEffectiveLocale());
-			for (String k : bundle.keySet()) {
+			for (String k : bundle.keySet())
+			{
 				String v = bundle.getString(k);
-				if (v != null) labels.put(k, v.trim());
+				if (v != null)
+					labels.put(k, v.trim());
 			}
-		} catch (java.util.MissingResourceException e) {
+		}
+		catch (java.util.MissingResourceException e)
+		{
 			// ignore missing translation bundle
 		}
 		return labels;
 	}
 
-	private static void addDefaults(Map<String, Object> result) {
+	private static void addDefaults(Map<String, Object> result)
+	{
 		List<String> artPacks = Assets.listArtPacks(false);
 		String artPack = (artPacks != null && !artPacks.isEmpty()) ? artPacks.get(0) : Assets.installedArtPack;
 
@@ -383,218 +538,207 @@ public class MapApiServer
 		result.put("defaults", normalized);
 	}
 
-	private static List<String> getCityIconTypesForPack(String pack) {
-		try {
+	private static List<String> getCityIconTypesForPack(String pack)
+	{
+		try
+		{
 			return ImageCache.getInstance(pack, null).getIconGroupNames(IconType.cities);
-		} catch (RuntimeException e) {
+		}
+		catch (RuntimeException e)
+		{
 			return java.util.Collections.emptyList();
 		}
 	}
 
 	// Convert a list of NamedResource into the lightweight map form used by the UI
 	@SuppressWarnings("unused")
-	private static class ResourceInfo {
+	private static class ResourceInfo
+	{
 		private final String artPack;
 		private final String name;
 
-		ResourceInfo(NamedResource r) {
+		ResourceInfo(NamedResource r)
+		{
 			this.artPack = r.artPack;
 			this.name = r.name;
 		}
 
-		public String getArtPack() {
+		public String getArtPack()
+		{
 			return artPack;
 		}
 
-		public String getName() {
+		public String getName()
+		{
 			return name;
 		}
 	}
 
 	// Convert a list of NamedResource into the lightweight POJO list used by the UI
-	private static List<ResourceInfo> namedResourcesToList(List<NamedResource> resources) {
+	private static List<ResourceInfo> namedResourcesToList(List<NamedResource> resources)
+	{
 		List<ResourceInfo> out = new java.util.ArrayList<>();
-		if (resources == null) return out;
-		for (NamedResource r : resources) {
+		if (resources == null)
+			return out;
+		for (NamedResource r : resources)
+		{
 			out.add(new ResourceInfo(r));
 		}
 		return out;
 	}
 
-// Extracted helpers to keep `main` small and focused.
-private static void setupCors()
-{
-	// Basic CORS
-	options("/*", (request, response) ->
-	{
-		String accessControlRequestHeaders = request.headers("Access-Control-Request-Headers");
-		if (accessControlRequestHeaders != null)
-		{
-			response.header("Access-Control-Allow-Headers", accessControlRequestHeaders);
-		}
-		String accessControlRequestMethod = request.headers("Access-Control-Request-Method");
-		if (accessControlRequestMethod != null)
-		{
-			response.header("Access-Control-Allow-Methods", accessControlRequestMethod);
-		}
-		return "OK";
-	});
-	before((req, res) -> res.header("Access-Control-Allow-Origin", "*"));
-}
-
-
-private static Object handleUiOptions(Request req, Response res)
-{
-	res.type(CONTENT_TYPE_JSON);
-	String requestedLanguage = req.queryParams("uiLanguage");
-	applyRequestLanguage(requestedLanguage);
-
-	// Ensure a platform implementation is available before any classes
-	// that depend on PlatformFactory (e.g. Color) are initialized.
-	PlatformFactory.setInstance(new AwtFactory());
-
-	// Build the standard UI options/labels. Deterministic seed
-	// support removed — defaults are always generated fresh.
-	Map<String, Object> ui = buildWebUiOptions();
-
-	// Also include resource lists so the frontend can fetch a single
-	// endpoint for all initial UI state (art packs, books, textures,
-	// border types, and city icon groups per art pack).
-	try {
-		List<String> artPacks = Assets.listArtPacks(false);
-		ui.put("artPacks", artPacks);
-
-		ui.put("books", SettingsGenerator.getAllBooks());
-
-		ui.put("textures", namedResourcesToList(Assets.listBackgroundTexturesForAllArtPacks(null)));
-
-		ui.put("borderTypes", namedResourcesToList(Assets.listAllBorderTypes(null)));
-
-		// City icon groups per art pack (may be empty for some packs)
-		Map<String, List<String>> cityIconTypesByPack = new LinkedHashMap<>();
-		PlatformFactory.setInstance(new AwtFactory());
-		for (String pack : artPacks) {
-			cityIconTypesByPack.put(pack, getCityIconTypesForPack(pack));
-		}
-		ui.put("cityIconTypesByPack", cityIconTypesByPack);
-	} catch (RuntimeException e) {
-		// If resource enumeration fails, still return UI options.
-		Logger.println("Failed to enumerate UI resources: " + e.getMessage());
-	}
-
-	return gson.toJson(ui);
-}
 
 	// Recursively sort Map keys (lexicographically) so JSON serialization
 	// produces deterministic canonical ordering. Lists are preserved and
 	// non-container values are returned as-is.
-	private static Object sortKeysInObject(Object o) {
-		if (o == null) return null;
-		if (o instanceof Map) return sortMap((Map<?,?>) o);
-		if (o instanceof List) return sortList((List<?>) o);
+	private static Object sortKeysInObject(Object o)
+	{
+		if (o == null)
+			return null;
+		if (o instanceof Map)
+			return sortMap((Map<?, ?>) o);
+		if (o instanceof List)
+			return sortList((List<?>) o);
 		return o;
 	}
 
-	private static Map<String,Object> sortMap(Map<?,?> m) {
-		java.util.TreeMap<String,Object> out = new java.util.TreeMap<>();
-		for (Map.Entry<?,?> e : m.entrySet()) {
+	private static Map<String, Object> sortMap(Map<?, ?> m)
+	{
+		java.util.TreeMap<String, Object> out = new java.util.TreeMap<>();
+		for (Map.Entry<?, ?> e : m.entrySet())
+		{
 			String k = String.valueOf(e.getKey());
 			out.put(k, sortKeysInObject(e.getValue()));
 		}
 		return out;
 	}
 
-	private static List<Object> sortList(List<?> l) {
+	private static List<Object> sortList(List<?> l)
+	{
 		List<Object> out = new java.util.ArrayList<>(l.size());
-		for (Object v : l) out.add(sortKeysInObject(v));
+		for (Object v : l)
+			out.add(sortKeysInObject(v));
 		return out;
 	}
 
 	// Recursively find any Map entries with key "books" whose value is a List
 	// and sort that list lexicographically (by string value). This enforces a
 	// deterministic ordering for the books array in returned .nort content.
-	private static void sortBooksInObject(Object o) {
-		if (o == null) return;
-		if (o instanceof Map) {
-			processMapForBooks((Map<?,?>) o);
-		} else if (o instanceof List) {
-			for (Object v : (List<?>) o) sortBooksInObject(v);
+	private static void sortBooksInObject(Object o)
+	{
+		if (o == null)
+			return;
+		if (o instanceof Map)
+		{
+			processMapForBooks((Map<?, ?>) o);
+		}
+		else if (o instanceof List)
+		{
+			for (Object v : (List<?>) o)
+				sortBooksInObject(v);
 		}
 	}
 
-	private static void processMapForBooks(Map<?,?> m) {
-		for (Map.Entry<?,?> e : m.entrySet()) {
+	private static void processMapForBooks(Map<?, ?> m)
+	{
+		for (Map.Entry<?, ?> e : m.entrySet())
+		{
 			String k = String.valueOf(e.getKey());
 			Object v = e.getValue();
-			if ("books".equals(k) && v instanceof List) {
+			if ("books".equals(k) && v instanceof List)
+			{
 				sortBooksListInMap(m, k, v);
-			} else {
+			}
+			else
+			{
 				sortBooksInObject(v);
 			}
 		}
 	}
 
-	private static void sortBooksListInMap(Map<?,?> m, String key, Object v) {
-		try {
+	private static void sortBooksListInMap(Map<?, ?> m, String key, Object v)
+	{
+		try
+		{
 			@SuppressWarnings("unchecked")
 			List<Object> lst = new java.util.ArrayList<>((List<Object>) v);
-			lst.sort((a,b) -> String.valueOf(a).compareTo(String.valueOf(b)));
+			lst.sort((a, b) -> String.valueOf(a).compareTo(String.valueOf(b)));
 			@SuppressWarnings("unchecked")
-			Map<String,Object> mm = (Map<String,Object>) m;
+			Map<String, Object> mm = (Map<String, Object>) m;
 			mm.put(key, lst);
-		} catch (ClassCastException | NullPointerException ignore) {
+		}
+		catch (ClassCastException | NullPointerException ignore)
+		{
 			// best-effort sorting; ignore malformed entries
 		}
 	}
 
-		// Ensure numeric values that are whole numbers are represented as
-		// integer types to avoid exponential/scientific notation when
-		// serialized to JSON. This walks Maps and Lists recursively.
-		private static Object normalizeNumbersInObject(Object o) {
-			if (o == null) return null;
-			if (o instanceof Map) return normalizeMap((Map<?,?>) o);
-			if (o instanceof List) return normalizeList((List<?>) o);
-			if (o instanceof Number number) return normalizeNumber(number);
-			return o;
-		}
+	// Ensure numeric values that are whole numbers are represented as
+	// integer types to avoid exponential/scientific notation when
+	// serialized to JSON. This walks Maps and Lists recursively.
+	private static Object normalizeNumbersInObject(Object o)
+	{
+		if (o == null)
+			return null;
+		if (o instanceof Map)
+			return normalizeMap((Map<?, ?>) o);
+		if (o instanceof List)
+			return normalizeList((List<?>) o);
+		if (o instanceof Number number)
+			return normalizeNumber(number);
+		return o;
+	}
 
-		private static Map<Object,Object> normalizeMap(Map<?,?> m) {
-			Map<Object,Object> out = new LinkedHashMap<>();
-			for (Map.Entry<?,?> e : m.entrySet()) {
-				Object k = e.getKey();
-				Object v = e.getValue();
-				out.put(k, normalizeNumbersInObject(v));
-			}
-			return out;
+	private static Map<Object, Object> normalizeMap(Map<?, ?> m)
+	{
+		Map<Object, Object> out = new LinkedHashMap<>();
+		for (Map.Entry<?, ?> e : m.entrySet())
+		{
+			Object k = e.getKey();
+			Object v = e.getValue();
+			out.put(k, normalizeNumbersInObject(v));
 		}
+		return out;
+	}
 
-		private static List<Object> normalizeList(List<?> l) {
-			List<Object> out = new java.util.ArrayList<>(l.size());	
-			for (Object v : l) out.add(normalizeNumbersInObject(v));
-			return out;
-		}
+	private static List<Object> normalizeList(List<?> l)
+	{
+		List<Object> out = new java.util.ArrayList<>(l.size());
+		for (Object v : l)
+			out.add(normalizeNumbersInObject(v));
+		return out;
+	}
 
-		private static Object normalizeNumber(Number n) {
-			if (n instanceof java.math.BigDecimal bd) {
-				try {
-					long lv = bd.longValueExact();
-					if (lv >= Integer.MIN_VALUE && lv <= Integer.MAX_VALUE) return Integer.valueOf((int) lv);
-					return Long.valueOf(lv);
-				} catch (ArithmeticException ae) {
-					return bd.doubleValue();
-				}
+	private static Object normalizeNumber(Number n)
+	{
+		if (n instanceof java.math.BigDecimal bd)
+		{
+			try
+			{
+				long lv = bd.longValueExact();
+				if (lv >= Integer.MIN_VALUE && lv <= Integer.MAX_VALUE)
+					return Integer.valueOf((int) lv);
+				return Long.valueOf(lv);
 			}
-			if (n instanceof Double || n instanceof Float) {
-				double d = n.doubleValue();
-				if (Double.isFinite(d) && Math.floor(d) == d) {
-					long lv = (long) d;
-					if (lv >= Integer.MIN_VALUE && lv <= Integer.MAX_VALUE) return Integer.valueOf((int) lv);
-					return Long.valueOf(lv);
-				}
-				return Double.valueOf(d);
+			catch (ArithmeticException ae)
+			{
+				return bd.doubleValue();
 			}
-			return n;
 		}
+		if (n instanceof Double || n instanceof Float)
+		{
+			double d = n.doubleValue();
+			if (Double.isFinite(d) && Math.floor(d) == d)
+			{
+				long lv = (long) d;
+				if (lv >= Integer.MIN_VALUE && lv <= Integer.MAX_VALUE)
+					return Integer.valueOf((int) lv);
+				return Long.valueOf(lv);
+			}
+			return Double.valueOf(d);
+		}
+		return n;
+	}
 
 	private static Map<String, String> option(String value, String label)
 	{
@@ -609,7 +753,7 @@ private static Object handleUiOptions(Request req, Response res)
 		return Translation.get(key);
 	}
 
-	private static Object handleBackgroundBase(Request req, Response res)
+	private static void handleBackgroundBase(Context ctx)
 	{
 		// This endpoint no longer depends on MapSettings. Accept a
 		// small BackgroundBaseRequest JSON or multipart form with an optional
@@ -617,96 +761,134 @@ private static Object handleUiOptions(Request req, Response res)
 		PlatformFactory.setInstance(new AwtFactory());
 
 		Image baseImage = null;
-		try {
-				// Delegate the heavy lifting to a helper to keep this method simple
-				baseImage = generateBaseImageAndWriteResponse(req, res);
-			return res.raw();
-		} catch (java.io.IOException | com.google.gson.JsonSyntaxException e) {
+		try
+		{
+			// Delegate the heavy lifting to a helper to keep this method simple
+			baseImage = generateBaseImageAndWriteResponse(ctx);
+			// response already written to the output stream
+		}
+		catch (java.io.IOException | com.google.gson.JsonSyntaxException e)
+		{
 			Logger.println("handleBackgroundBase failed: " + e);
-			res.type(CONTENT_TYPE_JSON);
-			res.status(500);
-			return gson.toJson(new ApiResponse(false, "Failed to generate background base: " + e.getClass().getSimpleName() + (e.getMessage() != null ? (" - " + e.getMessage()) : ""), null, null));
-		} finally {
-			if (baseImage != null) baseImage.close();
+			ctx.contentType(CONTENT_TYPE_JSON);
+			ctx.status(500);
+			ctx.result(
+					gson.toJson(new ApiResponse(false, "Failed to generate background base: " + e.getClass().getSimpleName() + (e.getMessage() != null ? (" - " + e.getMessage()) : ""), null, null)));
+		}
+		finally
+		{
+			if (baseImage != null)
+				baseImage.close();
 		}
 	}
 
 	// Helper to robustly parse an Integer from a loosely-typed JSON value.
-	private static Integer parseInteger(Object v) {
-		if (v == null) return null;
-		if (v instanceof Number number) return number.intValue();
-		try {
+	private static Integer parseInteger(Object v)
+	{
+		if (v == null)
+			return null;
+		if (v instanceof Number number)
+			return number.intValue();
+		try
+		{
 			return Integer.valueOf(String.valueOf(v));
-		} catch (RuntimeException e) {
+		}
+		catch (RuntimeException e)
+		{
 			return null;
 		}
 	}
+
 	private static Image generateBackgroundBaseImage(int width, int height, String type, String cityIconType, String artPack)
 	{
-		if (type != null && "FractalNoise".equalsIgnoreCase(type)) {
+		if (type != null && "FractalNoise".equalsIgnoreCase(type))
+		{
 			return generateFractalBackground(width, height);
 		}
-		if (type != null && "GeneratedFromTexture".equalsIgnoreCase(type)) {
+		if (type != null && "GeneratedFromTexture".equalsIgnoreCase(type))
+		{
 			return generateBackgroundFromTexture(cityIconType, artPack, width, height);
 		}
 		return generateSolidBackground(width, height);
 	}
 
-	private static Image generateFractalBackground(int width, int height) {
+	private static Image generateFractalBackground(int width, int height)
+	{
 		Image fractal = FractalBGGenerator.generate(SHARED_RANDOM, 1.3f, width, height, 0.75f);
-		try {
+		try
+		{
 			return fractal.deepCopy();
-		} finally {
+		}
+		finally
+		{
 			fractal.close();
 		}
 	}
 
-	private static Image generateBackgroundFromTexture(String cityIconType, String artPack, int width, int height) {
+	private static Image generateBackgroundFromTexture(String cityIconType, String artPack, int width, int height)
+	{
 		Path texturePath = null;
 
-		if (cityIconType != null) {
+		if (cityIconType != null)
+		{
 			String pack = artPack;
-			if (pack == null || pack.isEmpty()) pack = Assets.installedArtPack;
+			if (pack == null || pack.isEmpty())
+				pack = Assets.installedArtPack;
 			NamedResource nr = new NamedResource(pack, cityIconType);
 			texturePath = Assets.getBackgroundTextureResourcePath(nr, null);
 		}
 
-		if (texturePath == null) {
+		if (texturePath == null)
+		{
 			Logger.println("Background texture not found: " + cityIconType + " (artPack=" + artPack + ") - falling back to solid background");
 			return generateSolidBackground(width, height);
 		}
 
 		Image texture = ImageCache.getInstance(artPack, null).getImageFromFile(texturePath);
-		try {
+		try
+		{
 			Image textureForOcean = ImageHelper.getInstance().convertToGrayscale(texture);
 			Image oceanBase = BackgroundGenerator.generateUsingWhiteNoiseConvolution(SHARED_RANDOM, textureForOcean, height, width);
-			try {
+			try
+			{
 				return oceanBase.deepCopy();
-			} finally {
+			}
+			finally
+			{
 				oceanBase.close();
-				if (textureForOcean != texture) {
+				if (textureForOcean != texture)
+				{
 					textureForOcean.close();
 				}
 			}
-		} finally {
+		}
+		finally
+		{
 			texture.close();
 		}
 	}
 
-	private static Image generateSolidBackground(int width, int height) {
+	private static Image generateSolidBackground(int width, int height)
+	{
 		Image solid = Image.create(width, height, ImageType.Grayscale8Bit);
-		try {
-			return ImageHelper.getInstance().colorize(solid, nortantis.platform.Color.create(255,255,255), ImageHelper.ColorizeAlgorithm.solidColor);
-		} finally {
+		try
+		{
+			return ImageHelper.getInstance().colorize(solid, nortantis.platform.Color.create(255, 255, 255), ImageHelper.ColorizeAlgorithm.solidColor);
+		}
+		finally
+		{
 			solid.close();
 		}
 	}
 
 	// Extracted helper to satisfy Sonar S1141: keep nested try logic in a
 	// separate method for clarity and single-responsibility.
-	private static void ensureIconEditsFlag(MapSettings settings) {
-		try {
-			if (settings.edits != null) {
+	private static void ensureIconEditsFlag(MapSettings settings)
+	{
+		try
+		{
+			if (settings.edits != null)
+			{
 				// Only mark hasIconEdits true when centerEdits are present (initialized).
 				// If only freeIcons are present without initialized centerEdits, the
 				// editor state is incomplete and IconDrawer expects centerEdits to exist
@@ -714,11 +896,14 @@ private static Object handleUiOptions(Request req, Response res)
 				// centerEdits when it intends to re-use edits; do not infer from
 				// freeIcons alone to avoid NPEs in the generation pipeline.
 				boolean hasCenterEdits = settings.edits.centerEdits != null && !settings.edits.centerEdits.isEmpty();
-				if (hasCenterEdits) {
+				if (hasCenterEdits)
+				{
 					settings.edits.hasIconEdits = true;
 				}
 			}
-		} catch (NullPointerException ignore) {
+		}
+		catch (NullPointerException ignore)
+		{
 			// best-effort; if this fails, default behavior remains unchanged
 		}
 	}
@@ -734,34 +919,54 @@ private static Object handleUiOptions(Request req, Response res)
 
 	private static void applyRandomMapParameterOverrides(RandomMapParameters p, MapSettings settings)
 	{
-		if (p.worldSize != null) settings.worldSize = p.worldSize;
-		if (p.cityIconSetName != null && !p.cityIconSetName.isEmpty()) settings.cityIconTypeName = p.cityIconSetName;
-		if (p.landShape != null && !p.landShape.isEmpty()) {
-			try { settings.landShape = LandShape.valueOf(p.landShape); } catch (IllegalArgumentException ignored) {
+		if (p.worldSize != null)
+			settings.worldSize = p.worldSize;
+		if (p.cityIconSetName != null && !p.cityIconSetName.isEmpty())
+			settings.cityIconTypeName = p.cityIconSetName;
+		if (p.landShape != null && !p.landShape.isEmpty())
+		{
+			try
+			{
+				settings.landShape = LandShape.valueOf(p.landShape);
+			}
+			catch (IllegalArgumentException ignored)
+			{
 				// Invalid landShape provided by client; ignore and keep generated default.
 			}
 		}
-		if (p.regionCount != null) settings.regionCount = p.regionCount;
-		if (p.cityFrequency != null) settings.cityProbability = p.cityFrequency / 100.0 * SettingsGenerator.maxCityProbability;
-		if (p.books != null && !p.books.isEmpty()) settings.books = new HashSet<>(p.books);
+		if (p.regionCount != null)
+			settings.regionCount = p.regionCount;
+		if (p.cityFrequency != null)
+			settings.cityProbability = p.cityFrequency / 100.0 * SettingsGenerator.maxCityProbability;
+		if (p.books != null && !p.books.isEmpty())
+			settings.books = new HashSet<>(p.books);
 		applyDimensionOverride(p, settings);
-		if (p.drawRegionColors != null) settings.drawRegionColors = p.drawRegionColors;
+		if (p.drawRegionColors != null)
+			settings.drawRegionColors = p.drawRegionColors;
 	}
 
 	// Extracted dimension handling to reduce method cognitive complexity (Sonar S3776)
-	private static void applyDimensionOverride(RandomMapParameters p, MapSettings settings) {
-		if (p.dimension == null || p.dimension.isEmpty()) return;
-		try {
+	private static void applyDimensionOverride(RandomMapParameters p, MapSettings settings)
+	{
+		if (p.dimension == null || p.dimension.isEmpty())
+			return;
+		try
+		{
 			GeneratedDimension dim = GeneratedDimension.valueOf(p.dimension);
-			if (dim != GeneratedDimension.Custom) {
+			if (dim != GeneratedDimension.Custom)
+			{
 				settings.generatedWidth = dim.width;
 				settings.generatedHeight = dim.height;
 			}
-		} catch (IllegalArgumentException ignored) {
+		}
+		catch (IllegalArgumentException ignored)
+		{
 			// Invalid dimension name supplied; ignore and keep generated/default dimensions.
 		}
 	}
-	private static class RandomMapParameters {
+
+	private static class RandomMapParameters
+	{
 		String language;
 		String dimension;
 		Integer worldSize;
@@ -777,24 +982,23 @@ private static Object handleUiOptions(Request req, Response res)
 	/**
 	 * Internal helper holding parsed request context for generation endpoints.
 	 */
-	private static class GenerationRequestContext {
+	private static class GenerationRequestContext
+	{
 		GenerationContext ctx; // populated for endpoints that load settings from .nort
-		MapSettings settings;  // populated when settings are available directly
+		MapSettings settings; // populated when settings are available directly
 	}
 
 	/**
-	 * Parse request and prepare a GenerationRequestContext.
-	 * If allowGenerateRandomSettings is true, the helper will generate random
-	 * settings when params are provided and no settings are included. If false,
-	 * the request must include settings (or an uploaded .nort) and the function
-	 * will attempt to load them into a GenerationContext via loadSettings.
-	 * Returns null and sets response status on error.
+	 * Parse request and prepare a GenerationRequestContext. If allowGenerateRandomSettings is true, the helper will generate random
+	 * settings when params are provided and no settings are included. If false, the request must include settings (or an uploaded .nort)
+	 * and the function will attempt to load them into a GenerationContext via loadSettings. Returns null and sets response status on error.
 	 */
-	private static GenerationRequestContext prepareGenerationRequest(Request req, Response res, boolean allowGenerateRandomSettings)
+	private static GenerationRequestContext prepareGenerationRequest(Context ctx, boolean allowGenerateRandomSettings)
 	{
-		String body = req.body();
-		if (body == null || body.isBlank()) {
-			res.status(400);
+		String body = ctx.body();
+		if (body.isBlank())
+		{
+			ctx.status(400);
 			return null;
 		}
 
@@ -802,52 +1006,66 @@ private static Object handleUiOptions(Request req, Response res)
 
 		RandomMapParameters params = tryParseParams(body);
 
-		if (allowGenerateRandomSettings && paramsContainGenerationFields(params)) {
+		if (allowGenerateRandomSettings && paramsContainGenerationFields(params))
+		{
 			return buildContextFromParams(params);
 		}
 
-		return buildContextFromNortBody(body, params, res);
+		return buildContextFromNortBody(body, params, ctx);
 	}
 
 	// Helper: attempt to parse the request body as RandomMapParameters
-	private static RandomMapParameters tryParseParams(String body) {
-		try {
+	private static RandomMapParameters tryParseParams(String body)
+	{
+		try
+		{
 			return gson.fromJson(body, RandomMapParameters.class);
-		} catch (com.google.gson.JsonSyntaxException e) {
+		}
+		catch (com.google.gson.JsonSyntaxException e)
+		{
 			return null;
 		}
 	}
 
 	// Helper: quick check whether parsed params contain any generation fields
-	private static boolean paramsContainGenerationFields(RandomMapParameters p) {
-		return p != null && (p.language != null || p.dimension != null || p.worldSize != null || p.landShape != null || p.regionCount != null || p.cityFrequency != null || (p.books != null && !p.books.isEmpty()));
+	private static boolean paramsContainGenerationFields(RandomMapParameters p)
+	{
+		return p != null && (p.language != null || p.dimension != null || p.worldSize != null || p.landShape != null || p.regionCount != null || p.cityFrequency != null
+				|| (p.books != null && !p.books.isEmpty()));
 	}
 
 	// Build GenerationRequestContext when params-driven generation is requested
-	private static GenerationRequestContext buildContextFromParams(RandomMapParameters params) {
+	private static GenerationRequestContext buildContextFromParams(RandomMapParameters params)
+	{
 		GenerationRequestContext out = new GenerationRequestContext();
 		out.settings = generateRandomMapSettings(params);
-		if (params.language != null && !params.language.isEmpty()) {
+		if (params.language != null && !params.language.isEmpty())
+		{
 			out.settings.language = params.language;
 		}
 		return out;
 	}
 
 	// Build GenerationRequestContext by parsing JSON only. Reject non-JSON inputs.
-	private static GenerationRequestContext buildContextFromNortBody(String body, RandomMapParameters params, Response res) {
-		try {
+	private static GenerationRequestContext buildContextFromNortBody(String body, RandomMapParameters params, Context ctx)
+	{
+		try
+		{
 			MapSettings settings = MapSettings.fromJson(body);
 			ensureIconEditsFlag(settings);
 			GenerationRequestContext out = new GenerationRequestContext();
 			out.ctx = new GenerationContext(settings);
 			out.settings = settings;
-			if (params != null && params.language != null && !params.language.isEmpty()) {
+			if (params != null && params.language != null && !params.language.isEmpty())
+			{
 				out.settings.language = params.language;
 			}
 			return out;
-		} catch (RuntimeException e) {
+		}
+		catch (RuntimeException e)
+		{
 			// Parsing failed: enforce API contract by returning 400.
-			res.status(400);
+			ctx.status(400);
 			return null;
 		}
 	}
@@ -963,7 +1181,7 @@ private static Object handleUiOptions(Request req, Response res)
 
 	private static final int MAX_BASE64_PREVIEW_DIMENSION = 1920;
 
-	private static Object returnJsonResponse(BufferedImage buf, MapSettings settings, Response res) throws IOException
+	private static Object returnJsonResponse(BufferedImage buf, MapSettings settings, Context ctx) throws IOException
 	{
 		buf = scaleImageIfNeeded(buf);
 		byte[] bytes = serializeImageToBytes(buf);
@@ -972,11 +1190,12 @@ private static Object handleUiOptions(Request req, Response res)
 		// Parse canonical settings into a map, attach imageBase64, and return
 		@SuppressWarnings("unchecked")
 		Map<String, Object> settingsMap = gson.fromJson(nortContent, Map.class);
-		if (settingsMap == null) settingsMap = new LinkedHashMap<>();
+		if (settingsMap == null)
+			settingsMap = new LinkedHashMap<>();
 		settingsMap.put("imageBase64", Base64.getEncoder().encodeToString(bytes));
 
-		res.type(CONTENT_TYPE_JSON);
-		res.status(200);
+		ctx.contentType(CONTENT_TYPE_JSON);
+		ctx.status(200);
 		return gson.toJson(settingsMap);
 	}
 
@@ -1012,11 +1231,15 @@ private static Object handleUiOptions(Request req, Response res)
 		// Ensure edits arrays are populated so clients receive usable editor
 		// state in the returned .nort. If edits are not initialized, create a
 		// temporary graph and initialize center/edge/region edits from it.
-		try {
-			if (settings.edits == null || !settings.edits.isInitialized()) {
+		try
+		{
+			if (settings.edits == null || !settings.edits.isInitialized())
+			{
 				initializeEditsFromGraph(settings);
 			}
-		} catch (Exception e) {
+		}
+		catch (Exception e)
+		{
 			// Best-effort only; avoid failing the whole request for this step.
 			Logger.println("Unexpected error while preparing nort content: " + e);
 		}
@@ -1025,23 +1248,30 @@ private static Object handleUiOptions(Request req, Response res)
 		return settings.toJsonString();
 	}
 
-	private static void initializeEditsFromGraph(MapSettings settings) {
-		try {
+	private static void initializeEditsFromGraph(MapSettings settings)
+	{
+		try
+		{
 			nortantis.WorldGraph graph = MapCreator.createGraphForUnitTests(settings);
-			try {
-				if (settings.edits == null) settings.edits = new nortantis.swing.MapEdits();
+			try
+			{
+				if (settings.edits == null)
+					settings.edits = new nortantis.swing.MapEdits();
 				settings.edits.initializeCenterEdits(graph.centers);
 				settings.edits.initializeEdgeEdits(graph.edges);
 				settings.edits.initializeRegionEdits(graph.regions.values());
-			} finally {
+			}
+			finally
+			{
 				// no explicit close needed for WorldGraph
 			}
-		} catch (RuntimeException e) {
+		}
+		catch (RuntimeException e)
+		{
 			// If graph creation fails, fall back to serializing settings as-is
 			Logger.println("Failed to initialize edits for export: " + e);
 		}
 	}
-
 
 
 	private static void writeCompressedPng(BufferedImage image, OutputStream outputStream) throws IOException
@@ -1102,7 +1332,6 @@ private static Object handleUiOptions(Request req, Response res)
 	}
 
 
-
 	@SuppressWarnings("unused")
 	private static class ApiResponse
 	{
@@ -1119,6 +1348,7 @@ private static Object handleUiOptions(Request req, Response res)
 			this.nortPath = nortPath;
 		}
 	}
+
 	@SuppressWarnings("unused")
 	private static class ImageAndSettingsResponse
 	{

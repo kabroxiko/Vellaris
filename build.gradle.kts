@@ -5,6 +5,7 @@ plugins {
     java
     application
     id("com.diffplug.spotless") version "6.23.3"
+    id("com.github.ben-manes.versions") version "0.48.0"
     eclipse
 }
 
@@ -13,14 +14,19 @@ repositories {
 }
 
 dependencies {
-    implementation(fileTree(mapOf("dir" to "libraries", "include" to listOf("*.jar"))))
     implementation("com.github.wendykierp:JTransforms:3.2:with-dependencies")
-    implementation("com.sparkjava:spark-core:2.9.4")
-    implementation("com.google.code.gson:gson:2.10.1")
+    implementation("io.javalin:javalin:7.2.2")
+    implementation("org.apache.commons:commons-lang3:3.20.0")
+    implementation("commons-io:commons-io:2.22.0")
+    implementation("org.apache.commons:commons-math3:3.6.1")
+    implementation("com.googlecode.json-simple:json-simple:1.1.1")
+    implementation("org.imgscalr:imgscalr-lib:4.2")
+    implementation("org.slf4j:slf4j-simple:2.0.7")
+    implementation("com.google.code.gson:gson:2.14.0")
     testImplementation(platform("org.junit:junit-bom:5.10.2"))
     testImplementation("org.junit.jupiter:junit-jupiter")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
-    implementation("com.formdev:flatlaf:3.6.2")
+    implementation("com.formdev:flatlaf:3.7.1")
 }
 
 // Attaches javadocs to libraries in Eclipse.

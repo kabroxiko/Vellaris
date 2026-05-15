@@ -479,25 +479,34 @@ public class OldPropertyBasedMapSettings implements Serializable
 
 	private static int toInt(Object value)
 	{
-		if (value == null) return 0;
-		if (value instanceof Number) return ((Number) value).intValue();
-		if (value instanceof String) return Integer.parseInt((String) value);
+		if (value == null)
+			return 0;
+		if (value instanceof Number)
+			return ((Number) value).intValue();
+		if (value instanceof String)
+			return Integer.parseInt((String) value);
 		throw new IllegalArgumentException("Cannot convert value to int: " + value.getClass());
 	}
 
 	private static long toLong(Object value)
 	{
-		if (value == null) return 0L;
-		if (value instanceof Number) return ((Number) value).longValue();
-		if (value instanceof String) return Long.parseLong((String) value);
+		if (value == null)
+			return 0L;
+		if (value instanceof Number)
+			return ((Number) value).longValue();
+		if (value instanceof String)
+			return Long.parseLong((String) value);
 		throw new IllegalArgumentException("Cannot convert value to long: " + value.getClass());
 	}
 
 	private static double toDouble(Object value)
 	{
-		if (value == null) return 0.0;
-		if (value instanceof Number) return ((Number) value).doubleValue();
-		if (value instanceof String) return Double.parseDouble((String) value);
+		if (value == null)
+			return 0.0;
+		if (value instanceof Number)
+			return ((Number) value).doubleValue();
+		if (value instanceof String)
+			return Double.parseDouble((String) value);
 		throw new IllegalArgumentException("Cannot convert value to double: " + value.getClass());
 	}
 

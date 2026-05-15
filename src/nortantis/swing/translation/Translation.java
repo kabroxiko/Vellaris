@@ -19,8 +19,8 @@ public class Translation
 	}
 
 	/**
-	 * Initialize translations using an explicit language code (e.g. "en", "fr").
-	 * This does not modify UserPreferences and is safe for per-request use in the API.
+	 * Initialize translations using an explicit language code (e.g. "en", "fr"). This does not modify UserPreferences and is safe for
+	 * per-request use in the API.
 	 */
 	public static void initializeWithLanguage(String language)
 	{
