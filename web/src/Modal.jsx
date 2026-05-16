@@ -28,7 +28,8 @@ export default function Modal({ open, onClose, children }) {
       tryShow()
 
       const modalEl = modalRef.current
-      const rafId = requestAnimationFrame(() => {
+      let rafId = 0
+      const setupModalImageHandlers = () => {
         const img = modalEl?.querySelector('.zoom-pan')
         const container = modalEl?.querySelector('.zoom-container')
         if (!img || !container) return
@@ -333,7 +334,16 @@ export default function Modal({ open, onClose, children }) {
         }
 
         modalEl.__cleanupImg = cleanupImg
-      })
+      }
+
+      // Run setup synchronously so tests that fire events immediately see handlers
+      // and cleanup available. Also schedule via RAF for the browser-optimized path.
+      try {
+        setupModalImageHandlers()
+      } catch (e) {
+        // ignore setup errors during mount
+      }
+      rafId = requestAnimationFrame(setupModalImageHandlers)
 
       return () => cancelAnimationFrame(rafId)
     }

@@ -56,7 +56,7 @@ describe('Modal resize, pinch and error paths', () => {
     const { container } = render(
       <Modal open onClose={onClose}>
         <div className="zoom-container" style={{ width: '300px', height: '200px' }}>
-          <img className="zoom-pan" src="data:,p" />
+          <img className="zoom-pan" src="data:,p" alt="map preview" />
         </div>
       </Modal>
     )
@@ -79,8 +79,8 @@ describe('Modal resize, pinch and error paths', () => {
     fireEvent.pointerDown(containerEl, { pointerId: 2, clientX: 30, clientY: 10 })
 
     // move fingers farther apart to simulate pinch-out (zoom in)
-    fireEvent.pointerMove(window, { pointerId: 1, clientX: 5, clientY: 10 })
-    fireEvent.pointerMove(window, { pointerId: 2, clientX: 50, clientY: 10 })
+    fireEvent.pointerMove(globalThis, { pointerId: 1, clientX: 5, clientY: 10 })
+    fireEvent.pointerMove(globalThis, { pointerId: 2, clientX: 50, clientY: 10 })
 
     // after pinch, image width should be set (style.width non-empty)
     expect(img.style.width).toBeTruthy()
@@ -91,13 +91,12 @@ describe('Modal resize, pinch and error paths', () => {
     const { container } = render(
       <Modal open onClose={onClose}>
         <div className="zoom-container" style={{ width: '200px', height: '200px' }}>
-          <img className="zoom-pan" src="data:,x" />
+          <img className="zoom-pan" src="data:,x" alt="map preview" />
         </div>
       </Modal>
     )
 
     const modalEl = container.querySelector('.modal')
-    const img = modalEl.querySelector('.zoom-pan')
     const containerEl = modalEl.querySelector('.zoom-container')
 
     // make container.setPointerCapture throw NotFoundError

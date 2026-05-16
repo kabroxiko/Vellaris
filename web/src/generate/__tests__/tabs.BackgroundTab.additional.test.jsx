@@ -105,7 +105,7 @@ describe('BackgroundTab additional coverage', () => {
     const gatedControlValue = (v) => v
 
     const renderColorControl = ({ id, onClose }) => (
-      <button data-testid={`rc-${id}`} onClick={() => onClose && onClose()}>
+      <button data-testid={`rc-${id}`} onClick={() => onClose?.()}>
         close
       </button>
     )

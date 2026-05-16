@@ -1,5 +1,5 @@
 import React from 'react'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, fireEvent } from '@testing-library/react'
 import Modal from '../Modal'
 import { vi } from 'vitest'
 
@@ -7,7 +7,7 @@ describe('Modal interactions', () => {
   afterEach(() => {
     // restore globals
     vi.restoreAllMocks()
-    delete global.open
+    delete globalThis.open
   })
 
   test('does not render when closed', () => {
@@ -27,7 +27,7 @@ describe('Modal interactions', () => {
     const dismiss = document.querySelector('.modal-overlay-dismiss')
     expect(dismiss).toBeTruthy()
     // simulate Escape
-    fireEvent.keyDown(window, { key: 'Escape' })
+    fireEvent.keyDown(globalThis, { key: 'Escape' })
     expect(onClose).toHaveBeenCalled()
   })
 
@@ -43,7 +43,7 @@ describe('Modal interactions', () => {
 
     render(
       <Modal open onClose={onClose}>
-        <img className="zoom-pan" src="data:,foo" data-filename="map.png" />
+        <img className="zoom-pan" src="data:,foo" data-filename="map.png" alt="map preview" />
       </Modal>
     )
 
@@ -62,8 +62,8 @@ describe('Modal interactions', () => {
 
   test('open-in-new-tab falls back to anchor when global open throws', () => {
     const onClose = vi.fn()
-    // make global.open throw to trigger fallback
-    global.open = vi.fn(() => {
+    // make globalThis.open throw to trigger fallback
+    globalThis.open = vi.fn(() => {
       throw new Error('fail')
     })
 
@@ -75,7 +75,7 @@ describe('Modal interactions', () => {
     })
     render(
       <Modal open onClose={onClose}>
-        <img className="zoom-pan" src="data:,bar" />
+        <img className="zoom-pan" src="data:,bar" alt="map preview" />
       </Modal>
     )
 
@@ -85,7 +85,7 @@ describe('Modal interactions', () => {
     expect(openBtn).toBeTruthy()
     fireEvent.click(openBtn)
 
-    expect(global.open).toHaveBeenCalled()
+    expect(globalThis.open).toHaveBeenCalled()
     expect(createSpy).toHaveBeenCalledWith('a')
     expect(fakeLink.click).toHaveBeenCalled()
 

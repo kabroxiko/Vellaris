@@ -45,8 +45,8 @@ beforeEach(() => {
 })
 
 test('generateFromNortContent is invoked when Regenerate clicked (calls runGenerate)', async () => {
-  // stub global.fetch used by fetchResolvedNort to return a resolved .nort
-  global.fetch = vi.fn((url) => {
+  // stub globalThis.fetch used by fetchResolvedNort to return a resolved .nort
+  globalThis.fetch = vi.fn((url) => {
     if (String(url).includes('/generate-settings')) {
       return Promise.resolve({ ok: true, text: () => Promise.resolve('{}') })
     }
@@ -73,9 +73,10 @@ test('generateFromNortContent is invoked when Regenerate clicked (calls runGener
   expect(firstCall).to.have.length.greaterThan(1)
   const requestOptions = firstCall[0]
   expect(requestOptions).to.be.an('object')
+  if (!requestOptions) throw new Error('requestOptions is null or undefined')
   expect(requestOptions.method).to.equal('POST')
   expect(firstCall[1]).to.equal('random-map')
 
   // cleanup fetch mock
-  global.fetch.mockRestore?.()
+  globalThis.fetch.mockRestore?.()
 })

@@ -1,5 +1,4 @@
 import { expect } from 'chai'
-import { vi } from 'vitest'
 
 import {
   serializeNortObject,
@@ -18,7 +17,6 @@ test('serializeNortObject sorts object keys recursively', () => {
   const obj = { b: 1, a: { d: 4, c: 3 }, z: [ { y: 2, x: 1 } ] }
   const s = serializeNortObject(obj)
   // keys at top level should be in sorted order: a, b, z
-  const firstLine = s.split('\n')[0]
   expect(s.indexOf('  "a"')).to.be.lessThan(s.indexOf('  "b"'))
   expect(s.indexOf('  "b"')).to.be.lessThan(s.indexOf('  "z"'))
 })
@@ -68,15 +66,16 @@ test('buildCustomizePayload maps values', () => {
 })
 
 test('persistCustomizeOverrides writes to localStorage', () => {
-  const setSpy = vi.spyOn(window.localStorage.__proto__, 'setItem')
   persistCustomizeOverrides({ backgroundType: 'x' })
-  expect(setSpy.mock.calls.length).to.be.at.least(1)
-  setSpy.mockRestore()
+  const raw = globalThis.localStorage.getItem('vellaris-customize-overrides')
+  expect(typeof raw).to.equal('string')
+  const parsed = JSON.parse(raw)
+  expect(parsed.backgroundType).to.equal('x')
 })
 
 test('loadRandom/CustomizeOverrides read from localStorage', () => {
-  window.localStorage.setItem('vellaris-random-manual-overrides', JSON.stringify({ a: 1 }))
-  window.localStorage.setItem('vellaris-customize-overrides', JSON.stringify({ b: 2 }))
+  globalThis.localStorage.setItem('vellaris-random-manual-overrides', JSON.stringify({ a: 1 }))
+  globalThis.localStorage.setItem('vellaris-customize-overrides', JSON.stringify({ b: 2 }))
   const r = loadRandomOverrides()
   const c = loadCustomizeOverrides()
   expect(r.a).to.equal(1)

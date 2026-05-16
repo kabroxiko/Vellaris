@@ -1,5 +1,5 @@
 import React from 'react'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import BackgroundTab from '../../generate/tabs/BackgroundTab.jsx'
 
 const baseProps = {
@@ -18,7 +18,7 @@ test('returns empty div when props are null/undefined', () => {
   // call the component function directly with null to exercise the early-return branch
   const el = BackgroundTab(null)
   // should return a React element for a div
-  expect(el && el.type).to.equal('div')
+  expect(el?.type).to.equal('div')
 })
 
 test('TextureSelect renders no-textures option and is disabled when hasTextures=false', () => {

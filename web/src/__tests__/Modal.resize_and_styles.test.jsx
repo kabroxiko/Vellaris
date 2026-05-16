@@ -4,10 +4,8 @@ import Modal from '../Modal'
 import { vi, expect } from 'vitest'
 
 describe('Modal resize and cleanup behavior', () => {
-  let rafSpy
   let origGetComputedStyle
   beforeEach(() => {
-    rafSpy = vi.spyOn(globalThis, 'requestAnimationFrame').mockImplementation((cb) => cb())
     vi.spyOn(globalThis, 'cancelAnimationFrame').mockImplementation(() => {})
 
     origGetComputedStyle = globalThis.getComputedStyle
@@ -36,7 +34,7 @@ describe('Modal resize and cleanup behavior', () => {
     const { container } = render(
       <Modal open onClose={onClose}>
         <div className="zoom-container" style={{ width: '320px', height: '240px' }}>
-          <img className="zoom-pan" src="data:,img" />
+          <img className="zoom-pan" src="data:,img" alt="map preview" />
         </div>
       </Modal>
     )
@@ -52,9 +50,9 @@ describe('Modal resize and cleanup behavior', () => {
     Object.defineProperty(containerEl, 'clientHeight', { value: 240, configurable: true })
 
     // trigger resize handler
-    window.dispatchEvent(new Event('resize'))
+    globalThis.dispatchEvent(new Event('resize'))
 
-    const width = parseInt(img.style.width || '0', 10)
+    const width = Number.parseInt(img.style.width || '0', 10)
     expect(width).toBeGreaterThanOrEqual(320)
   })
 
@@ -63,7 +61,7 @@ describe('Modal resize and cleanup behavior', () => {
     const { container } = render(
       <Modal open onClose={onClose}>
         <div className="zoom-container" style={{ width: '200px', height: '150px' }}>
-          <img className="zoom-pan" src="data:,img" />
+          <img className="zoom-pan" src="data:,img" alt="map preview" />
         </div>
       </Modal>
     )
@@ -97,7 +95,7 @@ describe('Modal resize and cleanup behavior', () => {
     const { container } = render(
       <Modal open onClose={onClose}>
         <div className="zoom-container" style={{ width: '300px', height: '200px' }}>
-          <img className="zoom-pan" src="data:,img3" />
+          <img className="zoom-pan" src="data:,img3" alt="map preview" />
         </div>
       </Modal>
     )

@@ -129,7 +129,7 @@ test('applyCoastOceanAndWavesHoisted sets shading and wave options and calls mer
     oceanWavesAlpha: '30',
     drawOceanEffectsInLakes: true,
     riverColorHex: '#050505',
-    parseBooleanWithDefault: (v) => Boolean(v),
+    parseBooleanWithDefault: Boolean,
     mergedSettingsRef: { current: {} },
     mergeColor,
   }

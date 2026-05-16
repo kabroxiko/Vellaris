@@ -16,7 +16,7 @@ describe('RandomSettingsSection', () => {
       setArtPack: vi.fn(),
       setCityIconType: vi.fn(),
       setCityFrequency: vi.fn(),
-      handleRandomMap: vi.fn((e) => e && e.preventDefault()),
+      handleRandomMap: vi.fn((e) => e?.preventDefault()),
     }
 
     const values = {

@@ -1,6 +1,6 @@
 import React from 'react'
-import { render } from '@testing-library/react'
 import { vi } from 'vitest'
+import { render } from '@testing-library/react'
 
 import {
   drawBackgroundAndInset,
@@ -65,7 +65,7 @@ test('drawIslandShape draws pattern and strokes when pattern present', () => {
 
 test('composeMiniIslandFromBlobModule returns a Blob using overrides', async () => {
   // stub createImageBitmap
-  global.createImageBitmap = async (b) => ({ width: 20, height: 20 })
+  globalThis.createImageBitmap = async (b) => ({ width: 20, height: 20 })
 
   const fakeCanvas = {
     toBlob(cb) { cb(new Blob(['ok'])) },
@@ -78,12 +78,7 @@ test('composeMiniIslandFromBlobModule returns a Blob using overrides', async () 
 
 test('ColorPickerModal renders children when open and closes on Escape and outside click', () => {
   const onClose = vi.fn()
-  const { container } = render(
-    <ColorPickerModal open={true} onClose={onClose}>
-      <div data-testid="inside">inside</div>
-    </ColorPickerModal>
-  )
-
+  render(<ColorPickerModal open={true} onClose={onClose}><div>inner</div></ColorPickerModal>)
   // simulate Escape
   document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
   // simulate mousedown outside by dispatching on document (not inside element)

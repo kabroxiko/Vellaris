@@ -62,20 +62,18 @@ test('prepareBitmapsModule calls colorizeBitmap appropriately', async () => {
     return originalCreate.call(document, tag)
   }
 
-  const mod = await import('../CustomizeSettingsSection.jsx')
   // ensure createImageBitmap exists so colorizeBitmap can complete if invoked
-  const origCIB = global.createImageBitmap
-  global.createImageBitmap = vi.fn().mockResolvedValue('ib')
-  globalThis.createImageBitmap = global.createImageBitmap
+  const origCIB = globalThis.createImageBitmap
+  globalThis.createImageBitmap = vi.fn().mockResolvedValue('ib')
   const img = {}
   const res = await prepareBitmapsModule(img, 4, 4, { colorizeOcean: true, colorizeLand: true }, { backgroundType: '' }, { colorizeLand: false })
   // both displayBitmap and landBitmap should be produced
   expect(res.displayBitmap).to.exist
   expect(res.landBitmap).to.exist
   // restore createImageBitmap
-  if (origCIB === undefined) delete global.createImageBitmap
-  else global.createImageBitmap = origCIB
-  if (typeof globalThis.createImageBitmap !== 'undefined') delete globalThis.createImageBitmap
+  if (origCIB === undefined) delete globalThis.createImageBitmap
+  else globalThis.createImageBitmap = origCIB
+  if (globalThis.createImageBitmap !== undefined) delete globalThis.createImageBitmap
   document.createElement = originalCreate
 })
 
@@ -96,16 +94,15 @@ test('colorizeBitmap runs and returns createImageBitmap result (stubbed)', async
   }
 
   const fakeIB = { ok: true }
-  const origCreateImageBitmap = global.createImageBitmap
-  global.createImageBitmap = vi.fn().mockResolvedValue(fakeIB)
-  globalThis.createImageBitmap = global.createImageBitmap
+  const origCreateImageBitmap = globalThis.createImageBitmap
+  globalThis.createImageBitmap = vi.fn().mockResolvedValue(fakeIB)
 
   const result = await colorizeBitmap({ /* fake sourceBitmap */ }, '#ff0000', 2, 2, { backgroundType: '' }, { preserveTexture: 0 })
   expect(result).to.equal(fakeIB)
 
   // restore
-  if (origCreateImageBitmap === undefined) delete global.createImageBitmap
-  else global.createImageBitmap = origCreateImageBitmap
-  if (typeof globalThis.createImageBitmap !== 'undefined') delete globalThis.createImageBitmap
+  if (origCreateImageBitmap === undefined) delete globalThis.createImageBitmap
+  else globalThis.createImageBitmap = origCreateImageBitmap
+  if (globalThis.createImageBitmap !== undefined) delete globalThis.createImageBitmap
   document.createElement = originalCreate
 })

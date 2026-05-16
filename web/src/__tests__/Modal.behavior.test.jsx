@@ -4,11 +4,9 @@ import Modal from '../Modal'
 import { vi, expect } from 'vitest'
 
 describe('Modal zoom and pan behavior', () => {
-  let rafSpy
   let origGetComputedStyle
   beforeEach(() => {
     // make RAF synchronous for determinism
-    rafSpy = vi.spyOn(globalThis, 'requestAnimationFrame').mockImplementation((cb) => cb())
     vi.spyOn(globalThis, 'cancelAnimationFrame').mockImplementation(() => {})
 
     // simple computed style to avoid NaN parsing
@@ -39,7 +37,7 @@ describe('Modal zoom and pan behavior', () => {
     const { container } = render(
       <Modal open onClose={onClose}>
         <div className="zoom-container" style={{ width: '200px', height: '200px' }}>
-          <img className="zoom-pan" src="data:,img" />
+          <img className="zoom-pan" src="data:,img" alt="map preview" />
         </div>
       </Modal>
     )
@@ -60,11 +58,11 @@ describe('Modal zoom and pan behavior', () => {
     // trigger load handling
     fireEvent.load(img)
 
-    const initialWidth = parseInt(img.style.width || '0', 10)
+    const initialWidth = Number.parseInt(img.style.width || '0', 10)
     // wheel to zoom (deltaY negative -> zoom in)
     fireEvent.wheel(containerEl, { deltaY: -100 })
 
-    const afterWidth = parseInt(img.style.width || '0', 10)
+    const afterWidth = Number.parseInt(img.style.width || '0', 10)
     expect(afterWidth).toBeGreaterThanOrEqual(initialWidth)
   })
 
@@ -73,7 +71,7 @@ describe('Modal zoom and pan behavior', () => {
     const { container } = render(
       <Modal open onClose={onClose}>
         <div className="zoom-container" style={{ width: '400px', height: '300px' }}>
-          <img className="zoom-pan" src="data:,img2" />
+          <img className="zoom-pan" src="data:,img2" alt="map preview" />
         </div>
       </Modal>
     )
@@ -94,8 +92,8 @@ describe('Modal zoom and pan behavior', () => {
 
     // simulate pointer down and move to pan via transform (no native scroll)
     fireEvent.pointerDown(img, { pointerId: 1, clientX: 10, clientY: 10 })
-    fireEvent.pointerMove(window, { pointerId: 1, clientX: 30, clientY: 25 })
-    fireEvent.pointerUp(window, { pointerId: 1, clientX: 30, clientY: 25 })
+    fireEvent.pointerMove(globalThis, { pointerId: 1, clientX: 30, clientY: 25 })
+    fireEvent.pointerUp(globalThis, { pointerId: 1, clientX: 30, clientY: 25 })
 
     // after panning, img may have transform applied
     expect(img.style.transform === '' || img.style.transform.includes('translate')).toBeTruthy()

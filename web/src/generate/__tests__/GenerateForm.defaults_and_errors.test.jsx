@@ -2,6 +2,7 @@ import React from 'react'
 import { render, waitFor } from '@testing-library/react'
 import { vi, test, beforeEach } from 'vitest'
 import { expect } from 'chai'
+import GenerateForm, { loadUiOptions } from '../GenerateForm'
 
 // Test applyServerDefaults side-effects via persisted localStorage
 const uiOptsWithDefaults = {
@@ -29,7 +30,6 @@ vi.mock('../hooks/useGenerate', async (importOriginal) => {
   return { ...actual, default: () => vi.fn() }
 })
 
-import GenerateForm from '../GenerateForm'
 
 beforeEach(() => {
   localStorage.clear()
@@ -52,8 +52,6 @@ test('mounting GenerateForm with defaults persists customized overrides', async 
   // options-based defaults should be reflected where possible
   expect(parsed.finalLandColoringMethod).to.equal('L1')
 })
-
-import { loadUiOptions } from '../GenerateForm'
 
 test('loadUiOptions propagates fetchJson errors', async () => {
   // arrange: mock fetchJson to reject
