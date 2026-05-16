@@ -228,22 +228,6 @@ function scaleSliderValue(sliderValue, sliderValueFor1Scale = 5, scaleMin = 0.5,
   }
 }
 
-function exposeSettingsForDebugging(parsedSettings) {
-  try {
-    if (typeof globalThis !== 'undefined') {
-      globalThis.__lastMergedParsedSettings = parsedSettings
-    }
-  } catch (error_) {
-    safeDebugLog('buildNortContentRequest', 'set __lastMergedParsedSettings failed', error_)
-  }
-}
-
-// deriveNortFilenameFromContent and sanitizeFilenameBase provided by sharedHelpers
-
-function safeDebugLog(functionName, message, error) {
-  // debug suppressed
-}
-
 // Pure helpers (module scope) — extracted so they can be unit tested.
 function computeGridOverlayAlpha(origColor, uiGridOverlayColorHex) {
   if (!origColor) return 255
@@ -377,20 +361,6 @@ function loadCityIconTypes(pack) {
     cityIconTypesRequestByPack.set(pack, Promise.resolve([]))
   }
   return cityIconTypesRequestByPack.get(pack)
-}
-// readResponseBytesWithProgress imported from sharedHelpers
-
-// use shared makeProgressToastController from sharedHelpers
-
-// Small debug hook: logs selected UI values when appliers have run.
-function usePostApplierLogger(lastApplierRunRef, deps = []) {
-  useEffect(() => {
-    if (!lastApplierRunRef || typeof lastApplierRunRef.current !== 'number') return
-    if (lastApplierRunRef.current > 0) {
-      // post-applier run (debug suppressed)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lastApplierRunRef?.current, ...(Array.isArray(deps) ? deps : [])])
 }
 
 function GenerateForm({ uiLanguage = 'en' }) {
@@ -591,17 +561,6 @@ function GenerateForm({ uiLanguage = 'en' }) {
 
   const runGenerate = useGenerate({ apiBase: API_BASE, handleResponseError, base64ToBlob, downloadNortContent, tryParse, serializeNortObject, handleSuccessRef, setError, setLoading })
 
-  // Log applied settings after appliers run (hook must be called at top-level)
-  usePostApplierLogger(lastApplierRunRef, [
-    coastlineColorHex,
-    coastShadingColorHex,
-    coastShadingAlpha,
-    oceanShadingColorHex,
-    oceanShadingAlpha,
-  ])
-
-  // Consolidated dependency array used by multiple effects to avoid duplication.
-  // Placed after state hooks to avoid referencing uninitialized variables.
   const customizeDeps = [
     backgroundType,
     textureRef,
@@ -979,7 +938,7 @@ function GenerateForm({ uiLanguage = 'en' }) {
   // Generate from a .nort JSON string by POSTing it to the generate endpoint.
   // Hoisted to component scope so callers outside `applyServerDefaults` can use it.
   const generateFromNortContent = async (nortContent, toast) => {
-    toast.show('Generating random map...')
+    toast.show(uiI18n?.labels?.['ui.generating'])
     const parsedReturned = tryParse(nortContent)
     if (parsedReturned && Object.hasOwn(randomOverrides, 'mapLanguage') && mapLanguage) parsedReturned.language = mapLanguage
     if (parsedReturned && Object.hasOwn(randomOverrides, 'cityIconType') && cityIconType) parsedReturned.cityIconSetName = cityIconType
@@ -1552,7 +1511,7 @@ function GenerateForm({ uiLanguage = 'en' }) {
 
   const doRandomMap = async (toast) => {
     // Build, resolve, and request the generated map using small helpers
-    toast.show('Preparing map settings...')
+    toast.show(uiI18n?.labels?.['ui.preparing'] || 'Preparing map settings...')
     const cfg = buildRandomCfg()
     const nortContent = await fetchResolvedNort(cfg)
     applyReturnedSettingsToUi(nortContent)
@@ -1627,14 +1586,9 @@ function GenerateForm({ uiLanguage = 'en' }) {
     let parsedSettings = parseNortSettings(explicitNortContent)
     if (!parsedSettings) throw new Error('Current settings are not valid JSON.')
 
-    try {
-      mergeUiIntoParsed(parsedSettings)
-    } catch (e) {
-      safeDebugLog('buildNortContentRequest', 'mergeUiIntoParsed failed', e)
-    }
+    mergeUiIntoParsed(parsedSettings)
 
     updateSettingsWithDimensions(parsedSettings)
-    exposeSettingsForDebugging(parsedSettings)
 
     if (mapLanguage) parsedSettings.language = mapLanguage
     serializeNortObject(parsedSettings)
