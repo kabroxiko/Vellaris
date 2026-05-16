@@ -26,4 +26,14 @@ describe('sharedHelpers module', () => {
     const json = JSON.stringify(obj)
     expect(shared.deriveNortFilenameFromContent(json)).toBe('MyTitle')
   })
+
+  it('mulberry32 produces deterministic sequences for same seed', () => {
+    const g1 = shared.mulberry32(42)
+    const g2 = shared.mulberry32(42)
+    const a = g1()
+    const b = g2()
+    expect(a).toBeCloseTo(b, 12)
+    expect(a).toBeGreaterThanOrEqual(0)
+    expect(a).toBeLessThan(1)
+  })
 })

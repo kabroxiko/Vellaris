@@ -49,8 +49,9 @@ export function createSettingsAppliers(setters, currentValues = {}) {
 
   // Per-applier instrumentation: record creation and calls.
   const randomPart = (() => {
-    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function')
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
       return crypto.randomUUID().replaceAll('-', '').slice(0, 8)
+    }
     if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
       const arr = new Uint8Array(6)
       crypto.getRandomValues(arr)

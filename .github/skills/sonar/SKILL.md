@@ -18,7 +18,7 @@ Prerequisites
 Behavior Overview
 -----------------
 - `scan` action: asks the SonarQube MCP to run or schedule analysis. When a full server scan is not available, the skill will invoke targeted file analysis via `sonarqube_analyze_file` for modified files.
- - Default interactive policy: the skill defaults to autonomous operation and will not offer interactive options unless strictly necessary to resolve ambiguity, request maintainer decisions, or propose non-trivial refactors. When user input is required the assistant will ask a single concise question rather than present multiple options.
+ - Default interactive policy: the skill operates non-interactively by default and will not prompt the maintainer for decisions during automated flows. Any operation that requires maintainer confirmation must be explicitly requested via flags (for example `--confirm` or an explicit `--interactive` flag).
  - `scan` action: asks the SonarQube MCP to run or schedule analysis. When a full server scan is not available, the skill will invoke targeted file analysis via `sonarqube_analyze_file` for modified files.
 - `query` action: uses the MCP `mcp_sonarqube_search_sonar_issues_in_projects` call to list issues for given `projectKeys`, `rules`, or explicit `issue` keys. By default the query uses `resolved=false`.
 - `hotspots` action: uses the MCP `mcp_sonarqube_search_security_hotspots` call to list Security Hotspots.
@@ -29,12 +29,12 @@ Commands and Flags
 - `/sonar scan` — request the MCP to run or schedule a server analysis and report outcome; if unsupported, the skill will perform targeted file analysis via `sonarqube_analyze_file` and report results.
 - `/sonar scan --include-resolved` — include resolved/closed issues when querying.
 - `/sonar query --rule <ruleKey>` — query for unresolved issues matching a rule (e.g., `javascript:S5852`) using `mcp_sonarqube_search_sonar_issues_in_projects`.
-- `/sonar repair --issue <issueKey>` — prepare a suggested, reversible textual patch for the specified issue (assistant will ask for confirmation before applying edits). Uses MCP issue data and `sonarqube_analyze_file` to re-run analysis after edits.
-- `/sonar repair --rule <ruleKey> [--limit N]` — prepare suggested, reversible textual patches for the first `N` unresolved issues matching `ruleKey` (defaults to `N=10`) via MCP queries. The assistant will list targeted issues, propose per-file patches, and ask for confirmation before applying any edits.
+ - `/sonar repair --issue <issueKey>` — prepare a suggested, reversible textual patch for the specified issue. The assistant will produce WorkspaceEdit-style patches and will only apply edits when `--apply --confirm` or `--interactive` flags are provided. Uses MCP issue data and `sonarqube_analyze_file` to re-run analysis after edits.
+ - `/sonar repair --rule <ruleKey> [--limit N]` — prepare suggested, reversible textual patches for the first `N` unresolved issues matching `ruleKey` (defaults to `N=10`) via MCP queries. The assistant will list targeted issues and propose per-file WorkspaceEdit patches; patches are applied only when `--apply --confirm` (or `--interactive`) are provided.
 - `/sonar --hotspots` — explicitly fetch hotspots via the MCP hotspots method (`mcp_sonarqube_search_security_hotspots`).
 - `--no-hotspots` — opt out of automatic hotspots fallback when an issues search returns no results.
  - `/sonar coverage [--threshold PERCENT] [--limit N]` — query coverage via MCP, list files below `--threshold` (default 80%), generate conservative test scaffolds for uncovered functions up to `--limit` files.
- - `/sonar coverage [--threshold PERCENT] [--limit N]` — query coverage via MCP, list files below `--threshold` (default 80%), and (by default) operate autonomously to generate and apply deterministic unit tests until the workspace-wide coverage meets or exceeds the threshold (default 80%) or the `--limit` of files has been processed. The skill will only pause for explicit confirmation in strictly necessary situations (ambiguous assertions, required refactors, or unsafe edits).
+- `/sonar coverage [--threshold PERCENT] [--limit N]` — query coverage via MCP, list files below `--threshold` (default 80%), and (by default) operate non-interactively to generate WorkspaceEdit-style deterministic unit tests for safely testable code paths. The assistant will not pause for confirmation unless `--interactive` or `--confirm` is provided; without these flags it will skip changes that require human judgment and surface patches for manual review.
 
 What the skill returns
 ----------------------
@@ -50,19 +50,19 @@ Coverage support
  	- analyze the source to identify exported or top-level pure functions and deterministic entry points that can be safely unit-tested (avoid complex integration points, external network calls, or native code).
  	- synthesize deterministic test files that import the module, invoke functions with deterministic inputs, and assert explicit expected results or stable structural properties derived from static analysis or documented behavior.
  	- apply generated test files directly (write WorkspaceEdit-style patches into the working tree) and re-run per-file analysis via `sonarqube_analyze_file` (or `analyze_file_list`) to update coverage; repeat iteratively until the workspace coverage reaches the `--threshold` (default 80%) or no further safe, testable targets are found.
- 	- the skill will only prompt for a maintainer decision when strictly necessary: ambiguous assertion choices, tests that require non-trivial refactors, or potential unsafe edits. In such cases the assistant will ask a single concise question and pause.
- 	- the skill will NOT create commits, pushes, or pull requests; it will write test files to the workspace for maintainers to review and commit with their normal workflows.
+ 	- the skill will not prompt the maintainer during normal automated coverage generation. If interactive confirmation for ambiguous or non-trivial edits is desired, pass `--interactive` or `--confirm` to enable a single confirmation prompt per logical change. By default the skill writes proposed WorkspaceEdit-style patches into the working tree only when `--apply` is used; otherwise it outputs the patches for manual review.
+ 	- the skill will NOT create commits, pushes, or pull requests, and it will not suggest creating them automatically; maintainers are expected to review WorkspaceEdit patches and use their normal VCS workflows to commit or open PRs.
 
 Notes on conservative behavior:
-	- The assistant will NOT generate snapshot-style or placeholder scaffolding tests by default. When a safe, deterministic assertion cannot be inferred, the assistant will either skip the target or propose a brief, explicit refactor patch and request confirmation before applying it.
-	- Small, safe refactors required to enable deterministic testing (for example, extracting a pure helper) will be proposed as separate patches and require explicit confirmation before application.
+	- The assistant will NOT generate snapshot-style or placeholder scaffolding tests by default. When a safe, deterministic assertion cannot be inferred, the assistant will either skip the target or produce a WorkspaceEdit-style refactor patch. Such refactor patches are not applied automatically; they are presented for manual review unless `--interactive --apply` (or `--confirm --apply`) are provided.
+	- Small, safe refactors required to enable deterministic testing (for example, extracting a pure helper) will be produced as separate WorkspaceEdit patches and will only be applied when explicit `--apply --confirm` flags are provided.
 
  Notes and safety rules for test generation
  ----------------------------------------
  - The assistant will only generate deterministic, assertion-based tests that validate explicit behavior using pure inputs and stable outputs. Tests must be real unit tests (no placeholder scaffolds).
  - The assistant will not create snapshot-style tests or one-off scaffolding as an automated outcome. Snapshot tests may be suggested only as a documented manual option in the proposal phase and only with explicit maintainer approval.
  - The skill will not modify production code solely to make it easier to test. When a small, safe refactor is required to enable deterministic testing (for example, extracting a pure helper), the assistant will propose the refactor as a separate patch and request confirmation before applying it.
- - Generated tests are always presented as WorkspaceEdit-style patches for maintainer review; the assistant will never commit or push them without explicit approval.
+ - Generated tests are always presented as WorkspaceEdit-style patches for maintainer review; the assistant will never commit, push, or create pull requests on behalf of a maintainer. It will not suggest creating PRs automatically.
 
 
 Repair Assistance
@@ -78,7 +78,7 @@ Repair-by-rule behavior
 Operational steps when applying patches
 --------------------------------------
 - Before making edits: the skill will attempt to use the MCP `sonarqube_exclude_from_analysis` or an automatic-analysis toggle API to disable automatic analysis if the MCP exposes it, preventing intermediate events while edits are staged.
-- The skill will prepare WorkspaceEdit-style patches and prompt the user to confirm which patches to apply.
+ - The skill will prepare WorkspaceEdit-style patches. Patches are only applied when `--apply --confirm` (or `--interactive`) are provided; otherwise patches are presented for manual review.
 - After applying patches locally, the skill MUST call the MCP `sonarqube_analyze_file` (or an `analyze_file_list` helper, if available) to re-analyze the modified files.
 - Finally, the skill will re-enable automatic analysis via the MCP toggle API if it was disabled.
 
@@ -112,7 +112,7 @@ Examples
 --------
 - `/sonar scan` — run analysis and list unresolved issues.
 - `/sonar query --rule javascript:S5852` — return unresolved S5852 issues; if none found, automatically query hotspots (unless `--no-hotspots`).
-- `/sonar repair --issue ca827621-090b-42a4-be07-cd48f8129493` — prepare a suggested fix for the specified issue and ask for confirmation before editing files.
+- `/sonar repair --issue ca827621-090b-42a4-be07-cd48f8129493` — prepare a suggested fix for the specified issue and produce a WorkspaceEdit patch. The patch will only be applied when `--apply --confirm` (or `--interactive`) is provided.
 
 Troubleshooting
 ---------------
@@ -121,7 +121,7 @@ Troubleshooting
 
 Notes for Maintainers
 ---------------------
-- Review patches locally. The skill will not commit, stage, push, or create pull requests, and it will not offer or suggest doing so. Use your normal workflows to commit or open PRs.
+- Review patches locally. The skill will not commit, stage, push, or create pull requests, and it will not offer, suggest, or attempt to perform commits or open pull requests. Use your normal workflows to commit or open PRs if desired.
 - If you want the skill to always include hotspots in queries, use `--hotspots` explicitly; automatic fallback occurs only when an issues query returns zero results.
 
 Implementation guidance for integrators

@@ -144,7 +144,7 @@ function applyBordersFrayedAndGrungeHoisted(parsedSettings, ctx) {
 }
 
 function applyCoastOceanAndWavesHoisted(parsedSettings, ctx) {
-  const { lineStyle, coastlineWidth, coastlineColorHex, coastShadingLevel, coastShadingColorHex, coastShadingAlpha, oceanShadingLevel, oceanShadingColorHex, oceanShadingAlpha, oceanWavesType, oceanWavesLevel, getConcentricWaveCount, fadeConcentricWaves, jitterToConcentricWaves, brokenLinesForConcentricWaves, mergeColor, oceanWavesColorHex, drawOceanEffectsInLakes, riverColorHex, parseBooleanWithDefault, mergedSettingsRef } = ctx
+  const { lineStyle, coastlineWidth, coastlineColorHex, coastShadingLevel, coastShadingColorHex, coastShadingAlpha, oceanShadingLevel, oceanShadingColorHex, oceanShadingAlpha, oceanWavesType, oceanWavesLevel, oceanWavesAlpha, getConcentricWaveCount, fadeConcentricWaves, jitterToConcentricWaves, brokenLinesForConcentricWaves, mergeColor, oceanWavesColorHex, drawOceanEffectsInLakes, riverColorHex, parseBooleanWithDefault, mergedSettingsRef } = ctx
   if (lineStyle) parsedSettings.lineStyle = lineStyle
   if (Number.isFinite(Number(coastlineWidth))) parsedSettings.coastlineWidth = Number(coastlineWidth)
   mergeColor(parsedSettings, 'coastlineColor', coastlineColorHex)
