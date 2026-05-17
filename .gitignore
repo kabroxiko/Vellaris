@@ -318,4 +318,6 @@ gradle-app.setting
 # Java heap dump
 *.hprof
 
+bin/
+
 # End of https://www.toptal.com/developers/gitignore/api/git,java,node,linux,macos,react,sonar,gradle,windows,sonarqube,backup

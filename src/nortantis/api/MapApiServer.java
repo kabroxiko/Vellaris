@@ -74,9 +74,12 @@ public class MapApiServer
 		// Increase Jetty's max form/request content size globally to 10 MB.
 		// This addresses server-side rejections when clients send large JSON
 		// bodies or image uploads without requiring Jetty API access here.
-		try {
+		try
+		{
 			System.setProperty("org.eclipse.jetty.server.Request.maxFormContentSize", "10000000");
-		} catch (SecurityException se) {
+		}
+		catch (SecurityException se)
+		{
 			// Ignore if security manager prevents setting system properties
 			Logger.println("Could not set Jetty maxFormContentSize system property: " + se.getMessage());
 		}
@@ -89,10 +92,13 @@ public class MapApiServer
 		Javalin app = Javalin.create(config ->
 		{
 			// Increase Javalin's allowed request body size to 10 MB (root-level fix)
-			try {
+			try
+			{
 				config.http.maxRequestSize = 10_000_000L; // 10 MB
 				Logger.println("Configured Javalin http.maxRequestSize=10000000");
-			} catch (Exception e) {
+			}
+			catch (Exception e)
+			{
 				Logger.println("Could not set config.http.maxRequestSize: " + e.getMessage());
 			}
 
