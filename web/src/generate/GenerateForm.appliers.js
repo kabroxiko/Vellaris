@@ -1,8 +1,7 @@
 import { formatColorString } from './utils'
 import { hexToRgbaString } from './sharedHelpers'
-import { parseBooleanWithDefault, computeConcentricWaveCount } from './GenerateForm.helpers'
 
-function mergeColor(parsedSettings, key, hexStr, opacityPercent = 100, useFormatter = false) {
+export function mergeColor(parsedSettings, key, hexStr, opacityPercent = 100, useFormatter = false) {
   if (!hexStr) return
   if (useFormatter) {
     const formatted = formatColorString(hexStr, opacityPercent)
@@ -54,10 +53,10 @@ export function applyGridAndColoringHoisted(parsedSettings, ctx) {
     drawVoronoiGridOverlayOnlyOnLand,
     resolveLandColoringMethod,
     finalLandColoringMethod,
-      mergeColor,
+    mergeColor,
     getGridOverlayAlpha,
   } = ctx
-    const merge = mergeColor || mergeColor
+    const merge = mergeColor
 
     if (!parsedSettings.regionBoundaryStyle || typeof parsedSettings.regionBoundaryStyle !== 'object') parsedSettings.regionBoundaryStyle = {}
     if (regionBoundaryStyle) parsedSettings.regionBoundaryStyle.type = regionBoundaryStyle

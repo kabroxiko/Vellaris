@@ -1,7 +1,8 @@
 import React from 'react'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { describe, it, expect, vi } from 'vitest'
-import useGenerate from '../hooks/useGenerate'
+// Note: do not import `useGenerate` at top-level because tests mock
+// `../sharedHelpers` dynamically; import it inside tests after mocking.
 
 describe('useGenerate additional flows', () => {
   beforeEach(() => {
@@ -12,7 +13,7 @@ describe('useGenerate additional flows', () => {
     // mock sharedHelpers
     const respObj = { imageBase64: btoa('PNGDATA'), meta: 1 }
     const bytes = new TextEncoder().encode(JSON.stringify(respObj))
-    vi.mock('../sharedHelpers', () => ({
+    vi.doMock('../sharedHelpers', () => ({
       makeProgressToastController: () => ({ show: () => {}, hide: () => {} }),
       readResponseBytesWithProgress: async () => bytes,
     }))
@@ -21,6 +22,9 @@ describe('useGenerate additional flows', () => {
     globalThis.fetch = vi.fn(async () => ({ ok: true, headers: { get: () => 'application/json' } }))
 
     const handleSuccessRef = { current: vi.fn() }
+
+    // import the hook after setting up the mock so the module loads with the mocked helpers
+    const { default: useGenerate } = await import('../hooks/useGenerate')
 
     function LocalRunner() {
       const setError = vi.fn()
@@ -46,7 +50,7 @@ describe('useGenerate additional flows', () => {
   })
 
   it('runGenerate sets error when nort-only expected but server returns image bytes', async () => {
-    vi.mock('../sharedHelpers', () => ({
+    vi.doMock('../sharedHelpers', () => ({
       makeProgressToastController: () => ({ show: () => {}, hide: () => {} }),
       readResponseBytesWithProgress: async () => new Uint8Array([1,2,3]),
     }))
@@ -55,6 +59,8 @@ describe('useGenerate additional flows', () => {
     const setError = vi.fn()
     const setLoading = vi.fn()
     const handleSuccessRef = { current: vi.fn() }
+
+    const { default: useGenerate } = await import('../hooks/useGenerate')
 
     function LocalRunner2() {
       const runGenerate = useGenerate({

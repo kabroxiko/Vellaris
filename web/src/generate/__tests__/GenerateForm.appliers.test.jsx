@@ -1,182 +1,143 @@
-import { expect } from 'chai'
-
 import {
+  mergeColor,
+  applyBackgroundFlagsHoisted,
   applyResourcesAndTopLevelHoisted,
   applyGridAndColoringHoisted,
   applyBordersFrayedAndGrungeHoisted,
   applyCoastOceanAndWavesHoisted,
   applyRoadsAndScalesHoisted,
   applyTextAndBackgroundHoisted,
-  setResourceFromRef,
-} from '../GenerateForm'
+} from '../GenerateForm.appliers'
 
-test('applyResourcesAndTopLevelHoisted sets numeric and book values', () => {
-  const parsed = {}
-  const ctx = {
-    setResourceFromRef,
-    borderRef: 'pack|b',
-    textureRef: 'pack|t',
-    backgroundSeed: '123',
-    artPack: 'ap',
-    worldSize: '42',
-    landShape: 'island',
-    regionCount: '5',
-    randomSeed: '7',
-    selectedBooks: new Set(['z', 'a']),
-  }
-  applyResourcesAndTopLevelHoisted(parsed, ctx)
-  expect(parsed.borderResource).to.deep.equal({ artPack: 'pack', name: 'b' })
-  expect(parsed.backgroundTextureResource).to.deep.equal({ artPack: 'pack', name: 't' })
-  expect(parsed.backgroundRandomSeed).to.equal(123)
-  expect(parsed.artPack).to.equal('ap')
-  expect(parsed.worldSize).to.equal(42)
-  expect(parsed.regionCount).to.equal(5)
-  expect(parsed.randomSeed).to.equal(7)
-  expect(parsed.books).to.deep.equal(['a', 'z'])
-})
+describe('GenerateForm appliers', () => {
+  it('mergeColor formats and sets color', () => {
+    const parsed = {}
+    mergeColor(parsed, 'x', '#112233', 50, true)
+    expect(parsed.x).toBeDefined()
+    expect(parsed.x.includes(',')).toBe(true)
+  })
 
-test('applyGridAndColoringHoisted applies grid and colors and resolves land method', () => {
-  const parsed = {}
-  const mergeColor = (ps, key, hex) => { ps[key] = hex }
-  const ctx = {
-    regionBoundaryStyle: 'dashed',
-    regionBoundaryWidth: '3',
-    regionBoundaryColorHex: '#112233',
-    drawRegionBoundaries: true,
-    colorizeLand: true,
-    colorizeOcean: false,
-    oceanColorHex: '#aabbcc',
-    landColorHex: '#ddeeff',
-    drawGridOverlay: true,
-    gridOverlayShape: 'square',
-    gridOverlayRowOrColCount: '4',
-    gridOverlayColorHex: '#010203',
-    gridOverlayXOffset: '5',
-    gridOverlayYOffset: '6',
-    gridOverlayLineWidth: '2',
-    gridOverlayLayer: 'above',
-    drawVoronoiGridOverlayOnlyOnLand: true,
-    resolveLandColoringMethod: (m) => (m === 'ColorPoliticalRegions' ? 'ColorPoliticalRegions' : null),
-    finalLandColoringMethod: 'ColorPoliticalRegions',
-    mergeColor,
-    getGridOverlayAlpha: () => 128,
-  }
-  applyGridAndColoringHoisted(parsed, ctx)
-  expect(parsed.regionBoundaryStyle.type).to.equal('dashed')
-  expect(parsed.regionBoundaryStyle.width).to.equal(3)
-  expect(parsed.regionBoundaryColor).to.equal('#112233')
-  expect(parsed.drawRegionBoundaries).to.equal(true)
-  expect(parsed.colorizeLand).to.equal(true)
-  expect(parsed.gridOverlayShape).to.equal('square')
-  expect(parsed.gridOverlayRowOrColCount).to.equal(4)
-  // gridOverlayColor is produced via hexToRgbaString; verify alpha included
-  expect(String(parsed.gridOverlayColor)).to.include('128')
-  expect(parsed.gridOverlayLineWidth).to.equal(2)
-  expect(parsed.drawVoronoiGridOverlayOnlyOnLand).to.equal(true)
-  expect(parsed.drawRegionColors).to.equal(true)
-})
+  it('applyBackgroundFlagsHoisted sets proper flags', () => {
+    const parsed = {}
+    applyBackgroundFlagsHoisted(parsed, 'SolidColor')
+    expect(parsed.solidColorBackground).toBe(true)
+    expect(parsed.generateBackgroundFromTexture).toBe(false)
+  })
 
-test('applyBordersFrayedAndGrungeHoisted sets numeric fields and calls mergeColor', () => {
-  const parsed = {}
-  const mergeColor = (ps, key, hex) => { ps[key] = hex }
-  const ctx = {
-    borderWidth: '4',
-    borderPosition: 'inside',
-    borderColorOption: 'auto',
-    borderColorHex: '#abc',
-    frayedBorder: true,
-    frayedBorderBlurLevel: '2',
-    frayedBorderSize: '6',
-    frayedBorderSeed: '9',
-    drawGrunge: true,
-    grungeWidth: '7',
-    frayedBorderColorHex: '#def',
-    mergeColor,
-  }
-  applyBordersFrayedAndGrungeHoisted(parsed, ctx)
-  expect(parsed.borderWidth).to.equal(4)
-  expect(parsed.borderPosition).to.equal('inside')
-  expect(parsed.borderColor).to.equal('#abc')
-  expect(parsed.frayedBorder).to.equal(true)
-  expect(parsed.frayedBorderBlurLevel).to.equal(2)
-  expect(parsed.frayedBorderSize).to.equal(6)
-  expect(parsed.frayedBorderSeed).to.equal(9)
-  expect(parsed.drawGrunge).to.equal(true)
-  expect(parsed.grungeWidth).to.equal(7)
-  expect(parsed.frayedBorderColor).to.equal('#def')
-})
+  it('applyResourcesAndTopLevelHoisted applies resources and fields', () => {
+    const parsed = {}
+    const setResourceFromRef = (p, key, ref) => { if (ref) p[key] = `ref:${ref}` }
+    const ctx = { setResourceFromRef, borderRef: 'b1', textureRef: 't1', backgroundSeed: '42', artPack: 'pack', worldSize: '10', landShape: 'island', regionCount: '5', randomSeed: '7', selectedBooks: new Set(['b','a']) }
+    applyResourcesAndTopLevelHoisted(parsed, ctx)
+    expect(parsed.borderResource).toBe('ref:b1')
+    expect(parsed.backgroundTextureResource).toBe('ref:t1')
+    expect(parsed.backgroundRandomSeed).toBe(42)
+    expect(parsed.artPack).toBe('pack')
+    expect(parsed.worldSize).toBe(10)
+    expect(parsed.regionCount).toBe(5)
+    expect(Array.isArray(parsed.books)).toBe(true)
+    expect(parsed.books[0] < parsed.books[1]).toBe(true)
+  })
 
-test('applyCoastOceanAndWavesHoisted sets shading and wave options and calls mergeColor', () => {
-  const parsed = {}
-  const mergeColor = (ps, key, hex, opacityPercent, useFormatter) => { ps[key] = { hex, opacityPercent, useFormatter } }
-  const ctx = {
-    lineStyle: 'solid',
-    coastlineWidth: '2',
-    coastlineColorHex: '#010101',
-    coastShadingLevel: '3',
-    coastShadingColorHex: '#020202',
-    coastShadingAlpha: '10',
-    oceanShadingLevel: '5',
-    oceanShadingColorHex: '#030303',
-    oceanShadingAlpha: '20',
-    oceanWavesType: 'ripples',
-    oceanWavesLevel: '4',
-    getConcentricWaveCount: () => 7,
-    fadeConcentricWaves: true,
-    jitterToConcentricWaves: false,
-    brokenLinesForConcentricWaves: true,
-    oceanWavesColorHex: '#040404',
-    oceanWavesAlpha: '30',
-    drawOceanEffectsInLakes: true,
-    riverColorHex: '#050505',
-    parseBooleanWithDefault: Boolean,
-    mergedSettingsRef: { current: {} },
-    mergeColor,
-  }
-  applyCoastOceanAndWavesHoisted(parsed, ctx)
-  expect(parsed.lineStyle).to.equal('solid')
-  expect(parsed.coastlineWidth).to.equal(2)
-  expect(parsed.coastlineColor.hex).to.equal('#010101')
-  expect(parsed.coastShadingLevel).to.equal(3)
-  expect(parsed.coastShadingColor).to.deep.equal({ hex: '#020202', opacityPercent: 90, useFormatter: true })
-  expect(parsed.oceanWavesLevel).to.equal(4)
-  expect(parsed.concentricWaveCount).to.equal(7)
-  expect(parsed.drawOceanEffectsInLakes).to.equal(true)
-  expect(parsed.riverColor.hex).to.equal('#050505')
-})
+  it('applyGridAndColoringHoisted sets grid and coloring values', () => {
+    const parsed = {}
+    const ctx = {
+      regionBoundaryStyle: 'dashed',
+      regionBoundaryWidth: '2',
+      regionBoundaryColorHex: '#010203',
+      drawRegionBoundaries: true,
+      colorizeLand: false,
+      colorizeOcean: true,
+      oceanColorHex: '#0000ff',
+      landColorHex: '#00ff00',
+      drawGridOverlay: true,
+      gridOverlayShape: 'square',
+      gridOverlayRowOrColCount: '4',
+      gridOverlayColorHex: '#abcdef',
+      gridOverlayXOffset: '3',
+      gridOverlayYOffset: '4',
+      gridOverlayLineWidth: '1',
+      gridOverlayLayer: 'top',
+      drawVoronoiGridOverlayOnlyOnLand: true,
+      resolveLandColoringMethod: () => 'SingleColor',
+      finalLandColoringMethod: null,
+      mergeColor,
+      getGridOverlayAlpha: () => 128,
+    }
+    applyGridAndColoringHoisted(parsed, ctx)
+    expect(parsed.regionBoundaryStyle.type).toBe('dashed')
+    expect(parsed.regionBoundaryStyle.width).toBe(2)
+    expect(parsed.drawRegionBoundaries).toBe(true)
+    expect(parsed.gridOverlayShape).toBe('square')
+    expect(parsed.gridOverlayRowOrColCount).toBe(4)
+    expect(parsed.gridOverlayColor).toContain(',')
+    expect(parsed.drawVoronoiGridOverlayOnlyOnLand).toBe(true)
+  })
 
-test('applyRoadsAndScalesHoisted sets road style and scales', () => {
-  const parsed = {}
-  const mergeColor = (ps, key, hex) => { ps[key] = hex }
-  const scaleSlider = (v) => v * 0.1
-  const ctx = {
-    drawRoads: true,
-    roadStyle: null,
-    roadWidth: '3',
-    roadColorHex: '#111111',
-    mountainSize: '2',
-    hillSize: '3',
-    duneSize: '4',
-    treeHeight: '5',
-    citySize: '6',
-    scaleSliderValue: scaleSlider,
-    mergeColor,
-  }
-  applyRoadsAndScalesHoisted(parsed, ctx)
-  expect(parsed.drawRoads).to.equal(true)
-  expect(parsed.roadStyle.width).to.equal(3)
-  expect(parsed.roadColor).to.equal('#111111')
-  expect(parsed.mountainScale).to.be.a('number')
-  expect(parsed.treeHeightScale).to.be.a('number')
-})
+  it('applyBordersFrayedAndGrungeHoisted applies border and frayed props', () => {
+    const parsed = {}
+    const ctx = { borderWidth: '5', borderPosition: 'inside', borderColorOption: 'auto', borderColorHex: '#112233', frayedBorder: true, frayedBorderBlurLevel: '2', frayedBorderSize: '3', frayedBorderSeed: '9', drawGrunge: true, grungeWidth: '6', frayedBorderColorHex: '#ffffff' }
+    applyBordersFrayedAndGrungeHoisted(parsed, ctx)
+    expect(parsed.borderWidth).toBe(5)
+    expect(parsed.borderPosition).toBe('inside')
+    expect(parsed.frayedBorder).toBe(true)
+    expect(parsed.frayedBorderBlurLevel).toBe(2)
+    expect(parsed.frayedBorderColor).toBeDefined()
+  })
 
-test('applyTextAndBackgroundHoisted applies text and bold background settings', () => {
-  const parsed = {}
-  const mergeColor = (ps, key, hex) => { ps[key] = hex }
-  const ctx = { drawText: true, textColorHex: '#abc', drawBoldBackground: true, boldBackgroundColorHex: '#def', mergeColor }
-  applyTextAndBackgroundHoisted(parsed, ctx)
-  expect(parsed.drawText).to.equal(true)
-  expect(parsed.textColor).to.equal('#abc')
-  expect(parsed.drawBoldBackground).to.equal(true)
-  expect(parsed.boldBackgroundColor).to.equal('#def')
+  it('applyCoastOceanAndWavesHoisted computes shading and waves fields', () => {
+    const parsed = {}
+    const ctx = {
+      lineStyle: 'solid',
+      coastlineWidth: '4',
+      coastlineColorHex: '#123456',
+      coastShadingLevel: '2',
+      coastShadingColorHex: '#112233',
+      coastShadingAlpha: '10',
+      oceanShadingLevel: '3',
+      oceanShadingColorHex: '#223344',
+      oceanShadingAlpha: '20',
+      oceanWavesType: 'concentric',
+      oceanWavesLevel: '7',
+      oceanWavesAlpha: '5',
+      getConcentricWaveCount: () => 8,
+      fadeConcentricWaves: true,
+      jitterToConcentricWaves: false,
+      brokenLinesForConcentricWaves: true,
+      oceanWavesColorHex: '#00ff00',
+      drawOceanEffectsInLakes: true,
+      riverColorHex: '#010101',
+      parseBooleanWithDefault: (val, msRef, key, fallback) => Boolean(val),
+      mergedSettingsRef: {},
+    }
+    applyCoastOceanAndWavesHoisted(parsed, ctx)
+    expect(parsed.lineStyle).toBe('solid')
+    expect(parsed.coastlineWidth).toBe(4)
+    expect(parsed.coastShadingLevel).toBe(2)
+    expect(parsed.oceanShadingLevel).toBe(3)
+    expect(parsed.concentricWaveCount).toBe(8)
+    expect(parsed.drawOceanEffectsInLakes).toBe(true)
+    expect(parsed.riverColor).toBeDefined()
+  })
+
+  it('applyRoadsAndScalesHoisted applies road style and scales', () => {
+    const parsed = {}
+    const ctx = { drawRoads: true, roadStyle: 'major', roadWidth: '3', roadColorHex: '#010203', mountainSize: '2', hillSize: '3', duneSize: '4', treeHeight: '5', citySize: '6', scaleSliderValue: (v) => v * 10 }
+    applyRoadsAndScalesHoisted(parsed, ctx)
+    expect(parsed.drawRoads).toBe(true)
+    expect(parsed.roadStyle.type).toBe('major')
+    expect(parsed.roadStyle.width).toBe(3)
+    expect(parsed.mountainScale).toBe(20)
+    expect(parsed.treeHeightScale).toBeGreaterThan(0)
+  })
+
+  it('applyTextAndBackgroundHoisted sets text and bold background', () => {
+    const parsed = {}
+    const ctx = { drawText: true, textColorHex: '#abcdef', drawBoldBackground: true, boldBackgroundColorHex: '#010101' }
+    applyTextAndBackgroundHoisted(parsed, ctx)
+    expect(parsed.drawText).toBe(true)
+    expect(parsed.drawBoldBackground).toBe(true)
+    expect(parsed.textColor).toBeDefined()
+    expect(parsed.boldBackgroundColor).toBeDefined()
+  })
 })

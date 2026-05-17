@@ -2,11 +2,10 @@ import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import PropTypes from 'prop-types'
 import CustomizeSettingsSection from './CustomizeSettingsSection'
 import RandomSettingsSection from './RandomSettingsSection'
-import { base64ToBlob, formatColorString, colorToHex, parseColorChannels } from './utils'
+import { base64ToBlob, colorToHex, parseColorChannels } from './utils'
 import { selectCityIconType, fetchJson, handleResponseError, tryParseJson as tryParse } from './helpers'
 import { downloadNortContent } from './responseHandlers'
 import {
-  hexToRgbaString,
   sanitizeFilenameBase,
   deriveNortFilenameFromContent,
   makeProgressToastController,
@@ -21,10 +20,8 @@ import {
   computeConcentricWaveCount,
   setResourceFromRef,
   parseBooleanWithDefault,
-  buildCustomizePayload,
   persistCustomizeOverrides,
   loadRandomOverrides,
-  loadCustomizeOverrides,
 } from './GenerateForm.helpers'
 import {
   applyBackgroundFlagsHoisted,
@@ -34,6 +31,7 @@ import {
   applyCoastOceanAndWavesHoisted,
   applyRoadsAndScalesHoisted,
   applyTextAndBackgroundHoisted,
+  mergeColor,
 } from './GenerateForm.appliers'
 const API_BASE = import.meta?.env?.VITE_API_BASE || '/api'
 const RANDOM_OVERRIDES_STORAGE_KEY = 'vellaris-random-manual-overrides'
@@ -1034,7 +1032,10 @@ function GenerateForm({ uiLanguage = 'en' }) {
     // are stored in `mergedSettingsRef` and UI helper values (hex/alpha)
     // are derived from canonical numeric colors where appropriate.
     let settings = tryParse(currentSource.nortContent)
-    if (!settings) throw new Error('Current source nortContent is not valid JSON.')
+    if (!settings) {
+      globalThis.showToast?.('Loaded settings file is not valid JSON.', { type: 'warning', duration: 6000 })
+      return
+    }
     // mark origin so appliers can log which source triggered them
     settings.__applierSource = 'currentSource'
     // Always apply map size and seed settings so the Random panel
@@ -1336,7 +1337,14 @@ function GenerateForm({ uiLanguage = 'en' }) {
   async function handleGenerateAndSaveNort(evt) {
     evt.preventDefault()
     // Build merged settings from current UI state and download that
-    const result = buildNortContentRequest()
+    let result
+    try {
+      result = buildNortContentRequest()
+    } catch (err) {
+      const message = err?.message ?? 'Cannot download merged settings.'
+      globalThis.showToast?.(message, { type: 'warning', duration: 6000 })
+      return
+    }
     const body = result.requestOptions?.body
     if (!body) {
       globalThis.showToast?.('Cannot download merged settings. Open the Customize panel and save settings locally first.', { type: 'warning', duration: 6000 })
@@ -1403,6 +1411,16 @@ function GenerateForm({ uiLanguage = 'en' }) {
     }
 
     await runGenerate(result.requestOptions, result.baseName, result.source, outputMode)
+  }
+
+  // Expose internal helpers for unit tests (test harness uses these)
+  if (typeof globalThis !== 'undefined') {
+    try {
+      globalThis.__test_buildNortContentRequest = buildNortContentRequest
+      globalThis.__test_handleGenerateAndSaveNort = handleGenerateAndSaveNort
+    } catch (e) {
+      // ignore in environments that disallow global assignment
+    }
   }
 
   function openPreviewModal() {
@@ -1664,9 +1682,10 @@ function GenerateForm({ uiLanguage = 'en' }) {
 export default GenerateForm
 
 // Named exports for tests
-export { serializeNortObject, scaleSliderValue, loadRandomOverrides, loadCustomizeOverrides, loadUiOptions }
+export { serializeNortObject, scaleSliderValue, loadRandomOverrides, loadUiOptions }
+export { buildCustomizePayload, loadCustomizeOverrides } from './GenerateForm.helpers'
 // Additional exports for testing
-export { buildCustomizePayload, persistCustomizeOverrides, applyBackgroundFlagsHoisted, setResourceFromRef, parseBooleanWithDefault, computeGridOverlayAlpha, computeConcentricWaveCount }
+export { persistCustomizeOverrides, applyBackgroundFlagsHoisted, setResourceFromRef, parseBooleanWithDefault, computeGridOverlayAlpha, computeConcentricWaveCount }
 // Export additional hoisted appliers for unit testing
 export { applyResourcesAndTopLevelHoisted, applyGridAndColoringHoisted, applyBordersFrayedAndGrungeHoisted, applyCoastOceanAndWavesHoisted, applyRoadsAndScalesHoisted, applyTextAndBackgroundHoisted }
 

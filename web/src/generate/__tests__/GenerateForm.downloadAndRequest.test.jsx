@@ -2,7 +2,7 @@ import React from 'react'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { vi } from 'vitest'
 
-// Mock useGenerate hook to capture runGenerate calls
+// Mock useGenerate hook to avoid real network
 const runGenerateMock = vi.fn().mockResolvedValue(undefined)
 vi.mock('../hooks/useGenerate', () => ({ default: () => runGenerateMock }))
 
@@ -23,19 +23,21 @@ vi.mock('../helpers', async () => {
   }
 })
 
-vi.mock('../i18n/webLabels', () => ({ getFrontendLabels: async () => ({ 'ui.loading': 'Loading', 'ui.button.downloadSettings': 'Download settings', 'ui.button.regenerate': 'Regenerate' }) }))
+// Spy on downloadNortContent
+const downloadSpy = vi.fn()
+vi.mock('../responseHandlers', async () => ({ ...(await vi.importActual('../responseHandlers')), downloadNortContent: (...args) => downloadSpy(...args) }))
 
-// Keep sharedHelpers real except where needed
-vi.mock('../sharedHelpers', async () => ({ ...(await vi.importActual('../sharedHelpers')), makeProgressToastController: () => ({ show: () => {}, hide: () => {} }) }))
+vi.mock('../i18n/webLabels', () => ({ getFrontendLabels: async () => ({ 'ui.loading': 'Loading', 'ui.button.downloadSettings': 'Download settings', 'ui.button.regenerate': 'Regenerate' }) }))
 
 import GenerateForm from '../GenerateForm'
 
-describe('GenerateForm component', () => {
+describe('GenerateForm download settings', () => {
   beforeEach(() => {
     runGenerateMock.mockClear()
+    downloadSpy.mockClear()
   })
 
-  it('selecting a .nort file and clicking Download settings calls runGenerate', async () => {
+  it('uploads a .nort file and clicking Download settings calls downloadNortContent', async () => {
     render(<GenerateForm uiLanguage="en" />)
 
     // wait for the Download settings button to appear
@@ -43,7 +45,8 @@ describe('GenerateForm component', () => {
     expect(downloadLabel).toBeTruthy()
 
     // simulate file selection via hidden input
-    const file = new File([JSON.stringify({ generatedWidth: 200 })], 'test.nort', { type: 'application/json' })
+    const fileContent = { generatedWidth: 200 }
+    const file = new File([JSON.stringify(fileContent)], 'test.nort', { type: 'application/json' })
     const input = document.getElementById('nort-file-input')
     expect(input).toBeTruthy()
 
@@ -53,11 +56,15 @@ describe('GenerateForm component', () => {
     // Wait for internal file handler to process and call runGenerate
     await waitFor(() => expect(runGenerateMock).toHaveBeenCalled())
 
-    // Now click the Download settings button which should call runGenerateFromCurrentSource
+    // Now click the Download settings button which should trigger downloadNortContent
     const downloadBtn = screen.getByText('Download settings')
     fireEvent.click(downloadBtn)
 
-    // runGenerate should have been called at least once
-    await waitFor(() => expect(runGenerateMock).toHaveBeenCalled())
+    await waitFor(() => expect(downloadSpy).toHaveBeenCalled())
+    const args = downloadSpy.mock.calls[0]
+    // first arg is serialized content string
+    expect(typeof args[0]).toBe('string')
+    // second arg is a basename string
+    expect(typeof args[1]).toBe('string')
   })
 })

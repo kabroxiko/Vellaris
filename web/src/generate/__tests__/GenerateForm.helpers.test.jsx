@@ -56,6 +56,14 @@ test('computeGridOverlayAlpha returns 255 when origColor missing', () => {
   expect(computeGridOverlayAlpha(null, '#000')).to.equal(255)
 })
 
+test('computeGridOverlayAlpha returns alpha when hex matches and has alpha channel', () => {
+  // origColor as CSV with alpha 123 (r,g,b,a) and ui hex matching
+  const orig = '17,34,51,123'
+  expect(computeGridOverlayAlpha(orig, '#112233')).to.equal(123)
+  // case-insensitive match
+  expect(computeGridOverlayAlpha(orig, '#112233'.toUpperCase())).to.equal(123)
+})
+
 test('buildCustomizePayload maps values', () => {
   const vals = { backgroundType: 'Solid', textureRef: 'p|n', backgroundSeed: '42', drawRegionBoundaries: true }
   const out = buildCustomizePayload(vals)
@@ -80,4 +88,10 @@ test('loadRandom/CustomizeOverrides read from localStorage', () => {
   const c = loadCustomizeOverrides()
   expect(r.a).to.equal(1)
   expect(c.b).to.equal(2)
+})
+
+test('loadRandomOverrides returns empty object on invalid JSON', () => {
+  globalThis.localStorage.setItem('vellaris-random-manual-overrides', 'not-json')
+  expect(loadRandomOverrides()).to.deep.equal({})
+  globalThis.localStorage.removeItem('vellaris-random-manual-overrides')
 })

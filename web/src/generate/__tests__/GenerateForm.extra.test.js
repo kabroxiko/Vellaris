@@ -5,7 +5,6 @@ import {
   computeGridOverlayAlpha,
   computeConcentricWaveCount,
   scaleSliderValue,
-  mergeColor,
   loadRandomOverrides,
   loadCustomizeOverrides,
 } from '../GenerateForm.jsx'
