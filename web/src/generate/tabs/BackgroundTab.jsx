@@ -536,7 +536,7 @@ export default function BackgroundTab(props) {
         />
 
         <div />
-        <label className={`checkbox-label${!canToggleColorize ? ' is-disabled' : ''}`}>
+        <label className={`checkbox-label${canToggleColorize ? '' : ' is-disabled'}`}>
           <input
             type="checkbox"
             checked={colorizeLand}
@@ -574,7 +574,7 @@ export default function BackgroundTab(props) {
         />
 
         <div />
-        <label className={`checkbox-label${!canToggleColorize ? ' is-disabled' : ''}`}>
+        <label className={`checkbox-label${canToggleColorize ? '' : ' is-disabled'}`}>
           <input
             type="checkbox"
             checked={colorizeOcean}

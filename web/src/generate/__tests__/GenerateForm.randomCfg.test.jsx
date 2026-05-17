@@ -1,6 +1,7 @@
 import React from 'react'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { vi } from 'vitest'
+import GenerateForm from '../GenerateForm'
 
 // Mock useGenerate to avoid network during final image generate
 const runGenerateMock = vi.fn().mockResolvedValue(undefined)
@@ -25,7 +26,15 @@ vi.mock('../helpers', async () => {
 
 vi.mock('../i18n/webLabels', () => ({ getFrontendLabels: async () => ({ 'ui.loading': 'Loading', 'ui.generate': 'Generate', 'ui.button.downloadSettings': 'Download settings' }) }))
 
-import GenerateForm from '../GenerateForm'
+// mock globalThis fetch to capture the POST body for generate-settings
+function getUrlString(url) {
+    if (typeof url === 'string') return url
+    if (url instanceof Request) return url.url
+    if (url instanceof URL) return url.href
+    if (url && typeof url === 'object' && 'url' in url && typeof url.url === 'string') return url.url
+    if (url && typeof url.toString === 'function' && url.toString !== Object.prototype.toString) return url.toString()
+    return ''
+}
 
 describe('GenerateForm buildRandomCfg', () => {
   beforeEach(() => {
@@ -37,9 +46,10 @@ describe('GenerateForm buildRandomCfg', () => {
     // set manual overrides in localStorage so loadRandomOverrides picks them up
     localStorage.setItem('vellaris-random-manual-overrides', JSON.stringify({ mapLanguage: 'zz', artPack: 'packX', selectedBooks: ['bookB'], regionCount: 7 }))
 
-    // mock globalThis fetch to capture the POST body for generate-settings
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, opts) => {
-      if (String(url).includes('/generate-settings')) {
+      const urlStr = getUrlString(url)
+
+      if (urlStr.includes('/generate-settings')) {
         return { ok: true, text: async () => JSON.stringify({}) }
       }
       // backgroundBaseCache may request images; return a blob-like response
@@ -60,7 +70,7 @@ describe('GenerateForm buildRandomCfg', () => {
       expect(fetchMock).toHaveBeenCalled()
     })
 
-    const called = fetchMock.mock.calls.find((c) => String(c[0]).includes('/generate-settings'))
+    const called = fetchMock.mock.calls.find((c) => getUrlString(c[0]).includes('/generate-settings'))
     expect(called).toBeTruthy()
     const opts = called[1]
     const body = JSON.parse(opts.body)

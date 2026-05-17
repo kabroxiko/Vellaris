@@ -24,9 +24,18 @@ import GenerateForm from '../GenerateForm'
 
 // Ensure global fetch handles relative URLs used by the app (node fetch needs absolute URLs)
 const originalFetch = globalThis.fetch
+function getUrlString(url) {
+  if (typeof url === 'string') return url
+  if (url instanceof Request) return url.url
+  if (url instanceof URL) return url.href
+  if (url && typeof url === 'object' && 'url' in url && typeof url.url === 'string') return url.url
+  if (url && typeof url.toString === 'function' && url.toString !== Object.prototype.toString) return url.toString()
+  return ''
+}
+
 beforeAll(() => {
   vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, opts) => {
-    const s = String(url)
+    const s = getUrlString(url)
     if (s.includes('/generate-settings') || s.includes('/ui-options')) {
       return { ok: true, text: async () => JSON.stringify({}), json: async () => ({}) }
     }

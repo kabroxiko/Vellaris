@@ -336,14 +336,18 @@ export default function Modal({ open, onClose, children }) {
         modalEl.__cleanupImg = cleanupImg
       }
 
-      // Run setup synchronously so tests that fire events immediately see handlers
-      // and cleanup available. Also schedule via RAF for the browser-optimized path.
-      try {
-        setupModalImageHandlers()
-      } catch (e) {
-        // ignore setup errors during mount
+      // Run setup synchronously so tests that fire events immediately see handlers,
+      // and schedule a RAF-optimized run as well.
+      const safeSetupModalImageHandlers = () => {
+        try {
+          setupModalImageHandlers()
+        } catch (e) {
+          console.error('Error setting up modal image handlers:', e)
+        }
       }
-      rafId = requestAnimationFrame(setupModalImageHandlers)
+
+      safeSetupModalImageHandlers()
+      rafId = requestAnimationFrame(safeSetupModalImageHandlers)
 
       return () => cancelAnimationFrame(rafId)
     }

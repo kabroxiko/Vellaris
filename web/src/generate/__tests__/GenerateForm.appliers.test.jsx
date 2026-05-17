@@ -107,7 +107,7 @@ describe('GenerateForm appliers', () => {
       oceanWavesColorHex: '#00ff00',
       drawOceanEffectsInLakes: true,
       riverColorHex: '#010101',
-      parseBooleanWithDefault: (val, msRef, key, fallback) => Boolean(val),
+      parseBooleanWithDefault: Boolean,
       mergedSettingsRef: {},
     }
     applyCoastOceanAndWavesHoisted(parsed, ctx)

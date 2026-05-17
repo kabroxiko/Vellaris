@@ -27,6 +27,8 @@ import io.javalin.Javalin;
 import io.javalin.http.Context;
 import java.util.concurrent.CountDownLatch;
 
+// No direct Jetty imports here; configure server limits via system property
+
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -69,10 +71,31 @@ public class MapApiServer
 	{
 		CountDownLatch latch = new CountDownLatch(1);
 
-		// Create and configure the Javalin app (Javalin 7 requires routes be
-		// declared inside the config.routes block passed to create)
+		// Increase Jetty's max form/request content size globally to 10 MB.
+		// This addresses server-side rejections when clients send large JSON
+		// bodies or image uploads without requiring Jetty API access here.
+		try {
+			System.setProperty("org.eclipse.jetty.server.Request.maxFormContentSize", "10000000");
+		} catch (SecurityException se) {
+			// Ignore if security manager prevents setting system properties
+			Logger.println("Could not set Jetty maxFormContentSize system property: " + se.getMessage());
+		}
+		// Initialize translations early so API endpoints using Translation.get()
+		// have a valid ResourceBundle available even before any request-level
+		// language handling occurs.
+		nortantis.swing.translation.Translation.initialize();
+
+		// Create and configure the Javalin app (routes declared inside config.routes)
 		Javalin app = Javalin.create(config ->
 		{
+			// Increase Javalin's allowed request body size to 10 MB (root-level fix)
+			try {
+				config.http.maxRequestSize = 10_000_000L; // 10 MB
+				Logger.println("Configured Javalin http.maxRequestSize=10000000");
+			} catch (Exception e) {
+				Logger.println("Could not set config.http.maxRequestSize: " + e.getMessage());
+			}
+
 			// Basic CORS handling equivalent to previous implementation
 			config.routes.options("/*", ctx ->
 			{
@@ -246,6 +269,11 @@ public class MapApiServer
 	{
 		ctx.contentType(CONTENT_TYPE_JSON);
 		String requestedLanguage = ctx.queryParam("uiLanguage");
+		if (requestedLanguage == null || requestedLanguage.isEmpty())
+		{
+			// Clients historically used the `lang` query parameter; accept it as an alias.
+			requestedLanguage = ctx.queryParam("lang");
+		}
 		applyRequestLanguage(requestedLanguage);
 
 		// Ensure a platform implementation is available before any classes

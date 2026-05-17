@@ -76,6 +76,47 @@ function makeCanvasForBitmap(imgBitmap) {
   return { canvas, ctx, w, h }
 }
 
+// Utility: strip optional surrounding <html>...</html> wrapper (linear scan)
+function stripHtmlWrapper(str) {
+  let start = 0
+  let end = str.length
+  while (start < end && /\s/.test(str.charAt(start))) start++
+  while (end > start && /\s/.test(str.charAt(end - 1))) end--
+  if (end - start >= 6 && str.substring(start, start + 6).toLowerCase() === '<html>') {
+    start += 6
+    while (start < end && /\s/.test(str.charAt(start))) start++
+  }
+  if (end - start >= 7 && str.substring(end - 7, end).toLowerCase() === '</html>') {
+    end -= 7
+    while (end > start && /\s/.test(str.charAt(end - 1))) end--
+  }
+  return str.substring(start, end)
+}
+
+// Utility: remove HTML tags using a linear scanner (avoids regex backtracking)
+function removeTags(str) {
+  let out = ''
+  let inTag = false
+  for (let i = 0; i < str.length; i++) {
+    const ch = str.charAt(i)
+    if (!inTag) {
+      if (ch === '<') inTag = true
+      else out += ch
+    } else if (ch === '>') inTag = false
+  }
+  return out
+}
+
+// Utility: pick keys from an object (module scope to avoid re-allocating per render)
+function pick(obj, keys) {
+  const out = {}
+  if (!obj) return out
+  for (const k of keys) {
+    if (Object.hasOwn(obj, k)) out[k] = obj[k]
+  }
+  return out
+}
+
 // Helper: draw the background and inset box (hoisted)
 function drawBackgroundAndInset(opts) {
   const { ctx, img, w, h, x, y, boxW, boxH } = opts || {}
@@ -286,6 +327,56 @@ export {
   fetchPreviewBlob,
   ColorPickerModal,
 }
+
+// Payload helpers: hoisted so they can be unit-tested independently.
+function pickDefaultTexture(textures = [], cityIconTypesByPack = {}) {
+  if (cityIconTypesByPack && Object.keys(cityIconTypesByPack).length > 0) {
+    const firstPack = Object.keys(cityIconTypesByPack)[0]
+    const firstTypes = cityIconTypesByPack[firstPack]
+    if (Array.isArray(firstTypes) && firstTypes.length > 0) return { artPack: firstPack, cityIconType: firstTypes[0] }
+  }
+  if (Array.isArray(textures) && textures.length > 0) {
+    const t = textures[0]
+    return { artPack: t.artPack, cityIconType: t.name }
+  }
+  return {}
+}
+
+function resolveRawTextureRef(rawRef, textures = []) {
+  if (!rawRef) return {}
+  const ref = String(rawRef)
+  if (ref.includes('|')) {
+    if (Array.isArray(textures) && textures.length > 0) {
+      const found = textures.find((tt) => `${tt.artPack}|${tt.name}` === ref)
+      if (found) return { artPack: found.artPack, cityIconType: found.name }
+    }
+    const [ap, nm] = ref.split('|', 2)
+    return { artPack: ap, cityIconType: nm }
+  }
+  return { cityIconType: rawRef }
+}
+
+function buildPreviewPayload(previewFields = {}, textures = [], currentSource = {}) {
+  let payload = { width: 520, height: 170 }
+  if (previewFields) payload = { ...payload, ...previewFields }
+  payload.type = previewFields?.backgroundType === undefined ? null : previewFields.backgroundType
+  const bg = payload.type
+  if (bg === 'GeneratedFromTexture' || (typeof bg === 'string' && bg.toLowerCase().includes('texture'))) {
+    const rawRef = previewFields?.textureRef
+    const isEmpty = rawRef === undefined || rawRef === null || String(rawRef).trim() === ''
+    if (isEmpty) {
+      payload = { ...payload, ...pickDefaultTexture(textures) }
+    } else {
+      payload = { ...payload, ...resolveRawTextureRef(rawRef, textures) }
+    }
+  }
+  if (currentSource?.type === 'random' && currentSource?.payload) payload = { ...payload, ...currentSource.payload }
+  if (!payload.cityIconType && previewFields?.cityIconType) payload.cityIconType = previewFields.cityIconType
+  return payload
+}
+
+export { pickDefaultTexture, resolveRawTextureRef, buildPreviewPayload }
+export { pick, stripHtmlWrapper, removeTags }
 
 
 export default function CustomizeSettingsSection({ values, handlers, options, ui }) {
@@ -564,50 +655,9 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
 
     return await new Promise((resolve) => canvas.toBlob(resolve))
   }
-  // Build a minimal payload for the background preview request.
-  function pickDefaultTexture() {
-    if (cityIconTypesByPack && Object.keys(cityIconTypesByPack).length > 0) {
-      const firstPack = Object.keys(cityIconTypesByPack)[0]
-      const firstTypes = cityIconTypesByPack[firstPack]
-      if (Array.isArray(firstTypes) && firstTypes.length > 0) return { artPack: firstPack, cityIconType: firstTypes[0] }
-    }
-    if (Array.isArray(textures) && textures.length > 0) {
-      const t = textures[0]
-      return { artPack: t.artPack, cityIconType: t.name }
-    }
-    return {}
-  }
-
-  function resolveRawTextureRef(rawRef) {
-    if (!rawRef) return {}
-    if (String(rawRef).includes('|') && Array.isArray(textures) && textures.length > 0) {
-      const ref = String(rawRef)
-      const found = textures.find((tt) => `${tt.artPack}|${tt.name}` === ref)
-      if (found) return { artPack: found.artPack, cityIconType: found.name }
-      const [ap, nm] = ref.split('|', 2)
-      return { artPack: ap, cityIconType: nm }
-    }
-    return { cityIconType: rawRef }
-  }
-
-  function buildPreviewPayload() {
-    let payload = { width: 520, height: 170 }
-    if (previewFields) payload = { ...payload, ...previewFields }
-    payload.type = previewFields?.backgroundType === undefined ? null : previewFields.backgroundType
-    const bg = payload.type
-    if (bg === 'GeneratedFromTexture' || (typeof bg === 'string' && bg.toLowerCase().includes('texture'))) {
-      const rawRef = previewFields?.textureRef
-      const isEmpty = rawRef === undefined || rawRef === null || String(rawRef).trim() === ''
-      if (isEmpty) {
-        payload = { ...payload, ...pickDefaultTexture() }
-      } else {
-        payload = { ...payload, ...resolveRawTextureRef(rawRef) }
-      }
-    }
-    if (currentSource?.type === 'random' && currentSource?.payload) payload = { ...payload, ...currentSource.payload }
-    if (!payload.cityIconType && previewFields?.cityIconType) payload.cityIconType = previewFields.cityIconType
-    return payload
-  }
+  // Build a minimal payload for the background preview request. Uses
+  // the module-scope `buildPreviewPayload(previewFields, textures, currentSource)`
+  // helper which is exported for unit testing.
 
   
 
@@ -747,9 +797,8 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     setBoldBackgroundColorHex: handlers.setBoldBackgroundColorHex,
   }
 
-  const { textures, borderTypes, i18n, cityIconTypesByPack } = options
+  const { textures, borderTypes, i18n } = options
   const { loading } = ui
-  // Debug logging removed to avoid console noise in the web UI.
   const labels = i18n?.labels
   const backendOptions = i18n?.options
 
@@ -797,10 +846,10 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     const alternate = baseKey && Object.hasOwn(labels ?? {}, baseKey) ? labels[baseKey] : null
     const value = txt || alternate || key
     // If the translation contains literal <br> tags, return React nodes
-      // Guard against extremely long inputs to avoid expensive regex operations
-      if (typeof value === 'string' && value.length <= 2000 && /<br\s*\/?>/i.test(value)) {
-        const parts = value.split(/<br\s*\/?>/i)
-        return parts.flatMap((p) => (p === parts.at(-1) ? [p] : [p, React.createElement('br', { key: `br-${String(p).slice(0,20)}` })]))
+    // Guard against extremely long inputs to avoid expensive regex operations
+    if (typeof value === 'string' && value.length <= 2000 && /<br\s*\/?/i.test(value)) {
+      const parts = value.split(/<br\s*\/?/i)
+      return parts.flatMap((p) => (p === parts.at(-1) ? [p] : [p, React.createElement('br', { key: `br-${String(p).slice(0,20)}` })]))
     }
     return value
   }
@@ -827,55 +876,24 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     if (v === seedLabelFallback) return ''
     return v
   }
-
   const sanitizeTranslation = (s) => {
-    if (!s) { return s }
-    if (typeof s !== 'string') { return s }
+    if (!s) return s
+    if (typeof s !== 'string') return s
     // Remove surrounding <html> wrappers and preserve <br> as line breaks
     let t = String(s)
-      const MAX_SANITIZE_LENGTH = 2000
-      if (t.length > MAX_SANITIZE_LENGTH) t = t.slice(0, MAX_SANITIZE_LENGTH)
-
-      // Strip an optional surrounding <html>...</html> wrapper using
-      // a linear-time scanner to avoid regex backtracking risks.
-      const stripHtmlWrapper = (str) => {
-        let start = 0
-        let end = str.length
-        while (start < end && /\s/.test(str.charAt(start))) start++
-        while (end > start && /\s/.test(str.charAt(end - 1))) end--
-        if (end - start >= 6 && str.substring(start, start + 6).toLowerCase() === '<html>') {
-          start += 6
-          while (start < end && /\s/.test(str.charAt(start))) start++
-        }
-        if (end - start >= 7 && str.substring(end - 7, end).toLowerCase() === '</html>') {
-          end -= 7
-          while (end > start && /\s/.test(str.charAt(end - 1))) end--
-        }
-        return str.substring(start, end)
-      }
-      t = stripHtmlWrapper(t)
+    const MAX_SANITIZE_LENGTH = 2000
+    if (t.length > MAX_SANITIZE_LENGTH) t = t.slice(0, MAX_SANITIZE_LENGTH)
+    // Strip optional surrounding <html> wrapper using module-scope helper
+    t = stripHtmlWrapper(t)
     // If there are <br> tags, convert to React nodes with breaks
     if (/<br\s*\/?>/i.test(t)) {
       const parts = t.split(/<br\s*\/?>/i)
       return parts.flatMap((p) => (p === parts.at(-1) ? [p] : [p, React.createElement('br', { key: `br-${String(p).slice(0,20)}` })]))
     }
-    // Otherwise strip any other HTML tags
-      // Otherwise strip any other HTML tags using a linear scanner
-      const removeTags = (str) => {
-        let out = ''
-        let inTag = false
-        for (let i = 0; i < str.length; i++) {
-          const ch = str.charAt(i)
-          if (!inTag) {
-            if (ch === '<') inTag = true
-            else out += ch
-          } else if (ch === '>') inTag = false
-        }
-        return out
-      }
-      t = removeTags(t)
-      t = t.replaceAll("''", "'")
-      t = t.replaceAll(/\s+/g, ' ').trim()
+    // Otherwise strip any other HTML tags using module-scope helper
+    t = removeTags(t)
+    t = t.replaceAll("''", "'")
+    t = t.replaceAll(/\s+/g, ' ').trim()
     return t
   }
 
@@ -1039,7 +1057,7 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     // request is sent with the fully-settled state.
     let timerId = setTimeout(async () => {
       if (controller.signal.aborted) return
-      const payload = buildPreviewPayload()
+      const payload = buildPreviewPayload(previewFields, textures, currentSource)
       const blob = await fetchPreviewBlob(payload, controller)
       await setPreviewFromBlob(blob)
     }, 100)
@@ -1251,14 +1269,6 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
   
 
   // Tab implementations have been moved into dedicated components.
-  // Helper to pass a narrowed `context` object to each tab (avoid passing whole `tabProps`).
-  const pick = (obj, keys) => {
-    const out = {}
-    for (const k of keys) {
-      if (Object.hasOwn(obj, k)) out[k] = obj[k]
-    }
-    return out
-  }
 
   const backgroundKeys = [
     'translateLabel', 'gatedControlValue', 'emptyComboOption', 'renderColorControl', 'notifyManualChange', 'recomposeUsingLastBase', 'textures', 'backgroundTypes', 'strokeTypes', 'landColoringMethods',

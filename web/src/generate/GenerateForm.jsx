@@ -1419,7 +1419,9 @@ function GenerateForm({ uiLanguage = 'en' }) {
       globalThis.__test_buildNortContentRequest = buildNortContentRequest
       globalThis.__test_handleGenerateAndSaveNort = handleGenerateAndSaveNort
     } catch (e) {
-      // ignore in environments that disallow global assignment
+      if (typeof console !== 'undefined' && typeof console.debug === 'function') {
+        console.debug('GenerateForm: cannot expose test hooks on globalThis — assignment skipped', e)
+      }
     }
   }
 
@@ -1682,12 +1684,12 @@ function GenerateForm({ uiLanguage = 'en' }) {
 export default GenerateForm
 
 // Named exports for tests
-export { serializeNortObject, scaleSliderValue, loadRandomOverrides, loadUiOptions }
-export { buildCustomizePayload, loadCustomizeOverrides } from './GenerateForm.helpers'
-// Additional exports for testing
-export { persistCustomizeOverrides, applyBackgroundFlagsHoisted, setResourceFromRef, parseBooleanWithDefault, computeGridOverlayAlpha, computeConcentricWaveCount }
+export { loadUiOptions }
+// Re-export helper functions used by unit tests
+export { serializeNortObject, scaleSliderValue, computeGridOverlayAlpha, computeConcentricWaveCount, setResourceFromRef, parseBooleanWithDefault, persistCustomizeOverrides, loadRandomOverrides, loadCustomizeOverrides, buildCustomizePayload } from './GenerateForm.helpers'
+// Additional exports for testing (handled via re-exports above)
 // Export additional hoisted appliers for unit testing
-export { applyResourcesAndTopLevelHoisted, applyGridAndColoringHoisted, applyBordersFrayedAndGrungeHoisted, applyCoastOceanAndWavesHoisted, applyRoadsAndScalesHoisted, applyTextAndBackgroundHoisted }
+export { applyBackgroundFlagsHoisted, applyResourcesAndTopLevelHoisted, applyGridAndColoringHoisted, applyBordersFrayedAndGrungeHoisted, applyCoastOceanAndWavesHoisted, applyTextAndBackgroundHoisted,applyRoadsAndScalesHoisted } from './GenerateForm.appliers'
 
 GenerateForm.propTypes = {
   uiLanguage: PropTypes.string,
