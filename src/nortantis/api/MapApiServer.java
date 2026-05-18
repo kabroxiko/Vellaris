@@ -3,15 +3,12 @@ package nortantis.api;
 import com.google.gson.Gson;
 import nortantis.BackgroundGenerator;
 import nortantis.FractalBGGenerator;
-import nortantis.GeneratedDimension;
 import nortantis.IconType;
 import nortantis.ImageCache;
-import nortantis.LandShape;
 import nortantis.MapCreator;
 import nortantis.MapSettings;
 import nortantis.NamedResource;
 import nortantis.SettingsGenerator;
-import nortantis.TextureSource;
 import nortantis.editor.UserPreferences;
 import nortantis.swing.translation.Translation;
 import nortantis.util.Assets;
@@ -31,22 +28,16 @@ import java.util.concurrent.CountDownLatch;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.awt.image.BufferedImage;
 import java.util.Base64;
 import java.util.List;
 import java.util.Random;
+ 
 import java.security.SecureRandom;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.ResourceBundle;
-import javax.imageio.ImageIO;
-import javax.imageio.IIOImage;
-import javax.imageio.ImageWriteParam;
-import javax.imageio.ImageWriter;
-import javax.imageio.stream.ImageOutputStream;
 import java.nio.file.Path;
 
 // Replaced Spark Java handlers with Javalin
@@ -63,9 +54,13 @@ public class MapApiServer
 	private static final Random SHARED_RANDOM = new SecureRandom();
 	private static final String CONTENT_TYPE_JSON = "application/json";
 	private static final String CONTENT_TYPE_PNG = "image/png";
-	private static final String PNG_FORMAT_NAME = "png";
 	private static final String MSG_FAILED_TO_PARSE_CONFIG = "Failed to parse config";
-	private static final float PNG_COMPRESSION_QUALITY = 0.95f;
+
+	// Thread-safe holder for the supplier used to create MapCreator instances.
+	// Use AtomicReference so updates are atomic and visible across threads
+	// (volatile alone does not provide atomicity for updates).
+	private static final java.util.concurrent.atomic.AtomicReference<java.util.function.Supplier<MapCreator>> mapCreatorFactory =
+		new java.util.concurrent.atomic.AtomicReference<>(MapCreator::new);
 
 	public static void main(String[] args)
 	{
@@ -134,7 +129,7 @@ public class MapApiServer
 				Logger.println("Unhandled API exception: " + e);
 				ctx.contentType(CONTENT_TYPE_JSON);
 				ctx.status(500);
-				ctx.result(gson.toJson(new ApiResponse(false, "Unhandled exception: " + formatExceptionMessage(e), null, null)));
+				ctx.result(gson.toJson(new ApiResponse(false, "Unhandled exception: " + ApiUtils.formatExceptionMessage(e), null, null)));
 			});
 		});
 
@@ -190,10 +185,10 @@ public class MapApiServer
 		{
 			@SuppressWarnings("unchecked")
 			Map<String, Object> raw = gson.fromJson(ctx.body(), Map.class);
-			if (raw != null)
+				if (raw != null)
 			{
-				Integer w = parseInteger(raw.get("width"));
-				Integer h = parseInteger(raw.get("height"));
+				Integer w = ApiUtils.parseInteger(raw.get("width"));
+				Integer h = ApiUtils.parseInteger(raw.get("height"));
 				if (w != null)
 					width = w;
 				if (h != null)
@@ -230,7 +225,7 @@ public class MapApiServer
 		// directly depending on servlet response APIs.
 		try (ByteArrayOutputStream baos = new ByteArrayOutputStream())
 		{
-			writeCompressedPng(buffered, baos);
+			ApiUtils.writeCompressedPng(buffered, baos);
 			baos.flush();
 			ctx.contentType(CONTENT_TYPE_PNG);
 			ctx.status(200);
@@ -257,12 +252,12 @@ public class MapApiServer
 		@SuppressWarnings("unchecked")
 		Map<String, Object> settingsMap = gson.fromJson(rawJson, Map.class);
 		@SuppressWarnings("unchecked")
-		Map<String, Object> normalized = (Map<String, Object>) normalizeNumbersInObject(settingsMap);
+		Map<String, Object> normalized = (Map<String, Object>) ApiUtils.normalizeNumbersInObject(settingsMap);
 
 		// Ensure `books` arrays are sorted for deterministic output,
 		// then sort keys recursively to produce a deterministic canonical JSON
-		sortBooksInObject(normalized);
-		Object sorted = sortKeysInObject(normalized);
+		ApiUtils.sortBooksInObject(normalized);
+		Object sorted = ApiUtils.sortKeysInObject(normalized);
 		String normalizedJson = gson.toJson(sorted);
 
 		// Return the canonical normalized .nort JSON directly as the response body
@@ -322,21 +317,7 @@ public class MapApiServer
 		return gson.toJson(ui);
 	}
 
-	private static String formatExceptionMessage(Exception exception)
-	{
-		if (exception == null)
-		{
-			return "unknown";
-		}
 
-		String message = exception.getMessage();
-		if (message == null || message.isBlank())
-		{
-			return exception.getClass().getSimpleName();
-		}
-
-		return exception.getClass().getSimpleName() + " - " + message;
-	}
 
 	private static Object handleGenerate(Context ctx)
 	{
@@ -478,31 +459,31 @@ public class MapApiServer
 
 	private static void populateStandardOptions(Map<String, Object> options)
 	{
-		options.put("tabs", List.of(option("background", tr("theme.tab.background")), option("border", tr("theme.tab.border")), option("effects", tr("theme.tab.effects")),
-				option("fonts", tr("theme.tab.fonts"))));
-		options.put("dimensions", List.of(option("Square", tr("GeneratedDimension.Square")), option("Sixteen_by_9", tr("GeneratedDimension.Sixteen_by_9")),
-				option("Golden_Ratio", tr("GeneratedDimension.Golden_Ratio"))));
-		options.put("landShapes", List.of(option("Continents", tr("LandShape.Continents")), option("Inland_Sea", tr("LandShape.Inland_Sea")), option("Scattered", tr("LandShape.Scattered"))));
-		options.put("landColoringMethods", List.of(option("SingleColor", tr("LandColoringMethod.SingleColor")), option("ColorPoliticalRegions", tr("LandColoringMethod.ColorPoliticalRegions"))));
-		options.put("backgroundTypes", List.of(option("FractalNoise", tr("theme.background.fractalNoise")), option("GeneratedFromTexture", tr("theme.background.generatedFromTexture")),
-				option("SolidColor", tr("theme.background.solidColor"))));
-		options.put("strokeTypes", List.of(option("Solid", tr("StrokeType.Solid")), option("Dashes", tr("StrokeType.Dashes")), option("Rounded_Dashes", tr("StrokeType.Rounded_Dashes")),
-				option("Dots", tr("StrokeType.Dots"))));
-		options.put("borderPositions", List.of(option("Outside_map", tr("BorderPosition.Outside_map")), option("Over_map", tr("BorderPosition.Over_map"))));
-		options.put("borderColorOptions", List.of(option("Ocean_color", tr("BorderColorOption.Ocean_color")), option("Choose_color", tr("BorderColorOption.Choose_color"))));
-		options.put("lineStyles", List.of(option("Jagged", tr("theme.lineStyle.jagged")), option("Splines", tr("theme.lineStyle.splines")),
-				option("SplinesWithSmoothedCoastlines", tr("theme.lineStyle.splinesSmoothed"))));
+		options.put("tabs", List.of(ApiUtils.option("background", tr("theme.tab.background")), ApiUtils.option("border", tr("theme.tab.border")), ApiUtils.option("effects", tr("theme.tab.effects")),
+			ApiUtils.option("fonts", tr("theme.tab.fonts"))));
+		options.put("dimensions", List.of(ApiUtils.option("Square", tr("GeneratedDimension.Square")), ApiUtils.option("Sixteen_by_9", tr("GeneratedDimension.Sixteen_by_9")),
+			ApiUtils.option("Golden_Ratio", tr("GeneratedDimension.Golden_Ratio"))));
+		options.put("landShapes", List.of(ApiUtils.option("Continents", tr("LandShape.Continents")), ApiUtils.option("Inland_Sea", tr("LandShape.Inland_Sea")), ApiUtils.option("Scattered", tr("LandShape.Scattered"))));
+		options.put("landColoringMethods", List.of(ApiUtils.option("SingleColor", tr("LandColoringMethod.SingleColor")), ApiUtils.option("ColorPoliticalRegions", tr("LandColoringMethod.ColorPoliticalRegions"))));
+		options.put("backgroundTypes", List.of(ApiUtils.option("FractalNoise", tr("theme.background.fractalNoise")), ApiUtils.option("GeneratedFromTexture", tr("theme.background.generatedFromTexture")),
+			ApiUtils.option("SolidColor", tr("theme.background.solidColor"))));
+		options.put("strokeTypes", List.of(ApiUtils.option("Solid", tr("StrokeType.Solid")), ApiUtils.option("Dashes", tr("StrokeType.Dashes")), ApiUtils.option("Rounded_Dashes", tr("StrokeType.Rounded_Dashes")),
+			ApiUtils.option("Dots", tr("StrokeType.Dots"))));
+		options.put("borderPositions", List.of(ApiUtils.option("Outside_map", tr("BorderPosition.Outside_map")), ApiUtils.option("Over_map", tr("BorderPosition.Over_map"))));
+		options.put("borderColorOptions", List.of(ApiUtils.option("Ocean_color", tr("BorderColorOption.Ocean_color")), ApiUtils.option("Choose_color", tr("BorderColorOption.Choose_color"))));
+		options.put("lineStyles", List.of(ApiUtils.option("Jagged", tr("theme.lineStyle.jagged")), ApiUtils.option("Splines", tr("theme.lineStyle.splines")),
+			ApiUtils.option("SplinesWithSmoothedCoastlines", tr("theme.lineStyle.splinesSmoothed"))));
 		options.put("oceanWaveTypes",
-				List.of(option("ConcentricWaves", tr("theme.waveType.concentricWaves")), option("Ripples", tr("theme.waveType.ripples")), option("None", tr("theme.waveType.none"))));
+			List.of(ApiUtils.option("ConcentricWaves", tr("theme.waveType.concentricWaves")), ApiUtils.option("Ripples", tr("theme.waveType.ripples")), ApiUtils.option("None", tr("theme.waveType.none"))));
 	}
 
 	private static void populateGridOptions(Map<String, Object> options)
 	{
-		options.put("gridOverlayShapes", List.of(option("Horizontal_hexes", tr("GridOverlayShape.Horizontal_hexes")), option("Vertical_hexes", tr("GridOverlayShape.Vertical_hexes")),
-				option("Squares", tr("GridOverlayShape.Squares")), option("Voronoi_polygons", tr("GridOverlayShape.Voronoi_polygons"))));
-		options.put("gridOverlayOffsets", List.of(option("zero", tr("GridOverlayOffset.zero")), option("quarter", tr("GridOverlayOffset.quarter")), option("half", tr("GridOverlayOffset.half")),
-				option("threeQuarters", tr("GridOverlayOffset.threeQuarters"))));
-		options.put("gridOverlayLayers", List.of(option("Under_icons", tr("GridOverlayLayer.Under_icons")), option("Over_icons", tr("GridOverlayLayer.Over_icons"))));
+		options.put("gridOverlayShapes", List.of(ApiUtils.option("Horizontal_hexes", tr("GridOverlayShape.Horizontal_hexes")), ApiUtils.option("Vertical_hexes", tr("GridOverlayShape.Vertical_hexes")),
+			ApiUtils.option("Squares", tr("GridOverlayShape.Squares")), ApiUtils.option("Voronoi_polygons", tr("GridOverlayShape.Voronoi_polygons"))));
+		options.put("gridOverlayOffsets", List.of(ApiUtils.option("zero", tr("GridOverlayOffset.zero")), ApiUtils.option("quarter", tr("GridOverlayOffset.quarter")), ApiUtils.option("half", tr("GridOverlayOffset.half")),
+			ApiUtils.option("threeQuarters", tr("GridOverlayOffset.threeQuarters"))));
+		options.put("gridOverlayLayers", List.of(ApiUtils.option("Under_icons", tr("GridOverlayLayer.Under_icons")), ApiUtils.option("Over_icons", tr("GridOverlayLayer.Over_icons"))));
 	}
 
 	private static void enumerateFonts(Map<String, Object> options)
@@ -573,7 +554,7 @@ public class MapApiServer
 		@SuppressWarnings("unchecked")
 		Map<String, Object> defMap = gson.fromJson(defJson, Map.class);
 		@SuppressWarnings("unchecked")
-		Map<String, Object> normalized = (Map<String, Object>) normalizeNumbersInObject(defMap);
+		Map<String, Object> normalized = (Map<String, Object>) ApiUtils.normalizeNumbersInObject(defMap);
 		result.put("defaults", normalized);
 	}
 
@@ -627,165 +608,9 @@ public class MapApiServer
 	}
 
 
-	// Recursively sort Map keys (lexicographically) so JSON serialization
-	// produces deterministic canonical ordering. Lists are preserved and
-	// non-container values are returned as-is.
-	private static Object sortKeysInObject(Object o)
-	{
-		if (o == null)
-			return null;
-		if (o instanceof Map)
-			return sortMap((Map<?, ?>) o);
-		if (o instanceof List)
-			return sortList((List<?>) o);
-		return o;
-	}
+    
 
-	private static Map<String, Object> sortMap(Map<?, ?> m)
-	{
-		java.util.TreeMap<String, Object> out = new java.util.TreeMap<>();
-		for (Map.Entry<?, ?> e : m.entrySet())
-		{
-			String k = String.valueOf(e.getKey());
-			out.put(k, sortKeysInObject(e.getValue()));
-		}
-		return out;
-	}
-
-	private static List<Object> sortList(List<?> l)
-	{
-		List<Object> out = new java.util.ArrayList<>(l.size());
-		for (Object v : l)
-			out.add(sortKeysInObject(v));
-		return out;
-	}
-
-	// Recursively find any Map entries with key "books" whose value is a List
-	// and sort that list lexicographically (by string value). This enforces a
-	// deterministic ordering for the books array in returned .nort content.
-	private static void sortBooksInObject(Object o)
-	{
-		if (o == null)
-			return;
-		if (o instanceof Map)
-		{
-			processMapForBooks((Map<?, ?>) o);
-		}
-		else if (o instanceof List)
-		{
-			for (Object v : (List<?>) o)
-				sortBooksInObject(v);
-		}
-	}
-
-	private static void processMapForBooks(Map<?, ?> m)
-	{
-		for (Map.Entry<?, ?> e : m.entrySet())
-		{
-			String k = String.valueOf(e.getKey());
-			Object v = e.getValue();
-			if ("books".equals(k) && v instanceof List)
-			{
-				sortBooksListInMap(m, k, v);
-			}
-			else
-			{
-				sortBooksInObject(v);
-			}
-		}
-	}
-
-	private static void sortBooksListInMap(Map<?, ?> m, String key, Object v)
-	{
-		try
-		{
-			@SuppressWarnings("unchecked")
-			List<Object> lst = new java.util.ArrayList<>((List<Object>) v);
-			lst.sort((a, b) -> String.valueOf(a).compareTo(String.valueOf(b)));
-			@SuppressWarnings("unchecked")
-			Map<String, Object> mm = (Map<String, Object>) m;
-			mm.put(key, lst);
-		}
-		catch (ClassCastException | NullPointerException ignore)
-		{
-			// best-effort sorting; ignore malformed entries
-		}
-	}
-
-	// Ensure numeric values that are whole numbers are represented as
-	// integer types to avoid exponential/scientific notation when
-	// serialized to JSON. This walks Maps and Lists recursively.
-	private static Object normalizeNumbersInObject(Object o)
-	{
-		if (o == null)
-			return null;
-		if (o instanceof Map)
-			return normalizeMap((Map<?, ?>) o);
-		if (o instanceof List)
-			return normalizeList((List<?>) o);
-		if (o instanceof Number number)
-			return normalizeNumber(number);
-		return o;
-	}
-
-	private static Map<Object, Object> normalizeMap(Map<?, ?> m)
-	{
-		Map<Object, Object> out = new LinkedHashMap<>();
-		for (Map.Entry<?, ?> e : m.entrySet())
-		{
-			Object k = e.getKey();
-			Object v = e.getValue();
-			out.put(k, normalizeNumbersInObject(v));
-		}
-		return out;
-	}
-
-	private static List<Object> normalizeList(List<?> l)
-	{
-		List<Object> out = new java.util.ArrayList<>(l.size());
-		for (Object v : l)
-			out.add(normalizeNumbersInObject(v));
-		return out;
-	}
-
-	private static Object normalizeNumber(Number n)
-	{
-		if (n instanceof java.math.BigDecimal bd)
-		{
-			try
-			{
-				long lv = bd.longValueExact();
-				if (lv >= Integer.MIN_VALUE && lv <= Integer.MAX_VALUE)
-					return Integer.valueOf((int) lv);
-				return Long.valueOf(lv);
-			}
-			catch (ArithmeticException ae)
-			{
-				return bd.doubleValue();
-			}
-		}
-		if (n instanceof Double || n instanceof Float)
-		{
-			double d = n.doubleValue();
-			if (Double.isFinite(d) && Math.floor(d) == d)
-			{
-				long lv = (long) d;
-				if (lv >= Integer.MIN_VALUE && lv <= Integer.MAX_VALUE)
-					return Integer.valueOf((int) lv);
-				return Long.valueOf(lv);
-			}
-			return Double.valueOf(d);
-		}
-		return n;
-	}
-
-	private static Map<String, String> option(String value, String label)
-	{
-		Map<String, String> entry = new LinkedHashMap<>();
-		entry.put("value", value);
-		entry.put("label", label);
-		return entry;
-	}
+    
 
 	private static String tr(String key)
 	{
@@ -821,22 +646,7 @@ public class MapApiServer
 		}
 	}
 
-	// Helper to robustly parse an Integer from a loosely-typed JSON value.
-	private static Integer parseInteger(Object v)
-	{
-		if (v == null)
-			return null;
-		if (v instanceof Number number)
-			return number.intValue();
-		try
-		{
-			return Integer.valueOf(String.valueOf(v));
-		}
-		catch (RuntimeException e)
-		{
-			return null;
-		}
-	}
+    
 
 	private static Image generateBackgroundBaseImage(int width, int height, String type, String cityIconType, String artPack)
 	{
@@ -920,103 +730,16 @@ public class MapApiServer
 		}
 	}
 
-	// Extracted helper to satisfy Sonar S1141: keep nested try logic in a
-	// separate method for clarity and single-responsibility.
-	private static void ensureIconEditsFlag(MapSettings settings)
-	{
-		try
-		{
-			if (settings.edits != null)
-			{
-				// Only mark hasIconEdits true when centerEdits are present (initialized).
-				// If only freeIcons are present without initialized centerEdits, the
-				// editor state is incomplete and IconDrawer expects centerEdits to exist
-				// for full-map icon updates. The frontend should send initialized
-				// centerEdits when it intends to re-use edits; do not infer from
-				// freeIcons alone to avoid NPEs in the generation pipeline.
-				boolean hasCenterEdits = settings.edits.centerEdits != null && !settings.edits.centerEdits.isEmpty();
-				if (hasCenterEdits)
-				{
-					settings.edits.hasIconEdits = true;
-				}
-			}
-		}
-		catch (NullPointerException ignore)
-		{
-			// best-effort; if this fails, default behavior remains unchanged
-		}
-	}
-
-	private static MapSettings generateRandomMapSettings(RandomMapParameters params)
+	private static MapSettings generateRandomMapSettings(ApiUtils.RandomMapParameters params)
 	{
 		Random rand = SHARED_RANDOM;
 		String artPack = (params.artPack != null && !params.artPack.isEmpty()) ? params.artPack : Assets.installedArtPack;
 		MapSettings settings = SettingsGenerator.generate(rand, artPack, null);
-		applyRandomMapParameterOverrides(params, settings);
+		ApiUtils.applyRandomMapParameterOverrides(params, settings);
 		return settings;
 	}
 
-	private static void applyRandomMapParameterOverrides(RandomMapParameters p, MapSettings settings)
-	{
-		if (p.worldSize != null)
-			settings.worldSize = p.worldSize;
-		if (p.cityIconSetName != null && !p.cityIconSetName.isEmpty())
-			settings.cityIconTypeName = p.cityIconSetName;
-		if (p.landShape != null && !p.landShape.isEmpty())
-		{
-			try
-			{
-				settings.landShape = LandShape.valueOf(p.landShape);
-			}
-			catch (IllegalArgumentException ignored)
-			{
-				// Invalid landShape provided by client; ignore and keep generated default.
-			}
-		}
-		if (p.regionCount != null)
-			settings.regionCount = p.regionCount;
-		if (p.cityFrequency != null)
-			settings.cityProbability = p.cityFrequency / 100.0 * SettingsGenerator.maxCityProbability;
-		if (p.books != null && !p.books.isEmpty())
-			settings.books = new HashSet<>(p.books);
-		applyDimensionOverride(p, settings);
-		if (p.drawRegionColors != null)
-			settings.drawRegionColors = p.drawRegionColors;
-	}
-
-	// Extracted dimension handling to reduce method cognitive complexity (Sonar S3776)
-	private static void applyDimensionOverride(RandomMapParameters p, MapSettings settings)
-	{
-		if (p.dimension == null || p.dimension.isEmpty())
-			return;
-		try
-		{
-			GeneratedDimension dim = GeneratedDimension.valueOf(p.dimension);
-			if (dim != GeneratedDimension.Custom)
-			{
-				settings.generatedWidth = dim.width;
-				settings.generatedHeight = dim.height;
-			}
-		}
-		catch (IllegalArgumentException ignored)
-		{
-			// Invalid dimension name supplied; ignore and keep generated/default dimensions.
-		}
-	}
-
-	private static class RandomMapParameters
-	{
-		String language;
-		String dimension;
-		Integer worldSize;
-		String landShape;
-		Integer regionCount;
-		Boolean drawRegionColors;
-		Integer cityFrequency;
-		List<String> books;
-		String artPack;
-		String cityIconSetName;
-	}
+    
 
 	/**
 	 * Internal helper holding parsed request context for generation endpoints.
@@ -1043,7 +766,7 @@ public class MapApiServer
 
 		PlatformFactory.setInstance(new AwtFactory());
 
-		RandomMapParameters params = tryParseParams(body);
+		ApiUtils.RandomMapParameters params = tryParseParams(body);
 
 		if (allowGenerateRandomSettings && paramsContainGenerationFields(params))
 		{
@@ -1054,11 +777,11 @@ public class MapApiServer
 	}
 
 	// Helper: attempt to parse the request body as RandomMapParameters
-	private static RandomMapParameters tryParseParams(String body)
+	private static ApiUtils.RandomMapParameters tryParseParams(String body)
 	{
 		try
 		{
-			return gson.fromJson(body, RandomMapParameters.class);
+			return gson.fromJson(body, ApiUtils.RandomMapParameters.class);
 		}
 		catch (com.google.gson.JsonSyntaxException e)
 		{
@@ -1067,14 +790,14 @@ public class MapApiServer
 	}
 
 	// Helper: quick check whether parsed params contain any generation fields
-	private static boolean paramsContainGenerationFields(RandomMapParameters p)
+	private static boolean paramsContainGenerationFields(ApiUtils.RandomMapParameters p)
 	{
 		return p != null && (p.language != null || p.dimension != null || p.worldSize != null || p.landShape != null || p.regionCount != null || p.cityFrequency != null
 				|| (p.books != null && !p.books.isEmpty()));
 	}
 
 	// Build GenerationRequestContext when params-driven generation is requested
-	private static GenerationRequestContext buildContextFromParams(RandomMapParameters params)
+	private static GenerationRequestContext buildContextFromParams(ApiUtils.RandomMapParameters params)
 	{
 		GenerationRequestContext out = new GenerationRequestContext();
 		out.settings = generateRandomMapSettings(params);
@@ -1086,12 +809,12 @@ public class MapApiServer
 	}
 
 	// Build GenerationRequestContext by parsing JSON only. Reject non-JSON inputs.
-	private static GenerationRequestContext buildContextFromNortBody(String body, RandomMapParameters params, Context ctx)
+	private static GenerationRequestContext buildContextFromNortBody(String body, ApiUtils.RandomMapParameters params, Context ctx)
 	{
 		try
 		{
 			MapSettings settings = MapSettings.fromJson(body);
-			ensureIconEditsFlag(settings);
+			ApiUtils.ensureIconEditsFlag(settings);
 			GenerationRequestContext out = new GenerationRequestContext();
 			out.ctx = new GenerationContext(settings);
 			out.settings = settings;
@@ -1117,7 +840,7 @@ public class MapApiServer
 		// requested which influences resolution calculations; matching that
 		// behavior here ensures generated worlds are consistent given the
 		// same settings and seed.
-		Dimension dims = (generatedWidth != null || generatedHeight != null) ? computeRenderDimensions(settings, generatedWidth, generatedHeight) : null;
+		Dimension dims = (generatedWidth != null || generatedHeight != null) ? ApiUtils.computeRenderDimensionsFromSettings(settings, generatedWidth, generatedHeight) : null;
 
 		try
 		{
@@ -1130,21 +853,10 @@ public class MapApiServer
 		}
 	}
 
-	private static Dimension computeRenderDimensions(MapSettings settings, Integer generatedWidth, Integer generatedHeight)
-	{
-		// If the caller did not provide explicit width/height, prefer the
-		// `generatedWidth`/`generatedHeight` from the loaded `.nort` settings
-		// so maps loaded from files render at their intended resolution.
-		int defaultWidth = settings.generatedWidth > 0 ? settings.generatedWidth : 2000;
-		int defaultHeight = settings.generatedHeight > 0 ? settings.generatedHeight : 1200;
-		int w = (generatedWidth != null) ? generatedWidth : defaultWidth;
-		int h = (generatedHeight != null) ? generatedHeight : defaultHeight;
-		return new Dimension(w, h);
-	}
-
 	private static GenerationResult attemptPrimaryRender(MapSettings settings, Dimension dims)
 	{
-		MapCreator creator = new MapCreator();
+		java.util.function.Supplier<MapCreator> supplier = mapCreatorFactory.get();
+		MapCreator creator = supplier.get();
 		Image image = creator.createMap(settings, dims, null);
 		return GenerationResult.success(image);
 	}
@@ -1154,14 +866,15 @@ public class MapApiServer
 		try
 		{
 			MapSettings fallback = prepareFallbackSettings(settings);
-			MapCreator creator = new MapCreator();
+			java.util.function.Supplier<MapCreator> supplier = mapCreatorFactory.get();
+			MapCreator creator = supplier.get();
 			Image fallbackImage = creator.createMap(fallback, dims, null);
 			return GenerationResult.success(fallbackImage);
 		}
 		catch (RuntimeException fallbackError)
 		{
 			Logger.println("generateMap fallback render failed: " + fallbackError);
-			String message = buildErrorMessage(firstError, fallbackError);
+			String message = ApiUtils.buildErrorMessage(firstError, fallbackError);
 			return GenerationResult.failure(message);
 		}
 	}
@@ -1176,54 +889,19 @@ public class MapApiServer
 			fallback.artPack = Assets.installedArtPack;
 		}
 
-		disableFileTextureIfNeeded(fallback);
-		disableCustomTextureIfNeeded(fallback);
-		disableCustomBorderIfNeeded(fallback);
+		ApiUtils.disableFileTextureIfNeeded(fallback);
+		ApiUtils.disableCustomTextureIfNeeded(fallback);
+		ApiUtils.disableCustomBorderIfNeeded(fallback);
 
 		return fallback;
 	}
 
-	private static void disableFileTextureIfNeeded(MapSettings fallback)
-	{
-		if (fallback.backgroundTextureSource == TextureSource.File)
-		{
-			fallback.generateBackgroundFromTexture = false;
-			fallback.solidColorBackground = true;
-			fallback.backgroundTextureImage = "";
-		}
-	}
-
-	private static void disableCustomTextureIfNeeded(MapSettings fallback)
-	{
-		if (fallback.backgroundTextureResource != null && Assets.customArtPack.equals(fallback.backgroundTextureResource.artPack))
-		{
-			fallback.generateBackgroundFromTexture = false;
-			fallback.solidColorBackground = true;
-			fallback.backgroundTextureResource = null;
-		}
-	}
-
-	private static void disableCustomBorderIfNeeded(MapSettings fallback)
-	{
-		if (fallback.borderResource != null && Assets.customArtPack.equals(fallback.borderResource.artPack))
-		{
-			fallback.drawBorder = false;
-			fallback.borderResource = null;
-		}
-	}
-
-	private static String buildErrorMessage(Exception firstError, Exception fallbackError)
-	{
-		return "Failed to generate map: " + fallbackError.getClass().getSimpleName() + (fallbackError.getMessage() != null ? (" - " + fallbackError.getMessage()) : "") + " (primary error: "
-				+ firstError.getClass().getSimpleName() + (firstError.getMessage() != null ? (" - " + firstError.getMessage()) : "") + ")";
-	}
-
-	private static final int MAX_BASE64_PREVIEW_DIMENSION = 1920;
+    
 
 	private static Object returnJsonResponse(BufferedImage buf, MapSettings settings, Context ctx) throws IOException
 	{
-		buf = scaleImageIfNeeded(buf);
-		byte[] bytes = serializeImageToBytes(buf);
+		buf = ApiUtils.scaleImageIfNeeded(buf);
+		byte[] bytes = ApiUtils.serializeImageToBytes(buf);
 		String nortContent = resolveBestNortContent(settings);
 
 		// Parse canonical settings into a map, attach imageBase64, and return
@@ -1238,32 +916,7 @@ public class MapApiServer
 		return gson.toJson(settingsMap);
 	}
 
-	private static BufferedImage scaleImageIfNeeded(BufferedImage buf)
-	{
-		if (buf.getWidth() > MAX_BASE64_PREVIEW_DIMENSION || buf.getHeight() > MAX_BASE64_PREVIEW_DIMENSION)
-		{
-			double scale = Math.min((double) MAX_BASE64_PREVIEW_DIMENSION / buf.getWidth(), (double) MAX_BASE64_PREVIEW_DIMENSION / buf.getHeight());
-			int previewWidth = (int) (buf.getWidth() * scale);
-			int previewHeight = (int) (buf.getHeight() * scale);
-			BufferedImage scaled = new BufferedImage(previewWidth, previewHeight, buf.getType());
-			java.awt.Graphics2D g = scaled.createGraphics();
-			g.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION, java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-			g.drawImage(buf, 0, 0, previewWidth, previewHeight, null);
-			g.dispose();
-			return scaled;
-		}
-		return buf;
-	}
-
-	private static byte[] serializeImageToBytes(BufferedImage buf) throws IOException
-	{
-		try (ByteArrayOutputStream baos = new ByteArrayOutputStream())
-		{
-			writeCompressedPng(buf, baos);
-			baos.flush();
-			return baos.toByteArray();
-		}
-	}
+    
 
 	private static String resolveBestNortContent(MapSettings settings)
 	{
@@ -1313,32 +966,7 @@ public class MapApiServer
 	}
 
 
-	private static void writeCompressedPng(BufferedImage image, OutputStream outputStream) throws IOException
-	{
-		java.util.Iterator<ImageWriter> writers = ImageIO.getImageWritersByFormatName(PNG_FORMAT_NAME);
-		if (!writers.hasNext())
-		{
-			ImageIO.write(image, PNG_FORMAT_NAME, outputStream);
-			return;
-		}
-
-		ImageWriter writer = writers.next();
-		try (ImageOutputStream imageOutputStream = ImageIO.createImageOutputStream(outputStream))
-		{
-			writer.setOutput(imageOutputStream);
-			ImageWriteParam param = writer.getDefaultWriteParam();
-			if (param.canWriteCompressed())
-			{
-				param.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
-				param.setCompressionQuality(PNG_COMPRESSION_QUALITY);
-			}
-			writer.write(null, new IIOImage(image, null, null), param);
-		}
-		finally
-		{
-			writer.dispose();
-		}
-	}
+    
 
 	private static class GenerationContext
 	{

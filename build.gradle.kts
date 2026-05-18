@@ -4,9 +4,11 @@ import org.gradle.plugins.ide.eclipse.model.internal.FileReferenceFactory
 plugins {
     java
     application
+    `java-test-fixtures`
     id("com.diffplug.spotless") version "6.23.3"
     id("com.github.ben-manes.versions") version "0.48.0"
     eclipse
+    jacoco
 }
 
 repositories {
@@ -188,5 +190,18 @@ spotless {
     java {
         eclipse().configFile("eclipse-formatter-config.xml")
         cleanthat()
+    }
+}
+
+jacoco {
+    toolVersion = "0.8.10"
+}
+
+tasks.jacocoTestReport {
+    dependsOn(tasks.test)
+    reports {
+        xml.required.set(true)
+        html.required.set(true)
+        csv.required.set(false)
     }
 }

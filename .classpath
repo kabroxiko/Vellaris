@@ -7,19 +7,28 @@
 			<attribute name="test" value="true"/>
 		</attributes>
 	</classpathentry>
-	<classpathentry including="**/*.properties|**/manifest.txt|**/*.java" kind="src" output="bin/main" path="src">
+	<classpathentry kind="src" output="bin/testFixtures" path="src/testFixtures/java">
 		<attributes>
-			<attribute name="gradle_scope" value="main"/>
-			<attribute name="gradle_used_by_scope" value="main,test"/>
+			<attribute name="gradle_scope" value="testFixtures"/>
+			<attribute name="gradle_used_by_scope" value="testFixtures"/>
+			<attribute name="test" value="true"/>
 		</attributes>
 	</classpathentry>
-	<classpathentry including="**/*.properties|**/manifest.txt" kind="src" output="bin/main" path="build/generated-resources">
+	<classpathentry excluding="**" including="**/*.properties|**/manifest.txt|**/*.java" kind="src" output="bin/main" path="src">
 		<attributes>
 			<attribute name="gradle_scope" value="main"/>
-			<attribute name="gradle_used_by_scope" value="main,test"/>
+			<attribute name="gradle_used_by_scope" value="main"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry excluding="**" including="**/*.properties|**/manifest.txt" kind="src" output="bin/main" path="build/generated-resources">
+		<attributes>
+			<attribute name="gradle_scope" value="main"/>
+			<attribute name="gradle_used_by_scope" value="main"/>
 		</attributes>
 	</classpathentry>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/JavaSE-21/"/>
 	<classpathentry kind="con" path="org.eclipse.buildship.core.gradleclasspathcontainer"/>
+	<classpathentry kind="lib" path="/Users/kabroxiko/nortantis/build/libs/nortantis-test-fixtures.jar"/>
+	<classpathentry kind="lib" path="/Users/kabroxiko/nortantis/build/libs/Nortantis.jar"/>
 	<classpathentry kind="output" path="bin/default"/>
 </classpath>
