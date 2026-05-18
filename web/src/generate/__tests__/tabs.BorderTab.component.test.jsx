@@ -33,7 +33,10 @@ describe('BorderTab', () => {
       borderPosition: 'inside',
       borderPositions: [{ value: 'inside', label: 'Inside' }],
       borderColorOption: 'Default',
-      borderColorOptions: [{ value: 'Default', label: 'Default' }, { value: 'Choose_color', label: 'Choose' }],
+      borderColorOptions: [
+        { value: 'Default', label: 'Default' },
+        { value: 'Choose_color', label: 'Choose' },
+      ],
       borderColorHex: '#000000',
       frayedBorder: false,
       frayedBorderBlurLevel: 2,

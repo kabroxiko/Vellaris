@@ -15,12 +15,27 @@ vi.mock('../backgroundBaseCache', () => {
 
 // Mock BackgroundTab to expose recomposeUsingLastBase via a button
 vi.mock('../tabs/BackgroundTab', () => ({
-  default: (props) => React.createElement('div', { 'data-testid': 'bg-tab' }, React.createElement('button', { 'data-testid': 'recompose-btn', onClick: () => props?.recomposeUsingLastBase() }, 'Recompose')),
+  default: (props) =>
+    React.createElement(
+      'div',
+      { 'data-testid': 'bg-tab' },
+      React.createElement(
+        'button',
+        { 'data-testid': 'recompose-btn', onClick: () => props?.recomposeUsingLastBase() },
+        'Recompose'
+      )
+    ),
 }))
 // Keep other tabs simple
-vi.mock('../tabs/BorderTab', () => ({ default: (props) => React.createElement('div', { 'data-testid': 'border-tab' }, 'BORDER') }))
-vi.mock('../tabs/EffectsTab', () => ({ default: (props) => React.createElement('div', { 'data-testid': 'effects-tab' }, 'EFFECTS') }))
-vi.mock('../tabs/FontsTab', () => ({ default: (props) => React.createElement('div', { 'data-testid': 'fonts-tab' }, 'FONTS') }))
+vi.mock('../tabs/BorderTab', () => ({
+  default: (props) => React.createElement('div', { 'data-testid': 'border-tab' }, 'BORDER'),
+}))
+vi.mock('../tabs/EffectsTab', () => ({
+  default: (props) => React.createElement('div', { 'data-testid': 'effects-tab' }, 'EFFECTS'),
+}))
+vi.mock('../tabs/FontsTab', () => ({
+  default: (props) => React.createElement('div', { 'data-testid': 'fonts-tab' }, 'FONTS'),
+}))
 
 import CustomizeSettingsSection from '../CustomizeSettingsSection'
 
@@ -49,11 +64,27 @@ function makeProps(overrides = {}) {
   }
   const options = {
     textures: [],
-    i18n: { labels: undefined, options: { tabs: [ { id: 'background', label: 'Background' }, { id: 'border', label: 'Border' }, { id: 'effects', label: 'Effects' }, { id: 'fonts', label: 'Fonts' } ], fonts: [] } },
+    i18n: {
+      labels: undefined,
+      options: {
+        tabs: [
+          { id: 'background', label: 'Background' },
+          { id: 'border', label: 'Border' },
+          { id: 'effects', label: 'Effects' },
+          { id: 'fonts', label: 'Fonts' },
+        ],
+        fonts: [],
+      },
+    },
     borderTypes: [],
   }
   const ui = { loading: false, customizationDirty: false, hasGeneratedOnce: false }
-  return { values: { ...baseValues, ...overrides.values }, handlers: { ...handlers, ...(overrides.handlers ) }, options: { ...options, ...(overrides.options ) }, ui: { ...ui, ...(overrides.ui) } }
+  return {
+    values: { ...baseValues, ...overrides.values },
+    handlers: { ...handlers, ...overrides.handlers },
+    options: { ...options, ...overrides.options },
+    ui: { ...ui, ...overrides.ui },
+  }
 }
 
 describe('CustomizeSettingsSection preview lifecycle', () => {
@@ -99,7 +130,8 @@ describe('CustomizeSettingsSection preview lifecycle', () => {
     }
     const originalCreate = document.createElement.bind(document)
     vi.spyOn(document, 'createElement').mockImplementation((tag) => {
-      if (tag === 'canvas') return { width: 10, height: 6, getContext: () => mockCtx, toBlob: (cb) => cb('PBLOB') }
+      if (tag === 'canvas')
+        return { width: 10, height: 6, getContext: () => mockCtx, toBlob: (cb) => cb('PBLOB') }
       return originalCreate(tag)
     })
 

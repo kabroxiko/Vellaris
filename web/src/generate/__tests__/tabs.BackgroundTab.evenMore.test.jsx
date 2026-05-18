@@ -28,7 +28,10 @@ test('grid layer and shape selects call setters when changed', () => {
   const setGridOverlayLayer = vi.fn()
   const setGridOverlayShape = vi.fn()
   const layers = [{ value: 'layerA', label: 'Layer A' }]
-  const shapes = [{ value: 'square', label: 'Square' }, { value: 'voronoi', label: 'Voronoi' }]
+  const shapes = [
+    { value: 'square', label: 'Square' },
+    { value: 'voronoi', label: 'Voronoi' },
+  ]
 
   render(
     <BackgroundTab

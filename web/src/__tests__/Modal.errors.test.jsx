@@ -106,10 +106,14 @@ describe('Modal resize, pinch and error paths', () => {
     // also make releasePointerCapture throw InvalidStateError
     const imgEl = modalEl.querySelector('.zoom-pan')
     // make a real element's releasePointerCapture throw
-    imgEl.releasePointerCapture = () => { throw new DOMException('x','InvalidStateError') }
+    imgEl.releasePointerCapture = () => {
+      throw new DOMException('x', 'InvalidStateError')
+    }
 
     // pointerdown should not throw even if setPointerCapture throws
-    expect(() => fireEvent.pointerDown(containerEl, { pointerId: 5, clientX: 10, clientY: 10 })).not.toThrow()
+    expect(() =>
+      fireEvent.pointerDown(containerEl, { pointerId: 5, clientX: 10, clientY: 10 })
+    ).not.toThrow()
 
     // pointerup on the real img element (whose releasePointerCapture throws) should not escape
     expect(() => fireEvent.pointerUp(imgEl, { pointerId: 5 })).not.toThrow()

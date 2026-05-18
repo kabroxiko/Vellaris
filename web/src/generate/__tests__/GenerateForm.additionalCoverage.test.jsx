@@ -5,7 +5,16 @@ vi.mock('../helpers', async () => {
   const actual = await vi.importActual('../helpers')
   return {
     ...actual,
-    fetchJson: vi.fn(async () => ({ options: {}, defaults: {}, artPacks: [], books: [], textures: [], borderTypes: [], cityIconTypesByPack: {}, labels: {} })),
+    fetchJson: vi.fn(async () => ({
+      options: {},
+      defaults: {},
+      artPacks: [],
+      books: [],
+      textures: [],
+      borderTypes: [],
+      cityIconTypesByPack: {},
+      labels: {},
+    })),
   }
 })
 
@@ -34,7 +43,9 @@ test('buildNortContentRequest returns body when explicit content provided', asyn
   // `currentSource.type` for the returned `source`. In that environment
   // we expect the call to throw due to missing currentSource, which
   // still exercises merge path for explicit content.
-  expect(() => globalThis.__test_buildNortContentRequest({ explicitNortContent: explicit })).toThrow()
+  expect(() =>
+    globalThis.__test_buildNortContentRequest({ explicitNortContent: explicit })
+  ).toThrow()
 })
 
 test('handleGenerateAndSaveNort shows warning when build fails', async () => {

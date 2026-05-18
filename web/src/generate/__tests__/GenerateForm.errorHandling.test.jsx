@@ -11,14 +11,30 @@ vi.mock('../helpers', async () => {
   const actual = await vi.importActual('../helpers')
   return {
     ...actual,
-    fetchJson: vi.fn(() => Promise.resolve({
-      labels: { 'ui.button.downloadSettings': 'Download settings', 'ui.button.regenerate': 'Regenerate' },
-      books: [], artPacks: [], textures: [], borderTypes: [], options: {}, defaults: {},
-    })),
+    fetchJson: vi.fn(() =>
+      Promise.resolve({
+        labels: {
+          'ui.button.downloadSettings': 'Download settings',
+          'ui.button.regenerate': 'Regenerate',
+        },
+        books: [],
+        artPacks: [],
+        textures: [],
+        borderTypes: [],
+        options: {},
+        defaults: {},
+      })
+    ),
   }
 })
 
-vi.mock('../i18n/webLabels', () => ({ getFrontendLabels: async () => ({ 'ui.loading': 'Loading', 'ui.button.downloadSettings': 'Download settings', 'ui.button.regenerate': 'Regenerate' }) }))
+vi.mock('../i18n/webLabels', () => ({
+  getFrontendLabels: async () => ({
+    'ui.loading': 'Loading',
+    'ui.button.downloadSettings': 'Download settings',
+    'ui.button.regenerate': 'Regenerate',
+  }),
+}))
 
 import GenerateForm from '../GenerateForm'
 
@@ -29,7 +45,8 @@ function getUrlString(url) {
   if (url instanceof Request) return url.url
   if (url instanceof URL) return url.href
   if (url && typeof url === 'object' && 'url' in url && typeof url.url === 'string') return url.url
-  if (url && typeof url.toString === 'function' && url.toString !== Object.prototype.toString) return url.toString()
+  if (url && typeof url.toString === 'function' && url.toString !== Object.prototype.toString)
+    return url.toString()
   return ''
 }
 

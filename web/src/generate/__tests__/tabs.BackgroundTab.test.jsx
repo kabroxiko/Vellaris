@@ -45,8 +45,12 @@ describe('BackgroundTab component', () => {
       if (id !== 'land-color') return null
       return (
         <>
-          <button data-testid="color-change" onClick={() => onHexChange('#112233')}>change</button>
-          <button data-testid="color-close" onClick={onClose}>close</button>
+          <button data-testid="color-change" onClick={() => onHexChange('#112233')}>
+            change
+          </button>
+          <button data-testid="color-close" onClick={onClose}>
+            close
+          </button>
         </>
       )
     }

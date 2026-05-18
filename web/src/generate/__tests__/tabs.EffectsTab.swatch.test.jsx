@@ -4,7 +4,9 @@ import EffectsTab from '../tabs/EffectsTab'
 
 describe('EffectsTab swatchReplacement', () => {
   it('passes sanitized swatchReplacement when finalLandColoringMethod is ColorPoliticalRegions', () => {
-    const renderColorControl = (opts) => <div data-swatch={opts.swatchReplacement}>{opts.label}</div>
+    const renderColorControl = (opts) => (
+      <div data-swatch={opts.swatchReplacement}>{opts.label}</div>
+    )
     const translateLabel = (k) => {
       if (k === 'theme.coastShadingColor.disabled') return '<b>Disabled {0}</b>'
       if (k === 'LandColoringMethod.ColorPoliticalRegions') return 'Political'

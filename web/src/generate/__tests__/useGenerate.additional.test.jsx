@@ -52,7 +52,7 @@ describe('useGenerate additional flows', () => {
   it('runGenerate sets error when nort-only expected but server returns image bytes', async () => {
     vi.doMock('../sharedHelpers', () => ({
       makeProgressToastController: () => ({ show: () => {}, hide: () => {} }),
-      readResponseBytesWithProgress: async () => new Uint8Array([1,2,3]),
+      readResponseBytesWithProgress: async () => new Uint8Array([1, 2, 3]),
     }))
     globalThis.fetch = vi.fn(async () => ({ ok: true, headers: { get: () => 'image/png' } }))
 
@@ -74,7 +74,11 @@ describe('useGenerate additional flows', () => {
         setError,
         setLoading,
       })
-      return <button onClick={() => runGenerate({ body: null }, 'base', 'src', 'nort-only')}>RunNort</button>
+      return (
+        <button onClick={() => runGenerate({ body: null }, 'base', 'src', 'nort-only')}>
+          RunNort
+        </button>
+      )
     }
 
     render(<LocalRunner2 />)

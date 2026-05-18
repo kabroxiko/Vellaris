@@ -10,7 +10,12 @@ describe('utils module', () => {
   it('parses various color formats', () => {
     expect(utils.parseColorChannels('#010203')).toEqual({ r: 1, g: 2, b: 3, a: 255 })
     expect(utils.parseColorChannels('4,5,6')).toEqual({ r: 4, g: 5, b: 6, a: 255 })
-    expect(utils.parseColorChannels({ r: '7', g: 8, b: 9, a: 10 })).toEqual({ r: 7, g: 8, b: 9, a: 10 })
+    expect(utils.parseColorChannels({ r: '7', g: 8, b: 9, a: 10 })).toEqual({
+      r: 7,
+      g: 8,
+      b: 9,
+      a: 10,
+    })
     expect(utils.colorToHex('#0a0b0c')).toBe('#0a0b0c')
     expect(utils.colorToAlphaPercent('#010203')).toBe(100)
     expect(utils.formatColorString('#010203', 50)).toBe('1,2,3,128')

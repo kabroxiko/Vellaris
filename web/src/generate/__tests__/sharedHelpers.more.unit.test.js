@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { shadeColor, hexWithAlpha, rgbaToHex, findTitle, deriveNortFilenameFromContent } from '../sharedHelpers'
+import {
+  shadeColor,
+  hexWithAlpha,
+  rgbaToHex,
+  findTitle,
+  deriveNortFilenameFromContent,
+} from '../sharedHelpers'
 
 describe('sharedHelpers additional functions', () => {
   it('shadeColor adjusts channel values safely', () => {
@@ -20,7 +26,7 @@ describe('sharedHelpers additional functions', () => {
   })
 
   it('findTitle and deriveNortFilenameFromContent extract Title fields', () => {
-    const parsed = { edits: { textEdits: [ { type: 'Title', text: 'My Map' } ] } }
+    const parsed = { edits: { textEdits: [{ type: 'Title', text: 'My Map' }] } }
     expect(findTitle(parsed)).toBe('My Map')
     const content = JSON.stringify(parsed)
     expect(deriveNortFilenameFromContent(content)).toBe('My Map')

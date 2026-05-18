@@ -2,27 +2,27 @@
 export function hexToHSB(hex) {
   const hh = String(hex || '').replace(/^#/, '')
   if (!/^[0-9a-fA-F]{6}$/.test(hh)) return [0, 0, 0]
-  const r = Number.parseInt(hh.slice(0,2),16)/255
-  const g = Number.parseInt(hh.slice(2,4),16)/255
-  const b = Number.parseInt(hh.slice(4,6),16)/255
-  const max = Math.max(r,g,b)
-  const min = Math.min(r,g,b)
+  const r = Number.parseInt(hh.slice(0, 2), 16) / 255
+  const g = Number.parseInt(hh.slice(2, 4), 16) / 255
+  const b = Number.parseInt(hh.slice(4, 6), 16) / 255
+  const max = Math.max(r, g, b)
+  const min = Math.min(r, g, b)
   const delta = max - min
   let hue = 0
   if (delta !== 0) {
     if (max === r) hue = ((g - b) / delta) % 6
-    else if (max === g) hue = ((b - r) / delta) + 2
-    else hue = ((r - g) / delta) + 4
+    else if (max === g) hue = (b - r) / delta + 2
+    else hue = (r - g) / delta + 4
     hue = hue * 60
     if (hue < 0) hue += 360
   }
   const sat = max === 0 ? 0 : delta / max
   const bri = max
-  return [hue/360, sat, bri]
+  return [hue / 360, sat, bri]
 }
 
 export function mulberry32(a) {
-  return function() {
+  return function () {
     let t = (a += 0x6d2b79f5)
     t = Math.imul(t ^ (t >>> 15), t | 1)
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
@@ -31,11 +31,13 @@ export function mulberry32(a) {
 }
 
 export function hsbToRgb(h, s, v) {
-  const hh = (h * 360)
+  const hh = h * 360
   const c = v * s
-  const x = c * (1 - Math.abs(((hh/60) % 2) - 1))
+  const x = c * (1 - Math.abs(((hh / 60) % 2) - 1))
   const m = v - c
-  let r1=0,g1=0,b1=0
+  let r1 = 0,
+    g1 = 0,
+    b1 = 0
   if (hh >= 0 && hh < 60) {
     r1 = c
     g1 = x
@@ -58,7 +60,7 @@ export function hsbToRgb(h, s, v) {
   const R = Math.round((r1 + m) * 255)
   const G = Math.round((g1 + m) * 255)
   const B = Math.round((b1 + m) * 255)
-  return [R,G,B]
+  return [R, G, B]
 }
 
 export function hexToRgba(hex, transparencyPercent = 0) {
@@ -68,7 +70,7 @@ export function hexToRgba(hex, transparencyPercent = 0) {
   const r = Number.parseInt(h.slice(0, 2), 16)
   const g = Number.parseInt(h.slice(2, 4), 16)
   const b = Number.parseInt(h.slice(4, 6), 16)
-  const opacity = 1 - (Number(transparencyPercent || 0) / 100)
+  const opacity = 1 - Number(transparencyPercent || 0) / 100
   return { r, g, b, a: Math.max(0, Math.min(1, opacity)) }
 }
 
@@ -77,9 +79,9 @@ export function rgbaToHex(col) {
   const g = Math.round(col.g || 0)
   const b = Math.round(col.b || 0)
   return (
-    '#'+
-    r.toString(16).padStart(2, '0')+
-    g.toString(16).padStart(2, '0')+
+    '#' +
+    r.toString(16).padStart(2, '0') +
+    g.toString(16).padStart(2, '0') +
     b.toString(16).padStart(2, '0')
   )
 }
@@ -107,7 +109,7 @@ export function shadeColor(hex, percent) {
   r = Math.max(0, Math.min(255, r))
   g = Math.max(0, Math.min(255, g))
   b = Math.max(0, Math.min(255, b))
-  return '#' + (r << 16 | g << 8 | b).toString(16).padStart(6, '0')
+  return '#' + ((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')
 }
 
 export function hexWithAlpha(hex, alpha) {

@@ -3,15 +3,14 @@ const esLabels = {
   'ui.generating': 'Generando...',
   'ui.mapLanguage': 'Idioma del mapa',
   'ui.title': 'Crear o cargar configuracion',
-  'ui.subtitle':
-    'Empieza desde una configuracion aleatoria o carga un archivo de configuracion.',
+  'ui.subtitle': 'Empieza desde una configuracion aleatoria o carga un archivo de configuracion.',
   'ui.seed': 'Semilla (opcional)',
   'ui.seed.placeholder': 'ej. 12345',
   'ui.upload.aria': 'Subir o soltar archivo de configuracion',
-  
+
   'ui.upload.loadedPrefix': 'Cargado',
   'ui.upload.hint': 'Arrastra y suelta un archivo de configuracion aqui',
-  
+
   'ui.section.or': 'o',
   'ui.section.then': 'luego',
   'ui.preview.empty': 'Vista previa no disponible',

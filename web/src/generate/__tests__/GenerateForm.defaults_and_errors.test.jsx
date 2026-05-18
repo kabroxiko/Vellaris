@@ -12,7 +12,11 @@ const uiOptsWithDefaults = {
   borderTypes: [],
   defaults: { coastlineWidth: 12, generatedWidth: 200 },
   labels: {},
-  options: { backgroundTypes: [{ value: 'MyBg' }], finalLandColoringMethods: [{ value: 'L1' }], lineStyles: [{ value: 'ls' }] },
+  options: {
+    backgroundTypes: [{ value: 'MyBg' }],
+    finalLandColoringMethods: [{ value: 'L1' }],
+    lineStyles: [{ value: 'ls' }],
+  },
 }
 
 vi.mock('../helpers', async (importOriginal) => {
@@ -29,7 +33,6 @@ vi.mock('../hooks/useGenerate', async (importOriginal) => {
   const actual = await importOriginal()
   return { ...actual, default: () => vi.fn() }
 })
-
 
 beforeEach(() => {
   localStorage.clear()

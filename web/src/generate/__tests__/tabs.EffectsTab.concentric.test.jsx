@@ -18,7 +18,10 @@ describe('EffectsTab concentric waves behavior', () => {
       gatedControlValue: (v) => v,
       emptyComboOption: <option value="">Empty</option>,
       renderColorControl: () => null,
-      oceanWaveTypes: [{ value: 'none', label: 'None' }, { value: 'concentric', label: 'Concentric' }],
+      oceanWaveTypes: [
+        { value: 'none', label: 'None' },
+        { value: 'concentric', label: 'Concentric' },
+      ],
       oceanWavesType: 'concentric',
       concentricWaveValue: 'concentric',
       noneWaveValue: 'none',

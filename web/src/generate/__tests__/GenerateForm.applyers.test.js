@@ -31,7 +31,9 @@ describe('GenerateForm additional hoisted appliers', () => {
       drawVoronoiGridOverlayOnlyOnLand: true,
       resolveLandColoringMethod: () => 'ColorPoliticalRegions',
       finalLandColoringMethod: 'whatever',
-      mergeColor: (ps, k, hex) => { ps[k] = 'M:'+hex },
+      mergeColor: (ps, k, hex) => {
+        ps[k] = 'M:' + hex
+      },
       getGridOverlayAlpha: () => 128,
     }
     applyGridAndColoringHoisted(parsed, ctx)
@@ -50,7 +52,9 @@ describe('GenerateForm additional hoisted appliers', () => {
       drawRoads: true,
       roadStyle: null,
       roadWidth: '3',
-      mergeColor: (ps, k, hex) => { ps[k] = hex || 'no' },
+      mergeColor: (ps, k, hex) => {
+        ps[k] = hex || 'no'
+      },
       roadColorHex: '#fff',
       mountainSize: '2',
       hillSize: '3',
@@ -70,7 +74,9 @@ describe('GenerateForm additional hoisted appliers', () => {
   it('applyResourcesAndTopLevelHoisted parses resources and numeric fields and books set', () => {
     const parsed = {}
     const ctx = {
-      setResourceFromRef: (ps, key, ref) => { if (ref) ps[key] = ref },
+      setResourceFromRef: (ps, key, ref) => {
+        if (ref) ps[key] = ref
+      },
       borderRef: 'pack|border',
       textureRef: 'pack|tex',
       backgroundSeed: '42',
@@ -79,7 +85,7 @@ describe('GenerateForm additional hoisted appliers', () => {
       landShape: 'island',
       regionCount: '5',
       randomSeed: '100',
-      selectedBooks: new Set(['z','a']),
+      selectedBooks: new Set(['z', 'a']),
     }
     applyResourcesAndTopLevelHoisted(parsed, ctx)
     expect(parsed.backgroundRandomSeed).toBe(42)

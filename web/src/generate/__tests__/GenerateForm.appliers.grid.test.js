@@ -1,10 +1,14 @@
 import { vi } from 'vitest'
 
-
 vi.mock('../utils', () => ({ formatColorString: vi.fn((hex, op) => `fmt:${hex}:${op}`) }))
-vi.mock('../sharedHelpers', () => ({ hexToRgbaString: vi.fn((hex, alpha) => `rgba(${hex},${alpha})`) }))
+vi.mock('../sharedHelpers', () => ({
+  hexToRgbaString: vi.fn((hex, alpha) => `rgba(${hex},${alpha})`),
+}))
 
-import { applyGridAndColoringHoisted, mergeColor as moduleMergeColor } from '../GenerateForm.appliers'
+import {
+  applyGridAndColoringHoisted,
+  mergeColor as moduleMergeColor,
+} from '../GenerateForm.appliers'
 
 describe('applyGridAndColoringHoisted', () => {
   beforeEach(() => {

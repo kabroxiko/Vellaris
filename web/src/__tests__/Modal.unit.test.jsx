@@ -32,7 +32,12 @@ describe('Modal component basic interactions', () => {
     const onClose = vi.fn()
     render(
       <Modal open={true} onClose={onClose}>
-        <img alt="zoom-pan" className="zoom-pan" src="data:image/png;base64,iVB" data-filename="map.png" />
+        <img
+          alt="zoom-pan"
+          className="zoom-pan"
+          src="data:image/png;base64,iVB"
+          data-filename="map.png"
+        />
       </Modal>
     )
 
@@ -44,7 +49,9 @@ describe('Modal component basic interactions', () => {
     document.createElement = (name) => {
       const el = origCreate.call(document, name)
       if (name === 'a') {
-        el.click = () => { appended.push('clicked') }
+        el.click = () => {
+          appended.push('clicked')
+        }
         el.remove = () => {}
       }
       return el

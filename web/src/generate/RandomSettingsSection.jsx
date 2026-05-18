@@ -51,7 +51,11 @@ export default function RandomSettingsSection({ values, handlers, options, ui })
     const v = labels?.[key] || key
     if (typeof v === 'string' && /<br\s*\/?>/i.test(v)) {
       const parts = v.split(/<br\s*\/?>/i)
-      return parts.flatMap((p) => (p === parts.at(-1) ? [p] : [p, React.createElement('br', { key: `br-${String(p).slice(0,20)}` })]))
+      return parts.flatMap((p) =>
+        p === parts.at(-1)
+          ? [p]
+          : [p, React.createElement('br', { key: `br-${String(p).slice(0, 20)}` })]
+      )
     }
     return v
   }
@@ -62,15 +66,11 @@ export default function RandomSettingsSection({ values, handlers, options, ui })
   return (
     <section className="generator-section">
       <h3>{translateLabel('ui.title')}</h3>
-      <p className="section-hint">
-        {translateLabel('ui.subtitle')}
-      </p>
+      <p className="section-hint">{translateLabel('ui.subtitle')}</p>
       <form className="section-fields" onSubmit={handleRandomMap}>
         <div className="fields-grid two-col-layout">
           <div className="fields-column">
-            <label htmlFor="map-language-input">
-              {translateLabel('ui.mapLanguage')}
-            </label>
+            <label htmlFor="map-language-input">{translateLabel('ui.mapLanguage')}</label>
             <select
               id="map-language-input"
               value={mapLanguage}
@@ -88,7 +88,12 @@ export default function RandomSettingsSection({ values, handlers, options, ui })
               {Array.isArray(allBooks) && allBooks.length > 0 ? (
                 <div className="books-wrapper">
                   <div className="books-actions">
-                    <button type="button" onClick={() => setSelectedBooks(new Set(Array.isArray(allBooks) ? allBooks : []))}>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setSelectedBooks(new Set(Array.isArray(allBooks) ? allBooks : []))
+                      }
+                    >
                       {translateLabel('books.checkAll')}
                     </button>
                     <button type="button" onClick={() => setSelectedBooks(new Set())}>
@@ -96,21 +101,23 @@ export default function RandomSettingsSection({ values, handlers, options, ui })
                     </button>
                   </div>
                   <div className="books-list">
-                    {Array.isArray(allBooks) ? allBooks.map((book) => (
-                      <label key={book} className="book-item">
-                        <input
-                          type="checkbox"
-                          checked={selectedBooks.has(book)}
-                          onChange={(e) => {
-                            const next = new Set(selectedBooks)
-                            if (e.target.checked) next.add(book)
-                            else next.delete(book)
-                            setSelectedBooks(next)
-                          }}
-                        />
-                        <span className="book-title">{book}</span>
-                      </label>
-                    )) : null}
+                    {Array.isArray(allBooks)
+                      ? allBooks.map((book) => (
+                          <label key={book} className="book-item">
+                            <input
+                              type="checkbox"
+                              checked={selectedBooks.has(book)}
+                              onChange={(e) => {
+                                const next = new Set(selectedBooks)
+                                if (e.target.checked) next.add(book)
+                                else next.delete(book)
+                                setSelectedBooks(next)
+                              }}
+                            />
+                            <span className="book-title">{book}</span>
+                          </label>
+                        ))
+                      : null}
                   </div>
                 </div>
               ) : (
@@ -120,17 +127,21 @@ export default function RandomSettingsSection({ values, handlers, options, ui })
           </div>
 
           <div className="fields-column">
-            <label htmlFor="dimension-input">{translateLabel('newSettingsDialog.dimensions.label')}</label>
+            <label htmlFor="dimension-input">
+              {translateLabel('newSettingsDialog.dimensions.label')}
+            </label>
             <select
               id="dimension-input"
               value={dimension}
               onChange={(e) => setDimension(e.target.value)}
             >
-              {Array.isArray(dimensions) ? dimensions.map((item) => (
-                <option key={item.value} value={item.value}>
-                  {item.label}
-                </option>
-                )) : null}
+              {Array.isArray(dimensions)
+                ? dimensions.map((item) => (
+                    <option key={item.value} value={item.value}>
+                      {item.label}
+                    </option>
+                  ))
+                : null}
             </select>
 
             <label htmlFor="world-size-input">
@@ -149,17 +160,21 @@ export default function RandomSettingsSection({ values, handlers, options, ui })
               <span className="slider-value">{worldSize.toLocaleString()}</span>
             </div>
 
-            <label htmlFor="land-shape-input">{translateLabel('newSettingsDialog.landShape.label')}</label>
+            <label htmlFor="land-shape-input">
+              {translateLabel('newSettingsDialog.landShape.label')}
+            </label>
             <select
               id="land-shape-input"
               value={landShape}
               onChange={(e) => setLandShape(e.target.value)}
             >
-              {Array.isArray(landShapes) ? landShapes.map((item) => (
-                <option key={item.value} value={item.value}>
-                  {item.label}
-                </option>
-                )) : null}
+              {Array.isArray(landShapes)
+                ? landShapes.map((item) => (
+                    <option key={item.value} value={item.value}>
+                      {item.label}
+                    </option>
+                  ))
+                : null}
             </select>
 
             <label htmlFor="region-count-input">
@@ -186,14 +201,21 @@ export default function RandomSettingsSection({ values, handlers, options, ui })
               value={landColoringMethod}
               onChange={(e) => setLandColoringMethod(e.target.value)}
             >
-              {Array.isArray(landColoringMethods) ? landColoringMethods.map((item) => (
-                  <option key={item.value} value={item.value}>
-                    {item.label}
-                  </option>
-                )) : null}
+              {Array.isArray(landColoringMethods)
+                ? landColoringMethods.map((item) => (
+                    <option key={item.value} value={item.value}>
+                      {item.label}
+                    </option>
+                  ))
+                : null}
             </select>
 
-            <label htmlFor="art-pack-input" className={Array.isArray(artPacks) && artPacks.length === 0 ? 'is-disabled' : ''}>{translateLabel('newSettingsDialog.artPack.label')}</label>
+            <label
+              htmlFor="art-pack-input"
+              className={Array.isArray(artPacks) && artPacks.length === 0 ? 'is-disabled' : ''}
+            >
+              {translateLabel('newSettingsDialog.artPack.label')}
+            </label>
             <select
               id="art-pack-input"
               value={artPack}
@@ -207,7 +229,12 @@ export default function RandomSettingsSection({ values, handlers, options, ui })
               ))}
             </select>
 
-            <label htmlFor="city-icon-type-input" className={cityIconTypes.length === 0 ? 'is-disabled' : ''}>{translateLabel('newSettingsDialog.cityIconType.label')}</label>
+            <label
+              htmlFor="city-icon-type-input"
+              className={cityIconTypes.length === 0 ? 'is-disabled' : ''}
+            >
+              {translateLabel('newSettingsDialog.cityIconType.label')}
+            </label>
             <select
               id="city-icon-type-input"
               value={cityIconType}
@@ -243,9 +270,7 @@ export default function RandomSettingsSection({ values, handlers, options, ui })
 
         <div className="section-actions">
           <button type="submit" disabled={loading}>
-            {loading
-              ? translateLabel('ui.generating')
-              : translateLabel('ui.generate')}
+            {loading ? translateLabel('ui.generating') : translateLabel('ui.generate')}
           </button>
         </div>
 

@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { computeGridOverlayAlpha, computeConcentricWaveCount, buildCustomizePayload, serializeNortObject } from '../GenerateForm'
+import {
+  computeGridOverlayAlpha,
+  computeConcentricWaveCount,
+  buildCustomizePayload,
+  serializeNortObject,
+} from '../GenerateForm'
 
 describe('GenerateForm pure helpers', () => {
   it('computeGridOverlayAlpha returns 255 when no origColor', () => {

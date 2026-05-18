@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { mulberry32, sanitizeFilenameBase, findTitle, deriveNortFilenameFromContent } from '../sharedHelpers.js'
+import {
+  mulberry32,
+  sanitizeFilenameBase,
+  findTitle,
+  deriveNortFilenameFromContent,
+} from '../sharedHelpers.js'
 
 describe('sharedHelpers extras', () => {
   it('mulberry32 produces deterministic sequence', () => {
@@ -18,7 +23,7 @@ describe('sharedHelpers extras', () => {
   })
 
   it('findTitle and deriveNortFilenameFromContent extract Title', () => {
-    const parsed = { edits: { textEdits: [ { type: 'Title', text: 'My Title' } ] } }
+    const parsed = { edits: { textEdits: [{ type: 'Title', text: 'My Title' }] } }
     expect(findTitle(parsed)).toBe('My Title')
     const content = JSON.stringify(parsed)
     expect(deriveNortFilenameFromContent(content)).toBe('My Title')

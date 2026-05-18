@@ -4,9 +4,12 @@ import { describe, it, expect, vi } from 'vitest'
 
 // Mock heavy subcomponents to keep test deterministic and fast
 vi.mock('../generate/GenerateForm', () => ({
-  default: () => React.createElement('div', { 'data-testid': 'mock-generate-form' }, 'GenerateForm')
+  default: () =>
+    React.createElement('div', { 'data-testid': 'mock-generate-form' }, 'GenerateForm'),
 }))
-vi.mock('../Toast', () => ({ default: () => React.createElement('div', { 'data-testid': 'mock-toast' }, 'Toast') }))
+vi.mock('../Toast', () => ({
+  default: () => React.createElement('div', { 'data-testid': 'mock-toast' }, 'Toast'),
+}))
 
 import App from '../App'
 

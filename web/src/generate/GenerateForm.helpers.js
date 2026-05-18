@@ -31,10 +31,16 @@ export function parseBooleanWithDefault(value, mergedRef, priorKey, uiValue) {
   return Boolean(value)
 }
 
-export function scaleSliderValue(sliderValue, sliderValueFor1Scale = 5, scaleMin = 0.5, scaleMax = 3) {
+export function scaleSliderValue(
+  sliderValue,
+  sliderValueFor1Scale = 5,
+  scaleMin = 0.5,
+  scaleMax = 3
+) {
   const v = Number(sliderValue)
   if (!Number.isFinite(v)) return undefined
-  const minSlider = 1, maxSlider = 15
+  const minSlider = 1,
+    maxSlider = 15
   if (v <= sliderValueFor1Scale) {
     const slope = (sliderValueFor1Scale - minSlider) / (1 - scaleMin)
     return (v - (sliderValueFor1Scale - slope)) / slope
@@ -47,7 +53,11 @@ export function scaleSliderValue(sliderValue, sliderValueFor1Scale = 5, scaleMin
 export function computeGridOverlayAlpha(origColor, uiGridOverlayColorHex) {
   if (!origColor) return 255
   const origHex = colorToHex(origColor)
-  if (origHex && uiGridOverlayColorHex && origHex.toLowerCase() === String(uiGridOverlayColorHex).toLowerCase()) {
+  if (
+    origHex &&
+    uiGridOverlayColorHex &&
+    origHex.toLowerCase() === String(uiGridOverlayColorHex).toLowerCase()
+  ) {
     const ch = parseColorChannels(origColor)
     if (ch?.a !== undefined && Number.isFinite(Number(ch.a))) return Number(ch.a)
   }
@@ -143,7 +153,7 @@ export function loadRandomOverrides() {
   if (!raw) return {}
   try {
     const parsed = JSON.parse(raw)
-    return (parsed && typeof parsed === 'object') ? parsed : {}
+    return parsed && typeof parsed === 'object' ? parsed : {}
   } catch {
     return {}
   }
@@ -154,7 +164,7 @@ export function loadCustomizeOverrides() {
   if (!raw) return {}
   try {
     const parsed = JSON.parse(raw)
-    return (parsed && typeof parsed === 'object') ? parsed : {}
+    return parsed && typeof parsed === 'object' ? parsed : {}
   } catch {
     return {}
   }

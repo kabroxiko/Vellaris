@@ -7,10 +7,10 @@ const ptLabels = {
   'ui.seed': 'Semente (opcional)',
   'ui.seed.placeholder': 'ex. 12345',
   'ui.upload.aria': 'Carregar ou soltar arquivo de configuração',
-  
+
   'ui.upload.loadedPrefix': 'Carregado',
   'ui.upload.hint': 'Arraste um arquivo de configuração aqui',
-  
+
   'ui.section.or': 'ou',
   'ui.section.then': 'então',
   'ui.preview.empty': 'Nenhuma pré-visualização disponível',

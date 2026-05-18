@@ -2,7 +2,6 @@ import { base64ToBlob } from './utils'
 import { tryParseJson as tryParse } from './helpers'
 import { findTitle } from './sharedHelpers'
 
-
 // `findTitle` and `readResponseBytesWithProgress` are provided by sharedHelpers
 
 export function downloadNortContent(nortContent, baseName) {
@@ -16,7 +15,7 @@ export function downloadNortContent(nortContent, baseName) {
     if (!baseName) {
       const title = findTitle(parsed)
       if (title) filenameBase = title
-        else {
+      else {
         // treat as parse-failure for filename derivation so we fall back
         pretty = null
       }
@@ -28,7 +27,11 @@ export function downloadNortContent(nortContent, baseName) {
     pretty = typeof nortContent === 'string' ? nortContent : JSON.stringify(nortContent)
   }
   // sanitize filenameBase
-  filenameBase = String(filenameBase).trim().replaceAll(/[\\/:*?"<>|]+/g, '-').replaceAll(/\s+/g, '-') || 'generated-settings'
+  filenameBase =
+    String(filenameBase)
+      .trim()
+      .replaceAll(/[\\/:*?"<>|]+/g, '-')
+      .replaceAll(/\s+/g, '-') || 'generated-settings'
   const filename = `${filenameBase}.nort`
   const blob = new Blob([pretty], { type: 'application/json;charset=utf-8' })
   const url = URL.createObjectURL(blob)
@@ -88,7 +91,10 @@ function requireJson() {
 
 async function showFailureToast(err) {
   try {
-    globalThis.showToast?.(err?.message || 'Generate response processing failed', { type: 'error', duration: 5000 })
+    globalThis.showToast?.(err?.message || 'Generate response processing failed', {
+      type: 'error',
+      duration: 5000,
+    })
   } catch (error_) {
     console.error('showToast failed', error_)
   }
@@ -100,7 +106,8 @@ export async function processGenerateResponse(bytes, contentType, options) {
   // client log download removed
 
   async function handleJsonImageResponse(data) {
-    if (!data.imageBase64 || typeof data.imageBase64 !== 'string') throw new Error('Server did not return image data')
+    if (!data.imageBase64 || typeof data.imageBase64 !== 'string')
+      throw new Error('Server did not return image data')
     handleSuccess(base64ToBlob(data.imageBase64, 'image/png'), {
       baseName,
       source,
@@ -112,12 +119,16 @@ export async function processGenerateResponse(bytes, contentType, options) {
   }
 
   async function handleJsonNortResponse(data) {
-    if (!data.nortContent || typeof data.nortContent !== 'string') throw new Error('Server did not return settings content for download.')
+    if (!data.nortContent || typeof data.nortContent !== 'string')
+      throw new Error('Server did not return settings content for download.')
     try {
       downloadNortContent(data.nortContent, baseName)
     } catch (err) {
       try {
-        globalThis.showToast?.(err?.message || 'Failed to download settings', { type: 'error', duration: 5000 })
+        globalThis.showToast?.(err?.message || 'Failed to download settings', {
+          type: 'error',
+          duration: 5000,
+        })
       } catch (showErr) {
         console.error('showToast failed', showErr)
       }
@@ -133,7 +144,8 @@ export async function processGenerateResponse(bytes, contentType, options) {
 
   try {
     if (!contentType.includes('application/json')) {
-      if (outputMode === 'nort-only') throw new Error('Server returned image bytes; expected settings content.')
+      if (outputMode === 'nort-only')
+        throw new Error('Server returned image bytes; expected settings content.')
       handleSuccess(new Blob([bytes], { type: contentType || 'image/png' }), {
         baseName,
         source,

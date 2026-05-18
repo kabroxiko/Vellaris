@@ -38,7 +38,8 @@ export function tryParseJson(s) {
     }
     return s
   } catch (e) {
-    if (typeof console !== 'undefined' && typeof console.debug === 'function') console.debug('tryParseJson failed', e)
+    if (typeof console !== 'undefined' && typeof console.debug === 'function')
+      console.debug('tryParseJson failed', e)
     return null
   }
 }

@@ -9,7 +9,11 @@ const uiOpts = {
   textures: [],
   borderTypes: [],
   defaults: { generatedWidth: 640, generatedHeight: 480 },
-  labels: { 'ui.button.regenerate': 'Regenerate', 'ui.generating': 'Generating', 'ui.button.downloadSettings': 'Download Settings' },
+  labels: {
+    'ui.button.regenerate': 'Regenerate',
+    'ui.generating': 'Generating',
+    'ui.button.downloadSettings': 'Download Settings',
+  },
   options: { tabs: [{ id: 'background', label: 'Background' }] },
 }
 
@@ -25,7 +29,8 @@ vi.mock('../helpers', async (importOriginal) => {
 // Mock frontend labels merge to return simple labels
 vi.mock('../../i18n/webLabels', async (importOriginal) => ({
   constActual: await importOriginal(),
-  getFrontendLabels: () => Promise.resolve({ 'ui.button.regenerate': 'Regenerate', 'ui.generating': 'Generating' }),
+  getFrontendLabels: () =>
+    Promise.resolve({ 'ui.button.regenerate': 'Regenerate', 'ui.generating': 'Generating' }),
 }))
 
 // runGenerate stub captured here

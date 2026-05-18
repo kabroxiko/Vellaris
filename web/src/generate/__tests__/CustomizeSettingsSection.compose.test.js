@@ -38,7 +38,12 @@ describe('prepareBitmapsModule and composeMiniIslandFromBlobModule', () => {
     })
     // stub createImageBitmap used by colorizeBitmap
     vi.stubGlobal('createImageBitmap', async (c) => 'MOCK_BITMAP')
-    const defaults = { colorizeOcean: true, oceanColorHex: '#010101', colorizeLand: true, landColorHex: '#020202' }
+    const defaults = {
+      colorizeOcean: true,
+      oceanColorHex: '#010101',
+      colorizeLand: true,
+      landColorHex: '#020202',
+    }
     const res = await prepareBitmapsModule('IMG', 8, 8, {}, { backgroundSeed: 1 }, defaults)
     expect(res.displayBitmap).toBeTruthy()
     expect(res.landBitmap).toBeTruthy()
@@ -50,13 +55,24 @@ describe('prepareBitmapsModule and composeMiniIslandFromBlobModule', () => {
 
     // Provide overrides to avoid touching the module's internal canvas/draw helpers
     const overrides = {
-      makeCanvasForBitmap: () => ({ canvas: { toBlob: (cb) => cb('RESULT_BLOB') }, ctx: {}, w: 10, h: 6 }),
+      makeCanvasForBitmap: () => ({
+        canvas: { toBlob: (cb) => cb('RESULT_BLOB') },
+        ctx: {},
+        w: 10,
+        h: 6,
+      }),
       prepareBitmaps: async () => ({ displayBitmap: 'DB', landBitmap: 'LB' }),
       drawBackgroundAndInset: () => {},
       drawIslandShape: () => {},
     }
 
-    const blob = await composeMiniIslandFromBlobModule('SOME_BLOB', {}, { backgroundSeed: 42 }, {}, overrides)
+    const blob = await composeMiniIslandFromBlobModule(
+      'SOME_BLOB',
+      {},
+      { backgroundSeed: 42 },
+      {},
+      overrides
+    )
     expect(blob).toBe('RESULT_BLOB')
   })
 })

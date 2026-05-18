@@ -2,7 +2,16 @@ import React from 'react'
 import PropTypes from 'prop-types'
 import FileUploadButton from './FileUploadButton'
 
-export default function PreviewPanel({ preview, handleFileInput, onDrop, openPreviewModal, handleDownloadMap, dropRef, fileName, loading }) {
+export default function PreviewPanel({
+  preview,
+  handleFileInput,
+  onDrop,
+  openPreviewModal,
+  handleDownloadMap,
+  dropRef,
+  fileName,
+  loading,
+}) {
   return (
     <div className="preview-panel">
       <div className="upload-group">
@@ -25,8 +34,12 @@ export default function PreviewPanel({ preview, handleFileInput, onDrop, openPre
             <div className="preview-meta">
               <div className="preview-filename">{preview.filename}</div>
               <div className="preview-buttons">
-                <button type="button" onClick={openPreviewModal} disabled={!preview?.url}>Open</button>
-                <button type="button" onClick={handleDownloadMap} disabled={!preview?.url}>Download</button>
+                <button type="button" onClick={openPreviewModal} disabled={!preview?.url}>
+                  Open
+                </button>
+                <button type="button" onClick={handleDownloadMap} disabled={!preview?.url}>
+                  Download
+                </button>
               </div>
             </div>
           </div>

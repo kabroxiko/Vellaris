@@ -3,15 +3,14 @@ const deLabels = {
   'ui.generating': 'Wird generiert...',
   'ui.mapLanguage': 'Kartensprache',
   'ui.title': 'Einstellungen erstellen oder laden',
-  'ui.subtitle':
-    'Beginnen Sie mit zufälligen Einstellungen oder laden Sie eine Einstellungsdatei.',
+  'ui.subtitle': 'Beginnen Sie mit zufälligen Einstellungen oder laden Sie eine Einstellungsdatei.',
   'ui.seed': 'Saatgut (optional)',
   'ui.seed.placeholder': 'z.B. 12345',
   'ui.upload.aria': 'Einstellungsdatei hochladen oder ziehen',
-  
+
   'ui.upload.loadedPrefix': 'Geladen',
   'ui.upload.hint': 'Ziehen Sie eine Einstellungsdatei hierher',
-  
+
   'ui.section.or': 'oder',
   'ui.section.then': 'dann',
   'ui.preview.empty': 'Keine Vorschau verfügbar',

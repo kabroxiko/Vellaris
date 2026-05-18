@@ -60,7 +60,9 @@ describe('GenerateForm hoisted helpers (additional)', () => {
       textColorHex: '#112233',
       drawBoldBackground: true,
       boldBackgroundColorHex: '#445566',
-      mergeColor: (parsedSettings, key, hex) => { parsedSettings[key] = `merged:${hex}` },
+      mergeColor: (parsedSettings, key, hex) => {
+        parsedSettings[key] = `merged:${hex}`
+      },
     }
     applyTextAndBackgroundHoisted(parsed, ctx)
     expect(parsed.drawText).to.equal(true)
@@ -76,7 +78,9 @@ describe('GenerateForm hoisted helpers (additional)', () => {
       drawRoads: true,
       roadStyle: 'dashed',
       roadWidth: '4',
-      mergeColor: (parsedSettings, key, hex) => { parsedSettings[key] = `merged:${hex}` },
+      mergeColor: (parsedSettings, key, hex) => {
+        parsedSettings[key] = `merged:${hex}`
+      },
       roadColorHex: '#010203',
       mountainSize: '5',
       hillSize: '2',

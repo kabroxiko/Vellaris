@@ -25,7 +25,14 @@ describe('responseHandlers - processGenerateResponse', () => {
   it('calls setPreview for non-JSON image bytes', async () => {
     const setPreview = vi.fn()
     const setCurrentSource = vi.fn()
-    const options = { outputMode: 'image', baseName: null, source: null, fileName: null, setPreview, setCurrentSource }
+    const options = {
+      outputMode: 'image',
+      baseName: null,
+      source: null,
+      fileName: null,
+      setPreview,
+      setCurrentSource,
+    }
     const bytes = new Uint8Array([1, 2, 3])
 
     await processGenerateResponse(bytes, 'image/png', options)
@@ -38,7 +45,14 @@ describe('responseHandlers - processGenerateResponse', () => {
     const setCurrentSource = vi.fn()
     const payload = { imageBase64: 'ZmFrZQ==', nortContent: '{"foo":1}' }
     const bytes = new TextEncoder().encode(JSON.stringify(payload))
-    const options = { outputMode: 'image', baseName: null, source: null, fileName: null, setPreview, setCurrentSource }
+    const options = {
+      outputMode: 'image',
+      baseName: null,
+      source: null,
+      fileName: null,
+      setPreview,
+      setCurrentSource,
+    }
 
     await processGenerateResponse(bytes, 'application/json', options)
 
@@ -50,7 +64,14 @@ describe('responseHandlers - processGenerateResponse', () => {
     const setCurrentSource = vi.fn()
     const payload = { nortContent: '{"edits":{}}' }
     const bytes = new TextEncoder().encode(JSON.stringify(payload))
-    const options = { outputMode: 'nort-only', baseName: 'base', source: null, fileName: null, setPreview, setCurrentSource }
+    const options = {
+      outputMode: 'nort-only',
+      baseName: 'base',
+      source: null,
+      fileName: null,
+      setPreview,
+      setCurrentSource,
+    }
 
     await processGenerateResponse(bytes, 'application/json', options)
 

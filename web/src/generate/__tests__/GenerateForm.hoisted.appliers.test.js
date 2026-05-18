@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { applyGridAndColoringHoisted, applyBordersFrayedAndGrungeHoisted, applyRoadsAndScalesHoisted } from '../GenerateForm'
+import {
+  applyGridAndColoringHoisted,
+  applyBordersFrayedAndGrungeHoisted,
+  applyRoadsAndScalesHoisted,
+} from '../GenerateForm'
 
 describe('GenerateForm hoisted appliers', () => {
   it('applyGridAndColoringHoisted sets grid and color fields', () => {
@@ -24,7 +28,9 @@ describe('GenerateForm hoisted appliers', () => {
       drawVoronoiGridOverlayOnlyOnLand: true,
       resolveLandColoringMethod: () => 'ColorPoliticalRegions',
       finalLandColoringMethod: 'ColorPoliticalRegions',
-      mergeColor: (out, key, hex) => { if (hex) out[key] = hex },
+      mergeColor: (out, key, hex) => {
+        if (hex) out[key] = hex
+      },
       getGridOverlayAlpha: () => 128,
     }
 
@@ -51,7 +57,9 @@ describe('GenerateForm hoisted appliers', () => {
       drawGrunge: true,
       grungeWidth: '33',
       frayedBorderColorHex: '#abcdef',
-      mergeColor: (out, key, hex) => { if (hex) out[key] = hex },
+      mergeColor: (out, key, hex) => {
+        if (hex) out[key] = hex
+      },
     }
     applyBordersFrayedAndGrungeHoisted(parsed, ctx)
     expect(parsed.borderWidth).toBe(12)
@@ -73,7 +81,9 @@ describe('GenerateForm hoisted appliers', () => {
       duneSize: '7',
       treeHeight: '4',
       citySize: '3',
-      mergeColor: (out, key, hex) => { if (hex) out[key] = hex },
+      mergeColor: (out, key, hex) => {
+        if (hex) out[key] = hex
+      },
       scaleSliderValue: (v) => Number(v) * 0.1,
     }
     applyRoadsAndScalesHoisted(parsed, ctx)

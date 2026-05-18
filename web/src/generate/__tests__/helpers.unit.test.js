@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest'
-import { stringValueOrEmpty, seedStringOrEmpty, selectCityIconType, dimensionFromSize, tryParseJson, appendIfSet, handleResponseError } from '../helpers'
+import {
+  stringValueOrEmpty,
+  seedStringOrEmpty,
+  selectCityIconType,
+  dimensionFromSize,
+  tryParseJson,
+  appendIfSet,
+  handleResponseError,
+} from '../helpers'
 
 describe('helpers pure functions', () => {
   it('stringValueOrEmpty and seedStringOrEmpty behave', () => {
@@ -25,7 +33,12 @@ describe('helpers pure functions', () => {
   })
 
   it('appendIfSet appends only when set', () => {
-    const fd = { calls: [], append: function(k, v) { this.calls.push([k, v]) } }
+    const fd = {
+      calls: [],
+      append: function (k, v) {
+        this.calls.push([k, v])
+      },
+    }
     appendIfSet(fd, 'k', 'v')
     appendIfSet(fd, 'k2', '')
     appendIfSet(fd, 'k3', null)

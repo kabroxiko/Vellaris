@@ -6,7 +6,12 @@ import { vi, expect } from 'vitest'
 describe('BackgroundTab additional coverage', () => {
   test('renders with minimal props', () => {
     const { container } = render(
-      <BackgroundTab translateLabel={(k) => k} gatedControlValue={(v) => v} emptyComboOption={<option />} renderColorControl={() => <div />} />
+      <BackgroundTab
+        translateLabel={(k) => k}
+        gatedControlValue={(v) => v}
+        emptyComboOption={<option />}
+        renderColorControl={() => <div />}
+      />
     )
     expect(container.querySelector('.fields-grid')).toBeTruthy()
   })
@@ -100,7 +105,9 @@ describe('BackgroundTab additional coverage', () => {
   })
 
   test('renderColorControl onClose handles recomposeUsingLastBase throwing', () => {
-    const recomposeUsingLastBase = vi.fn(() => { throw new Error('boom') })
+    const recomposeUsingLastBase = vi.fn(() => {
+      throw new Error('boom')
+    })
     const translateLabel = (k) => k
     const gatedControlValue = (v) => v
 

@@ -4,7 +4,7 @@ import { vi } from 'vitest'
 import EffectsTab from '../tabs/EffectsTab'
 
 function simpleRenderColorControl(props) {
-  return (<span data-testid={props.id}>{props.label}</span>)
+  return <span data-testid={props.id}>{props.label}</span>
 }
 
 describe('EffectsTab', () => {
@@ -54,7 +54,10 @@ describe('EffectsTab', () => {
       oceanShadingColorHex: '#001122',
       oceanShadingAlpha: 20,
       showOceanPicker: false,
-      oceanWaveTypes: [{ value: 'none', label: 'None' }, { value: 'concentric', label: 'Concentric' }],
+      oceanWaveTypes: [
+        { value: 'none', label: 'None' },
+        { value: 'concentric', label: 'Concentric' },
+      ],
       oceanWavesType: 'none',
       concentricWaveValue: 'concentric',
       noneWaveValue: 'none',

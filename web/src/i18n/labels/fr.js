@@ -7,10 +7,10 @@ const frLabels = {
   'ui.seed': 'Graine (optionnel)',
   'ui.seed.placeholder': 'ex. 12345',
   'ui.upload.aria': 'Charger ou déposer un fichier de paramètres',
-  
+
   'ui.upload.loadedPrefix': 'Chargé',
   'ui.upload.hint': 'Déposez un fichier de paramètres ici',
-  
+
   'ui.section.or': 'ou',
   'ui.section.then': 'puis',
   'ui.preview.empty': 'Aperçu non disponible',

@@ -3,7 +3,12 @@ import PropTypes from 'prop-types'
 import CustomizeSettingsSection from './CustomizeSettingsSection'
 import RandomSettingsSection from './RandomSettingsSection'
 import { base64ToBlob, colorToHex, parseColorChannels } from './utils'
-import { selectCityIconType, fetchJson, handleResponseError, tryParseJson as tryParse } from './helpers'
+import {
+  selectCityIconType,
+  fetchJson,
+  handleResponseError,
+  tryParseJson as tryParse,
+} from './helpers'
 import { downloadNortContent } from './responseHandlers'
 import {
   sanitizeFilenameBase,
@@ -49,7 +54,6 @@ function populateCityIconTypes(byPack) {
 
 // color helpers imported from sharedHelpers
 
-
 // Hoisted helpers to apply UI values into parsed settings. These accept a
 // context object with needed values and helper functions so they can be
 // executed at module scope and keep `mergeUiIntoParsed` simple.
@@ -57,7 +61,6 @@ function populateCityIconTypes(byPack) {
 
 // Helper: parse and set resource (artPack|name)
 // Some helpers and appliers were moved to GenerateForm.helpers.js and GenerateForm.appliers.js
-
 
 function loadCityIconTypes(pack) {
   if (!cityIconTypesRequestByPack.has(pack)) {
@@ -88,12 +91,14 @@ function GenerateForm({ uiLanguage = 'en' }) {
   const [preview, setPreview] = useState(null)
   const [currentSource, setCurrentSource] = useState(null)
   const requestLanguage = uiLanguage
-  
+
   // Helpers for initial UI population to keep handleInitialUiOpts concise
   // use module-scoped `populateCityIconTypes` (hoisted) to satisfy S7721
 
   function computeInitialBooks(uiOpts) {
-    const overrideBooks = Array.isArray(initialRandomOverrides.selectedBooks) ? initialRandomOverrides.selectedBooks : null
+    const overrideBooks = Array.isArray(initialRandomOverrides.selectedBooks)
+      ? initialRandomOverrides.selectedBooks
+      : null
     const validBooks = overrideBooks ? overrideBooks.filter((b) => uiOpts.books?.includes(b)) : null
     let initialBooks
     if (validBooks?.length > 0) initialBooks = new Set(validBooks)
@@ -104,14 +109,22 @@ function GenerateForm({ uiLanguage = 'en' }) {
   }
 
   async function chooseArtPackAndLoad(uiOpts, defs) {
-      const determinePackAndPreferred = (uiOptsLocal, defsLocal) => {
-        const firstArtPack = Array.isArray(uiOptsLocal.artPacks) && uiOptsLocal.artPacks.length > 0 ? uiOptsLocal.artPacks[0] : null
-        const chosenPack = artPack ?? firstArtPack ?? 'nortantis'
-        const preferredCityDefault = defsLocal ? String(defsLocal.cityIconType ?? defsLocal.cityIconSetName ?? cityIconType) : cityIconType
-        return { chosenPack, firstArtPack, preferredCityDefault }
-      }
+    const determinePackAndPreferred = (uiOptsLocal, defsLocal) => {
+      const firstArtPack =
+        Array.isArray(uiOptsLocal.artPacks) && uiOptsLocal.artPacks.length > 0
+          ? uiOptsLocal.artPacks[0]
+          : null
+      const chosenPack = artPack ?? firstArtPack ?? 'nortantis'
+      const preferredCityDefault = defsLocal
+        ? String(defsLocal.cityIconType ?? defsLocal.cityIconSetName ?? cityIconType)
+        : cityIconType
+      return { chosenPack, firstArtPack, preferredCityDefault }
+    }
 
-    const { chosenPack, firstArtPack, preferredCityDefault } = determinePackAndPreferred(uiOpts, defs)
+    const { chosenPack, firstArtPack, preferredCityDefault } = determinePackAndPreferred(
+      uiOpts,
+      defs
+    )
     if (!artPack && firstArtPack) setArtPack(firstArtPack)
     const types = await loadCityIconTypes(chosenPack)
     handleCityIconTypesLoaded(types, preferredCityDefault)
@@ -138,9 +151,16 @@ function GenerateForm({ uiLanguage = 'en' }) {
 
   function applyOptionDefaults(opts, defs) {
     if (!opts) return
-    if (!backgroundType && Array.isArray(opts.backgroundTypes) && opts.backgroundTypes.length > 0) setBackgroundType(opts.backgroundTypes[0].value)
-    if (!finalLandColoringMethod && Array.isArray(opts.finalLandColoringMethods) && opts.finalLandColoringMethods.length > 0) setFinalLandColoringMethod(opts.finalLandColoringMethods[0].value)
-    if (!regionBoundaryStyle && Array.isArray(opts.lineStyles) && opts.lineStyles.length > 0) setRegionBoundaryStyle(opts.lineStyles[0].value)
+    if (!backgroundType && Array.isArray(opts.backgroundTypes) && opts.backgroundTypes.length > 0)
+      setBackgroundType(opts.backgroundTypes[0].value)
+    if (
+      !finalLandColoringMethod &&
+      Array.isArray(opts.finalLandColoringMethods) &&
+      opts.finalLandColoringMethods.length > 0
+    )
+      setFinalLandColoringMethod(opts.finalLandColoringMethods[0].value)
+    if (!regionBoundaryStyle && Array.isArray(opts.lineStyles) && opts.lineStyles.length > 0)
+      setRegionBoundaryStyle(opts.lineStyles[0].value)
     if (defs) applyServerDefaults(defs, opts)
   }
 
@@ -167,7 +187,9 @@ function GenerateForm({ uiLanguage = 'en' }) {
   const [worldSize, setWorldSize] = useState(0)
   const [landShape, setLandShape] = useState(initialRandomOverrides.landShape)
   const [regionCount, setRegionCount] = useState(0)
-  const [landColoringMethod, setLandColoringMethod] = useState(initialRandomOverrides.landColoringMethod)
+  const [landColoringMethod, setLandColoringMethod] = useState(
+    initialRandomOverrides.landColoringMethod
+  )
   const [cityIconTypes, setCityIconTypes] = useState([])
   const [cityIconType, setCityIconType] = useState(initialRandomOverrides.cityIconType)
   const [cityFrequency, setCityFrequency] = useState(0)
@@ -189,57 +211,93 @@ function GenerateForm({ uiLanguage = 'en' }) {
   const [borderTypes, setBorderTypes] = useState([])
   const [textureRef, setTextureRef] = useState(initialCustomize.textureRef)
   const [backgroundSeed, setBackgroundSeed] = useState(initialCustomize.backgroundSeed)
-  const [drawRegionBoundaries, setDrawRegionBoundaries] = useState(initialCustomize.drawRegionBoundaries)
+  const [drawRegionBoundaries, setDrawRegionBoundaries] = useState(
+    initialCustomize.drawRegionBoundaries
+  )
   const [colorizeLand, setColorizeLand] = useState(initialCustomize.colorizeLand)
   const [colorizeOcean, setColorizeOcean] = useState(initialCustomize.colorizeOcean)
   const [oceanColorHex, setOceanColorHex] = useState(initialCustomize.oceanColorHex)
   const [landColorHex, setLandColorHex] = useState(initialCustomize.landColorHex)
-  const [regionBoundaryStyle, setRegionBoundaryStyle] = useState(initialCustomize.regionBoundaryStyle)
-  const [regionBoundaryWidth, setRegionBoundaryWidth] = useState(initialCustomize.regionBoundaryWidth)
-  const [regionBoundaryColorHex, setRegionBoundaryColorHex] = useState(initialCustomize.regionBoundaryColorHex)
+  const [regionBoundaryStyle, setRegionBoundaryStyle] = useState(
+    initialCustomize.regionBoundaryStyle
+  )
+  const [regionBoundaryWidth, setRegionBoundaryWidth] = useState(
+    initialCustomize.regionBoundaryWidth
+  )
+  const [regionBoundaryColorHex, setRegionBoundaryColorHex] = useState(
+    initialCustomize.regionBoundaryColorHex
+  )
   const [drawBorder, setDrawBorder] = useState(initialCustomize.drawBorder)
   const [drawGridOverlay, setDrawGridOverlay] = useState(initialCustomize.drawGridOverlay)
   const [gridOverlayShape, setGridOverlayShape] = useState(initialCustomize.gridOverlayShape)
-  const [gridOverlayRowOrColCount, setGridOverlayRowOrColCount] = useState(initialCustomize.gridOverlayRowOrColCount)
-  const [gridOverlayColorHex, setGridOverlayColorHex] = useState(initialCustomize.gridOverlayColorHex)
+  const [gridOverlayRowOrColCount, setGridOverlayRowOrColCount] = useState(
+    initialCustomize.gridOverlayRowOrColCount
+  )
+  const [gridOverlayColorHex, setGridOverlayColorHex] = useState(
+    initialCustomize.gridOverlayColorHex
+  )
   const [gridOverlayXOffset, setGridOverlayXOffset] = useState(initialCustomize.gridOverlayXOffset)
   const [gridOverlayYOffset, setGridOverlayYOffset] = useState(initialCustomize.gridOverlayYOffset)
-  const [gridOverlayLineWidth, setGridOverlayLineWidth] = useState(initialCustomize.gridOverlayLineWidth)
+  const [gridOverlayLineWidth, setGridOverlayLineWidth] = useState(
+    initialCustomize.gridOverlayLineWidth
+  )
   const [gridOverlayLayer, setGridOverlayLayer] = useState(initialCustomize.gridOverlayLayer)
-  const [drawVoronoiGridOverlayOnlyOnLand, setDrawVoronoiGridOverlayOnlyOnLand] = useState(initialCustomize.drawVoronoiGridOverlayOnlyOnLand)
-  
-  const [finalLandColoringMethod, setFinalLandColoringMethod] = useState(initialCustomize.finalLandColoringMethod)
+  const [drawVoronoiGridOverlayOnlyOnLand, setDrawVoronoiGridOverlayOnlyOnLand] = useState(
+    initialCustomize.drawVoronoiGridOverlayOnlyOnLand
+  )
+
+  const [finalLandColoringMethod, setFinalLandColoringMethod] = useState(
+    initialCustomize.finalLandColoringMethod
+  )
   const [borderRef, setBorderRef] = useState(initialCustomize.borderRef)
   const [borderWidth, setBorderWidth] = useState(initialCustomize.borderWidth)
   const [borderPosition, setBorderPosition] = useState(initialCustomize.borderPosition)
   const [borderColorOption, setBorderColorOption] = useState(initialCustomize.borderColorOption)
   const [borderColorHex, setBorderColorHex] = useState(initialCustomize.borderColorHex)
   const [frayedBorder, setFrayedBorder] = useState(initialCustomize.frayedBorder)
-  const [frayedBorderBlurLevel, setFrayedBorderBlurLevel] = useState(initialCustomize.frayedBorderBlurLevel)
+  const [frayedBorderBlurLevel, setFrayedBorderBlurLevel] = useState(
+    initialCustomize.frayedBorderBlurLevel
+  )
   const [frayedBorderSize, setFrayedBorderSize] = useState(initialCustomize.frayedBorderSize)
   const [frayedBorderSeed, setFrayedBorderSeed] = useState(initialCustomize.frayedBorderSeed)
   const [drawGrunge, setDrawGrunge] = useState(initialCustomize.drawGrunge)
-  
+
   const [grungeWidth, setGrungeWidth] = useState(initialCustomize.grungeWidth)
-  const [frayedBorderColorHex, setFrayedBorderColorHex] = useState(initialCustomize.frayedBorderColorHex)
+  const [frayedBorderColorHex, setFrayedBorderColorHex] = useState(
+    initialCustomize.frayedBorderColorHex
+  )
   const [lineStyle, setLineStyle] = useState(initialCustomize.lineStyle)
   const [coastlineWidth, setCoastlineWidth] = useState(initialCustomize.coastlineWidth)
   const [coastlineColorHex, setCoastlineColorHex] = useState(initialCustomize.coastlineColorHex)
   const [coastShadingLevel, setCoastShadingLevel] = useState(initialCustomize.coastShadingLevel)
-  const [coastShadingColorHex, setCoastShadingColorHex] = useState(initialCustomize.coastShadingColorHex)
+  const [coastShadingColorHex, setCoastShadingColorHex] = useState(
+    initialCustomize.coastShadingColorHex
+  )
   const [coastShadingAlpha, setCoastShadingAlpha] = useState(initialCustomize.coastShadingAlpha)
   const [oceanShadingAlpha, setOceanShadingAlpha] = useState(initialCustomize.oceanShadingAlpha)
   const [oceanShadingLevel, setOceanShadingLevel] = useState(initialCustomize.oceanShadingLevel)
-  const [oceanShadingColorHex, setOceanShadingColorHex] = useState(initialCustomize.oceanShadingColorHex)
+  const [oceanShadingColorHex, setOceanShadingColorHex] = useState(
+    initialCustomize.oceanShadingColorHex
+  )
   const [oceanWavesType, setOceanWavesType] = useState(initialCustomize.oceanWavesType)
   const [oceanWavesLevel, setOceanWavesLevel] = useState(initialCustomize.oceanWavesLevel)
   const [oceanWavesColorHex, setOceanWavesColorHex] = useState(initialCustomize.oceanWavesColorHex)
   const [oceanWavesAlpha, setOceanWavesAlpha] = useState(initialCustomize.oceanWavesAlpha)
-  const [concentricWaveCount, setConcentricWaveCount] = useState(initialCustomize.concentricWaveCount)
-  const [fadeConcentricWaves, setFadeConcentricWaves] = useState(initialCustomize.fadeConcentricWaves)
-  const [jitterToConcentricWaves, setJitterToConcentricWaves] = useState(initialCustomize.jitterToConcentricWaves)
-  const [brokenLinesForConcentricWaves, setBrokenLinesForConcentricWaves] = useState(initialCustomize.brokenLinesForConcentricWaves)
-  const [drawOceanEffectsInLakes, setDrawOceanEffectsInLakes] = useState(initialCustomize.drawOceanEffectsInLakes)
+  const [concentricWaveCount, setConcentricWaveCount] = useState(
+    initialCustomize.concentricWaveCount
+  )
+  const [fadeConcentricWaves, setFadeConcentricWaves] = useState(
+    initialCustomize.fadeConcentricWaves
+  )
+  const [jitterToConcentricWaves, setJitterToConcentricWaves] = useState(
+    initialCustomize.jitterToConcentricWaves
+  )
+  const [brokenLinesForConcentricWaves, setBrokenLinesForConcentricWaves] = useState(
+    initialCustomize.brokenLinesForConcentricWaves
+  )
+  const [drawOceanEffectsInLakes, setDrawOceanEffectsInLakes] = useState(
+    initialCustomize.drawOceanEffectsInLakes
+  )
   const [riverColorHex, setRiverColorHex] = useState(initialCustomize.riverColorHex)
   const [drawRoads, setDrawRoads] = useState(initialCustomize.drawRoads)
   const [roadStyle, setRoadStyle] = useState(initialCustomize.roadStyle)
@@ -253,13 +311,19 @@ function GenerateForm({ uiLanguage = 'en' }) {
   const [drawText, setDrawText] = useState(initialCustomize.drawText)
   const [titleFontFamily, setTitleFontFamily] = useState(initialCustomize.titleFontFamily)
   const [regionFontFamily, setRegionFontFamily] = useState(initialCustomize.regionFontFamily)
-  const [mountainRangeFontFamily, setMountainRangeFontFamily] = useState(initialCustomize.mountainRangeFontFamily)
-  const [otherMountainsFontFamily, setOtherMountainsFontFamily] = useState(initialCustomize.otherMountainsFontFamily)
+  const [mountainRangeFontFamily, setMountainRangeFontFamily] = useState(
+    initialCustomize.mountainRangeFontFamily
+  )
+  const [otherMountainsFontFamily, setOtherMountainsFontFamily] = useState(
+    initialCustomize.otherMountainsFontFamily
+  )
   const [citiesFontFamily, setCitiesFontFamily] = useState(initialCustomize.citiesFontFamily)
   const [riverFontFamily, setRiverFontFamily] = useState(initialCustomize.riverFontFamily)
   const [textColorHex, setTextColorHex] = useState(initialCustomize.textColorHex)
   const [drawBoldBackground, setDrawBoldBackground] = useState(initialCustomize.drawBoldBackground)
-  const [boldBackgroundColorHex, setBoldBackgroundColorHex] = useState(initialCustomize.boldBackgroundColorHex)
+  const [boldBackgroundColorHex, setBoldBackgroundColorHex] = useState(
+    initialCustomize.boldBackgroundColorHex
+  )
 
   // --- Shared state ---
   const [loading, setLoading] = useState(false)
@@ -277,7 +341,17 @@ function GenerateForm({ uiLanguage = 'en' }) {
   const mergedSettingsRef = useRef(null)
   const handleSuccessRef = useRef(null)
 
-  const runGenerate = useGenerate({ apiBase: API_BASE, handleResponseError, base64ToBlob, downloadNortContent, tryParse, serializeNortObject, handleSuccessRef, setError, setLoading })
+  const runGenerate = useGenerate({
+    apiBase: API_BASE,
+    handleResponseError,
+    base64ToBlob,
+    downloadNortContent,
+    tryParse,
+    serializeNortObject,
+    handleSuccessRef,
+    setError,
+    setLoading,
+  })
 
   const customizeDeps = [
     backgroundType,
@@ -457,14 +531,24 @@ function GenerateForm({ uiLanguage = 'en' }) {
     setUiLoaded(true)
   }
 
-
   // Apply backend `defaults` to the UI using the existing setters.
   function applyServerDefaults(defs, opts) {
     // Helper setters shared across appliers
-    const setHex = (setter, value) => { if (value) { const h = colorToHex(value); if (h) setter(h) } }
-    const setNumber = (setter, value) => { if (Number.isFinite(Number(value))) setter(Number(value)) }
-    const setString = (setter, value) => { if (value !== undefined && value !== null) setter(String(value)) }
-    const setBoolean = (setter, value) => { if (typeof value === 'boolean') setter(value) }
+    const setHex = (setter, value) => {
+      if (value) {
+        const h = colorToHex(value)
+        if (h) setter(h)
+      }
+    }
+    const setNumber = (setter, value) => {
+      if (Number.isFinite(Number(value))) setter(Number(value))
+    }
+    const setString = (setter, value) => {
+      if (value !== undefined && value !== null) setter(String(value))
+    }
+    const setBoolean = (setter, value) => {
+      if (typeof value === 'boolean') setter(value)
+    }
 
     // Helper to set alpha either from explicit alpha value or by parsing color channels
     const setAlphaFromValueOrColor = (alphaVal, colorVal, setter) => {
@@ -504,7 +588,8 @@ function GenerateForm({ uiLanguage = 'en' }) {
     const applyRoadStyleHelper = (defs) => {
       if (typeof defs.roadStyle === 'object' && defs.roadStyle !== null) {
         if (typeof defs.roadStyle.type === 'string') setString(setRoadStyle, defs.roadStyle.type)
-        if (Number.isFinite(Number(defs.roadStyle.width))) setNumber(setRoadWidth, Number(defs.roadStyle.width))
+        if (Number.isFinite(Number(defs.roadStyle.width)))
+          setNumber(setRoadWidth, Number(defs.roadStyle.width))
       } else if (typeof defs.roadStyle === 'string') {
         setString(setRoadStyle, defs.roadStyle)
       }
@@ -516,7 +601,10 @@ function GenerateForm({ uiLanguage = 'en' }) {
       setNumber(setWorldSize, defs.worldSize)
       setNumber(setRegionCount, defs.regionCount)
       if (defs.cityProbability !== undefined && opts?.maxCityProbability !== undefined) {
-        setNumber(setCityFrequency, (Number(defs.cityProbability) / Number(opts.maxCityProbability)) * 100)
+        setNumber(
+          setCityFrequency,
+          (Number(defs.cityProbability) / Number(opts.maxCityProbability)) * 100
+        )
       }
       setNumber(setFinalWidth, defs.generatedWidth)
       setNumber(setFinalHeight, defs.generatedHeight)
@@ -543,8 +631,10 @@ function GenerateForm({ uiLanguage = 'en' }) {
       setString(setGridOverlayShape, defs.gridOverlayShape)
       setNumber(setGridOverlayRowOrColCount, defs.gridOverlayRowOrColCount)
       setHex(setGridOverlayColorHex, defs.gridOverlayColor)
-      if (defs.gridOverlayXOffset !== undefined && defs.gridOverlayXOffset !== null) setGridOverlayXOffset(defs.gridOverlayXOffset)
-      if (defs.gridOverlayYOffset !== undefined && defs.gridOverlayYOffset !== null) setGridOverlayYOffset(defs.gridOverlayYOffset)
+      if (defs.gridOverlayXOffset !== undefined && defs.gridOverlayXOffset !== null)
+        setGridOverlayXOffset(defs.gridOverlayXOffset)
+      if (defs.gridOverlayYOffset !== undefined && defs.gridOverlayYOffset !== null)
+        setGridOverlayYOffset(defs.gridOverlayYOffset)
       setNumber(setGridOverlayLineWidth, defs.gridOverlayLineWidth)
       setString(setGridOverlayLayer, defs.gridOverlayLayer)
       setBoolean(setDrawVoronoiGridOverlayOnlyOnLand, defs.drawVoronoiGridOverlayOnlyOnLand)
@@ -574,14 +664,26 @@ function GenerateForm({ uiLanguage = 'en' }) {
     const applyOceanAndRoads = (defs) => {
       setNumber(setCoastShadingLevel, defs.coastShadingLevel)
       setHex(setCoastShadingColorHex, defs.coastShadingColor)
-      setAlphaFromValueOrColor(defs.coastShadingAlpha, defs.coastShadingColor, setNumber.bind(null, setCoastShadingAlpha))
-      setAlphaFromValueOrColor(defs.oceanShadingAlpha, defs.oceanShadingColor, setNumber.bind(null, setOceanShadingAlpha))
+      setAlphaFromValueOrColor(
+        defs.coastShadingAlpha,
+        defs.coastShadingColor,
+        setNumber.bind(null, setCoastShadingAlpha)
+      )
+      setAlphaFromValueOrColor(
+        defs.oceanShadingAlpha,
+        defs.oceanShadingColor,
+        setNumber.bind(null, setOceanShadingAlpha)
+      )
       setNumber(setOceanShadingLevel, defs.oceanShadingLevel)
       setHex(setOceanShadingColorHex, defs.oceanShadingColor)
       setString(setOceanWavesType, defs.oceanWavesType)
       setNumber(setOceanWavesLevel, defs.oceanWavesLevel)
       setHex(setOceanWavesColorHex, defs.oceanWavesColor)
-      setAlphaFromValueOrColor(defs.oceanWavesAlpha, defs.oceanWavesColor, setNumber.bind(null, setOceanWavesAlpha))
+      setAlphaFromValueOrColor(
+        defs.oceanWavesAlpha,
+        defs.oceanWavesColor,
+        setNumber.bind(null, setOceanWavesAlpha)
+      )
       setNumber(setConcentricWaveCount, defs.concentricWaveCount)
       setBoolean(setFadeConcentricWaves, defs.fadeConcentricWaves)
       setBoolean(setJitterToConcentricWaves, defs.jitterToConcentricWaves)
@@ -594,7 +696,11 @@ function GenerateForm({ uiLanguage = 'en' }) {
 
     // Apply a scale-or-size mapping for standard elements
     const applyScaleOrSize = (scaleProp, sizeProp, setter) => {
-      if (defs[scaleProp] !== undefined && defs[scaleProp] !== null && Number.isFinite(Number(defs[scaleProp]))) {
+      if (
+        defs[scaleProp] !== undefined &&
+        defs[scaleProp] !== null &&
+        Number.isFinite(Number(defs[scaleProp]))
+      ) {
         const v = convertScaleToSlider(defs[scaleProp])
         if (v !== undefined) setter(v)
       } else if (Number.isFinite(Number(defs[sizeProp]))) {
@@ -603,20 +709,23 @@ function GenerateForm({ uiLanguage = 'en' }) {
     }
 
     const applySizeMappings = (defs) => {
-        applyScaleOrSize('mountainScale', 'mountainSize', (v) => setNumber(setMountainSize, v))
-        applyScaleOrSize('hillScale', 'hillSize', (v) => setNumber(setHillSize, v))
-        applyScaleOrSize('duneScale', 'duneSize', (v) => setNumber(setDuneSize, v))
-        if (defs.treeHeightScale !== undefined && defs.treeHeightScale !== null && Number.isFinite(Number(defs.treeHeightScale))) {
-          const s = Number(defs.treeHeightScale)
-          let v = Math.round((s - 0.1) / 0.05)
-          if (v < 1) v = 1
-          if (v > 15) v = 15
-          setNumber(setTreeHeight, v)
-        } else if (Number.isFinite(Number(defs.treeHeight))) {
-          setNumber(setTreeHeight, defs.treeHeight)
-        }
-        applyScaleOrSize('cityScale', 'citySize', (v) => setNumber(setCitySize, v))
-
+      applyScaleOrSize('mountainScale', 'mountainSize', (v) => setNumber(setMountainSize, v))
+      applyScaleOrSize('hillScale', 'hillSize', (v) => setNumber(setHillSize, v))
+      applyScaleOrSize('duneScale', 'duneSize', (v) => setNumber(setDuneSize, v))
+      if (
+        defs.treeHeightScale !== undefined &&
+        defs.treeHeightScale !== null &&
+        Number.isFinite(Number(defs.treeHeightScale))
+      ) {
+        const s = Number(defs.treeHeightScale)
+        let v = Math.round((s - 0.1) / 0.05)
+        if (v < 1) v = 1
+        if (v > 15) v = 15
+        setNumber(setTreeHeight, v)
+      } else if (Number.isFinite(Number(defs.treeHeight))) {
+        setNumber(setTreeHeight, defs.treeHeight)
+      }
+      applyScaleOrSize('cityScale', 'citySize', (v) => setNumber(setCitySize, v))
     }
 
     const applyTextAndFonts = (defs, opts) => {
@@ -630,7 +739,9 @@ function GenerateForm({ uiLanguage = 'en' }) {
       setHex(setTextColorHex, defs.textColor)
       setBoolean(setDrawBoldBackground, defs.drawBoldBackground)
       setHex(setBoldBackgroundColorHex, defs.boldBackgroundColor)
-      const backendDefaultFont = opts?.defaultFontFamily ?? (Array.isArray(opts?.fonts) && opts.fonts.length > 0 ? opts.fonts[0] : null)
+      const backendDefaultFont =
+        opts?.defaultFontFamily ??
+        (Array.isArray(opts?.fonts) && opts.fonts.length > 0 ? opts.fonts[0] : null)
       if (backendDefaultFont) {
         const fontSetters = [
           [titleFontFamily, setTitleFontFamily],
@@ -640,7 +751,9 @@ function GenerateForm({ uiLanguage = 'en' }) {
           [citiesFontFamily, setCitiesFontFamily],
           [riverFontFamily, setRiverFontFamily],
         ]
-        fontSetters.forEach(([current, setter]) => { if (!current) setter(backendDefaultFont) })
+        fontSetters.forEach(([current, setter]) => {
+          if (!current) setter(backendDefaultFont)
+        })
       }
       if (Array.isArray(defs.books)) setSelectedBooks(new Set(defs.books))
     }
@@ -658,10 +771,22 @@ function GenerateForm({ uiLanguage = 'en' }) {
   const generateFromNortContent = async (nortContent, toast) => {
     toast.show(uiI18n?.labels?.['ui.generating'])
     const parsedReturned = tryParse(nortContent)
-    if (parsedReturned && Object.hasOwn(randomOverrides, 'mapLanguage') && mapLanguage) parsedReturned.language = mapLanguage
-    if (parsedReturned && Object.hasOwn(randomOverrides, 'cityIconType') && cityIconType) parsedReturned.cityIconSetName = cityIconType
+    if (parsedReturned && Object.hasOwn(randomOverrides, 'mapLanguage') && mapLanguage)
+      parsedReturned.language = mapLanguage
+    if (parsedReturned && Object.hasOwn(randomOverrides, 'cityIconType') && cityIconType)
+      parsedReturned.cityIconSetName = cityIconType
     const bodyPayload = parsedReturned ?? tryParse(nortContent)
-    await runGenerate({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(bodyPayload) }, 'random-map', { type: 'random', name: 'Random Map', nortContent }, 'preview', toast)
+    await runGenerate(
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(bodyPayload),
+      },
+      'random-map',
+      { type: 'random', name: 'Random Map', nortContent },
+      'preview',
+      toast
+    )
   }
 
   const updateRandomOverride = useCallback((key, value) => {
@@ -808,7 +933,6 @@ function GenerateForm({ uiLanguage = 'en' }) {
     },
     [updateRandomOverride]
   )
-  
 
   const handleRegionCountChange = useCallback(
     (value) => {
@@ -832,85 +956,87 @@ function GenerateForm({ uiLanguage = 'en' }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const appliers = useMemo(
     () =>
-      createSettingsAppliers({
-        setFinalWidth,
-        setFinalHeight,
-        setFinalSeed,
-        setRandomSeed,
-        setArtPack,
-        setLandShape,
-        setRegionCount,
-        setWorldSize,
-        setCityIconType,
-        setSelectedBooks,
-        setDimension,
-        setRegionBoundaryStyle,
-        setRegionBoundaryWidth,
-        setBackgroundType,
-        setTextureRef,
-        setBackgroundSeed,
-        setDrawRegionBoundaries,
-        setColorizeLand,
-        setColorizeOcean,
-        setOceanColorHex,
-        setLandColorHex,
-        setRegionBoundaryColorHex,
-        setDrawBorder,
-        setDrawGridOverlay,
-        setLandColoringMethod,
-        setFinalLandColoringMethod,
-        setBorderRef,
-        setBorderWidth,
-        setBorderPosition,
-        setBorderColorOption,
-        setBorderColorHex,
-        setFrayedBorder,
-        setFrayedBorderBlurLevel,
-        setFrayedBorderSize,
-        setFrayedBorderSeed,
-        setDrawGrunge,
-        setGrungeWidth,
-        setFrayedBorderColorHex,
-        setLineStyle,
-        setCoastlineWidth,
-        setCoastlineColorHex,
-        setCoastShadingLevel,
-        setCoastShadingColorHex,
-        setCoastShadingAlpha,
-        setOceanShadingLevel,
-        setOceanShadingAlpha,
-        setOceanShadingColorHex,
-        setOceanWavesAlpha,
-        setOceanWavesType,
-        setOceanWavesLevel,
-        setOceanWavesColorHex,
-        setConcentricWaveCount,
-        setFadeConcentricWaves,
-        setJitterToConcentricWaves,
-        setBrokenLinesForConcentricWaves,
-        setDrawOceanEffectsInLakes,
-        setRiverColorHex,
-        setDrawRoads,
-        setRoadStyle,
-        setRoadWidth,
-        setRoadColorHex,
-        setMountainSize,
-        setHillSize,
-        setDuneSize,
-        setTreeHeight,
-        setCitySize,
-        setDrawText,
-        setTitleFontFamily,
-        setRegionFontFamily,
-        setMountainRangeFontFamily,
-        setOtherMountainsFontFamily,
-        setCitiesFontFamily,
-        setRiverFontFamily,
-        setTextColorHex,
-        setDrawBoldBackground,
-        setBoldBackgroundColorHex,
-      },
-      collectCustomizeValues()),
+      createSettingsAppliers(
+        {
+          setFinalWidth,
+          setFinalHeight,
+          setFinalSeed,
+          setRandomSeed,
+          setArtPack,
+          setLandShape,
+          setRegionCount,
+          setWorldSize,
+          setCityIconType,
+          setSelectedBooks,
+          setDimension,
+          setRegionBoundaryStyle,
+          setRegionBoundaryWidth,
+          setBackgroundType,
+          setTextureRef,
+          setBackgroundSeed,
+          setDrawRegionBoundaries,
+          setColorizeLand,
+          setColorizeOcean,
+          setOceanColorHex,
+          setLandColorHex,
+          setRegionBoundaryColorHex,
+          setDrawBorder,
+          setDrawGridOverlay,
+          setLandColoringMethod,
+          setFinalLandColoringMethod,
+          setBorderRef,
+          setBorderWidth,
+          setBorderPosition,
+          setBorderColorOption,
+          setBorderColorHex,
+          setFrayedBorder,
+          setFrayedBorderBlurLevel,
+          setFrayedBorderSize,
+          setFrayedBorderSeed,
+          setDrawGrunge,
+          setGrungeWidth,
+          setFrayedBorderColorHex,
+          setLineStyle,
+          setCoastlineWidth,
+          setCoastlineColorHex,
+          setCoastShadingLevel,
+          setCoastShadingColorHex,
+          setCoastShadingAlpha,
+          setOceanShadingLevel,
+          setOceanShadingAlpha,
+          setOceanShadingColorHex,
+          setOceanWavesAlpha,
+          setOceanWavesType,
+          setOceanWavesLevel,
+          setOceanWavesColorHex,
+          setConcentricWaveCount,
+          setFadeConcentricWaves,
+          setJitterToConcentricWaves,
+          setBrokenLinesForConcentricWaves,
+          setDrawOceanEffectsInLakes,
+          setRiverColorHex,
+          setDrawRoads,
+          setRoadStyle,
+          setRoadWidth,
+          setRoadColorHex,
+          setMountainSize,
+          setHillSize,
+          setDuneSize,
+          setTreeHeight,
+          setCitySize,
+          setDrawText,
+          setTitleFontFamily,
+          setRegionFontFamily,
+          setMountainRangeFontFamily,
+          setOtherMountainsFontFamily,
+          setCitiesFontFamily,
+          setRiverFontFamily,
+          setTextColorHex,
+          setDrawBoldBackground,
+          setBoldBackgroundColorHex,
+        },
+        collectCustomizeValues()
+      ),
     customizeDeps
   ) // setters from useState are stable references
 
@@ -994,7 +1120,6 @@ function GenerateForm({ uiLanguage = 'en' }) {
     lastUiDefaultsRef.current = null
   }, [uiI18n])
 
-
   useEffect(() => {
     return () => {
       if (preview?.url) {
@@ -1002,8 +1127,6 @@ function GenerateForm({ uiLanguage = 'en' }) {
       }
     }
   }, [preview])
-
-  
 
   // Note: background preview prefetch removed to avoid duplicate
   // /background-preview requests. `CustomizeSettingsSection` is now
@@ -1020,9 +1143,7 @@ function GenerateForm({ uiLanguage = 'en' }) {
 
   useEffect(() => {
     const pack = artPack ?? 'nortantis'
-    loadCityIconTypes(pack)
-      .then((types) => handleCityIconTypesLoaded(types, cityIconType))
-      
+    loadCityIconTypes(pack).then((types) => handleCityIconTypesLoaded(types, cityIconType))
   }, [artPack])
 
   useEffect(() => {
@@ -1033,7 +1154,10 @@ function GenerateForm({ uiLanguage = 'en' }) {
     // are derived from canonical numeric colors where appropriate.
     let settings = tryParse(currentSource.nortContent)
     if (!settings) {
-      globalThis.showToast?.('Loaded settings file is not valid JSON.', { type: 'warning', duration: 6000 })
+      globalThis.showToast?.('Loaded settings file is not valid JSON.', {
+        type: 'warning',
+        duration: 6000,
+      })
       return
     }
     // mark origin so appliers can log which source triggered them
@@ -1062,7 +1186,8 @@ function GenerateForm({ uiLanguage = 'en' }) {
     if (!Number.isFinite(Number(ms.concentricWaveCount))) return
     // Only overwrite UI if user hasn't changed the slider (still initial)
     if (concentricWaveCount === 3) setConcentricWaveCount(Number(ms.concentricWaveCount))
-    if (typeof ms.fadeConcentricWaves === 'boolean' && !fadeConcentricWaves) setFadeConcentricWaves(Boolean(ms.fadeConcentricWaves))
+    if (typeof ms.fadeConcentricWaves === 'boolean' && !fadeConcentricWaves)
+      setFadeConcentricWaves(Boolean(ms.fadeConcentricWaves))
     if (typeof ms.jitterToConcentricWaves === 'boolean' && !jitterToConcentricWaves)
       setJitterToConcentricWaves(Boolean(ms.jitterToConcentricWaves))
     if (typeof ms.brokenLinesForConcentricWaves === 'boolean' && !brokenLinesForConcentricWaves)
@@ -1085,25 +1210,26 @@ function GenerateForm({ uiLanguage = 'en' }) {
           if (!parsedSettings) throw new Error('Loaded settings file is not valid JSON.')
           const _p = tryParse(text)
           mergedSettingsRef.current = _p ?? parsedSettings
-              // Upload the original file text to avoid re-serializing and
-              // changing numeric types (integers -> floats). Use the raw
-              // uploaded content so the server receives exactly what the
-              // user provided in the .nort file.
-              // Send the uploaded .nort content as the raw JSON body (no wrapper).
-              const parsed = parsedSettings
-              await runGenerate(
-                {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify(parsed),
-                },
-                f.name.replace(/\.[^.]+$/, ''),
-                source
-              )
+          // Upload the original file text to avoid re-serializing and
+          // changing numeric types (integers -> floats). Use the raw
+          // uploaded content so the server receives exactly what the
+          // user provided in the .nort file.
+          // Send the uploaded .nort content as the raw JSON body (no wrapper).
+          const parsed = parsedSettings
+          await runGenerate(
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(parsed),
+            },
+            f.name.replace(/\.[^.]+$/, ''),
+            source
+          )
         })
         .catch((e) => {
-              if (typeof console !== 'undefined' && typeof console.debug === 'function') console.debug('GenerateForm: file read failed', e)
-            })
+          if (typeof console !== 'undefined' && typeof console.debug === 'function')
+            console.debug('GenerateForm: file read failed', e)
+        })
     },
     [requestLanguage, runGenerate]
   )
@@ -1133,11 +1259,14 @@ function GenerateForm({ uiLanguage = 'en' }) {
       return {
         url,
         filename,
-            sourceLabel: source?.type === 'random' ? 'Random Map' : (source?.name ?? fileName ?? 'Generated from Settings'),
+        sourceLabel:
+          source?.type === 'random'
+            ? 'Random Map'
+            : (source?.name ?? fileName ?? 'Generated from Settings'),
       }
     })
     if (nortContent) {
-          // suppressed debug: handleSuccess nortContent details
+      // suppressed debug: handleSuccess nortContent details
       setCurrentSource({
         type: 'nort-content',
         name: source?.name ?? fileName ?? 'Generated settings',
@@ -1179,17 +1308,74 @@ function GenerateForm({ uiLanguage = 'en' }) {
     const cfg = {}
 
     const appliers = [
-      ['mapLanguage', () => { cfg.language = mapLanguage }],
-      ['randomSeed', () => { cfg.randomSeed = randomSeed ? Number(randomSeed) : undefined }],
-      ['artPack', () => { cfg.artPack = artPack }],
-      ['dimension', () => { cfg.dimension = dimension }],
-      ['worldSize', () => { cfg.worldSize = worldSize }],
-      ['landShape', () => { cfg.landShape = landShape }],
-      ['regionCount', () => { cfg.regionCount = regionCount }],
-      ['landColoringMethod', () => { cfg.drawRegionColors = landColoringMethod ? (landColoringMethod === 'ColorPoliticalRegions') : undefined }],
-      ['cityFrequency', () => { cfg.cityFrequency = cityFrequency }],
-      ['cityIconType', () => { cfg.cityIconSetName = cityIconType }],
-      ['selectedBooks', () => { if (selectedBooks && selectedBooks.size > 0) cfg.books = Array.from(selectedBooks) }],
+      [
+        'mapLanguage',
+        () => {
+          cfg.language = mapLanguage
+        },
+      ],
+      [
+        'randomSeed',
+        () => {
+          cfg.randomSeed = randomSeed ? Number(randomSeed) : undefined
+        },
+      ],
+      [
+        'artPack',
+        () => {
+          cfg.artPack = artPack
+        },
+      ],
+      [
+        'dimension',
+        () => {
+          cfg.dimension = dimension
+        },
+      ],
+      [
+        'worldSize',
+        () => {
+          cfg.worldSize = worldSize
+        },
+      ],
+      [
+        'landShape',
+        () => {
+          cfg.landShape = landShape
+        },
+      ],
+      [
+        'regionCount',
+        () => {
+          cfg.regionCount = regionCount
+        },
+      ],
+      [
+        'landColoringMethod',
+        () => {
+          cfg.drawRegionColors = landColoringMethod
+            ? landColoringMethod === 'ColorPoliticalRegions'
+            : undefined
+        },
+      ],
+      [
+        'cityFrequency',
+        () => {
+          cfg.cityFrequency = cityFrequency
+        },
+      ],
+      [
+        'cityIconType',
+        () => {
+          cfg.cityIconSetName = cityIconType
+        },
+      ],
+      [
+        'selectedBooks',
+        () => {
+          if (selectedBooks && selectedBooks.size > 0) cfg.books = Array.from(selectedBooks)
+        },
+      ],
     ]
 
     for (const [key, apply] of appliers) {
@@ -1221,13 +1407,15 @@ function GenerateForm({ uiLanguage = 'en' }) {
     setError(null)
     setLoading(true)
     const toast = makeProgressToastController()
-    await doRandomMap(toast).catch((err) => {
-      setError(err.message)
-      globalThis.showToast?.(err.message, { type: 'error', duration: 6000 })
-    }).finally(() => {
-      setLoading(false)
-      toast.hide()
-    })
+    await doRandomMap(toast)
+      .catch((err) => {
+        setError(err.message)
+        globalThis.showToast?.(err.message, { type: 'error', duration: 6000 })
+      })
+      .finally(() => {
+        setLoading(false)
+        toast.hide()
+      })
   }
 
   const doRandomMap = async (toast) => {
@@ -1254,27 +1442,117 @@ function GenerateForm({ uiLanguage = 'en' }) {
   // exposeSettingsForDebugging) to satisfy S7721
   // Helper: preserve grid overlay alpha from prior settings if color unchanged
   function getGridOverlayAlpha() {
-    return computeGridOverlayAlpha(mergedSettingsRef?.current?.gridOverlayColor, gridOverlayColorHex)
+    return computeGridOverlayAlpha(
+      mergedSettingsRef?.current?.gridOverlayColor,
+      gridOverlayColorHex
+    )
   }
 
   // Helper: handle wave count preservation
   function getConcentricWaveCount() {
-    return computeConcentricWaveCount(mergedSettingsRef?.current?.concentricWaveCount, concentricWaveCount)
+    return computeConcentricWaveCount(
+      mergedSettingsRef?.current?.concentricWaveCount,
+      concentricWaveCount
+    )
   }
-
-  
 
   // Merge current UI theme/visual settings into a parsed settings object.
   // Reused by buildNortContentRequest and random-map outgoing settings.
   function mergeUiIntoParsed(parsedSettings) {
-      // Execute hoisted helpers with a context object to avoid nesting
-      applyBackgroundFlagsHoisted(parsedSettings, backgroundType)
-      applyResourcesAndTopLevelHoisted(parsedSettings, { setResourceFromRef, borderRef, textureRef, backgroundSeed, artPack, worldSize, landShape, regionCount, randomSeed, selectedBooks })
-      applyGridAndColoringHoisted(parsedSettings, { regionBoundaryStyle, regionBoundaryWidth, regionBoundaryColorHex, drawRegionBoundaries, colorizeLand, colorizeOcean, oceanColorHex, landColorHex, drawGridOverlay, gridOverlayShape, gridOverlayRowOrColCount, gridOverlayColorHex, gridOverlayXOffset, gridOverlayYOffset, gridOverlayLineWidth, gridOverlayLayer, drawVoronoiGridOverlayOnlyOnLand, resolveLandColoringMethod, finalLandColoringMethod, mergeColor, getGridOverlayAlpha })
-      applyBordersFrayedAndGrungeHoisted(parsedSettings, { borderWidth, borderPosition, borderColorOption, borderColorHex, frayedBorder, frayedBorderBlurLevel, frayedBorderSize, frayedBorderSeed, drawGrunge, grungeWidth, frayedBorderColorHex, mergeColor })
-      applyCoastOceanAndWavesHoisted(parsedSettings, { lineStyle, coastlineWidth, coastlineColorHex, coastShadingLevel, coastShadingColorHex, coastShadingAlpha, oceanShadingLevel, oceanShadingColorHex, oceanShadingAlpha, oceanWavesType, oceanWavesLevel, getConcentricWaveCount, fadeConcentricWaves, jitterToConcentricWaves, brokenLinesForConcentricWaves, mergeColor, oceanWavesColorHex, drawOceanEffectsInLakes, riverColorHex, parseBooleanWithDefault, mergedSettingsRef })
-      applyRoadsAndScalesHoisted(parsedSettings, { drawRoads, roadStyle, roadWidth, mergeColor, roadColorHex, mountainSize, hillSize, duneSize, treeHeight, citySize, scaleSliderValue })
-      applyTextAndBackgroundHoisted(parsedSettings, { drawText, textColorHex, drawBoldBackground, boldBackgroundColorHex, mergeColor })
+    // Execute hoisted helpers with a context object to avoid nesting
+    applyBackgroundFlagsHoisted(parsedSettings, backgroundType)
+    applyResourcesAndTopLevelHoisted(parsedSettings, {
+      setResourceFromRef,
+      borderRef,
+      textureRef,
+      backgroundSeed,
+      artPack,
+      worldSize,
+      landShape,
+      regionCount,
+      randomSeed,
+      selectedBooks,
+    })
+    applyGridAndColoringHoisted(parsedSettings, {
+      regionBoundaryStyle,
+      regionBoundaryWidth,
+      regionBoundaryColorHex,
+      drawRegionBoundaries,
+      colorizeLand,
+      colorizeOcean,
+      oceanColorHex,
+      landColorHex,
+      drawGridOverlay,
+      gridOverlayShape,
+      gridOverlayRowOrColCount,
+      gridOverlayColorHex,
+      gridOverlayXOffset,
+      gridOverlayYOffset,
+      gridOverlayLineWidth,
+      gridOverlayLayer,
+      drawVoronoiGridOverlayOnlyOnLand,
+      resolveLandColoringMethod,
+      finalLandColoringMethod,
+      mergeColor,
+      getGridOverlayAlpha,
+    })
+    applyBordersFrayedAndGrungeHoisted(parsedSettings, {
+      borderWidth,
+      borderPosition,
+      borderColorOption,
+      borderColorHex,
+      frayedBorder,
+      frayedBorderBlurLevel,
+      frayedBorderSize,
+      frayedBorderSeed,
+      drawGrunge,
+      grungeWidth,
+      frayedBorderColorHex,
+      mergeColor,
+    })
+    applyCoastOceanAndWavesHoisted(parsedSettings, {
+      lineStyle,
+      coastlineWidth,
+      coastlineColorHex,
+      coastShadingLevel,
+      coastShadingColorHex,
+      coastShadingAlpha,
+      oceanShadingLevel,
+      oceanShadingColorHex,
+      oceanShadingAlpha,
+      oceanWavesType,
+      oceanWavesLevel,
+      getConcentricWaveCount,
+      fadeConcentricWaves,
+      jitterToConcentricWaves,
+      brokenLinesForConcentricWaves,
+      mergeColor,
+      oceanWavesColorHex,
+      drawOceanEffectsInLakes,
+      riverColorHex,
+      parseBooleanWithDefault,
+      mergedSettingsRef,
+    })
+    applyRoadsAndScalesHoisted(parsedSettings, {
+      drawRoads,
+      roadStyle,
+      roadWidth,
+      mergeColor,
+      roadColorHex,
+      mountainSize,
+      hillSize,
+      duneSize,
+      treeHeight,
+      citySize,
+      scaleSliderValue,
+    })
+    applyTextAndBackgroundHoisted(parsedSettings, {
+      drawText,
+      textColorHex,
+      drawBoldBackground,
+      boldBackgroundColorHex,
+      mergeColor,
+    })
   }
 
   function parseNortSettings(explicitNortContent) {
@@ -1347,7 +1625,10 @@ function GenerateForm({ uiLanguage = 'en' }) {
     }
     const body = result.requestOptions?.body
     if (!body) {
-      globalThis.showToast?.('Cannot download merged settings. Open the Customize panel and save settings locally first.', { type: 'warning', duration: 6000 })
+      globalThis.showToast?.(
+        'Cannot download merged settings. Open the Customize panel and save settings locally first.',
+        { type: 'warning', duration: 6000 }
+      )
       return
     }
 
@@ -1357,7 +1638,10 @@ function GenerateForm({ uiLanguage = 'en' }) {
       // Body is a raw .nort JSON (no wrapper).
       const parsed = tryParse(body)
       if (!parsed) {
-        globalThis.showToast?.('Cannot download merged settings. Open the Customize panel and save settings locally first.', { type: 'warning', duration: 6000 })
+        globalThis.showToast?.(
+          'Cannot download merged settings. Open the Customize panel and save settings locally first.',
+          { type: 'warning', duration: 6000 }
+        )
         return
       }
       serialized = serializeNortObject(parsed)
@@ -1366,16 +1650,25 @@ function GenerateForm({ uiLanguage = 'en' }) {
       if (typeof body.get === 'function') {
         const nf = body.get('nortFile')
         if (!nf || typeof nf.text !== 'function') {
-          globalThis.showToast?.('Cannot download merged settings. Open the Customize panel and save settings locally first.', { type: 'warning', duration: 6000 })
+          globalThis.showToast?.(
+            'Cannot download merged settings. Open the Customize panel and save settings locally first.',
+            { type: 'warning', duration: 6000 }
+          )
           return
         }
         serialized = await nf.text()
       } else {
-        globalThis.showToast?.('Cannot download merged settings. Open the Customize panel and save settings locally first.', { type: 'warning', duration: 6000 })
+        globalThis.showToast?.(
+          'Cannot download merged settings. Open the Customize panel and save settings locally first.',
+          { type: 'warning', duration: 6000 }
+        )
         return
       }
     } else {
-      globalThis.showToast?.('Cannot download merged settings. Open the Customize panel and save settings locally first.', { type: 'warning', duration: 6000 })
+      globalThis.showToast?.(
+        'Cannot download merged settings. Open the Customize panel and save settings locally first.',
+        { type: 'warning', duration: 6000 }
+      )
       return
     }
 
@@ -1420,7 +1713,10 @@ function GenerateForm({ uiLanguage = 'en' }) {
       globalThis.__test_handleGenerateAndSaveNort = handleGenerateAndSaveNort
     } catch (e) {
       if (typeof console !== 'undefined' && typeof console.debug === 'function') {
-        console.debug('GenerateForm: cannot expose test hooks on globalThis — assignment skipped', e)
+        console.debug(
+          'GenerateForm: cannot expose test hooks on globalThis — assignment skipped',
+          e
+        )
       }
     }
   }
@@ -1442,11 +1738,7 @@ function GenerateForm({ uiLanguage = 'en' }) {
   // instrumentation removed
 
   if (!uiLoaded) {
-    return (
-      <div className="generate-form loading">
-        {uiI18n.labels['ui.loading']}
-      </div>
-    )
+    return <div className="generate-form loading">{uiI18n.labels['ui.loading']}</div>
   }
 
   return (
@@ -1686,10 +1978,29 @@ export default GenerateForm
 // Named exports for tests
 export { loadUiOptions }
 // Re-export helper functions used by unit tests
-export { serializeNortObject, scaleSliderValue, computeGridOverlayAlpha, computeConcentricWaveCount, setResourceFromRef, parseBooleanWithDefault, persistCustomizeOverrides, loadRandomOverrides, loadCustomizeOverrides, buildCustomizePayload } from './GenerateForm.helpers'
+export {
+  serializeNortObject,
+  scaleSliderValue,
+  computeGridOverlayAlpha,
+  computeConcentricWaveCount,
+  setResourceFromRef,
+  parseBooleanWithDefault,
+  persistCustomizeOverrides,
+  loadRandomOverrides,
+  loadCustomizeOverrides,
+  buildCustomizePayload,
+} from './GenerateForm.helpers'
 // Additional exports for testing (handled via re-exports above)
 // Export additional hoisted appliers for unit testing
-export { applyBackgroundFlagsHoisted, applyResourcesAndTopLevelHoisted, applyGridAndColoringHoisted, applyBordersFrayedAndGrungeHoisted, applyCoastOceanAndWavesHoisted, applyTextAndBackgroundHoisted,applyRoadsAndScalesHoisted } from './GenerateForm.appliers'
+export {
+  applyBackgroundFlagsHoisted,
+  applyResourcesAndTopLevelHoisted,
+  applyGridAndColoringHoisted,
+  applyBordersFrayedAndGrungeHoisted,
+  applyCoastOceanAndWavesHoisted,
+  applyTextAndBackgroundHoisted,
+  applyRoadsAndScalesHoisted,
+} from './GenerateForm.appliers'
 
 GenerateForm.propTypes = {
   uiLanguage: PropTypes.string,

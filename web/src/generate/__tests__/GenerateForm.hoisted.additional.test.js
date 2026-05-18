@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { applyGridAndColoringHoisted, applyBordersFrayedAndGrungeHoisted, applyRoadsAndScalesHoisted } from '../GenerateForm'
+import {
+  applyGridAndColoringHoisted,
+  applyBordersFrayedAndGrungeHoisted,
+  applyRoadsAndScalesHoisted,
+} from '../GenerateForm'
 
 describe('GenerateForm additional hoisted applier tests', () => {
   it('applyGridAndColoringHoisted sets gridOverlayColor with alpha from getGridOverlayAlpha', () => {
@@ -24,7 +28,9 @@ describe('GenerateForm additional hoisted applier tests', () => {
       drawVoronoiGridOverlayOnlyOnLand: true,
       resolveLandColoringMethod: () => null,
       finalLandColoringMethod: null,
-      mergeColor: (out, k, hex) => { if (hex) out[k] = hex },
+      mergeColor: (out, k, hex) => {
+        if (hex) out[k] = hex
+      },
       getGridOverlayAlpha: () => 128,
     }
 
@@ -48,7 +54,9 @@ describe('GenerateForm additional hoisted applier tests', () => {
       drawGrunge: true,
       grungeWidth: '4',
       frayedBorderColorHex: '#112233',
-      mergeColor: (out, k, hex) => { if (hex) out[k] = hex },
+      mergeColor: (out, k, hex) => {
+        if (hex) out[k] = hex
+      },
     }
 
     applyBordersFrayedAndGrungeHoisted(parsed, ctx)
@@ -68,7 +76,9 @@ describe('GenerateForm additional hoisted applier tests', () => {
       drawRoads: true,
       roadStyle: null,
       roadWidth: null,
-      mergeColor: (out, k, hex) => { if (hex) out[k] = hex },
+      mergeColor: (out, k, hex) => {
+        if (hex) out[k] = hex
+      },
       roadColorHex: '#010101',
       mountainSize: '3',
       hillSize: '4',

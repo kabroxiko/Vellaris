@@ -8,7 +8,7 @@ describe('FontsTab', () => {
     const setOpenFontComboId = vi.fn()
     const handleFontOptionClick = vi.fn()
     const props = {
-      translateLabel: (k) => k === 'common.choose' ? 'Choose' : k,
+      translateLabel: (k) => (k === 'common.choose' ? 'Choose' : k),
       renderColorControl: (opts) => <span key={opts.id}>{opts.label}</span>,
       drawText: true,
       setDrawText: vi.fn(),

@@ -26,7 +26,7 @@ function evictIfNeeded() {
     const k = it.value
     const v = cache.get(k)
     if (v?.objectUrl) {
-        URL.revokeObjectURL(v.objectUrl)
+      URL.revokeObjectURL(v.objectUrl)
     }
     cache.delete(k)
   }

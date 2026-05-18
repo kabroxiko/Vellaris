@@ -7,10 +7,10 @@ const zhLabels = {
   'ui.seed': '种子（可选）',
   'ui.seed.placeholder': '例如 12345',
   'ui.upload.aria': '上传或拖放设置文件',
-  
+
   'ui.upload.loadedPrefix': '已加载',
   'ui.upload.hint': '将设置文件拖放到此处',
-  
+
   'ui.section.or': '或',
   'ui.section.then': '然后',
   'ui.preview.empty': '暂无预览',

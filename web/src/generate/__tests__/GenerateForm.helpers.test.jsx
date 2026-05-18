@@ -14,7 +14,7 @@ import {
 } from '../GenerateForm.jsx'
 
 test('serializeNortObject sorts object keys recursively', () => {
-  const obj = { b: 1, a: { d: 4, c: 3 }, z: [ { y: 2, x: 1 } ] }
+  const obj = { b: 1, a: { d: 4, c: 3 }, z: [{ y: 2, x: 1 }] }
   const s = serializeNortObject(obj)
   // keys at top level should be in sorted order: a, b, z
   expect(s.indexOf('  "a"')).to.be.lessThan(s.indexOf('  "b"'))
@@ -65,7 +65,12 @@ test('computeGridOverlayAlpha returns alpha when hex matches and has alpha chann
 })
 
 test('buildCustomizePayload maps values', () => {
-  const vals = { backgroundType: 'Solid', textureRef: 'p|n', backgroundSeed: '42', drawRegionBoundaries: true }
+  const vals = {
+    backgroundType: 'Solid',
+    textureRef: 'p|n',
+    backgroundSeed: '42',
+    drawRegionBoundaries: true,
+  }
   const out = buildCustomizePayload(vals)
   expect(out.backgroundType).to.equal('Solid')
   expect(out.textureRef).to.equal('p|n')

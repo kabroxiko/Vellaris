@@ -7,7 +7,20 @@ vi.mock('../helpers', async () => {
   const actual = await vi.importActual('../helpers')
   return {
     ...actual,
-    fetchJson: vi.fn(() => Promise.resolve({ labels: { 'ui.button.downloadSettings': 'Download settings', 'ui.button.regenerate': 'Regenerate' }, books: [], artPacks: [], textures: [], borderTypes: [], options: {}, defaults: {} })),
+    fetchJson: vi.fn(() =>
+      Promise.resolve({
+        labels: {
+          'ui.button.downloadSettings': 'Download settings',
+          'ui.button.regenerate': 'Regenerate',
+        },
+        books: [],
+        artPacks: [],
+        textures: [],
+        borderTypes: [],
+        options: {},
+        defaults: {},
+      })
+    ),
   }
 })
 
@@ -26,7 +39,9 @@ describe('buildNortContentRequest unit', () => {
   })
 
   it('throws for invalid explicitNortContent', () => {
-    expect(() => globalThis.__test_buildNortContentRequest({ explicitNortContent: 'not json' })).toThrow()
+    expect(() =>
+      globalThis.__test_buildNortContentRequest({ explicitNortContent: 'not json' })
+    ).toThrow()
   })
 
   it('returns requestOptions for valid explicitNortContent', async () => {

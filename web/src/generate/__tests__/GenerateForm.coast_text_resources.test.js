@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { applyCoastOceanAndWavesHoisted, applyTextAndBackgroundHoisted, applyBackgroundFlagsHoisted, applyResourcesAndTopLevelHoisted } from '../GenerateForm'
+import {
+  applyCoastOceanAndWavesHoisted,
+  applyTextAndBackgroundHoisted,
+  applyBackgroundFlagsHoisted,
+  applyResourcesAndTopLevelHoisted,
+} from '../GenerateForm'
 
 describe('GenerateForm coast/ocean, text/background, and resources appliers', () => {
   it('applyCoastOceanAndWavesHoisted sets expected ocean and coast fields', () => {
@@ -21,7 +26,9 @@ describe('GenerateForm coast/ocean, text/background, and resources appliers', ()
       fadeConcentricWaves: true,
       jitterToConcentricWaves: false,
       brokenLinesForConcentricWaves: true,
-      mergeColor: (out, key, hex) => { if (hex) out[key] = hex },
+      mergeColor: (out, key, hex) => {
+        if (hex) out[key] = hex
+      },
       oceanWavesColorHex: '#112233',
       drawOceanEffectsInLakes: true,
       riverColorHex: '#445566',
@@ -53,7 +60,9 @@ describe('GenerateForm coast/ocean, text/background, and resources appliers', ()
       textColorHex: '#000000',
       drawBoldBackground: true,
       boldBackgroundColorHex: '#ffffff',
-      mergeColor: (out, key, hex) => { if (hex) out[key] = hex },
+      mergeColor: (out, key, hex) => {
+        if (hex) out[key] = hex
+      },
     }
 
     applyTextAndBackgroundHoisted(parsed, ctx)
@@ -78,7 +87,9 @@ describe('GenerateForm coast/ocean, text/background, and resources appliers', ()
   it('applyResourcesAndTopLevelHoisted maps resources and numeric fields', () => {
     const parsed = {}
     const ctx = {
-      setResourceFromRef: (out, key, ref) => { if (ref) out[key] = { artPack: ref.split('|')[0], name: ref.split('|')[1] } },
+      setResourceFromRef: (out, key, ref) => {
+        if (ref) out[key] = { artPack: ref.split('|')[0], name: ref.split('|')[1] }
+      },
       borderRef: 'packX|nameY',
       textureRef: '',
       backgroundSeed: '5',
@@ -87,7 +98,7 @@ describe('GenerateForm coast/ocean, text/background, and resources appliers', ()
       landShape: 'island',
       regionCount: '3',
       randomSeed: '7',
-      selectedBooks: new Set(['B','A']),
+      selectedBooks: new Set(['B', 'A']),
     }
 
     applyResourcesAndTopLevelHoisted(parsed, ctx)
@@ -99,6 +110,6 @@ describe('GenerateForm coast/ocean, text/background, and resources appliers', ()
     expect(parsed.regionCount).toBe(3)
     expect(parsed.randomSeed).toBe(7)
     expect(Array.isArray(parsed.books)).toBe(true)
-    expect(parsed.books).toEqual(['A','B'])
+    expect(parsed.books).toEqual(['A', 'B'])
   })
 })

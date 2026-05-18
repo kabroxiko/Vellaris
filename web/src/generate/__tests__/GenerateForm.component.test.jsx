@@ -11,22 +11,36 @@ vi.mock('../helpers', async () => {
   const actual = await vi.importActual('../helpers')
   return {
     ...actual,
-    fetchJson: vi.fn(() => Promise.resolve({
-      labels: { 'ui.button.downloadSettings': 'Download settings', 'ui.button.regenerate': 'Regenerate' },
-      books: [],
-      artPacks: [],
-      textures: [],
-      borderTypes: [],
-      options: {},
-      defaults: {},
-    })),
+    fetchJson: vi.fn(() =>
+      Promise.resolve({
+        labels: {
+          'ui.button.downloadSettings': 'Download settings',
+          'ui.button.regenerate': 'Regenerate',
+        },
+        books: [],
+        artPacks: [],
+        textures: [],
+        borderTypes: [],
+        options: {},
+        defaults: {},
+      })
+    ),
   }
 })
 
-vi.mock('../i18n/webLabels', () => ({ getFrontendLabels: async () => ({ 'ui.loading': 'Loading', 'ui.button.downloadSettings': 'Download settings', 'ui.button.regenerate': 'Regenerate' }) }))
+vi.mock('../i18n/webLabels', () => ({
+  getFrontendLabels: async () => ({
+    'ui.loading': 'Loading',
+    'ui.button.downloadSettings': 'Download settings',
+    'ui.button.regenerate': 'Regenerate',
+  }),
+}))
 
 // Keep sharedHelpers real except where needed
-vi.mock('../sharedHelpers', async () => ({ ...(await vi.importActual('../sharedHelpers')), makeProgressToastController: () => ({ show: () => {}, hide: () => {} }) }))
+vi.mock('../sharedHelpers', async () => ({
+  ...(await vi.importActual('../sharedHelpers')),
+  makeProgressToastController: () => ({ show: () => {}, hide: () => {} }),
+}))
 
 import GenerateForm from '../GenerateForm'
 
@@ -43,7 +57,9 @@ describe('GenerateForm component', () => {
     expect(downloadLabel).toBeTruthy()
 
     // simulate file selection via hidden input
-    const file = new File([JSON.stringify({ generatedWidth: 200 })], 'test.nort', { type: 'application/json' })
+    const file = new File([JSON.stringify({ generatedWidth: 200 })], 'test.nort', {
+      type: 'application/json',
+    })
     const input = document.getElementById('nort-file-input')
     expect(input).toBeTruthy()
 

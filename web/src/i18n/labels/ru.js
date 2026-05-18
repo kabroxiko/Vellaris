@@ -7,10 +7,10 @@ const ruLabels = {
   'ui.seed': 'Семя (опционально)',
   'ui.seed.placeholder': 'напр. 12345',
   'ui.upload.aria': 'Загрузить или перетащить файл настроек',
-  
+
   'ui.upload.loadedPrefix': 'Загружено',
   'ui.upload.hint': 'Перетащите файл настроек сюда',
-  
+
   'ui.section.or': 'или',
   'ui.section.then': 'затем',
   'ui.preview.empty': 'Предварительный просмотр недоступен',

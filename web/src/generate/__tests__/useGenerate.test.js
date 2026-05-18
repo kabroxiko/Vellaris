@@ -27,7 +27,7 @@ TestHarness.propTypes = {
 describe('useGenerate runGenerate branches', () => {
   it('calls handleSuccess for non-JSON image response', async () => {
     const { readResponseBytesWithProgress } = await import('../sharedHelpers')
-    readResponseBytesWithProgress.mockResolvedValueOnce(new Uint8Array([1,2,3]))
+    readResponseBytesWithProgress.mockResolvedValueOnce(new Uint8Array([1, 2, 3]))
 
     globalThis.fetch = vi.fn(async () => ({ ok: true, headers: { get: () => 'image/png' } }))
 
@@ -53,7 +53,9 @@ describe('useGenerate runGenerate branches', () => {
   it('handles JSON imageBase64 response and calls base64ToBlob', async () => {
     const { readResponseBytesWithProgress } = await import('../sharedHelpers')
     const payload = { imageBase64: 'QQ==', nortContent: '{}' }
-    readResponseBytesWithProgress.mockResolvedValueOnce(new TextEncoder().encode(JSON.stringify(payload)))
+    readResponseBytesWithProgress.mockResolvedValueOnce(
+      new TextEncoder().encode(JSON.stringify(payload))
+    )
 
     globalThis.fetch = vi.fn(async () => ({ ok: true, headers: { get: () => 'application/json' } }))
 
@@ -109,7 +111,9 @@ describe('useGenerate runGenerate branches', () => {
     const { readResponseBytesWithProgress } = await import('../sharedHelpers')
     readResponseBytesWithProgress.mockResolvedValueOnce(new Uint8Array([1]))
 
-    const handleResponseError = vi.fn(async () => { throw new Error('failed') })
+    const handleResponseError = vi.fn(async () => {
+      throw new Error('failed')
+    })
     globalThis.fetch = vi.fn(async () => ({ ok: false }))
 
     const setError = vi.fn()

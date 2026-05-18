@@ -11,11 +11,26 @@ vi.mock('../helpers', async () => {
   const actual = await vi.importActual('../helpers')
   return {
     ...actual,
-    fetchJson: vi.fn(() => Promise.resolve({ labels: { 'ui.button.regenerate': 'Regenerate' }, books: [], artPacks: [], textures: [], borderTypes: [], options: {}, defaults: {} })),
+    fetchJson: vi.fn(() =>
+      Promise.resolve({
+        labels: { 'ui.button.regenerate': 'Regenerate' },
+        books: [],
+        artPacks: [],
+        textures: [],
+        borderTypes: [],
+        options: {},
+        defaults: {},
+      })
+    ),
   }
 })
 
-vi.mock('../i18n/webLabels', () => ({ getFrontendLabels: async () => ({ 'ui.loading': 'Loading', 'ui.button.regenerate': 'Regenerate' }) }))
+vi.mock('../i18n/webLabels', () => ({
+  getFrontendLabels: async () => ({
+    'ui.loading': 'Loading',
+    'ui.button.regenerate': 'Regenerate',
+  }),
+}))
 
 import GenerateForm from '../GenerateForm'
 

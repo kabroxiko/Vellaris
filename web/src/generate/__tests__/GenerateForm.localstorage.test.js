@@ -1,5 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { loadRandomOverrides, loadCustomizeOverrides, persistCustomizeOverrides } from '../GenerateForm'
+import {
+  loadRandomOverrides,
+  loadCustomizeOverrides,
+  persistCustomizeOverrides,
+} from '../GenerateForm'
 
 beforeEach(() => {
   localStorage.clear()

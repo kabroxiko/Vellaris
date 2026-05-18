@@ -1,4 +1,11 @@
-import { dimensionFromSize, selectCityIconType, tryParseJson, appendIfSet, stringValueOrEmpty, seedStringOrEmpty } from '../helpers'
+import {
+  dimensionFromSize,
+  selectCityIconType,
+  tryParseJson,
+  appendIfSet,
+  stringValueOrEmpty,
+  seedStringOrEmpty,
+} from '../helpers'
 import { describe, it, expect } from 'vitest'
 
 describe('helpers', () => {

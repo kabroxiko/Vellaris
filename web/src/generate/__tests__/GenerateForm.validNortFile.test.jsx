@@ -13,18 +13,33 @@ vi.mock('../helpers', async () => {
   const actual = await vi.importActual('../helpers')
   return {
     ...actual,
-    fetchJson: vi.fn(() => Promise.resolve({
-      labels: { 'ui.button.downloadSettings': 'Download settings' },
-      books: [], artPacks: [], textures: [], borderTypes: [], options: {}, defaults: {},
-    })),
+    fetchJson: vi.fn(() =>
+      Promise.resolve({
+        labels: { 'ui.button.downloadSettings': 'Download settings' },
+        books: [],
+        artPacks: [],
+        textures: [],
+        borderTypes: [],
+        options: {},
+        defaults: {},
+      })
+    ),
   }
 })
 
 // Spy on downloadNortContent
 const downloadSpy = vi.fn()
-vi.mock('../responseHandlers', async () => ({ ...(await vi.importActual('../responseHandlers')), downloadNortContent: (...args) => downloadSpy(...args) }))
+vi.mock('../responseHandlers', async () => ({
+  ...(await vi.importActual('../responseHandlers')),
+  downloadNortContent: (...args) => downloadSpy(...args),
+}))
 
-vi.mock('../i18n/webLabels', () => ({ getFrontendLabels: async () => ({ 'ui.loading': 'Loading', 'ui.button.downloadSettings': 'Download settings' }) }))
+vi.mock('../i18n/webLabels', () => ({
+  getFrontendLabels: async () => ({
+    'ui.loading': 'Loading',
+    'ui.button.downloadSettings': 'Download settings',
+  }),
+}))
 
 import GenerateForm from '../GenerateForm'
 
@@ -42,7 +57,10 @@ describe('GenerateForm valid .nort file', () => {
     expect(downloadLabel).toBeTruthy()
 
     // Read the bundled test .nort file from repo
-    const nortPath = path.resolve(__dirname, '../../../../unit test files/map settings/simpleSmallWorld.nort')
+    const nortPath = path.resolve(
+      __dirname,
+      '../../../../unit test files/map settings/simpleSmallWorld.nort'
+    )
     const fileContent = readFileSync(nortPath, 'utf8')
 
     // simulate file selection via hidden input

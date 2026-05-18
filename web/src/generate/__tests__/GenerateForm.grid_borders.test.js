@@ -12,8 +12,10 @@ describe('GenerateForm grid/coloring and borders/fray appliers', () => {
       gridOverlayLayer: 'above',
       gridOverlayXOffset: '1',
       gridOverlayYOffset: '2',
-      mergeColor: (out, key, hex, alphaPct) => { if (hex) out[key] = { hex, alphaPct } },
-      parseBooleanWithDefault: (v, d=false) => (v === undefined ? d : Boolean(v)),
+      mergeColor: (out, key, hex, alphaPct) => {
+        if (hex) out[key] = { hex, alphaPct }
+      },
+      parseBooleanWithDefault: (v, d = false) => (v === undefined ? d : Boolean(v)),
       // provide land coloring resolver expected by the hoisted applier
       resolveLandColoringMethod: () => null,
       finalLandColoringMethod: null,
@@ -44,7 +46,9 @@ describe('GenerateForm grid/coloring and borders/fray appliers', () => {
       drawGrunge: true,
       grungeWidth: '30',
       frayedBorderColorHex: '#001122',
-      mergeColor: (out, key, hex) => { if (hex) out[key] = hex },
+      mergeColor: (out, key, hex) => {
+        if (hex) out[key] = hex
+      },
     }
 
     applyBordersFrayedAndGrungeHoisted(parsed, ctx)

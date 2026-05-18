@@ -13,7 +13,7 @@ vi.mock('../backgroundBaseCache', () => ({
   default: {
     preload: vi.fn(),
     get: vi.fn(() => Promise.resolve(new Blob(['x'], { type: 'image/png' }))),
-  }
+  },
 }))
 
 import CustomizeSettingsSection from '../CustomizeSettingsSection'
@@ -54,7 +54,12 @@ describe('CustomizeSettingsSection (component-level)', () => {
     const ui = { loading: false, customizationDirty: false, hasGeneratedOnce: false }
     const values = { preview: null, fileObj: null, currentSource: {} }
     render(
-      <CustomizeSettingsSection values={values} handlers={noopHandlers} options={defaultOptions} ui={ui} />
+      <CustomizeSettingsSection
+        values={values}
+        handlers={noopHandlers}
+        options={defaultOptions}
+        ui={ui}
+      />
     )
 
     // Find the section-actions buttons (there are three action buttons).
@@ -72,7 +77,12 @@ describe('CustomizeSettingsSection (component-level)', () => {
     const ui = { loading: false, customizationDirty: true, hasGeneratedOnce: true }
     const values = { preview: { url: 'blob:fake' }, fileObj: null, currentSource: {} }
     render(
-      <CustomizeSettingsSection values={values} handlers={noopHandlers} options={defaultOptions} ui={ui} />
+      <CustomizeSettingsSection
+        values={values}
+        handlers={noopHandlers}
+        options={defaultOptions}
+        ui={ui}
+      />
     )
 
     const actionButtons = Array.from(document.querySelectorAll('.section-actions button'))
@@ -87,7 +97,12 @@ describe('CustomizeSettingsSection (component-level)', () => {
     const ui = { loading: false, customizationDirty: false, hasGeneratedOnce: false }
     const values = { preview: { url: 'blob:preview' }, fileObj: null, currentSource: {} }
     render(
-      <CustomizeSettingsSection values={values} handlers={noopHandlers} options={defaultOptions} ui={ui} />
+      <CustomizeSettingsSection
+        values={values}
+        handlers={noopHandlers}
+        options={defaultOptions}
+        ui={ui}
+      />
     )
 
     const actionButtons = Array.from(document.querySelectorAll('.section-actions button'))

@@ -12,7 +12,11 @@ describe('EffectsTab swatchReplacement sanitization', () => {
     }
 
     const renderColorControl = ({ id, swatchReplacement, disabled }) => (
-      <div data-testid={`color-${id}`} data-swatch={swatchReplacement || ''} data-disabled={disabled ? '1' : '0'} />
+      <div
+        data-testid={`color-${id}`}
+        data-swatch={swatchReplacement || ''}
+        data-disabled={disabled ? '1' : '0'}
+      />
     )
 
     render(

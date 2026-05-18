@@ -5,10 +5,10 @@ const enLabels = {
   'ui.subtitle': 'Start from random settings, or load a settings file.',
   'ui.seed.placeholder': 'e.g. 12345',
   'ui.upload.aria': 'Upload or drop settings file',
-  
+
   'ui.upload.loadedPrefix': 'Loaded',
   'ui.upload.hint': 'or drag and drop a settings file here',
-  
+
   'ui.section.or': 'or',
   'ui.section.then': 'then',
   'ui.preview.empty': 'No preview available',
@@ -23,7 +23,6 @@ const enLabels = {
   'ui.texture.noneAvailable': 'No textures available',
   'ui.mapLanguage': 'Map language',
   'theme.styleOptions.label': 'Style options:',
-  
 }
 
 export default enLabels

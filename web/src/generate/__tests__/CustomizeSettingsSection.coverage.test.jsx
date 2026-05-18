@@ -66,7 +66,14 @@ test('prepareBitmapsModule calls colorizeBitmap appropriately', async () => {
   const origCIB = globalThis.createImageBitmap
   globalThis.createImageBitmap = vi.fn().mockResolvedValue('ib')
   const img = {}
-  const res = await prepareBitmapsModule(img, 4, 4, { colorizeOcean: true, colorizeLand: true }, { backgroundType: '' }, { colorizeLand: false })
+  const res = await prepareBitmapsModule(
+    img,
+    4,
+    4,
+    { colorizeOcean: true, colorizeLand: true },
+    { backgroundType: '' },
+    { colorizeLand: false }
+  )
   // both displayBitmap and landBitmap should be produced
   expect(res.displayBitmap).to.exist
   expect(res.landBitmap).to.exist
@@ -97,7 +104,16 @@ test('colorizeBitmap runs and returns createImageBitmap result (stubbed)', async
   const origCreateImageBitmap = globalThis.createImageBitmap
   globalThis.createImageBitmap = vi.fn().mockResolvedValue(fakeIB)
 
-  const result = await colorizeBitmap({ /* fake sourceBitmap */ }, '#ff0000', 2, 2, { backgroundType: '' }, { preserveTexture: 0 })
+  const result = await colorizeBitmap(
+    {
+      /* fake sourceBitmap */
+    },
+    '#ff0000',
+    2,
+    2,
+    { backgroundType: '' },
+    { preserveTexture: 0 }
+  )
   expect(result).to.equal(fakeIB)
 
   // restore

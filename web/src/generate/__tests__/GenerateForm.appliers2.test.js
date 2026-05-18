@@ -29,7 +29,9 @@ describe('GenerateForm appliers (grid, borders, coast/ocean)', () => {
       drawVoronoiGridOverlayOnlyOnLand: true,
       resolveLandColoringMethod: () => 'ColorPoliticalRegions',
       finalLandColoringMethod: undefined,
-      mergeColor: (p, k, hex) => { p[k] = `merged:${hex}` },
+      mergeColor: (p, k, hex) => {
+        p[k] = `merged:${hex}`
+      },
       getGridOverlayAlpha: () => 77,
     }
 
@@ -65,7 +67,9 @@ describe('GenerateForm appliers (grid, borders, coast/ocean)', () => {
       drawGrunge: true,
       grungeWidth: '6',
       frayedBorderColorHex: '#101010',
-      mergeColor: (p, k, hex) => { p[k] = `merged:${hex}` },
+      mergeColor: (p, k, hex) => {
+        p[k] = `merged:${hex}`
+      },
     }
 
     applyBordersFrayedAndGrungeHoisted(parsed, ctx)
@@ -102,7 +106,9 @@ describe('GenerateForm appliers (grid, borders, coast/ocean)', () => {
       fadeConcentricWaves: true,
       jitterToConcentricWaves: false,
       brokenLinesForConcentricWaves: true,
-      mergeColor: (p, k, hex) => { p[k] = `merged:${hex}` },
+      mergeColor: (p, k, hex) => {
+        p[k] = `merged:${hex}`
+      },
       oceanWavesColorHex: '#1a1b1c',
       drawOceanEffectsInLakes: true,
       riverColorHex: '#1d1e1f',

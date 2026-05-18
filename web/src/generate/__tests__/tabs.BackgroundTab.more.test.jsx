@@ -9,7 +9,10 @@ const baseProps = {
   renderColorControl: ({ id }) => <div data-testid={`color-${id}`} />,
   notifyManualChange: () => {},
   recomposeUsingLastBase: () => {},
-  backgroundTypes: [{ value: 'SolidColor', label: 'Solid' }, { value: 'GeneratedFromTexture', label: 'Generated' }],
+  backgroundTypes: [
+    { value: 'SolidColor', label: 'Solid' },
+    { value: 'GeneratedFromTexture', label: 'Generated' },
+  ],
   textures: [],
   strokeTypes: [],
 }
@@ -23,12 +26,7 @@ test('returns empty div when props are null/undefined', () => {
 
 test('TextureSelect renders no-textures option and is disabled when hasTextures=false', () => {
   render(
-    <BackgroundTab
-      {...baseProps}
-      textures={[]}
-      hasTextures={false}
-      showTextureOptions={true}
-    />
+    <BackgroundTab {...baseProps} textures={[]} hasTextures={false} showTextureOptions={true} />
   )
 
   const select = screen.getByLabelText('theme.texture.label')
@@ -40,7 +38,10 @@ test('TextureSelect renders no-textures option and is disabled when hasTextures=
 })
 
 test('TextureSelect renders available textures when provided', () => {
-  const textures = [{ artPack: 'packA', name: 'image1.png' }, { artPack: 'packB', name: 'tile.jpg' }]
+  const textures = [
+    { artPack: 'packA', name: 'image1.png' },
+    { artPack: 'packB', name: 'tile.jpg' },
+  ]
   render(
     <BackgroundTab
       {...baseProps}
@@ -57,7 +58,10 @@ test('TextureSelect renders available textures when provided', () => {
 })
 
 test('GridOffsetsSelects shows offset options when drawGridOverlay=true and not Voronoi', () => {
-  const offsets = [{ value: 'off1', label: 'Offset 1' }, { value: 'off2', label: 'Offset 2' }]
+  const offsets = [
+    { value: 'off1', label: 'Offset 1' },
+    { value: 'off2', label: 'Offset 2' },
+  ]
   render(
     <BackgroundTab
       {...baseProps}
@@ -82,12 +86,7 @@ test('GridOffsetsSelects shows offset options when drawGridOverlay=true and not 
 })
 
 test('colorize checkboxes disabled when backgroundType != GeneratedFromTexture and enabled when it is', () => {
-  const { rerender } = render(
-    <BackgroundTab
-      {...baseProps}
-      backgroundType={''}
-    />
-  )
+  const { rerender } = render(<BackgroundTab {...baseProps} backgroundType={''} />)
 
   // when backgroundType is not GeneratedFromTexture the colorize checkboxes should be disabled
   const landCheckboxDisabled = screen.getByText('theme.colorLand').previousSibling

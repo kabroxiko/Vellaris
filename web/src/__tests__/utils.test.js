@@ -26,7 +26,12 @@ describe('generate/utils', () => {
   it('parses color channels from #hex, rgb string, and object', () => {
     expect(parseColorChannels('#010203')).toEqual({ r: 1, g: 2, b: 3, a: 255 })
     expect(parseColorChannels(' 10, 20,30 ')).toEqual({ r: 10, g: 20, b: 30, a: 255 })
-    expect(parseColorChannels({ red: '5', green: 6, blue: 7, alpha: 128 })).toEqual({ r: 5, g: 6, b: 7, a: 128 })
+    expect(parseColorChannels({ red: '5', green: 6, blue: 7, alpha: 128 })).toEqual({
+      r: 5,
+      g: 6,
+      b: 7,
+      a: 128,
+    })
     expect(parseColorChannels(null)).toBeNull()
   })
 

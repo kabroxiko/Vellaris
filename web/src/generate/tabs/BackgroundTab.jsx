@@ -22,9 +22,7 @@ function RegionBoundaryControls({
       className={`control-group${drawRegionBoundaries ? '' : ' is-disabled'}`}
       style={drawRegionBoundaries ? undefined : { opacity: 0.5, pointerEvents: 'none' }}
     >
-      <label htmlFor="region-boundary-style-input">
-        {translateLabel('theme.style.label')}
-      </label>
+      <label htmlFor="region-boundary-style-input">{translateLabel('theme.style.label')}</label>
       <select
         id="region-boundary-style-input"
         value={gatedControlValue(regionBoundaryStyle)}
@@ -115,7 +113,10 @@ function LandColorControls({
         id: 'land-color',
         label: translateLabel('theme.landColor.label'),
         hexValue: landColorHex,
-        onHexChange: (hex) => { setLandColorHex(hex); notifyManualChange(); },
+        onHexChange: (hex) => {
+          setLandColorHex(hex)
+          notifyManualChange()
+        },
         showState: showLandPicker,
         setShowState: setShowLandPicker,
         disabled: !colorizeLand || finalLandColoringMethod === 'ColorPoliticalRegions',
@@ -123,7 +124,8 @@ function LandColorControls({
           try {
             recomposeUsingLastBase({ landColorHex: landColorHex })
           } catch (err) {
-            if (typeof console !== 'undefined' && console.debug) console.debug('BackgroundTab: recomposeUsingLastBase failed', err)
+            if (typeof console !== 'undefined' && console.debug)
+              console.debug('BackgroundTab: recomposeUsingLastBase failed', err)
           }
         },
       })}
@@ -151,7 +153,10 @@ function OceanColorControls({
         id: 'ocean-color',
         label: translateLabel('theme.oceanColor.label'),
         hexValue: oceanColorHex,
-        onHexChange: (hex) => { setOceanColorHex(hex); notifyManualChange(); },
+        onHexChange: (hex) => {
+          setOceanColorHex(hex)
+          notifyManualChange()
+        },
         showState: showOceanPicker,
         setShowState: setShowOceanPicker,
         disabled: !colorizeOcean,
@@ -159,7 +164,8 @@ function OceanColorControls({
           try {
             recomposeUsingLastBase({ oceanColorHex: oceanColorHex })
           } catch (err) {
-            if (typeof console !== 'undefined' && console.debug) console.debug('BackgroundTab: recomposeUsingLastBase failed', err)
+            if (typeof console !== 'undefined' && console.debug)
+              console.debug('BackgroundTab: recomposeUsingLastBase failed', err)
           }
         },
       })}
@@ -167,10 +173,21 @@ function OceanColorControls({
   )
 }
 
-function TextureSelect({ emptyComboOption, textures, hasTextures, showTextureOptions, translateLabel, gatedControlValue, textureRef, setTextureRef }) {
+function TextureSelect({
+  emptyComboOption,
+  textures,
+  hasTextures,
+  showTextureOptions,
+  translateLabel,
+  gatedControlValue,
+  textureRef,
+  setTextureRef,
+}) {
   return (
     <>
-      <label htmlFor="texture-input" className={showTextureOptions ? '' : 'is-disabled'}>{translateLabel('theme.texture.label')}</label>
+      <label htmlFor="texture-input" className={showTextureOptions ? '' : 'is-disabled'}>
+        {translateLabel('theme.texture.label')}
+      </label>
       <select
         id="texture-input"
         value={gatedControlValue(textureRef)}
@@ -196,7 +213,15 @@ function TextureSelect({ emptyComboOption, textures, hasTextures, showTextureOpt
   )
 }
 
-function GridShapeSelect({ translateLabel, gatedControlValue, emptyComboOption, gridOverlayShape, setGridOverlayShape, drawGridOverlay, gridOverlayShapes }) {
+function GridShapeSelect({
+  translateLabel,
+  gatedControlValue,
+  emptyComboOption,
+  gridOverlayShape,
+  setGridOverlayShape,
+  drawGridOverlay,
+  gridOverlayShapes,
+}) {
   return (
     <>
       <label htmlFor="grid-shape-input">{translateLabel('theme.shape.label')}</label>
@@ -217,10 +242,21 @@ function GridShapeSelect({ translateLabel, gatedControlValue, emptyComboOption, 
   )
 }
 
-function GridRowsControl({ translateLabel, isVerticalHex, drawGridOverlay, isVoronoi, gatedControlValue, gridOverlayRowOrColCount, setGridOverlayRowOrColCount }) {
+function GridRowsControl({
+  translateLabel,
+  isVerticalHex,
+  drawGridOverlay,
+  isVoronoi,
+  gatedControlValue,
+  gridOverlayRowOrColCount,
+  setGridOverlayRowOrColCount,
+}) {
   return (
     <>
-      <label htmlFor="grid-rows-input" className={drawGridOverlay && !isVoronoi ? '' : 'is-disabled'}>
+      <label
+        htmlFor="grid-rows-input"
+        className={drawGridOverlay && !isVoronoi ? '' : 'is-disabled'}
+      >
         {isVerticalHex ? translateLabel('theme.columns.label') : translateLabel('theme.rows.label')}
       </label>
       <div className="slider-row">
@@ -240,7 +276,12 @@ function GridRowsControl({ translateLabel, isVerticalHex, drawGridOverlay, isVor
   )
 }
 
-function GridLineWidthControl({ translateLabel, drawGridOverlay, gridOverlayLineWidth, setGridOverlayLineWidth }) {
+function GridLineWidthControl({
+  translateLabel,
+  drawGridOverlay,
+  gridOverlayLineWidth,
+  setGridOverlayLineWidth,
+}) {
   return (
     <>
       <label htmlFor="grid-linewidth-input">{translateLabel('theme.lineWidth.label')}</label>
@@ -261,29 +302,74 @@ function GridLineWidthControl({ translateLabel, drawGridOverlay, gridOverlayLine
   )
 }
 
-function GridOffsetsSelects({ translateLabel, drawGridOverlay, isVoronoi, gatedControlValue, gridOverlayXOffset, setGridOverlayXOffset, gridOverlayYOffset, setGridOverlayYOffset, gridOverlayOffsets, emptyComboOption }) {
+function GridOffsetsSelects({
+  translateLabel,
+  drawGridOverlay,
+  isVoronoi,
+  gatedControlValue,
+  gridOverlayXOffset,
+  setGridOverlayXOffset,
+  gridOverlayYOffset,
+  setGridOverlayYOffset,
+  gridOverlayOffsets,
+  emptyComboOption,
+}) {
   return (
     <>
-      <label htmlFor="grid-xoffset-input" className={drawGridOverlay && !isVoronoi ? '' : 'is-disabled'}>{translateLabel('theme.xOffset.label')}</label>
-      <select id="grid-xoffset-input" value={gatedControlValue(gridOverlayXOffset)} onChange={(e) => setGridOverlayXOffset(e.target.value)} disabled={!(drawGridOverlay && !isVoronoi)}>
+      <label
+        htmlFor="grid-xoffset-input"
+        className={drawGridOverlay && !isVoronoi ? '' : 'is-disabled'}
+      >
+        {translateLabel('theme.xOffset.label')}
+      </label>
+      <select
+        id="grid-xoffset-input"
+        value={gatedControlValue(gridOverlayXOffset)}
+        onChange={(e) => setGridOverlayXOffset(e.target.value)}
+        disabled={!(drawGridOverlay && !isVoronoi)}
+      >
         {emptyComboOption}
-        {Array.isArray(gridOverlayOffsets) ? gridOverlayOffsets.map((item) => (
-          <option key={item.value} value={item.value}>{item.label}</option>
-        )) : null}
+        {Array.isArray(gridOverlayOffsets)
+          ? gridOverlayOffsets.map((item) => (
+              <option key={item.value} value={item.value}>
+                {item.label}
+              </option>
+            ))
+          : null}
       </select>
 
-      <label htmlFor="grid-yoffset-input" className={drawGridOverlay && !isVoronoi ? '' : 'is-disabled'}>{translateLabel('theme.yOffset.label')}</label>
-      <select id="grid-yoffset-input" value={gatedControlValue(gridOverlayYOffset)} onChange={(e) => setGridOverlayYOffset(e.target.value)} disabled={!(drawGridOverlay && !isVoronoi)}>
+      <label
+        htmlFor="grid-yoffset-input"
+        className={drawGridOverlay && !isVoronoi ? '' : 'is-disabled'}
+      >
+        {translateLabel('theme.yOffset.label')}
+      </label>
+      <select
+        id="grid-yoffset-input"
+        value={gatedControlValue(gridOverlayYOffset)}
+        onChange={(e) => setGridOverlayYOffset(e.target.value)}
+        disabled={!(drawGridOverlay && !isVoronoi)}
+      >
         {emptyComboOption}
-        {Array.isArray(gridOverlayOffsets) ? gridOverlayOffsets.map((item) => (
-          <option key={item.value} value={item.value}>{item.label}</option>
-        )) : null}
+        {Array.isArray(gridOverlayOffsets)
+          ? gridOverlayOffsets.map((item) => (
+              <option key={item.value} value={item.value}>
+                {item.label}
+              </option>
+            ))
+          : null}
       </select>
     </>
   )
 }
 
-function GridVoronoiToggle({ translateLabel, drawGridOverlay, isVoronoi, drawVoronoiGridOverlayOnlyOnLand, setDrawVoronoiGridOverlayOnlyOnLand }) {
+function GridVoronoiToggle({
+  translateLabel,
+  drawGridOverlay,
+  isVoronoi,
+  drawVoronoiGridOverlayOnlyOnLand,
+  setDrawVoronoiGridOverlayOnlyOnLand,
+}) {
   return (
     <label className={`checkbox-label${drawGridOverlay && isVoronoi ? '' : ' is-disabled'}`}>
       <input
@@ -297,15 +383,32 @@ function GridVoronoiToggle({ translateLabel, drawGridOverlay, isVoronoi, drawVor
   )
 }
 
-function GridLayerSelect({ translateLabel, gatedControlValue, emptyComboOption, gridOverlayLayer, setGridOverlayLayer, drawGridOverlay, gridOverlayLayers }) {
+function GridLayerSelect({
+  translateLabel,
+  gatedControlValue,
+  emptyComboOption,
+  gridOverlayLayer,
+  setGridOverlayLayer,
+  drawGridOverlay,
+  gridOverlayLayers,
+}) {
   return (
     <>
       <label htmlFor="grid-layer-input">{translateLabel('theme.layer.label')}</label>
-      <select id="grid-layer-input" value={gatedControlValue(gridOverlayLayer)} onChange={(e) => setGridOverlayLayer(e.target.value)} disabled={!drawGridOverlay}>
+      <select
+        id="grid-layer-input"
+        value={gatedControlValue(gridOverlayLayer)}
+        onChange={(e) => setGridOverlayLayer(e.target.value)}
+        disabled={!drawGridOverlay}
+      >
         {emptyComboOption}
-        {Array.isArray(gridOverlayLayers) ? gridOverlayLayers.map((item) => (
-          <option key={item.value} value={item.value}>{item.label}</option>
-        )) : null}
+        {Array.isArray(gridOverlayLayers)
+          ? gridOverlayLayers.map((item) => (
+              <option key={item.value} value={item.value}>
+                {item.label}
+              </option>
+            ))
+          : null}
       </select>
     </>
   )
@@ -341,10 +444,11 @@ function GridOverlayControls({
   gridOverlayLayer,
   setGridOverlayLayer,
 }) {
-  
-
   return (
-    <div className={`control-group${drawGridOverlay ? '' : ' is-disabled'}`} style={drawGridOverlay ? undefined : { opacity: 0.5, pointerEvents: 'none' }}>
+    <div
+      className={`control-group${drawGridOverlay ? '' : ' is-disabled'}`}
+      style={drawGridOverlay ? undefined : { opacity: 0.5, pointerEvents: 'none' }}
+    >
       <GridShapeSelect
         translateLabel={translateLabel}
         gatedControlValue={gatedControlValue}
@@ -369,7 +473,15 @@ function GridOverlayControls({
         gridOverlayLineWidth={gridOverlayLineWidth}
         setGridOverlayLineWidth={setGridOverlayLineWidth}
       />
-      {renderColorControl({ id: 'grid-color', label: translateLabel('theme.color.label'), hexValue: gridOverlayColorHex, onHexChange: setGridOverlayColorHex, showState: showGridPicker, setShowState: setShowGridPicker, disabled: !drawGridOverlay })}
+      {renderColorControl({
+        id: 'grid-color',
+        label: translateLabel('theme.color.label'),
+        hexValue: gridOverlayColorHex,
+        onHexChange: setGridOverlayColorHex,
+        showState: showGridPicker,
+        setShowState: setShowGridPicker,
+        disabled: !drawGridOverlay,
+      })}
       <GridOffsetsSelects
         translateLabel={translateLabel}
         drawGridOverlay={drawGridOverlay}
@@ -476,7 +588,9 @@ export default function BackgroundTab(props) {
     landColoringMethods,
   } = props
 
-  const isVoronoi = String((gridOverlayShape || '')).toLowerCase().includes('voronoi')
+  const isVoronoi = String(gridOverlayShape || '')
+    .toLowerCase()
+    .includes('voronoi')
   const lowerShape = String(gridOverlayShape || '').toLowerCase()
   const isVerticalHex = lowerShape.includes('vertical')
   const canToggleColorize = String(backgroundType || '') === 'GeneratedFromTexture'
@@ -549,7 +663,8 @@ export default function BackgroundTab(props) {
               try {
                 recomposeUsingLastBase({ colorizeLand: v })
               } catch (err) {
-                if (typeof console !== 'undefined' && console.debug) console.debug('BackgroundTab: recomposeUsingLastBase failed', err)
+                if (typeof console !== 'undefined' && console.debug)
+                  console.debug('BackgroundTab: recomposeUsingLastBase failed', err)
               }
             }}
           />
@@ -587,7 +702,8 @@ export default function BackgroundTab(props) {
               try {
                 recomposeUsingLastBase({ colorizeOcean: v })
               } catch (err) {
-                if (typeof console !== 'undefined' && console.debug) console.debug('BackgroundTab: recomposeUsingLastBase failed', err)
+                if (typeof console !== 'undefined' && console.debug)
+                  console.debug('BackgroundTab: recomposeUsingLastBase failed', err)
               }
             }}
           />
@@ -657,9 +773,17 @@ export default function BackgroundTab(props) {
           setGridOverlayLayer={setGridOverlayLayer}
         />
 
-        <div className="background-preview-panel background-preview-panel--full-row" role="img" aria-label={translateLabel('theme.background.label')}>
+        <div
+          className="background-preview-panel background-preview-panel--full-row"
+          role="img"
+          aria-label={translateLabel('theme.background.label')}
+        >
           {backgroundPreviewUrl ? (
-            <img className="background-preview-canvas" src={backgroundPreviewUrl} alt={translateLabel('theme.background.label')} />
+            <img
+              className="background-preview-canvas"
+              src={backgroundPreviewUrl}
+              alt={translateLabel('theme.background.label')}
+            />
           ) : (
             <div className="background-preview-canvas background-preview-canvas--empty" />
           )}

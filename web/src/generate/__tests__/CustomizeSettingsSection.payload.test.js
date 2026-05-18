@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { pickDefaultTexture, resolveRawTextureRef, buildPreviewPayload } from '../CustomizeSettingsSection'
+import {
+  pickDefaultTexture,
+  resolveRawTextureRef,
+  buildPreviewPayload,
+} from '../CustomizeSettingsSection'
 
 describe('CustomizeSettingsSection payload helpers', () => {
   it('pickDefaultTexture prefers cityIconTypesByPack when present', () => {

@@ -30,16 +30,21 @@ export default function FontsTab(props) {
   return (
     <div className="customize-fonts-panel">
       <label className="checkbox-label">
-        <input
-          type="checkbox"
-          checked={drawText}
-          onChange={(e) => setDrawText(e.target.checked)}
-        />
+        <input type="checkbox" checked={drawText} onChange={(e) => setDrawText(e.target.checked)} />
         <span>{translateLabel('theme.enableText')}</span>
       </label>
       <div className={`control-group${drawText ? '' : ' is-disabled'}`}>
         <div className="customize-font-grid">
-          <div className="fonts-grid two-col-layout" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', columnGap: 24, rowGap: 8, alignItems: 'start' }}>
+          <div
+            className="fonts-grid two-col-layout"
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              columnGap: 24,
+              rowGap: 8,
+              alignItems: 'start',
+            }}
+          >
             <div className="fields-column">
               {fontFields.map((field) => (
                 <React.Fragment key={field.id}>
@@ -48,7 +53,9 @@ export default function FontsTab(props) {
                     <button
                       type="button"
                       className="font-combo-trigger"
-                      onClick={() => setOpenFontComboId(openFontComboId === field.id ? null : field.id)}
+                      onClick={() =>
+                        setOpenFontComboId(openFontComboId === field.id ? null : field.id)
+                      }
                       style={{ fontFamily: field.value || 'serif' }}
                       aria-haspopup="listbox"
                       aria-expanded={openFontComboId === field.id}

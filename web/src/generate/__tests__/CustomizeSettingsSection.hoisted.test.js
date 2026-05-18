@@ -1,6 +1,10 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from 'vitest'
-import { makeCanvasForBitmap, drawBackgroundAndInset, drawIslandShape } from '../CustomizeSettingsSection'
+import {
+  makeCanvasForBitmap,
+  drawBackgroundAndInset,
+  drawIslandShape,
+} from '../CustomizeSettingsSection'
 
 describe('CustomizeSettingsSection hoisted helpers', () => {
   it('makeCanvasForBitmap returns canvas and dimensions', () => {
@@ -23,8 +27,8 @@ describe('CustomizeSettingsSection hoisted helpers', () => {
     const opts = { ctx: mockCtx, img: 'IMG', w: 20, h: 10, x: 2, y: 3, boxW: 6, boxH: 4 }
     drawBackgroundAndInset(opts)
     expect(calls[0]).toBe('save')
-    expect(calls.some(c => Array.isArray(c) && c[0] === 'drawImage')).toBeTruthy()
-    expect(calls.some(c => Array.isArray(c) && c[0] === 'fillRect')).toBeTruthy()
+    expect(calls.some((c) => Array.isArray(c) && c[0] === 'drawImage')).toBeTruthy()
+    expect(calls.some((c) => Array.isArray(c) && c[0] === 'fillRect')).toBeTruthy()
     expect(calls.at(-1)).toBe('restore')
   })
 
@@ -71,7 +75,7 @@ describe('CustomizeSettingsSection hoisted helpers', () => {
     }
 
     drawIslandShape(opts)
-    expect(called.some(c => Array.isArray(c) && c[0] === 'createPattern')).toBeTruthy()
+    expect(called.some((c) => Array.isArray(c) && c[0] === 'createPattern')).toBeTruthy()
     // stroke should be called because computedDefaultWidth >=1
     expect(called.includes('stroke')).toBeTruthy()
   })

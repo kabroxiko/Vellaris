@@ -19,7 +19,14 @@ const uiOptsWithDefaults = {
     coastShadingColor: '10,20,30,102',
   },
   labels: {},
-  options: { backgroundTypes: [{ value: 'MyBg' }], finalLandColoringMethods: [{ value: 'L1' }], lineStyles: [{ value: 'ls' }], fonts: ['F1'], defaultFontFamily: 'F1', maxCityProbability: 100 },
+  options: {
+    backgroundTypes: [{ value: 'MyBg' }],
+    finalLandColoringMethods: [{ value: 'L1' }],
+    lineStyles: [{ value: 'ls' }],
+    fonts: ['F1'],
+    defaultFontFamily: 'F1',
+    maxCityProbability: 100,
+  },
 }
 
 vi.mock('../helpers', async (importOriginal) => {
@@ -51,7 +58,8 @@ test('applyServerDefaults: roadStyle object and scale mapping applied to persist
     // roadStyle should be set from object.type
     if (parsed.roadStyle !== 'major') throw new Error('roadStyle not applied')
     // mountainScale 0.5 should map to a slider value (number)
-    if (!parsed.mountainSize && parsed.mountainSize !== 0) throw new Error('mountainSize not present')
+    if (!parsed.mountainSize && parsed.mountainSize !== 0)
+      throw new Error('mountainSize not present')
     // hillScale >1 should produce a hillSize number
     if (!parsed.hillSize && parsed.hillSize !== 0) throw new Error('hillSize not present')
   })

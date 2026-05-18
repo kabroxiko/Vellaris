@@ -13,15 +13,37 @@ vi.mock('../helpers', async () => {
   const actual = await vi.importActual('../helpers')
   return {
     ...actual,
-    fetchJson: vi.fn(() => Promise.resolve({ labels: { 'ui.button.downloadSettings': 'Download settings', 'ui.button.regenerate': 'Regenerate' }, books: [], artPacks: [], textures: [], borderTypes: [], options: {}, defaults: {} })),
+    fetchJson: vi.fn(() =>
+      Promise.resolve({
+        labels: {
+          'ui.button.downloadSettings': 'Download settings',
+          'ui.button.regenerate': 'Regenerate',
+        },
+        books: [],
+        artPacks: [],
+        textures: [],
+        borderTypes: [],
+        options: {},
+        defaults: {},
+      })
+    ),
   }
 })
 
 // Spy on downloadNortContent
 const downloadSpy = vi.fn()
-vi.mock('../responseHandlers', async () => ({ ...(await vi.importActual('../responseHandlers')), downloadNortContent: (...args) => downloadSpy(...args) }))
+vi.mock('../responseHandlers', async () => ({
+  ...(await vi.importActual('../responseHandlers')),
+  downloadNortContent: (...args) => downloadSpy(...args),
+}))
 
-vi.mock('../i18n/webLabels', () => ({ getFrontendLabels: async () => ({ 'ui.loading': 'Loading', 'ui.button.downloadSettings': 'Download settings', 'ui.button.regenerate': 'Regenerate' }) }))
+vi.mock('../i18n/webLabels', () => ({
+  getFrontendLabels: async () => ({
+    'ui.loading': 'Loading',
+    'ui.button.downloadSettings': 'Download settings',
+    'ui.button.regenerate': 'Regenerate',
+  }),
+}))
 
 import GenerateForm from '../GenerateForm'
 
@@ -40,7 +62,10 @@ describe('GenerateForm build and save flows', () => {
     expect(downloadLabel).toBeTruthy()
 
     // Read real .nort file
-    const nortPath = path.resolve(__dirname, '../../../../unit test files/map settings/simpleSmallWorld.nort')
+    const nortPath = path.resolve(
+      __dirname,
+      '../../../../unit test files/map settings/simpleSmallWorld.nort'
+    )
     const fileContent = readFileSync(nortPath, 'utf8')
     const file = new File([fileContent], 'simpleSmallWorld.nort', { type: 'application/json' })
 
@@ -65,7 +90,9 @@ describe('GenerateForm build and save flows', () => {
     expect(downloadLabel).toBeTruthy()
 
     // upload a minimal valid .nort
-    const file = new File([JSON.stringify({ name: 't', language: 'en' })], 'min.nort', { type: 'application/json' })
+    const file = new File([JSON.stringify({ name: 't', language: 'en' })], 'min.nort', {
+      type: 'application/json',
+    })
     const input = document.getElementById('nort-file-input')
     fireEvent.change(input, { target: { files: [file] } })
 

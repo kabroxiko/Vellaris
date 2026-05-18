@@ -11,23 +11,37 @@ vi.mock('../helpers', async () => {
   const actual = await vi.importActual('../helpers')
   return {
     ...actual,
-    fetchJson: vi.fn(() => Promise.resolve({
-      labels: { 'ui.button.downloadSettings': 'Download settings', 'ui.button.regenerate': 'Regenerate' },
-      books: [],
-      artPacks: [],
-      textures: [],
-      borderTypes: [],
-      options: {},
-      defaults: {},
-    })),
+    fetchJson: vi.fn(() =>
+      Promise.resolve({
+        labels: {
+          'ui.button.downloadSettings': 'Download settings',
+          'ui.button.regenerate': 'Regenerate',
+        },
+        books: [],
+        artPacks: [],
+        textures: [],
+        borderTypes: [],
+        options: {},
+        defaults: {},
+      })
+    ),
   }
 })
 
 // Spy on downloadNortContent
 const downloadSpy = vi.fn()
-vi.mock('../responseHandlers', async () => ({ ...(await vi.importActual('../responseHandlers')), downloadNortContent: (...args) => downloadSpy(...args) }))
+vi.mock('../responseHandlers', async () => ({
+  ...(await vi.importActual('../responseHandlers')),
+  downloadNortContent: (...args) => downloadSpy(...args),
+}))
 
-vi.mock('../i18n/webLabels', () => ({ getFrontendLabels: async () => ({ 'ui.loading': 'Loading', 'ui.button.downloadSettings': 'Download settings', 'ui.button.regenerate': 'Regenerate' }) }))
+vi.mock('../i18n/webLabels', () => ({
+  getFrontendLabels: async () => ({
+    'ui.loading': 'Loading',
+    'ui.button.downloadSettings': 'Download settings',
+    'ui.button.regenerate': 'Regenerate',
+  }),
+}))
 
 import GenerateForm from '../GenerateForm'
 

@@ -38,18 +38,18 @@ vi.mock('../hooks/useGenerate', () => ({
         const blob = new Blob(['fakepng'], { type: 'image/png' })
         if (opts?.handleSuccessRef) {
           const tryCall = () => {
-              try {
-                const fn = opts.handleSuccessRef.current
-                if (typeof fn === 'function') {
-                  fn(blob, baseName, source, nort)
-                  return true
-                }
-              } catch (e) {
-                // Log instead of silently swallowing so test failures are observable
-                /* eslint-disable no-console */
-                console.debug('useGenerate mock: handleSuccessRef threw', e)
-                /* eslint-enable no-console */
+            try {
+              const fn = opts.handleSuccessRef.current
+              if (typeof fn === 'function') {
+                fn(blob, baseName, source, nort)
+                return true
               }
+            } catch (e) {
+              // Log instead of silently swallowing so test failures are observable
+              /* eslint-disable no-console */
+              console.debug('useGenerate mock: handleSuccessRef threw', e)
+              /* eslint-enable no-console */
+            }
             return false
           }
           if (!tryCall()) {
@@ -71,15 +71,23 @@ vi.mock('../hooks/useGenerate', () => ({
 // Mock helpers.fetchJson used by loadUiOptions
 vi.mock('../helpers', () => ({
   fetchJson: vi.fn(async () => ({
-    artPacks: [], books: [], textures: [], borderTypes: [],
-    defaults: {}, options: {}, cityIconTypesByPack: {}, labels: { 'ui.loading': 'Loading...' }
+    artPacks: [],
+    books: [],
+    textures: [],
+    borderTypes: [],
+    defaults: {},
+    options: {},
+    cityIconTypesByPack: {},
+    labels: { 'ui.loading': 'Loading...' },
   })),
   handleResponseError: vi.fn(),
   selectCityIconType: vi.fn(() => null),
   tryParseJson: JSON.parse,
   seedStringOrEmpty: (v) => (v !== undefined && v !== null && v !== '' ? String(v) : ''),
   stringValueOrEmpty: (v) => (typeof v === 'string' && v ? v : ''),
-  appendIfSet: (fd, key, value) => { if (value !== null && value !== undefined && value !== '') fd.append(key, String(value)) },
+  appendIfSet: (fd, key, value) => {
+    if (value !== null && value !== undefined && value !== '') fd.append(key, String(value))
+  },
 }))
 
 // Mock frontend labels
@@ -115,11 +123,26 @@ vi.mock('../RandomSettingsSection', () => ({
   default: ({ handlers }) => {
     return (
       <div>
-        <button data-testid="trigger-random" onClick={(e) => handlers.handleRandomMap?.(e)}>random</button>
-        <button data-testid="trigger-file" onClick={() => handlers.handleFileInput({ target: { files: [new File([JSON.stringify({ foo: 1 })], 'test.nort', { type: 'application/json' })] } })}>file</button>
+        <button data-testid="trigger-random" onClick={(e) => handlers.handleRandomMap?.(e)}>
+          random
+        </button>
+        <button
+          data-testid="trigger-file"
+          onClick={() =>
+            handlers.handleFileInput({
+              target: {
+                files: [
+                  new File([JSON.stringify({ foo: 1 })], 'test.nort', { type: 'application/json' }),
+                ],
+              },
+            })
+          }
+        >
+          file
+        </button>
       </div>
     )
-  }
+  },
 }))
 
 vi.mock('../CustomizeSettingsSection', () => ({
@@ -127,12 +150,21 @@ vi.mock('../CustomizeSettingsSection', () => ({
   default: ({ handlers }) => {
     return (
       <div>
-        <button data-testid="generate-save" onClick={(e) => handlers.handleGenerateAndSaveNort?.(e)}>save</button>
-        <button data-testid="open-preview" onClick={() => handlers.openPreviewModal?.()}>open</button>
-        <button data-testid="download-map" onClick={() => handlers.handleDownloadMap?.()}>download</button>
+        <button
+          data-testid="generate-save"
+          onClick={(e) => handlers.handleGenerateAndSaveNort?.(e)}
+        >
+          save
+        </button>
+        <button data-testid="open-preview" onClick={() => handlers.openPreviewModal?.()}>
+          open
+        </button>
+        <button data-testid="download-map" onClick={() => handlers.handleDownloadMap?.()}>
+          download
+        </button>
       </div>
     )
-  }
+  },
 }))
 
 beforeEach(() => {

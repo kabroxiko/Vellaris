@@ -46,7 +46,7 @@ describe('sharedHelpers deterministic functions', () => {
   it('sanitizeFilenameBase and title parsing', () => {
     // existing implementation may produce consecutive dashes for mixed separators
     expect(sanitizeFilenameBase(' My File / Name ')).toBe('My-File---Name')
-    const parsed = { edits: { textEdits: [ { type: 'Title', text: 'My Title' } ] } }
+    const parsed = { edits: { textEdits: [{ type: 'Title', text: 'My Title' }] } }
     expect(findTitle(parsed)).toBe('My Title')
     expect(deriveNortFilenameFromContent(JSON.stringify(parsed))).toBe('My Title')
     // invalid JSON should return null but not throw
@@ -55,33 +55,40 @@ describe('sharedHelpers deterministic functions', () => {
 
   it('reads response bytes with progress for stream and non-stream', async () => {
     // non-stream response
-    const nonStream = { arrayBuffer: async () => new Uint8Array([1,2,3]).buffer }
+    const nonStream = { arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer }
     const non = await readResponseBytesWithProgress(nonStream, () => {})
-    expect(Array.from(non)).toEqual([1,2,3])
+    expect(Array.from(non)).toEqual([1, 2, 3])
 
     // stream-like reader
     let called = false
-    const chunks = [Uint8Array.from([4,5]), Uint8Array.from([6])]
+    const chunks = [Uint8Array.from([4, 5]), Uint8Array.from([6])]
     const reader = {
       i: 0,
       read() {
         if (this.i >= chunks.length) return Promise.resolve({ done: true })
         return Promise.resolve({ done: false, value: chunks[this.i++] })
-      }
+      },
     }
     const streamResp = { body: { getReader: () => reader } }
-    const onStart = () => { called = true }
+    const onStart = () => {
+      called = true
+    }
     const res = await readResponseBytesWithProgress(streamResp, onStart)
     expect(called).toBe(true)
-    expect(Array.from(res)).toEqual([4,5,6])
+    expect(Array.from(res)).toEqual([4, 5, 6])
   })
 
   it('makeProgressToastController handles show/hide without errors', () => {
     const savedShow = globalThis.showToast
     const savedHide = globalThis.hideToast
     let last = null
-    globalThis.showToast = (msg) => { last = msg; return 'id' }
-    globalThis.hideToast = (id) => { last = `hide:${id}` }
+    globalThis.showToast = (msg) => {
+      last = msg
+      return 'id'
+    }
+    globalThis.hideToast = (id) => {
+      last = `hide:${id}`
+    }
     const ctl = makeProgressToastController()
     ctl.show('Working')
     expect(last).toBe('Working')

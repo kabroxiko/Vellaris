@@ -6,15 +6,7 @@ import BackgroundTab from './tabs/BackgroundTab'
 import BorderTab from './tabs/BorderTab'
 import EffectsTab from './tabs/EffectsTab'
 import FontsTab from './tabs/FontsTab'
-import {
-  hexToHSB,
-  mulberry32,
-  hsbToRgb,
-  hexToRgba,
-  rgbaToHex,
-  hexWithAlpha,
-} from './sharedHelpers'
-  
+import { hexToHSB, mulberry32, hsbToRgb, hexToRgba, rgbaToHex, hexWithAlpha } from './sharedHelpers'
 
 const API_BASE = import.meta.env.VITE_API_BASE || '/api'
 
@@ -23,7 +15,11 @@ const API_BASE = import.meta.env.VITE_API_BASE || '/api'
 // Colorize a bitmap to the specified color. Hoisted to module scope
 // so it can be reused and to satisfy Sonar rule S7721.
 async function colorizeBitmap(sourceBitmap, colorHex, w, h, previewFieldsLocal, opts) {
-  const alg = String(previewFieldsLocal?.backgroundType || '').toLowerCase().includes('fractal') ? 'algorithm2' : 'algorithm3'
+  const alg = String(previewFieldsLocal?.backgroundType || '')
+    .toLowerCase()
+    .includes('fractal')
+    ? 'algorithm2'
+    : 'algorithm3'
   const hsb = hexToHSB(colorHex)
   const tmp = document.createElement('canvas')
   tmp.width = w
@@ -32,16 +28,19 @@ async function colorizeBitmap(sourceBitmap, colorHex, w, h, previewFieldsLocal, 
   tctx.drawImage(sourceBitmap, 0, 0, w, h)
   const imd = tctx.getImageData(0, 0, w, h)
   const data = imd.data
-  const preserveTexture = (typeof opts?.preserveTexture === 'number') ? Math.max(0, Math.min(1, opts.preserveTexture)) : 0.02
+  const preserveTexture =
+    typeof opts?.preserveTexture === 'number'
+      ? Math.max(0, Math.min(1, opts.preserveTexture))
+      : 0.02
   for (let i = 0; i < data.length; i += 4) {
     const r0 = data[i]
-    const g0 = data[i+1]
-    const b0 = data[i+2]
+    const g0 = data[i + 1]
+    const b0 = data[i + 2]
     const level = (0.299 * r0 + 0.587 * g0 + 0.114 * b0) / 255
     let resultLevel
     if (alg === 'algorithm2') {
       const I = hsb[2] * 255
-      const overlay = ((I / 255) * (I + (2 * level) * (255 - I))) / 255
+      const overlay = ((I / 255) * (I + 2 * level * (255 - I))) / 255
       resultLevel = overlay
     } else if (hsb[2] < 0.5) {
       resultLevel = level * (hsb[2] * 2)
@@ -51,8 +50,8 @@ async function colorizeBitmap(sourceBitmap, colorHex, w, h, previewFieldsLocal, 
     }
     const [rC, gC, bC] = hsbToRgb(hsb[0], hsb[1], resultLevel)
     data[i] = Math.round((1 - preserveTexture) * rC + preserveTexture * r0)
-    data[i+1] = Math.round((1 - preserveTexture) * gC + preserveTexture * g0)
-    data[i+2] = Math.round((1 - preserveTexture) * bC + preserveTexture * b0)
+    data[i + 1] = Math.round((1 - preserveTexture) * gC + preserveTexture * g0)
+    data[i + 2] = Math.round((1 - preserveTexture) * bC + preserveTexture * b0)
   }
   tctx.putImageData(imd, 0, 0)
   return await createImageBitmap(tmp)
@@ -132,7 +131,24 @@ function drawBackgroundAndInset(opts) {
 
 // Helper: draw the island shape and fill with either pattern or color (hoisted)
 function drawIslandShape(opts) {
-  const { ctx, rng, cx, cy, baseRadius, xRadius, yRadius, boxW, boxH, x, y, landBitmap, displayBitmap, imgBitmap, coastlineWidth = undefined, coastlineColorHex = undefined } = opts || {}
+  const {
+    ctx,
+    rng,
+    cx,
+    cy,
+    baseRadius,
+    xRadius,
+    yRadius,
+    boxW,
+    boxH,
+    x,
+    y,
+    landBitmap,
+    displayBitmap,
+    imgBitmap,
+    coastlineWidth = undefined,
+    coastlineColorHex = undefined,
+  } = opts || {}
   const points = 32
   const jitterX = Math.max(6, Math.round(xRadius * 0.18))
   const jitterY = Math.max(6, Math.round(yRadius * 0.18))
@@ -150,7 +166,7 @@ function drawIslandShape(opts) {
 
   const landColor = '#c2b891'
   const pattern = ctx.createPattern(landBitmap || displayBitmap || imgBitmap, 'repeat')
-    if (pattern) {
+  if (pattern) {
     ctx.save()
     ctx.clip()
     ctx.fillStyle = pattern
@@ -158,9 +174,11 @@ function drawIslandShape(opts) {
     ctx.globalCompositeOperation = 'source-over'
     // Draw coastline stroke only when a positive coastline width is provided.
     const computedDefaultWidth = Math.max(1, Math.round(baseRadius * 0.03))
-    const strokeW = (typeof coastlineWidth === 'number') ? coastlineWidth : computedDefaultWidth
+    const strokeW = typeof coastlineWidth === 'number' ? coastlineWidth : computedDefaultWidth
     if (strokeW > 0) {
-      ctx.strokeStyle = coastlineColorHex ? hexWithAlpha(coastlineColorHex, 100) : 'rgba(255,255,240,0.55)'
+      ctx.strokeStyle = coastlineColorHex
+        ? hexWithAlpha(coastlineColorHex, 100)
+        : 'rgba(255,255,240,0.55)'
       ctx.lineWidth = strokeW
       ctx.lineJoin = 'round'
       ctx.stroke()
@@ -176,26 +194,48 @@ function drawIslandShape(opts) {
 // independently of the React component's closure.
 async function prepareBitmapsModule(imgBitmap, w, h, opts = {}, previewFields = {}, defaults = {}) {
   const processed = { displayBitmap: imgBitmap, landBitmap: imgBitmap }
-  const useColorizeOcean = (typeof opts?.colorizeOcean === 'boolean') ? opts.colorizeOcean : defaults.colorizeOcean
+  const useColorizeOcean =
+    typeof opts?.colorizeOcean === 'boolean' ? opts.colorizeOcean : defaults.colorizeOcean
   const useOceanColorHex = opts?.oceanColorHex || defaults.oceanColorHex
   const SEPPIA_HEX = '#C8A082'
   if (useColorizeOcean && useOceanColorHex) {
-    processed.displayBitmap = await colorizeBitmap(imgBitmap, useOceanColorHex, w, h, previewFields, opts)
+    processed.displayBitmap = await colorizeBitmap(
+      imgBitmap,
+      useOceanColorHex,
+      w,
+      h,
+      previewFields,
+      opts
+    )
   } else {
     processed.displayBitmap = await colorizeBitmap(imgBitmap, SEPPIA_HEX, w, h, previewFields, opts)
   }
 
-  const useColorizeLand = (typeof opts?.colorizeLand === 'boolean') ? opts.colorizeLand : defaults.colorizeLand
+  const useColorizeLand =
+    typeof opts?.colorizeLand === 'boolean' ? opts.colorizeLand : defaults.colorizeLand
   const useLandColorHex = opts?.landColorHex || defaults.landColorHex
   if (useColorizeLand && useLandColorHex) {
-    processed.landBitmap = await colorizeBitmap(imgBitmap, useLandColorHex, w, h, previewFields, opts)
+    processed.landBitmap = await colorizeBitmap(
+      imgBitmap,
+      useLandColorHex,
+      w,
+      h,
+      previewFields,
+      opts
+    )
   } else {
     processed.landBitmap = await colorizeBitmap(imgBitmap, SEPPIA_HEX, w, h, previewFields, opts)
   }
   return processed
 }
 
-async function composeMiniIslandFromBlobModule(sourceBlob, opts = {}, previewFields = {}, defaults = {}, overrides = {}) {
+async function composeMiniIslandFromBlobModule(
+  sourceBlob,
+  opts = {},
+  previewFields = {},
+  defaults = {},
+  overrides = {}
+) {
   const imgBitmap = await createImageBitmap(sourceBlob)
   const makeCanvas = overrides.makeCanvasForBitmap || makeCanvasForBitmap
   const doPrepare = overrides.prepareBitmaps || prepareBitmapsModule
@@ -211,7 +251,14 @@ async function composeMiniIslandFromBlobModule(sourceBlob, opts = {}, previewFie
   const seed = Number(previewFields.backgroundSeed) || Date.now()
   const rng = mulberry32(seed & 0xffffffff)
 
-  const { displayBitmap, landBitmap } = await doPrepare(imgBitmap, w, h, opts, previewFields, defaults)
+  const { displayBitmap, landBitmap } = await doPrepare(
+    imgBitmap,
+    w,
+    h,
+    opts,
+    previewFields,
+    defaults
+  )
 
   doDrawBackground({ ctx, img: displayBitmap, w, h, x, y, boxW, boxH })
 
@@ -276,7 +323,9 @@ function ColorPickerModal({ open, onClose, children }) {
   const innerRef = React.useRef(null)
   React.useEffect(() => {
     if (!open) return undefined
-    const onKey = (e) => { if (e.key === 'Escape') onClose() }
+    const onKey = (e) => {
+      if (e.key === 'Escape') onClose()
+    }
     document.addEventListener('keydown', onKey)
     const onMouseDown = (e) => {
       if (innerRef.current && !innerRef.current.contains?.(e.target)) onClose()
@@ -299,11 +348,12 @@ function ColorPickerModal({ open, onClose, children }) {
       ref={innerRef}
       style={modalBackdropStyle}
       open
-      onCancel={(e) => { e.preventDefault(); onClose() }}
+      onCancel={(e) => {
+        e.preventDefault()
+        onClose()
+      }}
     >
-      <div style={modalContentStyle}>
-        {children}
-      </div>
+      <div style={modalContentStyle}>{children}</div>
     </dialog>
   )
 }
@@ -333,7 +383,8 @@ function pickDefaultTexture(textures = [], cityIconTypesByPack = {}) {
   if (cityIconTypesByPack && Object.keys(cityIconTypesByPack).length > 0) {
     const firstPack = Object.keys(cityIconTypesByPack)[0]
     const firstTypes = cityIconTypesByPack[firstPack]
-    if (Array.isArray(firstTypes) && firstTypes.length > 0) return { artPack: firstPack, cityIconType: firstTypes[0] }
+    if (Array.isArray(firstTypes) && firstTypes.length > 0)
+      return { artPack: firstPack, cityIconType: firstTypes[0] }
   }
   if (Array.isArray(textures) && textures.length > 0) {
     const t = textures[0]
@@ -361,7 +412,10 @@ function buildPreviewPayload(previewFields = {}, textures = [], currentSource = 
   if (previewFields) payload = { ...payload, ...previewFields }
   payload.type = previewFields?.backgroundType === undefined ? null : previewFields.backgroundType
   const bg = payload.type
-  if (bg === 'GeneratedFromTexture' || (typeof bg === 'string' && bg.toLowerCase().includes('texture'))) {
+  if (
+    bg === 'GeneratedFromTexture' ||
+    (typeof bg === 'string' && bg.toLowerCase().includes('texture'))
+  ) {
     const rawRef = previewFields?.textureRef
     const isEmpty = rawRef === undefined || rawRef === null || String(rawRef).trim() === ''
     if (isEmpty) {
@@ -370,17 +424,17 @@ function buildPreviewPayload(previewFields = {}, textures = [], currentSource = 
       payload = { ...payload, ...resolveRawTextureRef(rawRef, textures) }
     }
   }
-  if (currentSource?.type === 'random' && currentSource?.payload) payload = { ...payload, ...currentSource.payload }
-  if (!payload.cityIconType && previewFields?.cityIconType) payload.cityIconType = previewFields.cityIconType
+  if (currentSource?.type === 'random' && currentSource?.payload)
+    payload = { ...payload, ...currentSource.payload }
+  if (!payload.cityIconType && previewFields?.cityIconType)
+    payload.cityIconType = previewFields.cityIconType
   return payload
 }
 
 export { pickDefaultTexture, resolveRawTextureRef, buildPreviewPayload }
 export { pick, stripHtmlWrapper, removeTags }
 
-
 export default function CustomizeSettingsSection({ values, handlers, options, ui }) {
-
   const [activeTab, setActiveTab] = useState('background')
   const [openFontComboId, setOpenFontComboId] = useState(null)
   const [backgroundPreviewUrl, setBackgroundPreviewUrl] = useState(null)
@@ -393,7 +447,6 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
   const FORCE_ENABLE_CUSTOMIZE = true
 
   useEffect(() => {
-    
     const onDocumentMouseDown = (event) => {
       const target = event.target
       if (!(target instanceof Element)) return
@@ -488,8 +541,6 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
   } = values
 
   // Runtime debug: log received `drawGrunge` value from parent `values`
-  
-
 
   // Aggregate all customization fields we want to send to the preview.
   // Extracted into a single helper to avoid duplicated lists and to keep
@@ -576,9 +627,6 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
 
   // Helper: RNG, color math and bitmap colorization extracted to reduce
   // cognitive complexity inside `composeMiniIslandFromBlob`.
-  
-
-  
 
   // Compose a mini island preview from a neutral base Blob. Exported at
   // component scope so color controls can trigger a local recomposition
@@ -590,20 +638,43 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
   // Helper: prepare display and land bitmaps (colorized variants)
   async function prepareBitmaps(imgBitmap, w, h, opts) {
     const processed = { displayBitmap: imgBitmap, landBitmap: imgBitmap }
-    const useColorizeOcean = (typeof opts?.colorizeOcean === 'boolean') ? opts.colorizeOcean : colorizeOcean
+    const useColorizeOcean =
+      typeof opts?.colorizeOcean === 'boolean' ? opts.colorizeOcean : colorizeOcean
     const useOceanColorHex = opts?.oceanColorHex || oceanColorHex
     const SEPPIA_HEX = '#C8A082'
     if (useColorizeOcean && useOceanColorHex) {
-      processed.displayBitmap = await colorizeBitmap(imgBitmap, useOceanColorHex, w, h, previewFields, opts)
+      processed.displayBitmap = await colorizeBitmap(
+        imgBitmap,
+        useOceanColorHex,
+        w,
+        h,
+        previewFields,
+        opts
+      )
     } else {
       // When ocean colorization is disabled, render the preview with a sepia tone
-      processed.displayBitmap = await colorizeBitmap(imgBitmap, SEPPIA_HEX, w, h, previewFields, opts)
+      processed.displayBitmap = await colorizeBitmap(
+        imgBitmap,
+        SEPPIA_HEX,
+        w,
+        h,
+        previewFields,
+        opts
+      )
     }
 
-    const useColorizeLand = (typeof opts?.colorizeLand === 'boolean') ? opts.colorizeLand : colorizeLand
+    const useColorizeLand =
+      typeof opts?.colorizeLand === 'boolean' ? opts.colorizeLand : colorizeLand
     const useLandColorHex = opts?.landColorHex || landColorHex
     if (useColorizeLand && useLandColorHex) {
-      processed.landBitmap = await colorizeBitmap(imgBitmap, useLandColorHex, w, h, previewFields, opts)
+      processed.landBitmap = await colorizeBitmap(
+        imgBitmap,
+        useLandColorHex,
+        w,
+        h,
+        previewFields,
+        opts
+      )
     } else {
       // When land colorization is disabled, render the preview land with a sepia tone
       processed.landBitmap = await colorizeBitmap(imgBitmap, SEPPIA_HEX, w, h, previewFields, opts)
@@ -659,8 +730,6 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
   // the module-scope `buildPreviewPayload(previewFields, textures, currentSource)`
   // helper which is exported for unit testing.
 
-  
-
   async function setPreviewFromBlob(blob) {
     lastBaseBlobRef.current = blob
     const processedBlob = await composeMiniIslandFromBlob(blob)
@@ -693,12 +762,12 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     })
   }
 
- 
   // Use a filtered preview key so color toggles/values DO NOT trigger
   // the background preview. We only want texture/background changes
   // (and other visual parameters) to trigger backend fetches.
   const previewTriggerKey = useMemo(() => {
-    const { colorizeLand, colorizeOcean, landColorHex, oceanColorHex, ...rest } = previewFields || {}
+    const { colorizeLand, colorizeOcean, landColorHex, oceanColorHex, ...rest } =
+      previewFields || {}
     return JSON.stringify(rest)
   }, [
     previewFields?.backgroundType,
@@ -820,10 +889,18 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     const candidates = []
     if (Array.isArray(textures) && textures.length > 0) {
       textures.slice(0, 5).forEach((t) => {
-        candidates.push({ width: 520, height: 170, type: 'GeneratedFromTexture', artPack: t.artPack, cityIconType: t.name })
+        candidates.push({
+          width: 520,
+          height: 170,
+          type: 'GeneratedFromTexture',
+          artPack: t.artPack,
+          cityIconType: t.name,
+        })
       })
     }
-    const fractal = Array.isArray(backgroundTypes) ? backgroundTypes.find((b) => b?.value && String(b.value).toLowerCase().includes('fractal')) : null
+    const fractal = Array.isArray(backgroundTypes)
+      ? backgroundTypes.find((b) => b?.value && String(b.value).toLowerCase().includes('fractal'))
+      : null
     if (fractal) candidates.push({ width: 520, height: 170, type: fractal.value })
     else candidates.push({ width: 520, height: 170, type: 'Fractal' })
 
@@ -836,20 +913,30 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
   const borderColorOptions = backendOptions?.borderColorOptions
   const lineStyles = backendOptions?.lineStyles
   const oceanWaveTypes = backendOptions?.oceanWaveTypes
-  const concentricWaveValue = Array.isArray(oceanWaveTypes) ? oceanWaveTypes.find(o => o?.value && /Concentric/i.test(o.value))?.value : undefined
-  const rippleWaveValue = Array.isArray(oceanWaveTypes) ? oceanWaveTypes.find(o => o?.value && /Ripple|Ripples/i.test(o.value))?.value : undefined
-  const noneWaveValue = Array.isArray(oceanWaveTypes) ? oceanWaveTypes.find(o => o?.value && /^(None|No|NoEffect|NoneWaves)$/i.test(o.value))?.value : undefined
+  const concentricWaveValue = Array.isArray(oceanWaveTypes)
+    ? oceanWaveTypes.find((o) => o?.value && /Concentric/i.test(o.value))?.value
+    : undefined
+  const rippleWaveValue = Array.isArray(oceanWaveTypes)
+    ? oceanWaveTypes.find((o) => o?.value && /Ripple|Ripples/i.test(o.value))?.value
+    : undefined
+  const noneWaveValue = Array.isArray(oceanWaveTypes)
+    ? oceanWaveTypes.find((o) => o?.value && /^(None|No|NoEffect|NoneWaves)$/i.test(o.value))?.value
+    : undefined
   const translateLabel = (key) => {
     const has = Object.hasOwn(labels ?? {}, key) && labels[key]
     const txt = has ? labels[key] : null
-    const baseKey = (!txt && key?.endsWith('.label')) ? key.slice(0, -'.label'.length) : null
+    const baseKey = !txt && key?.endsWith('.label') ? key.slice(0, -'.label'.length) : null
     const alternate = baseKey && Object.hasOwn(labels ?? {}, baseKey) ? labels[baseKey] : null
     const value = txt || alternate || key
     // If the translation contains literal <br> tags, return React nodes
     // Guard against extremely long inputs to avoid expensive regex operations
     if (typeof value === 'string' && value.length <= 2000 && /<br\s*\/?/i.test(value)) {
       const parts = value.split(/<br\s*\/?/i)
-      return parts.flatMap((p) => (p === parts.at(-1) ? [p] : [p, React.createElement('br', { key: `br-${String(p).slice(0,20)}` })]))
+      return parts.flatMap((p) =>
+        p === parts.at(-1)
+          ? [p]
+          : [p, React.createElement('br', { key: `br-${String(p).slice(0, 20)}` })]
+      )
     }
     return value
   }
@@ -888,7 +975,11 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     // If there are <br> tags, convert to React nodes with breaks
     if (/<br\s*\/?>/i.test(t)) {
       const parts = t.split(/<br\s*\/?>/i)
-      return parts.flatMap((p) => (p === parts.at(-1) ? [p] : [p, React.createElement('br', { key: `br-${String(p).slice(0,20)}` })]))
+      return parts.flatMap((p) =>
+        p === parts.at(-1)
+          ? [p]
+          : [p, React.createElement('br', { key: `br-${String(p).slice(0, 20)}` })]
+      )
     }
     // Otherwise strip any other HTML tags using module-scope helper
     t = removeTags(t)
@@ -924,7 +1015,7 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
   const triggerPreviewRefresh = () => {
     setPreviewRefreshNonce((n) => n + 1)
   }
-  
+
   const showTextureOptions = backgroundType === 'GeneratedFromTexture'
   const hasTextures = textures.length > 0
   // Keep Customize panel disabled unless the user explicitly has a .nort
@@ -932,9 +1023,7 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
   // panel merely because a random generation produced settings —
   // that should not be treated as an editable customization source.
   const hasCustomizationSource = Boolean(
-    fileObj ||
-    currentSource?.nortContent ||
-    FORCE_ENABLE_CUSTOMIZE
+    fileObj || currentSource?.nortContent || FORCE_ENABLE_CUSTOMIZE
   )
   const customizationDirty = ui?.customizationDirty || false
   const hasGeneratedOnce = ui?.hasGeneratedOnce || false
@@ -942,8 +1031,13 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
   const canSubmit = !loading && hasCustomizationSource
   // Downloads must be disabled if the user manually edited controls after
   // a prior generation until a new map is generated.
-  const canDownloadSettings = !loading && hasCustomizationSource && !(customizationDirty && hasGeneratedOnce)
-  const canDownloadMap = !loading && hasCustomizationSource && Boolean(preview?.url) && !(customizationDirty && hasGeneratedOnce)
+  const canDownloadSettings =
+    !loading && hasCustomizationSource && !(customizationDirty && hasGeneratedOnce)
+  const canDownloadMap =
+    !loading &&
+    hasCustomizationSource &&
+    Boolean(preview?.url) &&
+    !(customizationDirty && hasGeneratedOnce)
   const gatedControlValue = (value) => {
     // Show explicit values supplied by the server or a loaded .nort file.
     // Only hide controls when the value is undefined or null and there
@@ -954,7 +1048,7 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
   }
 
   // debug helper removed
-  const emptyComboOption = hasCustomizationSource ? null : (<option value="" />)
+  const emptyComboOption = hasCustomizationSource ? null : <option value="" />
 
   const fontFields = useMemo(
     () => [
@@ -1076,74 +1170,89 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     previewRefreshNonce,
   ])
 
-    function renderColorControl({ id, label, hexValue, onHexChange, alphaValue, onAlphaChange, disabled, showState, setShowState, swatchStyle, onClose, swatchReplacement }) {
-      const openerClick = (e) => {
-        if (disabled) return
+  function renderColorControl({
+    id,
+    label,
+    hexValue,
+    onHexChange,
+    alphaValue,
+    onAlphaChange,
+    disabled,
+    showState,
+    setShowState,
+    swatchStyle,
+    onClose,
+    swatchReplacement,
+  }) {
+    const openerClick = (e) => {
+      if (disabled) return
+      if (typeof setShowState === 'function') setShowState(true)
+    }
+    const openerKey = (e) => {
+      if ((e.key === 'Enter' || e.key === ' ') && !disabled) {
+        e.preventDefault()
         if (typeof setShowState === 'function') setShowState(true)
       }
-      const openerKey = (e) => {
-        if ((e.key === 'Enter' || e.key === ' ') && !disabled) {
-          e.preventDefault()
-          if (typeof setShowState === 'function') setShowState(true)
-        }
-      }
-      const closePicker = () => {
-        if (typeof setShowState === 'function') setShowState(false)
-        if (typeof onClose === 'function') onClose()
-      }
+    }
+    const closePicker = () => {
+      if (typeof setShowState === 'function') setShowState(false)
+      if (typeof onClose === 'function') onClose()
+    }
 
-      return (
-        <>
-          <label htmlFor={`${id}`} className={disabled ? 'is-disabled' : ''}>{label}</label>
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-            {swatchReplacement ? (
-              <div className="disabled-color-replacement">{swatchReplacement}</div>
-            ) : (
-              <button
-                type="button"
-                aria-label={`Open ${label} color picker`}
-                disabled={disabled}
-                onClick={openerClick}
-                onKeyDown={openerKey}
-                style={{
-                  display: 'inline-block',
-                  flex: '1 1 auto',
-                  minWidth: 48,
-                  height: 28,
-                  background: hexValue || '#000000',
-                  border: '1px solid #bbb',
-                  cursor: disabled ? 'default' : 'pointer',
-                  opacity: disabled ? 0.5 : 1,
-                  pointerEvents: disabled ? 'none' : undefined,
-                  ...(swatchStyle),
+    return (
+      <>
+        <label htmlFor={`${id}`} className={disabled ? 'is-disabled' : ''}>
+          {label}
+        </label>
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          {swatchReplacement ? (
+            <div className="disabled-color-replacement">{swatchReplacement}</div>
+          ) : (
+            <button
+              type="button"
+              aria-label={`Open ${label} color picker`}
+              disabled={disabled}
+              onClick={openerClick}
+              onKeyDown={openerKey}
+              style={{
+                display: 'inline-block',
+                flex: '1 1 auto',
+                minWidth: 48,
+                height: 28,
+                background: hexValue || '#000000',
+                border: '1px solid #bbb',
+                cursor: disabled ? 'default' : 'pointer',
+                opacity: disabled ? 0.5 : 1,
+                pointerEvents: disabled ? 'none' : undefined,
+                ...swatchStyle,
+              }}
+            />
+          )}
+        </div>
+        {showState && (
+          <ColorPickerModal open={showState} onClose={closePicker}>
+            <>
+              <RgbaColorPicker
+                color={hexToRgba(hexValue, alphaValue || 0)}
+                onChange={(col) => {
+                  const hex = rgbaToHex(col)
+                  onHexChange(hex)
+                  if (typeof onAlphaChange === 'function') {
+                    onAlphaChange(Math.round((1 - (col.a ?? 1)) * 100))
+                  }
                 }}
               />
-            )}
-          </div>
-          {showState && (
-            <ColorPickerModal open={showState} onClose={closePicker}>
-              <>
-                <RgbaColorPicker
-                  color={hexToRgba(hexValue, alphaValue || 0)}
-                  onChange={(col) => {
-                    const hex = rgbaToHex(col)
-                    onHexChange(hex)
-                    if (typeof onAlphaChange === 'function') {
-                      onAlphaChange(Math.round((1 - (col.a ?? 1)) * 100))
-                    }
-                  }}
-                />
-                <div style={{ marginTop: 8, display: 'flex', justifyContent: 'flex-end' }}>
-                  <button type="button" onClick={closePicker}>
-                    Close
-                  </button>
-                </div>
-              </>
-            </ColorPickerModal>
-          )}
-        </>
-      )
-    }
+              <div style={{ marginTop: 8, display: 'flex', justifyContent: 'flex-end' }}>
+                <button type="button" onClick={closePicker}>
+                  Close
+                </button>
+              </div>
+            </>
+          </ColorPickerModal>
+        )}
+      </>
+    )
+  }
 
   useEffect(() => {
     return () => {
@@ -1266,25 +1375,215 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
 
   const tabProps = buildTabProps()
 
-  
-
   // Tab implementations have been moved into dedicated components.
 
   const backgroundKeys = [
-    'translateLabel', 'gatedControlValue', 'emptyComboOption', 'renderColorControl', 'notifyManualChange', 'recomposeUsingLastBase', 'textures', 'backgroundTypes', 'strokeTypes', 'landColoringMethods',
-    'backgroundType','setBackgroundType','showTextureOptions','hasTextures','textureRef','setTextureRef','drawRegionBoundaries','setDrawRegionBoundaries','regionBoundaryStyle','setRegionBoundaryStyle','regionBoundaryWidth','setRegionBoundaryWidth','regionBoundaryColorHex','setRegionBoundaryColorHex','showRegionBoundaryPicker','setShowRegionBoundaryPicker','colorizeLand','setColorizeLand','finalLandColoringMethod','setFinalLandColoringMethod','landColorHex','setLandColorHex','showLandPicker','setShowLandPicker','colorizeOcean','setColorizeOcean','showOceanPicker','setShowOceanPicker','oceanColorHex','setOceanColorHex','backgroundSeed','sanitizeSeedValue','setBackgroundSeed','drawGridOverlay','setDrawGridOverlay','gridOverlayShape','setGridOverlayShape','gridOverlayRowOrColCount','setGridOverlayRowOrColCount','gridOverlayLineWidth','setGridOverlayLineWidth','gridOverlayColorHex','setGridOverlayColorHex','showGridPicker','setShowGridPicker','gridOverlayOffsets','gridOverlayXOffset','setGridOverlayXOffset','gridOverlayYOffset','setGridOverlayYOffset','gridOverlayLayers','gridOverlayLayer','setGridOverlayLayer','backgroundPreviewUrl','gridOverlayShapes','drawVoronoiGridOverlayOnlyOnLand','setDrawVoronoiGridOverlayOnlyOnLand'
+    'translateLabel',
+    'gatedControlValue',
+    'emptyComboOption',
+    'renderColorControl',
+    'notifyManualChange',
+    'recomposeUsingLastBase',
+    'textures',
+    'backgroundTypes',
+    'strokeTypes',
+    'landColoringMethods',
+    'backgroundType',
+    'setBackgroundType',
+    'showTextureOptions',
+    'hasTextures',
+    'textureRef',
+    'setTextureRef',
+    'drawRegionBoundaries',
+    'setDrawRegionBoundaries',
+    'regionBoundaryStyle',
+    'setRegionBoundaryStyle',
+    'regionBoundaryWidth',
+    'setRegionBoundaryWidth',
+    'regionBoundaryColorHex',
+    'setRegionBoundaryColorHex',
+    'showRegionBoundaryPicker',
+    'setShowRegionBoundaryPicker',
+    'colorizeLand',
+    'setColorizeLand',
+    'finalLandColoringMethod',
+    'setFinalLandColoringMethod',
+    'landColorHex',
+    'setLandColorHex',
+    'showLandPicker',
+    'setShowLandPicker',
+    'colorizeOcean',
+    'setColorizeOcean',
+    'showOceanPicker',
+    'setShowOceanPicker',
+    'oceanColorHex',
+    'setOceanColorHex',
+    'backgroundSeed',
+    'sanitizeSeedValue',
+    'setBackgroundSeed',
+    'drawGridOverlay',
+    'setDrawGridOverlay',
+    'gridOverlayShape',
+    'setGridOverlayShape',
+    'gridOverlayRowOrColCount',
+    'setGridOverlayRowOrColCount',
+    'gridOverlayLineWidth',
+    'setGridOverlayLineWidth',
+    'gridOverlayColorHex',
+    'setGridOverlayColorHex',
+    'showGridPicker',
+    'setShowGridPicker',
+    'gridOverlayOffsets',
+    'gridOverlayXOffset',
+    'setGridOverlayXOffset',
+    'gridOverlayYOffset',
+    'setGridOverlayYOffset',
+    'gridOverlayLayers',
+    'gridOverlayLayer',
+    'setGridOverlayLayer',
+    'backgroundPreviewUrl',
+    'gridOverlayShapes',
+    'drawVoronoiGridOverlayOnlyOnLand',
+    'setDrawVoronoiGridOverlayOnlyOnLand',
   ]
 
   const borderKeys = [
-    'translateLabel','gatedControlValue','emptyComboOption','renderColorControl','drawBorder','setDrawBorder','borderRef','setBorderRef','borderTypes','borderWidth','setBorderWidth','borderPosition','setBorderPosition','borderPositions','borderColorOption','setBorderColorOption','borderColorOptions','borderColorHex','setBorderColorHex','frayedBorder','setFrayedBorder','frayedBorderBlurLevel','setFrayedBorderBlurLevel','frayedBorderSize','setFrayedBorderSize','frayedBorderSeed','setFrayedBorderSeed','drawGrunge','setDrawGrunge','grungeWidth','setGrungeWidth','frayedBorderColorHex','setFrayedBorderColorHex','showBorderColorPicker','setShowBorderColorPicker','showFrayedBorderPicker','setShowFrayedBorderPicker'
+    'translateLabel',
+    'gatedControlValue',
+    'emptyComboOption',
+    'renderColorControl',
+    'drawBorder',
+    'setDrawBorder',
+    'borderRef',
+    'setBorderRef',
+    'borderTypes',
+    'borderWidth',
+    'setBorderWidth',
+    'borderPosition',
+    'setBorderPosition',
+    'borderPositions',
+    'borderColorOption',
+    'setBorderColorOption',
+    'borderColorOptions',
+    'borderColorHex',
+    'setBorderColorHex',
+    'frayedBorder',
+    'setFrayedBorder',
+    'frayedBorderBlurLevel',
+    'setFrayedBorderBlurLevel',
+    'frayedBorderSize',
+    'setFrayedBorderSize',
+    'frayedBorderSeed',
+    'setFrayedBorderSeed',
+    'drawGrunge',
+    'setDrawGrunge',
+    'grungeWidth',
+    'setGrungeWidth',
+    'frayedBorderColorHex',
+    'setFrayedBorderColorHex',
+    'showBorderColorPicker',
+    'setShowBorderColorPicker',
+    'showFrayedBorderPicker',
+    'setShowFrayedBorderPicker',
   ]
 
   const effectsKeys = [
-    'translateLabel','gatedControlValue','emptyComboOption','renderColorControl','lineStyles','lineStyle','setLineStyle','coastlineWidth','setCoastlineWidth','coastlineColorHex','setCoastlineColorHex','showCoastlinePicker','setShowCoastlinePicker','coastShadingLevel','setCoastShadingLevel','coastShadingAlpha','setCoastShadingAlpha','finalLandColoringMethod','oceanShadingLevel','setOceanShadingLevel','oceanShadingColorHex','setOceanShadingColorHex','oceanShadingAlpha','setOceanShadingAlpha','showOceanPicker','setShowOceanPicker','oceanWaveTypes','oceanWavesType','setOceanWavesType','concentricWaveValue','noneWaveValue','oceanWavesLevel','setOceanWavesLevel','oceanWavesAlpha','setOceanWavesAlpha','oceanWavesColorHex','setOceanWavesColorHex','showOceanWavesPicker','setShowOceanWavesPicker','concentricWaveCount','setConcentricWaveCount','fadeConcentricWaves','setFadeConcentricWaves','jitterToConcentricWaves','setJitterToConcentricWaves','brokenLinesForConcentricWaves','setBrokenLinesForConcentricWaves','drawOceanEffectsInLakes','setDrawOceanEffectsInLakes','riverColorHex','setRiverColorHex','showRiverPicker','setShowRiverPicker','drawRoads','setDrawRoads','roadStyle','setRoadStyle','strokeTypes','roadWidth','setRoadWidth','roadColorHex','setRoadColorHex','showRoadPicker','setShowRoadPicker','mountainSize','setMountainSize','hillSize','setHillSize','duneSize','setDuneSize','treeHeight','setTreeHeight','citySize','setCitySize'
+    'translateLabel',
+    'gatedControlValue',
+    'emptyComboOption',
+    'renderColorControl',
+    'lineStyles',
+    'lineStyle',
+    'setLineStyle',
+    'coastlineWidth',
+    'setCoastlineWidth',
+    'coastlineColorHex',
+    'setCoastlineColorHex',
+    'showCoastlinePicker',
+    'setShowCoastlinePicker',
+    'coastShadingLevel',
+    'setCoastShadingLevel',
+    'coastShadingAlpha',
+    'setCoastShadingAlpha',
+    'finalLandColoringMethod',
+    'oceanShadingLevel',
+    'setOceanShadingLevel',
+    'oceanShadingColorHex',
+    'setOceanShadingColorHex',
+    'oceanShadingAlpha',
+    'setOceanShadingAlpha',
+    'showOceanPicker',
+    'setShowOceanPicker',
+    'oceanWaveTypes',
+    'oceanWavesType',
+    'setOceanWavesType',
+    'concentricWaveValue',
+    'noneWaveValue',
+    'oceanWavesLevel',
+    'setOceanWavesLevel',
+    'oceanWavesAlpha',
+    'setOceanWavesAlpha',
+    'oceanWavesColorHex',
+    'setOceanWavesColorHex',
+    'showOceanWavesPicker',
+    'setShowOceanWavesPicker',
+    'concentricWaveCount',
+    'setConcentricWaveCount',
+    'fadeConcentricWaves',
+    'setFadeConcentricWaves',
+    'jitterToConcentricWaves',
+    'setJitterToConcentricWaves',
+    'brokenLinesForConcentricWaves',
+    'setBrokenLinesForConcentricWaves',
+    'drawOceanEffectsInLakes',
+    'setDrawOceanEffectsInLakes',
+    'riverColorHex',
+    'setRiverColorHex',
+    'showRiverPicker',
+    'setShowRiverPicker',
+    'drawRoads',
+    'setDrawRoads',
+    'roadStyle',
+    'setRoadStyle',
+    'strokeTypes',
+    'roadWidth',
+    'setRoadWidth',
+    'roadColorHex',
+    'setRoadColorHex',
+    'showRoadPicker',
+    'setShowRoadPicker',
+    'mountainSize',
+    'setMountainSize',
+    'hillSize',
+    'setHillSize',
+    'duneSize',
+    'setDuneSize',
+    'treeHeight',
+    'setTreeHeight',
+    'citySize',
+    'setCitySize',
   ]
 
   const fontsKeys = [
-    'translateLabel','renderColorControl','drawText','setDrawText','fontFields','availableFontFamilies','openFontComboId','setOpenFontComboId','handleFontOptionClick','textColorHex','setTextColorHex','showTextColorPicker','setShowTextColorPicker','drawBoldBackground','setDrawBoldBackground','boldBackgroundColorHex','setBoldBackgroundColorHex','showBoldBackgroundPicker','setShowBoldBackgroundPicker'
+    'translateLabel',
+    'renderColorControl',
+    'drawText',
+    'setDrawText',
+    'fontFields',
+    'availableFontFamilies',
+    'openFontComboId',
+    'setOpenFontComboId',
+    'handleFontOptionClick',
+    'textColorHex',
+    'setTextColorHex',
+    'showTextColorPicker',
+    'setShowTextColorPicker',
+    'drawBoldBackground',
+    'setDrawBoldBackground',
+    'boldBackgroundColorHex',
+    'setBoldBackgroundColorHex',
+    'showBoldBackgroundPicker',
+    'setShowBoldBackgroundPicker',
   ]
 
   return (
@@ -1294,13 +1593,9 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
         <h3 style={{ margin: 0 }}>{translateLabel('ui.title.customize')}</h3>
       </div>
-      <p className="section-hint">
-        {translateLabel('ui.subtitle.customize')}
-      </p>
+      <p className="section-hint">{translateLabel('ui.subtitle.customize')}</p>
       {!hasCustomizationSource && (
-        <p className="section-hint">
-          {translateLabel('ui.noSourceHint')}
-        </p>
+        <p className="section-hint">{translateLabel('ui.noSourceHint')}</p>
       )}
       <form
         className={`section-fields${hasCustomizationSource ? '' : ' section-fields--disabled'}`}
@@ -1330,7 +1625,7 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
         <fieldset className="customize-disabled-fieldset" disabled={!hasCustomizationSource}>
           <div className="customize-tabs" role="tablist" aria-label="Customization sections">
             {Array.isArray(tabs)
-                ? tabs.map((tab, idx) => {
+              ? tabs.map((tab, idx) => {
                   let derivedId
                   if (tab?.id) derivedId = String(tab.id)
                   else if (tab?.label) derivedId = String(tab.label)
@@ -1361,9 +1656,7 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
 
           <div className="section-actions">
             <button type="submit" disabled={!canSubmit}>
-              {loading
-                ? translateLabel('ui.generating')
-                : translateLabel('ui.button.regenerate')}
+              {loading ? translateLabel('ui.generating') : translateLabel('ui.button.regenerate')}
             </button>
             <button
               type="button"

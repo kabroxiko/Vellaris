@@ -9,7 +9,9 @@ function SliderRow({ id, label, min, max, step, value, onChange, disabled, forma
 
   return (
     <>
-      <label htmlFor={id} className={disabled ? 'is-disabled' : ''}>{label}</label>
+      <label htmlFor={id} className={disabled ? 'is-disabled' : ''}>
+        {label}
+      </label>
       <div className="slider-row">
         <input
           id={id}
@@ -104,7 +106,6 @@ export default function BorderTab(props) {
 
   // Runtime debug: log types/values for grunge props to diagnose value/setter swaps
   // debug effect removed
-  
 
   return (
     <div className="fields-grid two-col-layout">
@@ -130,15 +131,17 @@ export default function BorderTab(props) {
             disabled={!drawBorder}
           >
             {emptyComboOption}
-            
-            {Array.isArray(borderTypes) ? borderTypes.map((borderType) => {
-              const ref = `${borderType.artPack}|${borderType.name}`
-              return (
-                <option key={ref} value={ref}>
-                  {borderType.name} [{borderType.artPack}]
-                </option>
-              )
-            }) : null}
+
+            {Array.isArray(borderTypes)
+              ? borderTypes.map((borderType) => {
+                  const ref = `${borderType.artPack}|${borderType.name}`
+                  return (
+                    <option key={ref} value={ref}>
+                      {borderType.name} [{borderType.artPack}]
+                    </option>
+                  )
+                })
+              : null}
           </select>
 
           <SliderRow
@@ -161,7 +164,9 @@ export default function BorderTab(props) {
             emptyComboOption={emptyComboOption}
             items={borderPositions}
             renderItem={(item) => (
-              <option key={item.value} value={item.value}>{item.label}</option>
+              <option key={item.value} value={item.value}>
+                {item.label}
+              </option>
             )}
           />
 
@@ -174,105 +179,109 @@ export default function BorderTab(props) {
             emptyComboOption={emptyComboOption}
             items={borderColorOptions}
             renderItem={(item) => (
-              <option key={item.value} value={item.value}>{item.label}</option>
+              <option key={item.value} value={item.value}>
+                {item.label}
+              </option>
             )}
           />
 
-            {renderColorControl({
-              id: 'border-color',
-              label: translateLabel('theme.borderColor.title'),
-              hexValue: borderColorHex,
-              onHexChange: setBorderColorHex,
-              showState: showBorderColorPicker,
-              setShowState: setShowBorderColorPicker,
-              disabled: !drawBorder || borderColorOption !== 'Choose_color',
-            })}
-            </div>
-          </div>
-
-          <div className="fields-column">
-          <label className="checkbox-label">
-            <input
-              type="checkbox"
-              checked={frayedBorder}
-              onChange={(e) => setFrayedBorder(e.target.checked)}
-            />
-            <span>{translateLabel('theme.frayEdges')}</span>
-          </label>
-
-          <div
-            className={`control-group${frayedBorder ? '' : ' is-disabled'}`}
-            style={frayedBorder ? undefined : { opacity: 0.5, pointerEvents: 'none' }}
-          >
-            <SliderRow
-              id="frayed-border-blur-input"
-              label={translateLabel('theme.shadingWidth.label')}
-              min={0}
-              max={500}
-              step={1}
-              value={frayedBorderBlurLevel}
-              onChange={setFrayedBorderBlurLevel}
-              disabled={!frayedBorder}
-            />
-
-            <SliderRow
-              id="frayed-border-size-input"
-              label={translateLabel('theme.fraySize.label')}
-              min={1}
-              max={15}
-              step={1}
-              value={frayedBorderSize}
-              onChange={setFrayedBorderSize}
-              disabled={!frayedBorder}
-            />
-
-            <label htmlFor="frayed-border-seed-input">{translateLabel('theme.randomSeed.label')}</label>
-            <input
-              id="frayed-border-seed-input"
-              type="text"
-              value={gatedControlValue(frayedBorderSeed)}
-              onChange={(e) => setFrayedBorderSeed(e.target.value)}
-              placeholder={''}
-              disabled={!frayedBorder}
-            />
-          </div>
-
-          <label className="checkbox-label">
-            <input
-              type="checkbox"
-              checked={drawGrunge}
-              onChange={(e) => setDrawGrunge(e.target.checked)}
-            />
-            <span>{translateLabel('theme.drawGrunge')}</span>
-          </label>
-
-          <div
-            className={`control-group${drawGrunge ? '' : ' is-disabled'}`}
-            style={drawGrunge ? undefined : { opacity: 0.5, pointerEvents: 'none' }}
-          >
-            <SliderRow
-              id="grunge-width-input"
-              label={translateLabel('theme.width.label')}
-              min={0}
-              max={2000}
-              step={1}
-              value={grungeWidth}
-              onChange={setGrungeWidth}
-              disabled={!drawGrunge}
-            />
-
-            {renderColorControl({
-              id: 'frayed-border-color',
-              label: translateLabel('theme.grungeColor.label'),
-              hexValue: frayedBorderColorHex,
-              onHexChange: setFrayedBorderColorHex,
-              showState: showFrayedBorderPicker,
-              setShowState: setShowFrayedBorderPicker,
-              disabled: !drawGrunge,
-            })}
-          </div>
+          {renderColorControl({
+            id: 'border-color',
+            label: translateLabel('theme.borderColor.title'),
+            hexValue: borderColorHex,
+            onHexChange: setBorderColorHex,
+            showState: showBorderColorPicker,
+            setShowState: setShowBorderColorPicker,
+            disabled: !drawBorder || borderColorOption !== 'Choose_color',
+          })}
         </div>
       </div>
+
+      <div className="fields-column">
+        <label className="checkbox-label">
+          <input
+            type="checkbox"
+            checked={frayedBorder}
+            onChange={(e) => setFrayedBorder(e.target.checked)}
+          />
+          <span>{translateLabel('theme.frayEdges')}</span>
+        </label>
+
+        <div
+          className={`control-group${frayedBorder ? '' : ' is-disabled'}`}
+          style={frayedBorder ? undefined : { opacity: 0.5, pointerEvents: 'none' }}
+        >
+          <SliderRow
+            id="frayed-border-blur-input"
+            label={translateLabel('theme.shadingWidth.label')}
+            min={0}
+            max={500}
+            step={1}
+            value={frayedBorderBlurLevel}
+            onChange={setFrayedBorderBlurLevel}
+            disabled={!frayedBorder}
+          />
+
+          <SliderRow
+            id="frayed-border-size-input"
+            label={translateLabel('theme.fraySize.label')}
+            min={1}
+            max={15}
+            step={1}
+            value={frayedBorderSize}
+            onChange={setFrayedBorderSize}
+            disabled={!frayedBorder}
+          />
+
+          <label htmlFor="frayed-border-seed-input">
+            {translateLabel('theme.randomSeed.label')}
+          </label>
+          <input
+            id="frayed-border-seed-input"
+            type="text"
+            value={gatedControlValue(frayedBorderSeed)}
+            onChange={(e) => setFrayedBorderSeed(e.target.value)}
+            placeholder={''}
+            disabled={!frayedBorder}
+          />
+        </div>
+
+        <label className="checkbox-label">
+          <input
+            type="checkbox"
+            checked={drawGrunge}
+            onChange={(e) => setDrawGrunge(e.target.checked)}
+          />
+          <span>{translateLabel('theme.drawGrunge')}</span>
+        </label>
+
+        <div
+          className={`control-group${drawGrunge ? '' : ' is-disabled'}`}
+          style={drawGrunge ? undefined : { opacity: 0.5, pointerEvents: 'none' }}
+        >
+          <SliderRow
+            id="grunge-width-input"
+            label={translateLabel('theme.width.label')}
+            min={0}
+            max={2000}
+            step={1}
+            value={grungeWidth}
+            onChange={setGrungeWidth}
+            disabled={!drawGrunge}
+          />
+
+          {renderColorControl({
+            id: 'frayed-border-color',
+            label: translateLabel('theme.grungeColor.label'),
+            hexValue: frayedBorderColorHex,
+            onHexChange: setFrayedBorderColorHex,
+            showState: showFrayedBorderPicker,
+            setShowState: setShowFrayedBorderPicker,
+            disabled: !drawGrunge,
+          })}
+        </div>
+      </div>
+    </div>
   )
 }
 

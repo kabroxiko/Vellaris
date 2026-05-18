@@ -26,8 +26,21 @@ describe('GenerateForm appliers', () => {
 
   it('applyResourcesAndTopLevelHoisted applies resources and fields', () => {
     const parsed = {}
-    const setResourceFromRef = (p, key, ref) => { if (ref) p[key] = `ref:${ref}` }
-    const ctx = { setResourceFromRef, borderRef: 'b1', textureRef: 't1', backgroundSeed: '42', artPack: 'pack', worldSize: '10', landShape: 'island', regionCount: '5', randomSeed: '7', selectedBooks: new Set(['b','a']) }
+    const setResourceFromRef = (p, key, ref) => {
+      if (ref) p[key] = `ref:${ref}`
+    }
+    const ctx = {
+      setResourceFromRef,
+      borderRef: 'b1',
+      textureRef: 't1',
+      backgroundSeed: '42',
+      artPack: 'pack',
+      worldSize: '10',
+      landShape: 'island',
+      regionCount: '5',
+      randomSeed: '7',
+      selectedBooks: new Set(['b', 'a']),
+    }
     applyResourcesAndTopLevelHoisted(parsed, ctx)
     expect(parsed.borderResource).toBe('ref:b1')
     expect(parsed.backgroundTextureResource).toBe('ref:t1')
@@ -76,7 +89,19 @@ describe('GenerateForm appliers', () => {
 
   it('applyBordersFrayedAndGrungeHoisted applies border and frayed props', () => {
     const parsed = {}
-    const ctx = { borderWidth: '5', borderPosition: 'inside', borderColorOption: 'auto', borderColorHex: '#112233', frayedBorder: true, frayedBorderBlurLevel: '2', frayedBorderSize: '3', frayedBorderSeed: '9', drawGrunge: true, grungeWidth: '6', frayedBorderColorHex: '#ffffff' }
+    const ctx = {
+      borderWidth: '5',
+      borderPosition: 'inside',
+      borderColorOption: 'auto',
+      borderColorHex: '#112233',
+      frayedBorder: true,
+      frayedBorderBlurLevel: '2',
+      frayedBorderSize: '3',
+      frayedBorderSeed: '9',
+      drawGrunge: true,
+      grungeWidth: '6',
+      frayedBorderColorHex: '#ffffff',
+    }
     applyBordersFrayedAndGrungeHoisted(parsed, ctx)
     expect(parsed.borderWidth).toBe(5)
     expect(parsed.borderPosition).toBe('inside')
@@ -122,7 +147,18 @@ describe('GenerateForm appliers', () => {
 
   it('applyRoadsAndScalesHoisted applies road style and scales', () => {
     const parsed = {}
-    const ctx = { drawRoads: true, roadStyle: 'major', roadWidth: '3', roadColorHex: '#010203', mountainSize: '2', hillSize: '3', duneSize: '4', treeHeight: '5', citySize: '6', scaleSliderValue: (v) => v * 10 }
+    const ctx = {
+      drawRoads: true,
+      roadStyle: 'major',
+      roadWidth: '3',
+      roadColorHex: '#010203',
+      mountainSize: '2',
+      hillSize: '3',
+      duneSize: '4',
+      treeHeight: '5',
+      citySize: '6',
+      scaleSliderValue: (v) => v * 10,
+    }
     applyRoadsAndScalesHoisted(parsed, ctx)
     expect(parsed.drawRoads).toBe(true)
     expect(parsed.roadStyle.type).toBe('major')
@@ -133,7 +169,12 @@ describe('GenerateForm appliers', () => {
 
   it('applyTextAndBackgroundHoisted sets text and bold background', () => {
     const parsed = {}
-    const ctx = { drawText: true, textColorHex: '#abcdef', drawBoldBackground: true, boldBackgroundColorHex: '#010101' }
+    const ctx = {
+      drawText: true,
+      textColorHex: '#abcdef',
+      drawBoldBackground: true,
+      boldBackgroundColorHex: '#010101',
+    }
     applyTextAndBackgroundHoisted(parsed, ctx)
     expect(parsed.drawText).toBe(true)
     expect(parsed.drawBoldBackground).toBe(true)

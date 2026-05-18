@@ -13,7 +13,9 @@ const baseProps = {
 test('recomposeUsingLastBase exceptions for land are caught and logged', () => {
   const setColorizeLand = vi.fn()
   const notifyManualChange = vi.fn()
-  const recomposeUsingLastBase = vi.fn(() => { throw new Error('boom-land') })
+  const recomposeUsingLastBase = vi.fn(() => {
+    throw new Error('boom-land')
+  })
 
   const props = {
     ...baseProps,
@@ -42,7 +44,9 @@ test('recomposeUsingLastBase exceptions for land are caught and logged', () => {
 test('recomposeUsingLastBase exceptions for ocean are caught and logged', () => {
   const setColorizeOcean = vi.fn()
   const notifyManualChange = vi.fn()
-  const recomposeUsingLastBase = vi.fn(() => { throw new Error('boom-ocean') })
+  const recomposeUsingLastBase = vi.fn(() => {
+    throw new Error('boom-ocean')
+  })
 
   const props = {
     ...baseProps,

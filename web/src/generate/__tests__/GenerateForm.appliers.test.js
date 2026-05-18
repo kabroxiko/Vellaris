@@ -18,7 +18,9 @@ describe('GenerateForm applier helpers', () => {
   it('applyResourcesAndTopLevelHoisted sets top-level fields and books', () => {
     const parsed = {}
     const ctx = {
-      setResourceFromRef: (ps, key, ref) => { if (ref) ps[key] = { parsedRef: ref } },
+      setResourceFromRef: (ps, key, ref) => {
+        if (ref) ps[key] = { parsedRef: ref }
+      },
       borderRef: 'pack|border',
       textureRef: null,
       backgroundSeed: '42',
@@ -62,7 +64,9 @@ describe('GenerateForm applier helpers', () => {
       drawVoronoiGridOverlayOnlyOnLand: true,
       resolveLandColoringMethod: () => 'ColorPoliticalRegions',
       finalLandColoringMethod: undefined,
-      mergeColor: (ps, key, hex) => { if (hex) ps[key] = `MERGED:${hex}` },
+      mergeColor: (ps, key, hex) => {
+        if (hex) ps[key] = `MERGED:${hex}`
+      },
       getGridOverlayAlpha: () => 128,
     }
     applyGridAndColoringHoisted(parsed, ctx)
@@ -96,7 +100,9 @@ describe('GenerateForm applier helpers', () => {
       drawGrunge: true,
       grungeWidth: '4',
       frayedBorderColorHex: '#222222',
-      mergeColor: (ps, key, hex) => { if (hex) ps[key] = `MERGED:${hex}` },
+      mergeColor: (ps, key, hex) => {
+        if (hex) ps[key] = `MERGED:${hex}`
+      },
     }
     applyBordersFrayedAndGrungeHoisted(parsed, ctx)
     expect(parsed.borderWidth).toBe(5)
@@ -130,7 +136,9 @@ describe('GenerateForm applier helpers', () => {
       fadeConcentricWaves: true,
       jitterToConcentricWaves: false,
       brokenLinesForConcentricWaves: true,
-      mergeColor: (ps, key, hex, percent, useFormatter) => { if (hex) ps[key] = `MERGED:${hex}:${percent}:${useFormatter}` },
+      mergeColor: (ps, key, hex, percent, useFormatter) => {
+        if (hex) ps[key] = `MERGED:${hex}:${percent}:${useFormatter}`
+      },
       oceanWavesColorHex: null,
       drawOceanEffectsInLakes: true,
       riverColorHex: '#050505',
@@ -159,7 +167,9 @@ describe('GenerateForm applier helpers', () => {
       drawRoads: true,
       roadStyle: 'dotted',
       roadWidth: '2',
-      mergeColor: (ps, key, hex) => { if (hex) ps[key] = `MERGED:${hex}` },
+      mergeColor: (ps, key, hex) => {
+        if (hex) ps[key] = `MERGED:${hex}`
+      },
       roadColorHex: '#060606',
       mountainSize: '5',
       hillSize: '6',
@@ -185,7 +195,9 @@ describe('GenerateForm applier helpers', () => {
       textColorHex: '#070707',
       drawBoldBackground: true,
       boldBackgroundColorHex: '#080808',
-      mergeColor: (ps, key, hex) => { if (hex) ps[key] = `MERGED:${hex}` },
+      mergeColor: (ps, key, hex) => {
+        if (hex) ps[key] = `MERGED:${hex}`
+      },
     }
     applyTextAndBackgroundHoisted(parsed, ctxText)
     expect(parsed.drawText).toBe(true)
@@ -199,7 +211,9 @@ describe('GenerateForm appliers', () => {
   it('applyResourcesAndTopLevelHoisted sets parsedSettings fields from ctx', () => {
     const parsed = {}
     const ctx = {
-      setResourceFromRef: (ps, key, ref) => { if (ref) ps[key] = { artPack: ref.split('|')[0], name: ref.split('|')[1] } },
+      setResourceFromRef: (ps, key, ref) => {
+        if (ref) ps[key] = { artPack: ref.split('|')[0], name: ref.split('|')[1] }
+      },
       borderRef: 'packA|border1',
       textureRef: 'packB|tex1',
       backgroundSeed: '42',
@@ -208,7 +222,7 @@ describe('GenerateForm appliers', () => {
       landShape: 'island',
       regionCount: '5',
       randomSeed: '7',
-      selectedBooks: new Set(['alpha','beta']),
+      selectedBooks: new Set(['alpha', 'beta']),
     }
 
     applyResourcesAndTopLevelHoisted(parsed, ctx)
@@ -220,7 +234,7 @@ describe('GenerateForm appliers', () => {
     expect(parsed.landShape).toBe('island')
     expect(parsed.regionCount).toBe(5)
     expect(parsed.randomSeed).toBe(7)
-    expect(parsed.books).toEqual(['alpha','beta'])
+    expect(parsed.books).toEqual(['alpha', 'beta'])
   })
 
   it('applyGridAndColoringHoisted sets gridOverlayColor using getGridOverlayAlpha', () => {
@@ -243,9 +257,11 @@ describe('GenerateForm appliers', () => {
       gridOverlayLineWidth: '2',
       gridOverlayLayer: 'top',
       drawVoronoiGridOverlayOnlyOnLand: true,
-      resolveLandColoringMethod: () => (v) => (v || 'SingleColor'),
+      resolveLandColoringMethod: () => (v) => v || 'SingleColor',
       finalLandColoringMethod: 'ColorPoliticalRegions',
-      mergeColor: (ps, k, v) => { if (v) ps[k] = v },
+      mergeColor: (ps, k, v) => {
+        if (v) ps[k] = v
+      },
       getGridOverlayAlpha: () => 128,
     }
 
@@ -262,7 +278,9 @@ describe('GenerateForm appliers', () => {
       drawRoads: true,
       roadStyle: 'highway',
       roadWidth: '4',
-      mergeColor: (ps, k, v) => { if (v) ps[k] = v },
+      mergeColor: (ps, k, v) => {
+        if (v) ps[k] = v
+      },
       roadColorHex: '#0a0b0c',
       mountainSize: '5',
       hillSize: '3',

@@ -118,7 +118,9 @@ describe('RandomSettingsSection', () => {
     expect(setSelectedBooks).toHaveBeenCalled()
 
     // Change dimension triggers setDimension (label text comes from i18n key)
-    fireEvent.change(screen.getByLabelText('newSettingsDialog.dimensions.label'), { target: { value: 'Square' } })
+    fireEvent.change(screen.getByLabelText('newSettingsDialog.dimensions.label'), {
+      target: { value: 'Square' },
+    })
 
     // Submitting the form calls handleRandomMap (button disabled when loading true)
     const button = screen.getByRole('button', { name: /ui.generating|ui.generate/ })

@@ -42,7 +42,7 @@ describe('responseHandlers: downloadNortContent and processGenerateResponse', ()
   it('processGenerateResponse handles JSON nort-only response by calling downloadNortContent', async () => {
     const data = { nortContent: '{"title":"X"}' }
     const encoded = new TextEncoder().encode(JSON.stringify(data)).buffer
-      const createSpy = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob://x')
+    const createSpy = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob://x')
     const setCurrentSource = vi.fn()
 
     await RH.processGenerateResponse(encoded, 'application/json', {
@@ -53,7 +53,7 @@ describe('responseHandlers: downloadNortContent and processGenerateResponse', ()
       setPreview: () => {},
       setCurrentSource,
     })
-      expect(createSpy).to.have.been.called
+    expect(createSpy).to.have.been.called
     expect(setCurrentSource).to.have.been.called
   })
 })

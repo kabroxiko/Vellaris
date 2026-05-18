@@ -1,11 +1,25 @@
 import { describe, it, expect } from 'vitest'
-import { parseColorChannels, colorToHex, colorToAlphaPercent, formatColorString, parseFontSpec, fontSpecToFamily, updateFontFamilyInSpec, base64ToBlob } from '../utils'
+import {
+  parseColorChannels,
+  colorToHex,
+  colorToAlphaPercent,
+  formatColorString,
+  parseFontSpec,
+  fontSpecToFamily,
+  updateFontFamilyInSpec,
+  base64ToBlob,
+} from '../utils'
 
 describe('utils pure helpers', () => {
   it('parseColorChannels handles hex, rgb string, and object', () => {
     expect(parseColorChannels('#0a0b0c')).toEqual({ r: 10, g: 11, b: 12, a: 255 })
     expect(parseColorChannels('18,52,86')).toEqual({ r: 18, g: 52, b: 86, a: 255 })
-    expect(parseColorChannels({ red: '1', green: 2, blue: 3 })).toEqual({ r: 1, g: 2, b: 3, a: 255 })
+    expect(parseColorChannels({ red: '1', green: 2, blue: 3 })).toEqual({
+      r: 1,
+      g: 2,
+      b: 3,
+      a: 255,
+    })
     expect(parseColorChannels('invalid')).toBeNull()
   })
 

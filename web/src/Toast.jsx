@@ -7,7 +7,9 @@ function makeId() {
   if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
     const arr = new Uint8Array(6)
     crypto.getRandomValues(arr)
-    return Array.from(arr, (b) => b.toString(36).padStart(2, '0')).join('').slice(0, 8)
+    return Array.from(arr, (b) => b.toString(36).padStart(2, '0'))
+      .join('')
+      .slice(0, 8)
   }
   throw new Error('crypto unavailable: makeId requires crypto.randomUUID or crypto.getRandomValues')
 }

@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest'
-import { hexToHSB, hsbToRgb, sanitizeFilenameBase, parseHexColor, hexToRgbaString, mulberry32 } from '../sharedHelpers'
+import {
+  hexToHSB,
+  hsbToRgb,
+  sanitizeFilenameBase,
+  parseHexColor,
+  hexToRgbaString,
+  mulberry32,
+} from '../sharedHelpers'
 
 describe('sharedHelpers pure functions', () => {
   it('hexToHSB and round-trip to rgb', () => {

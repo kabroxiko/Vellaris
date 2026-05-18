@@ -51,7 +51,12 @@ test('generateFromNortContent is invoked when Regenerate clicked (calls runGener
       return Promise.resolve({ ok: true, text: () => Promise.resolve('{}') })
     }
     // For other fetches (image/blob), return a Response-like object with blob()
-    return Promise.resolve({ ok: true, blob: () => Promise.resolve(new Blob([''], { type: 'image/png' })), arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)), headers: { get: () => 'image/png' } })
+    return Promise.resolve({
+      ok: true,
+      blob: () => Promise.resolve(new Blob([''], { type: 'image/png' })),
+      arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
+      headers: { get: () => 'image/png' },
+    })
   })
 
   render(<GenerateForm uiLanguage="en" />)

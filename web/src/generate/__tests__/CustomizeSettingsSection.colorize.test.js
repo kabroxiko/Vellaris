@@ -41,7 +41,16 @@ describe('colorizeBitmap', () => {
       return 'MOCK_IMAGE_BITMAP'
     })
 
-    const result = await colorizeBitmap({/* sourceBitmap not used by our mocks */}, '#abcdef', 4, 4, undefined, { preserveTexture: 0 })
+    const result = await colorizeBitmap(
+      {
+        /* sourceBitmap not used by our mocks */
+      },
+      '#abcdef',
+      4,
+      4,
+      undefined,
+      { preserveTexture: 0 }
+    )
     expect(result).toBe('MOCK_IMAGE_BITMAP')
   })
 })

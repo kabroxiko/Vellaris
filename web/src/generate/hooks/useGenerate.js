@@ -3,14 +3,29 @@ import { makeProgressToastController, readResponseBytesWithProgress } from '../s
 
 // use shared makeProgressToastController from sharedHelpers
 
-export default function useGenerate({ apiBase, handleResponseError, base64ToBlob, downloadNortContent, tryParse, serializeNortObject, handleSuccessRef, setError, setLoading }) {
+export default function useGenerate({
+  apiBase,
+  handleResponseError,
+  base64ToBlob,
+  downloadNortContent,
+  tryParse,
+  serializeNortObject,
+  handleSuccessRef,
+  setError,
+  setLoading,
+}) {
   // use shared readResponseBytesWithProgress from sharedHelpers
 
   const processGenerateResponse = useCallback(
     async (bytes, contentType, outputMode, baseName, source) => {
       if (!contentType.includes('application/json')) {
-        if (outputMode === 'nort-only') throw new Error('Server returned image bytes; expected settings content.')
-        handleSuccessRef.current?.(new Blob([bytes], { type: contentType || 'image/png' }), baseName, source)
+        if (outputMode === 'nort-only')
+          throw new Error('Server returned image bytes; expected settings content.')
+        handleSuccessRef.current?.(
+          new Blob([bytes], { type: contentType || 'image/png' }),
+          baseName,
+          source
+        )
         return
       }
       const decoded = new TextDecoder('utf-8').decode(bytes)
@@ -21,7 +36,12 @@ export default function useGenerate({ apiBase, handleResponseError, base64ToBlob
         const copy = { ...data }
         delete copy.imageBase64
         const nortContent = serializeNortObject(copy)
-        handleSuccessRef.current?.(base64ToBlob(imageBase64, 'image/png'), baseName, source, nortContent)
+        handleSuccessRef.current?.(
+          base64ToBlob(imageBase64, 'image/png'),
+          baseName,
+          source,
+          nortContent
+        )
         return
       }
       const copy = { ...data }
@@ -44,9 +64,15 @@ export default function useGenerate({ apiBase, handleResponseError, base64ToBlob
       setLoading(true)
       const toast = externalToast ?? makeProgressToastController()
       try {
-        if (!externalToast) toast.show(outputMode === 'nort-only' ? 'Preparing settings...' : 'Generating map..')
+        if (!externalToast)
+          toast.show(outputMode === 'nort-only' ? 'Preparing settings...' : 'Generating map..')
         const body = requestOptions.body
-        if (outputMode === 'nort-only' && body && typeof FormData !== 'undefined' && body instanceof FormData) {
+        if (
+          outputMode === 'nort-only' &&
+          body &&
+          typeof FormData !== 'undefined' &&
+          body instanceof FormData
+        ) {
           body.append('returnSettings', 'true')
         }
 
@@ -69,7 +95,14 @@ export default function useGenerate({ apiBase, handleResponseError, base64ToBlob
         if (!externalToast) toast.hide()
       }
     },
-    [apiBase, handleResponseError, readResponseBytesWithProgress, processGenerateResponse, setError, setLoading]
+    [
+      apiBase,
+      handleResponseError,
+      readResponseBytesWithProgress,
+      processGenerateResponse,
+      setError,
+      setLoading,
+    ]
   )
 
   return runGenerate

@@ -1,9 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import {
-  appendIfSet,
-  fetchJson,
-  tryParseJson,
-} from '../helpers.js'
+import { appendIfSet, fetchJson, tryParseJson } from '../helpers.js'
 import { base64ToBlob, formatColorString } from '../utils.js'
 
 beforeEach(() => {
