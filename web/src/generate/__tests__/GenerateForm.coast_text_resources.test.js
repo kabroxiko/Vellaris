@@ -4,7 +4,7 @@ import {
   applyTextAndBackgroundHoisted,
   applyBackgroundFlagsHoisted,
   applyResourcesAndTopLevelHoisted,
-} from '../GenerateForm'
+} from '../GenerateForm.appliers'
 
 describe('GenerateForm coast/ocean, text/background, and resources appliers', () => {
   it('applyCoastOceanAndWavesHoisted sets expected ocean and coast fields', () => {

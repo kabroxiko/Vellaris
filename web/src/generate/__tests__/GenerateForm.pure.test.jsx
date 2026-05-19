@@ -4,7 +4,7 @@ import {
   computeConcentricWaveCount,
   buildCustomizePayload,
   serializeNortObject,
-} from '../GenerateForm'
+} from '../GenerateForm.helpers'
 
 describe('GenerateForm pure helpers', () => {
   it('computeGridOverlayAlpha returns 255 when no origColor', () => {

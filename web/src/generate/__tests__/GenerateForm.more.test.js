@@ -1,14 +1,11 @@
 import { expect } from 'chai'
 
-import {
-  applyBackgroundFlagsHoisted,
-  applyResourcesAndTopLevelHoisted,
-  applyRoadsAndScalesHoisted,
-  applyTextAndBackgroundHoisted,
-  loadCityIconTypes,
-  setResourceFromRef,
-  scaleSliderValue,
-} from '../GenerateForm.jsx'
+import { applyBackgroundFlagsHoisted, applyResourcesAndTopLevelHoisted, applyRoadsAndScalesHoisted, applyTextAndBackgroundHoisted } from '../GenerateForm.appliers'
+import { setResourceFromRef,
+scaleSliderValue,
+buildCustomizePayload,
+persistCustomizeOverrides,
+parseBooleanWithDefault } from '../GenerateForm.helpers'
 
 describe('GenerateForm hoisted helpers (additional)', () => {
   it('applyBackgroundFlagsHoisted sets flags for SolidColor', () => {
@@ -73,7 +70,6 @@ describe('GenerateForm hoisted helpers (additional)', () => {
 
   it('applyRoadsAndScalesHoisted sets road and scale values', () => {
     const parsed = {}
-    const recorded = {}
     const ctx = {
       drawRoads: true,
       roadStyle: 'dashed',
@@ -100,14 +96,6 @@ describe('GenerateForm hoisted helpers (additional)', () => {
     expect(parsed.treeHeightScale).to.be.closeTo(0.3, 0.0001)
   })
 })
-import { expect, vi } from 'vitest'
-import {
-  buildCustomizePayload,
-  persistCustomizeOverrides,
-  applyBackgroundFlagsHoisted,
-  setResourceFromRef,
-  parseBooleanWithDefault,
-} from '../GenerateForm.jsx'
 
 describe('GenerateForm additional helpers', () => {
   beforeEach(() => {

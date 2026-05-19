@@ -1,6 +1,7 @@
 import React from 'react'
 import { render, screen } from '@testing-library/react'
 import { vi } from 'vitest'
+import CustomizeSettingsSection from '../CustomizeSettingsSection'
 
 // Mock background cache to avoid network / blob work during mount
 vi.mock('./backgroundBaseCache', () => ({
@@ -9,8 +10,6 @@ vi.mock('./backgroundBaseCache', () => ({
     get: vi.fn().mockResolvedValue(new Blob()),
   },
 }))
-
-import CustomizeSettingsSection from '../CustomizeSettingsSection'
 
 describe('CustomizeSettingsSection', () => {
   it('renders header and basic structure', () => {

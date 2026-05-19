@@ -1,6 +1,7 @@
 import React from 'react'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { vi, expect } from 'vitest'
+import GenerateForm from '../GenerateForm'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 
@@ -44,8 +45,6 @@ vi.mock('../i18n/webLabels', () => ({
     'ui.button.regenerate': 'Regenerate',
   }),
 }))
-
-import GenerateForm from '../GenerateForm'
 
 describe('GenerateForm build and save flows', () => {
   beforeEach(() => {

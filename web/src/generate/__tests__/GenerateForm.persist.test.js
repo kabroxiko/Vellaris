@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { buildCustomizePayload, persistCustomizeOverrides } from '../GenerateForm'
+import { buildCustomizePayload, persistCustomizeOverrides } from '../GenerateForm.helpers'
 
 describe('GenerateForm persistCustomizeOverrides', () => {
   let originalLocalStorage

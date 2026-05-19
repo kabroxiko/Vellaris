@@ -3,12 +3,12 @@ import { render } from '@testing-library/react'
 import { describe, it, expect, vi } from 'vitest'
 
 // Mock sharedHelpers imported by the hook
-vi.mock('../sharedHelpers', () => ({
+vi.mock('../../sharedHelpers', () => ({
   readResponseBytesWithProgress: vi.fn(),
   makeProgressToastController: () => ({ show: vi.fn(), hide: vi.fn() }),
 }))
 
-import useGenerate from '../hooks/useGenerate.js'
+import useGenerate from '../useGenerate.js'
 import PropTypes from 'prop-types'
 
 function TestHarness({ deps, call }) {
@@ -26,7 +26,7 @@ TestHarness.propTypes = {
 
 describe('useGenerate runGenerate branches', () => {
   it('calls handleSuccess for non-JSON image response', async () => {
-    const { readResponseBytesWithProgress } = await import('../sharedHelpers')
+    const { readResponseBytesWithProgress } = await import('../../sharedHelpers')
     readResponseBytesWithProgress.mockResolvedValueOnce(new Uint8Array([1, 2, 3]))
 
     globalThis.fetch = vi.fn(async () => ({ ok: true, headers: { get: () => 'image/png' } }))
@@ -51,7 +51,7 @@ describe('useGenerate runGenerate branches', () => {
   })
 
   it('handles JSON imageBase64 response and calls base64ToBlob', async () => {
-    const { readResponseBytesWithProgress } = await import('../sharedHelpers')
+    const { readResponseBytesWithProgress } = await import('../../sharedHelpers')
     const payload = { imageBase64: 'QQ==', nortContent: '{}' }
     readResponseBytesWithProgress.mockResolvedValueOnce(
       new TextEncoder().encode(JSON.stringify(payload))
@@ -81,7 +81,7 @@ describe('useGenerate runGenerate branches', () => {
   })
 
   it('appends returnSettings for nort-only FormData body', async () => {
-    const { readResponseBytesWithProgress } = await import('../sharedHelpers')
+    const { readResponseBytesWithProgress } = await import('../../sharedHelpers')
     readResponseBytesWithProgress.mockResolvedValueOnce(new Uint8Array([1]))
 
     globalThis.fetch = vi.fn(async () => ({ ok: true, headers: { get: () => 'image/png' } }))
@@ -108,7 +108,7 @@ describe('useGenerate runGenerate branches', () => {
   })
 
   it('handles fetch non-ok by calling handleResponseError and setting error', async () => {
-    const { readResponseBytesWithProgress } = await import('../sharedHelpers')
+    const { readResponseBytesWithProgress } = await import('../../sharedHelpers')
     readResponseBytesWithProgress.mockResolvedValueOnce(new Uint8Array([1]))
 
     const handleResponseError = vi.fn(async () => {

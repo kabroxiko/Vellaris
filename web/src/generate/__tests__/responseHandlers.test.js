@@ -1,4 +1,5 @@
 import { vi } from 'vitest'
+import { downloadNortContent, handleSuccess, processGenerateResponse } from '../responseHandlers.js'
 
 vi.mock('./utils', () => ({ base64ToBlob: vi.fn(() => new Blob(['x'])) }))
 vi.mock('./helpers', () => ({
@@ -11,8 +12,6 @@ vi.mock('./helpers', () => ({
   },
 }))
 vi.mock('./sharedHelpers', () => ({ findTitle: (p) => p?.edits?.textEdits?.[0]?.text ?? null }))
-
-import { downloadNortContent, handleSuccess, processGenerateResponse } from '../responseHandlers.js'
 
 describe('responseHandlers', () => {
   beforeEach(() => {

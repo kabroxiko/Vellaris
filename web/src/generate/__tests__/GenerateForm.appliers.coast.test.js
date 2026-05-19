@@ -1,11 +1,10 @@
 import { vi } from 'vitest'
+import { applyCoastOceanAndWavesHoisted } from '../GenerateForm.appliers'
 
 vi.mock('../utils', () => ({ formatColorString: vi.fn((hex, op) => `fmt:${hex}:${op}`) }))
 vi.mock('../sharedHelpers', () => ({
   hexToRgbaString: vi.fn((hex, alpha) => `rgba(${hex},${alpha})`),
 }))
-
-import { applyCoastOceanAndWavesHoisted } from '../GenerateForm.appliers'
 
 describe('applyCoastOceanAndWavesHoisted', () => {
   beforeEach(() => vi.clearAllMocks())

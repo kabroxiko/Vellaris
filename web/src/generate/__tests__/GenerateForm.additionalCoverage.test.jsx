@@ -1,4 +1,7 @@
 import { vi } from 'vitest'
+import React from 'react'
+import { render } from '@testing-library/react'
+import GenerateForm from '../GenerateForm'
 
 // Mock helpers ESM module before importing the component
 vi.mock('../helpers', async () => {
@@ -17,10 +20,6 @@ vi.mock('../helpers', async () => {
     })),
   }
 })
-
-import React from 'react'
-import { render } from '@testing-library/react'
-import GenerateForm from '../GenerateForm'
 
 beforeEach(() => {
   vi.resetAllMocks()

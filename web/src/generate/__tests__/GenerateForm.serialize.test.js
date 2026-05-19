@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { serializeNortObject } from '../GenerateForm'
+import { serializeNortObject } from '../GenerateForm.helpers'
 
 describe('serializeNortObject', () => {
   it('sorts object keys recursively when serializing', () => {

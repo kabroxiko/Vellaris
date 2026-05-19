@@ -1,6 +1,7 @@
 import React from 'react'
 import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import { vi, beforeEach, test } from 'vitest'
+import GenerateForm from '../GenerateForm'
 import { expect } from 'chai'
 
 // Minimal UI options fixture so component mounts
@@ -36,8 +37,6 @@ vi.mock('../hooks/useGenerate', async (importOriginal) => ({
   constActual: await importOriginal(),
   default: () => runGenerateMock,
 }))
-
-import GenerateForm from '../GenerateForm'
 
 beforeEach(() => {
   vi.clearAllMocks()

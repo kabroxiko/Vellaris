@@ -1,79 +1,20 @@
-import React, { useEffect, useMemo, useState, useRef } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { RgbaColorPicker } from 'react-colorful'
 import PropTypes from 'prop-types'
-import backgroundBaseCache from './backgroundBaseCache'
 import BackgroundTab from './tabs/BackgroundTab'
 import BorderTab from './tabs/BorderTab'
 import EffectsTab from './tabs/EffectsTab'
 import FontsTab from './tabs/FontsTab'
-import { hexToHSB, mulberry32, hsbToRgb, hexToRgba, rgbaToHex, hexWithAlpha } from './sharedHelpers'
+import { hexToRgba, rgbaToHex } from './sharedHelpers'
+import {
+  fetchPreviewBlob,
+  buildPreviewPayload,
+} from './CustomizePreviewHelpers'
+import useCustomizePreview from './hooks/useCustomizePreview'
+import backgroundBaseCache from './backgroundBaseCache'
 
 const API_BASE = import.meta.env.VITE_API_BASE || '/api'
 
-// color/HSB helpers imported from sharedHelpers
-
-// Colorize a bitmap to the specified color. Hoisted to module scope
-// so it can be reused and to satisfy Sonar rule S7721.
-async function colorizeBitmap(sourceBitmap, colorHex, w, h, previewFieldsLocal, opts) {
-  const alg = String(previewFieldsLocal?.backgroundType || '')
-    .toLowerCase()
-    .includes('fractal')
-    ? 'algorithm2'
-    : 'algorithm3'
-  const hsb = hexToHSB(colorHex)
-  const tmp = document.createElement('canvas')
-  tmp.width = w
-  tmp.height = h
-  const tctx = tmp.getContext('2d')
-  tctx.drawImage(sourceBitmap, 0, 0, w, h)
-  const imd = tctx.getImageData(0, 0, w, h)
-  const data = imd.data
-  const preserveTexture =
-    typeof opts?.preserveTexture === 'number'
-      ? Math.max(0, Math.min(1, opts.preserveTexture))
-      : 0.02
-  for (let i = 0; i < data.length; i += 4) {
-    const r0 = data[i]
-    const g0 = data[i + 1]
-    const b0 = data[i + 2]
-    const level = (0.299 * r0 + 0.587 * g0 + 0.114 * b0) / 255
-    let resultLevel
-    if (alg === 'algorithm2') {
-      const I = hsb[2] * 255
-      const overlay = ((I / 255) * (I + 2 * level * (255 - I))) / 255
-      resultLevel = overlay
-    } else if (hsb[2] < 0.5) {
-      resultLevel = level * (hsb[2] * 2)
-    } else {
-      const range = (1 - hsb[2]) * 2
-      resultLevel = range * level + (1 - range)
-    }
-    const [rC, gC, bC] = hsbToRgb(hsb[0], hsb[1], resultLevel)
-    data[i] = Math.round((1 - preserveTexture) * rC + preserveTexture * r0)
-    data[i + 1] = Math.round((1 - preserveTexture) * gC + preserveTexture * g0)
-    data[i + 2] = Math.round((1 - preserveTexture) * bC + preserveTexture * b0)
-  }
-  tctx.putImageData(imd, 0, 0)
-  return await createImageBitmap(tmp)
-}
-
-// hexToRgba/rgbaToHex imported from sharedHelpers
-
-// doFetchWithRetries imported from sharedHelpers
-
-// Helper to darken/lighten hex color (hoisted)
-// shadeColor and hexWithAlpha imported from sharedHelpers
-
-// Helper: create canvas and context from an ImageBitmap (hoisted)
-function makeCanvasForBitmap(imgBitmap) {
-  const w = imgBitmap.width
-  const h = imgBitmap.height
-  const canvas = document.createElement('canvas')
-  canvas.width = w
-  canvas.height = h
-  const ctx = canvas.getContext('2d')
-  return { canvas, ctx, w, h }
-}
 
 // Utility: strip optional surrounding <html>...</html> wrapper (linear scan)
 function stripHtmlWrapper(str) {
@@ -116,181 +57,7 @@ function pick(obj, keys) {
   return out
 }
 
-// Helper: draw the background and inset box (hoisted)
-function drawBackgroundAndInset(opts) {
-  const { ctx, img, w, h, x, y, boxW, boxH } = opts || {}
-  ctx.save()
-  try {
-    ctx.drawImage(img, 0, 0, w, h)
-    ctx.fillStyle = 'rgba(255,255,255,0.04)'
-    ctx.fillRect(x - 2, y - 2, boxW + 4, boxH + 4)
-  } finally {
-    ctx.restore()
-  }
-}
-
-// Helper: draw the island shape and fill with either pattern or color (hoisted)
-function drawIslandShape(opts) {
-  const {
-    ctx,
-    rng,
-    cx,
-    cy,
-    baseRadius,
-    xRadius,
-    yRadius,
-    boxW,
-    boxH,
-    x,
-    y,
-    landBitmap,
-    displayBitmap,
-    imgBitmap,
-    coastlineWidth = undefined,
-    coastlineColorHex = undefined,
-  } = opts || {}
-  const points = 32
-  const jitterX = Math.max(6, Math.round(xRadius * 0.18))
-  const jitterY = Math.max(6, Math.round(yRadius * 0.18))
-  ctx.beginPath()
-  for (let i = 0; i < points; i++) {
-    const a = (i / points) * Math.PI * 2
-    const rx = xRadius + (rng() - 0.5) * jitterX
-    const ry = yRadius + (rng() - 0.5) * jitterY
-    const px = cx + Math.round(Math.cos(a) * rx)
-    const py = cy + Math.round(Math.sin(a) * ry)
-    if (i === 0) ctx.moveTo(px, py)
-    else ctx.lineTo(px, py)
-  }
-  ctx.closePath()
-
-  const landColor = '#c2b891'
-  const pattern = ctx.createPattern(landBitmap || displayBitmap || imgBitmap, 'repeat')
-  if (pattern) {
-    ctx.save()
-    ctx.clip()
-    ctx.fillStyle = pattern
-    ctx.fillRect(x, y, boxW, boxH)
-    ctx.globalCompositeOperation = 'source-over'
-    // Draw coastline stroke only when a positive coastline width is provided.
-    const computedDefaultWidth = Math.max(1, Math.round(baseRadius * 0.03))
-    const strokeW = typeof coastlineWidth === 'number' ? coastlineWidth : computedDefaultWidth
-    if (strokeW > 0) {
-      ctx.strokeStyle = coastlineColorHex
-        ? hexWithAlpha(coastlineColorHex, 100)
-        : 'rgba(255,255,240,0.55)'
-      ctx.lineWidth = strokeW
-      ctx.lineJoin = 'round'
-      ctx.stroke()
-    }
-    ctx.restore()
-  } else {
-    ctx.fillStyle = landColor
-    ctx.fill()
-  }
-}
-
-// Module-scoped prepare and compose helpers so they can be unit-tested
-// independently of the React component's closure.
-async function prepareBitmapsModule(imgBitmap, w, h, opts = {}, previewFields = {}, defaults = {}) {
-  const processed = { displayBitmap: imgBitmap, landBitmap: imgBitmap }
-  const useColorizeOcean =
-    typeof opts?.colorizeOcean === 'boolean' ? opts.colorizeOcean : defaults.colorizeOcean
-  const useOceanColorHex = opts?.oceanColorHex || defaults.oceanColorHex
-  const SEPPIA_HEX = '#C8A082'
-  if (useColorizeOcean && useOceanColorHex) {
-    processed.displayBitmap = await colorizeBitmap(
-      imgBitmap,
-      useOceanColorHex,
-      w,
-      h,
-      previewFields,
-      opts
-    )
-  } else {
-    processed.displayBitmap = await colorizeBitmap(imgBitmap, SEPPIA_HEX, w, h, previewFields, opts)
-  }
-
-  const useColorizeLand =
-    typeof opts?.colorizeLand === 'boolean' ? opts.colorizeLand : defaults.colorizeLand
-  const useLandColorHex = opts?.landColorHex || defaults.landColorHex
-  if (useColorizeLand && useLandColorHex) {
-    processed.landBitmap = await colorizeBitmap(
-      imgBitmap,
-      useLandColorHex,
-      w,
-      h,
-      previewFields,
-      opts
-    )
-  } else {
-    processed.landBitmap = await colorizeBitmap(imgBitmap, SEPPIA_HEX, w, h, previewFields, opts)
-  }
-  return processed
-}
-
-async function composeMiniIslandFromBlobModule(
-  sourceBlob,
-  opts = {},
-  previewFields = {},
-  defaults = {},
-  overrides = {}
-) {
-  const imgBitmap = await createImageBitmap(sourceBlob)
-  const makeCanvas = overrides.makeCanvasForBitmap || makeCanvasForBitmap
-  const doPrepare = overrides.prepareBitmaps || prepareBitmapsModule
-  const doDrawBackground = overrides.drawBackgroundAndInset || drawBackgroundAndInset
-  const doDrawIsland = overrides.drawIslandShape || drawIslandShape
-  const { canvas, ctx, w, h } = makeCanvas(imgBitmap)
-
-  const boxW = Math.round(w * 0.45)
-  const boxH = Math.round(h * 0.45)
-  const x = Math.round((w - boxW) / 2)
-  const y = Math.round((h - boxH) / 2)
-
-  const seed = Number(previewFields.backgroundSeed) || Date.now()
-  const rng = mulberry32(seed & 0xffffffff)
-
-  const { displayBitmap, landBitmap } = await doPrepare(
-    imgBitmap,
-    w,
-    h,
-    opts,
-    previewFields,
-    defaults
-  )
-
-  doDrawBackground({ ctx, img: displayBitmap, w, h, x, y, boxW, boxH })
-
-  const cx = x + Math.round(boxW * 0.5)
-  const cy = y + Math.round(boxH * 0.5)
-  const baseRadius = Math.round(Math.min(boxW, boxH) * 0.48)
-  const xRadius = Math.round(baseRadius * 1.45)
-  const yRadius = baseRadius
-
-  doDrawIsland({
-    ctx,
-    rng,
-    cx,
-    cy,
-    baseRadius,
-    xRadius,
-    yRadius,
-    boxW,
-    boxH,
-    x,
-    y,
-    landBitmap,
-    displayBitmap,
-    imgBitmap,
-    coastlineWidth: previewFields?.coastlineWidth,
-    coastlineColorHex: previewFields?.coastlineColorHex,
-  })
-
-  return await new Promise((resolve) => canvas.toBlob(resolve))
-}
-
-// Modal styles for color picker (hoisted)
+// Modal styles for color picker
 const modalBackdropStyle = {
   position: 'fixed',
   left: 0,
@@ -309,14 +76,6 @@ const modalContentStyle = {
   padding: 12,
   borderRadius: 6,
   boxShadow: '0 6px 24px rgba(0,0,0,0.3)',
-}
-
-async function fetchPreviewBlob(payload, controller) {
-  // kick off a background preload (non-blocking)
-  backgroundBaseCache.preload(payload)
-  // await cached or in-flight fetch
-  const blob = await backgroundBaseCache.get(payload, controller?.signal)
-  return blob
 }
 
 function ColorPickerModal({ open, onClose, children }) {
@@ -364,7 +123,11 @@ ColorPickerModal.propTypes = {
   children: PropTypes.node,
 }
 
-// Export module-scope helpers for unit testing of hoisted functions.
+// Export small module-scope helpers and modal styles
+export { modalBackdropStyle, modalContentStyle, ColorPickerModal }
+
+// Re-export payload/preview helpers from the dedicated module for tests and compatibility
+export { pickDefaultTexture, resolveRawTextureRef, buildPreviewPayload } from './CustomizePreviewHelpers'
 export {
   colorizeBitmap,
   makeCanvasForBitmap,
@@ -372,78 +135,15 @@ export {
   drawIslandShape,
   prepareBitmapsModule,
   composeMiniIslandFromBlobModule,
-  modalBackdropStyle,
-  modalContentStyle,
   fetchPreviewBlob,
-  ColorPickerModal,
-}
-
-// Payload helpers: hoisted so they can be unit-tested independently.
-function pickDefaultTexture(textures = [], cityIconTypesByPack = {}) {
-  if (cityIconTypesByPack && Object.keys(cityIconTypesByPack).length > 0) {
-    const firstPack = Object.keys(cityIconTypesByPack)[0]
-    const firstTypes = cityIconTypesByPack[firstPack]
-    if (Array.isArray(firstTypes) && firstTypes.length > 0)
-      return { artPack: firstPack, cityIconType: firstTypes[0] }
-  }
-  if (Array.isArray(textures) && textures.length > 0) {
-    const t = textures[0]
-    return { artPack: t.artPack, cityIconType: t.name }
-  }
-  return {}
-}
-
-function resolveRawTextureRef(rawRef, textures = []) {
-  if (!rawRef) return {}
-  const ref = String(rawRef)
-  if (ref.includes('|')) {
-    if (Array.isArray(textures) && textures.length > 0) {
-      const found = textures.find((tt) => `${tt.artPack}|${tt.name}` === ref)
-      if (found) return { artPack: found.artPack, cityIconType: found.name }
-    }
-    const [ap, nm] = ref.split('|', 2)
-    return { artPack: ap, cityIconType: nm }
-  }
-  return { cityIconType: rawRef }
-}
-
-function buildPreviewPayload(previewFields = {}, textures = [], currentSource = {}) {
-  let payload = { width: 520, height: 170 }
-  if (previewFields) payload = { ...payload, ...previewFields }
-  payload.type = previewFields?.backgroundType === undefined ? null : previewFields.backgroundType
-  const bg = payload.type
-  if (
-    bg === 'GeneratedFromTexture' ||
-    (typeof bg === 'string' && bg.toLowerCase().includes('texture'))
-  ) {
-    const rawRef = previewFields?.textureRef
-    const isEmpty = rawRef === undefined || rawRef === null || String(rawRef).trim() === ''
-    if (isEmpty) {
-      payload = { ...payload, ...pickDefaultTexture(textures) }
-    } else {
-      payload = { ...payload, ...resolveRawTextureRef(rawRef, textures) }
-    }
-  }
-  if (currentSource?.type === 'random' && currentSource?.payload)
-    payload = { ...payload, ...currentSource.payload }
-  if (!payload.cityIconType && previewFields?.cityIconType)
-    payload.cityIconType = previewFields.cityIconType
-  return payload
-}
-
-export { pickDefaultTexture, resolveRawTextureRef, buildPreviewPayload }
+} from './CustomizePreviewHelpers'
 export { pick, stripHtmlWrapper, removeTags }
 
 export default function CustomizeSettingsSection({ values, handlers, options, ui }) {
   const [activeTab, setActiveTab] = useState('background')
   const [openFontComboId, setOpenFontComboId] = useState(null)
-  const [backgroundPreviewUrl, setBackgroundPreviewUrl] = useState(null)
-  const [previewRefreshNonce, setPreviewRefreshNonce] = useState(0)
-  const lastBaseBlobRef = useRef(null)
+  
 
-  // Testing override: set to true to force the Customize panel enabled
-  // regardless of having an uploaded .nort source. Remove or set to false
-  // for normal behavior.
   const FORCE_ENABLE_CUSTOMIZE = true
 
   useEffect(() => {
@@ -625,124 +325,6 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
 
   const previewFields = collectPreviewFields()
 
-  // Helper: RNG, color math and bitmap colorization extracted to reduce
-  // cognitive complexity inside `composeMiniIslandFromBlob`.
-
-  // Compose a mini island preview from a neutral base Blob. Exported at
-  // component scope so color controls can trigger a local recomposition
-  // without initiating a new network fetch.
-  // use hoisted `makeCanvasForBitmap`, `drawBackgroundAndInset` and
-  // `drawIslandShape`. The only in-component helper we keep is
-  // `prepareBitmaps` because it references component-level preview fields
-  // and color flags.
-  // Helper: prepare display and land bitmaps (colorized variants)
-  async function prepareBitmaps(imgBitmap, w, h, opts) {
-    const processed = { displayBitmap: imgBitmap, landBitmap: imgBitmap }
-    const useColorizeOcean =
-      typeof opts?.colorizeOcean === 'boolean' ? opts.colorizeOcean : colorizeOcean
-    const useOceanColorHex = opts?.oceanColorHex || oceanColorHex
-    const SEPPIA_HEX = '#C8A082'
-    if (useColorizeOcean && useOceanColorHex) {
-      processed.displayBitmap = await colorizeBitmap(
-        imgBitmap,
-        useOceanColorHex,
-        w,
-        h,
-        previewFields,
-        opts
-      )
-    } else {
-      // When ocean colorization is disabled, render the preview with a sepia tone
-      processed.displayBitmap = await colorizeBitmap(
-        imgBitmap,
-        SEPPIA_HEX,
-        w,
-        h,
-        previewFields,
-        opts
-      )
-    }
-
-    const useColorizeLand =
-      typeof opts?.colorizeLand === 'boolean' ? opts.colorizeLand : colorizeLand
-    const useLandColorHex = opts?.landColorHex || landColorHex
-    if (useColorizeLand && useLandColorHex) {
-      processed.landBitmap = await colorizeBitmap(
-        imgBitmap,
-        useLandColorHex,
-        w,
-        h,
-        previewFields,
-        opts
-      )
-    } else {
-      // When land colorization is disabled, render the preview land with a sepia tone
-      processed.landBitmap = await colorizeBitmap(imgBitmap, SEPPIA_HEX, w, h, previewFields, opts)
-    }
-    return processed
-  }
-
-  async function composeMiniIslandFromBlob(sourceBlob, opts) {
-    const imgBitmap = await createImageBitmap(sourceBlob)
-    const { canvas, ctx, w, h } = makeCanvasForBitmap(imgBitmap)
-
-    const boxW = Math.round(w * 0.45)
-    const boxH = Math.round(h * 0.45)
-    const x = Math.round((w - boxW) / 2)
-    const y = Math.round((h - boxH) / 2)
-
-    const seed = Number(previewFields.backgroundSeed) || Date.now()
-    const rng = mulberry32(seed & 0xffffffff)
-
-    const { displayBitmap, landBitmap } = await prepareBitmaps(imgBitmap, w, h, opts)
-
-    drawBackgroundAndInset({ ctx, img: displayBitmap, w, h, x, y, boxW, boxH })
-
-    const cx = x + Math.round(boxW * 0.5)
-    const cy = y + Math.round(boxH * 0.5)
-    const baseRadius = Math.round(Math.min(boxW, boxH) * 0.48)
-    const xRadius = Math.round(baseRadius * 1.45)
-    const yRadius = baseRadius
-
-    drawIslandShape({
-      ctx,
-      rng,
-      cx,
-      cy,
-      baseRadius,
-      xRadius,
-      yRadius,
-      boxW,
-      boxH,
-      x,
-      y,
-      landBitmap,
-      displayBitmap,
-      imgBitmap,
-      // pass coastline settings from previewFields so preview can show no coastline
-      coastlineWidth: previewFields?.coastlineWidth,
-      coastlineColorHex: previewFields?.coastlineColorHex,
-    })
-
-    return await new Promise((resolve) => canvas.toBlob(resolve))
-  }
-  // Build a minimal payload for the background preview request. Uses
-  // the module-scope `buildPreviewPayload(previewFields, textures, currentSource)`
-  // helper which is exported for unit testing.
-
-  async function setPreviewFromBlob(blob) {
-    lastBaseBlobRef.current = blob
-    const processedBlob = await composeMiniIslandFromBlob(blob)
-    const url = URL.createObjectURL(processedBlob || blob)
-    setBackgroundPreviewUrl((previous) => {
-      if (previous) URL.revokeObjectURL(previous)
-      return url
-    })
-  }
-  // expose existing local render helpers to the tab components so they
-  // can reuse the current implementations without duplicating logic.
-  // (render helpers will be attached to tabProps after it's created)
-
   async function onSubmitGenerate(e) {
     if (e && typeof e.preventDefault === 'function') e.preventDefault()
     if (typeof handlers.handleGenerateFromSettings === 'function') {
@@ -752,19 +334,9 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     triggerPreviewRefresh()
   }
 
-  async function recomposeUsingLastBase(opts) {
-    if (!lastBaseBlobRef.current) return
-    const processed = await composeMiniIslandFromBlob(lastBaseBlobRef.current, opts)
-    const url = URL.createObjectURL(processed || lastBaseBlobRef.current)
-    setBackgroundPreviewUrl((previous) => {
-      if (previous) URL.revokeObjectURL(previous)
-      return url
-    })
-  }
+  
 
-  // Use a filtered preview key so color toggles/values DO NOT trigger
-  // the background preview. We only want texture/background changes
-  // (and other visual parameters) to trigger backend fetches.
+  // Use a filtered preview key so color toggles/values do not trigger the background preview.
   const previewTriggerKey = useMemo(() => {
     const { colorizeLand, colorizeOcean, landColorHex, oceanColorHex, ...rest } =
       previewFields || {}
@@ -804,13 +376,9 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     previewFields?.citySize,
   ])
 
-  // Use the `handlers` object directly; avoid creating many unused
-  // local `set*` variables that Sonar flags as unused. Accessors
-  // below will reference `handlers.<name>`.
+  // Use the `handlers` object directly; accessors below will reference `handlers.<name>`.
 
-  // Consolidated map of setter functions so they can be spread into
-  // `tabProps` as named properties (preserves runtime bindings and
-  // avoids Sonar false-positives about unused declarations).
+  // Consolidated map of setter functions so they can be spread into `tabProps`.
   const setterDeps = {
     setGridOverlayLayer: handlers.setGridOverlayLayer,
     setDrawVoronoiGridOverlayOnlyOnLand: handlers.setDrawVoronoiGridOverlayOnlyOnLand,
@@ -879,8 +447,6 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
   const backgroundTypes = backendOptions?.backgroundTypes
 
   // Fonts are provided by the backend via `i18n.options.fonts`.
-  // Per project policy: do not introduce client-side fallbacks — if the
-  // server does not provide fonts, the list will be empty.
   const availableFontFamilies = backendOptions?.fonts
 
   // Preload the first few texture bases and a fractal base so the UI
@@ -909,6 +475,13 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     })
   }, [textures, backgroundTypes])
   const strokeTypes = backendOptions?.strokeTypes
+  const {
+    backgroundPreviewUrl,
+    setPreviewFromBlob,
+    recomposeUsingLastBase,
+    triggerPreviewRefresh,
+    clearPreview,
+  } = useCustomizePreview({ previewFields, textures, currentSource })
   const borderPositions = backendOptions?.borderPositions
   const borderColorOptions = backendOptions?.borderColorOptions
   const lineStyles = backendOptions?.lineStyles
@@ -989,9 +562,7 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
   }
 
   // Small helpers to convert between hex and rgba used by the picker.
-  // (moved to module scope; use the hoisted versions)
-
-  // use hoisted `rgbaToHex` helper to satisfy S7721
+  // (helpers available in module scope)
 
   const [showCoastPicker, setShowCoastPicker] = useState(false)
   const [showGridPicker, setShowGridPicker] = useState(false)
@@ -1011,9 +582,6 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
   // the first successful generation) and therefore disable downloads.
   const notifyManualChange = () => {
     if (typeof handlers.notifyManualChange === 'function') handlers.notifyManualChange()
-  }
-  const triggerPreviewRefresh = () => {
-    setPreviewRefreshNonce((n) => n + 1)
   }
 
   const showTextureOptions = backgroundType === 'GeneratedFromTexture'
@@ -1120,11 +688,9 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     if (typeof globalThis !== 'undefined' && globalThis.__prefetchedBackgroundPreviewBlob) {
       const blob = globalThis.__prefetchedBackgroundPreviewBlob
       delete globalThis.__prefetchedBackgroundPreviewBlob
-      const url = URL.createObjectURL(blob)
-      setBackgroundPreviewUrl((previous) => {
-        if (previous) URL.revokeObjectURL(previous)
-        return url
-      })
+      ;(async () => {
+        await setPreviewFromBlob(blob)
+      })()
       return
     }
 
@@ -1134,10 +700,7 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     // `nortContent` source. Use `hasCustomizationSource` which respects the
     // `FORCE_ENABLE_CUSTOMIZE` override.
     if (!hasCustomizationSource && !hasRandomPayloadSource) {
-      setBackgroundPreviewUrl((previous) => {
-        if (previous) URL.revokeObjectURL(previous)
-        return null
-      })
+      clearPreview()
       return
     }
 
@@ -1167,7 +730,6 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     currentSource?.nortContent,
     currentSource?.payload,
     currentSource?.type,
-    previewRefreshNonce,
   ])
 
   function renderColorControl({
@@ -1256,10 +818,7 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
 
   useEffect(() => {
     return () => {
-      setBackgroundPreviewUrl((previous) => {
-        if (previous) URL.revokeObjectURL(previous)
-        return null
-      })
+      clearPreview()
     }
   }, [])
 

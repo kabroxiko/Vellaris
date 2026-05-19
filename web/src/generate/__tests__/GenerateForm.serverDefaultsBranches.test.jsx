@@ -2,7 +2,8 @@ import React from 'react'
 import { render, waitFor } from '@testing-library/react'
 import { vi, test, beforeEach } from 'vitest'
 import { expect } from 'chai'
-import GenerateForm, { loadUiOptions } from '../GenerateForm'
+import GenerateForm from '../GenerateForm'
+import { loadUiOptions } from '../hooks/useUiOptions'
 
 const uiOptsWithDefaults = {
   books: [],

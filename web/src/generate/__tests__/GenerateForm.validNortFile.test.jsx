@@ -1,6 +1,7 @@
 import React from 'react'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { vi } from 'vitest'
+import GenerateForm from '../GenerateForm'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 
@@ -40,8 +41,6 @@ vi.mock('../i18n/webLabels', () => ({
     'ui.button.downloadSettings': 'Download settings',
   }),
 }))
-
-import GenerateForm from '../GenerateForm'
 
 describe('GenerateForm valid .nort file', () => {
   beforeEach(() => {

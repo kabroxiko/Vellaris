@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { setResourceFromRef, scaleSliderValue } from '../GenerateForm'
+import { setResourceFromRef, scaleSliderValue } from '../GenerateForm.helpers'
 
 describe('GenerateForm helpers - setResourceFromRef and scaleSliderValue', () => {
   it('setResourceFromRef parses pack|name into object', () => {

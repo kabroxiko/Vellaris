@@ -9,7 +9,7 @@ import {
   persistCustomizeOverrides,
   loadCustomizeOverrides,
   loadRandomOverrides,
-} from '../GenerateForm'
+} from '../GenerateForm.helpers'
 
 describe('GenerateForm helpers (focused)', () => {
   beforeEach(() => {

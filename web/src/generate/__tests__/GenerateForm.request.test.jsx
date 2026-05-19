@@ -1,6 +1,7 @@
 import React from 'react'
 import { render, fireEvent, waitFor } from '@testing-library/react'
 import { vi, expect } from 'vitest'
+import GenerateForm from '../GenerateForm'
 
 // Mock helpers.fetchJson to avoid network calls
 vi.mock('../helpers', async () => {
@@ -27,8 +28,6 @@ vi.mock('../helpers', async () => {
 // Mock useGenerate hook
 const runGenerateMock = vi.fn().mockResolvedValue(undefined)
 vi.mock('../hooks/useGenerate', () => ({ default: () => runGenerateMock }))
-
-import GenerateForm from '../GenerateForm'
 
 describe('buildNortContentRequest unit', () => {
   beforeEach(() => {

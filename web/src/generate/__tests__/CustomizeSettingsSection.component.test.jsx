@@ -1,6 +1,7 @@
 import React from 'react'
 import { render } from '@testing-library/react'
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import CustomizeSettingsSection from '../CustomizeSettingsSection'
 
 // Mock child tabs to keep the component lightweight for testing
 vi.mock('../tabs/BackgroundTab', () => ({ default: () => <div data-testid="background-tab" /> }))
@@ -15,8 +16,6 @@ vi.mock('../backgroundBaseCache', () => ({
     get: vi.fn(() => Promise.resolve(new Blob(['x'], { type: 'image/png' }))),
   },
 }))
-
-import CustomizeSettingsSection from '../CustomizeSettingsSection'
 
 const defaultOptions = {
   textures: [],

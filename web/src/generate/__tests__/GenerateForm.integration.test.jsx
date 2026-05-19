@@ -1,6 +1,7 @@
 import React from 'react'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { vi, describe, it, expect, beforeEach } from 'vitest'
+import GenerateForm from '../GenerateForm'
 
 // Prepare a deterministic UI options payload returned by the backend
 const uiOpts = {
@@ -39,8 +40,6 @@ vi.mock('../hooks/useGenerate', async (importOriginal) => {
   const actual = await importOriginal()
   return { ...actual, default: () => runGenerateMock }
 })
-
-import GenerateForm from '../GenerateForm'
 
 describe('GenerateForm integration (file upload -> generate)', () => {
   beforeEach(() => {

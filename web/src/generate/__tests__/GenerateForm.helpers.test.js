@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
+import { applyBackgroundFlagsHoisted } from '../GenerateForm.appliers'
 import {
-  applyBackgroundFlagsHoisted,
   setResourceFromRef,
   parseBooleanWithDefault,
   scaleSliderValue,
@@ -9,8 +9,8 @@ import {
   serializeNortObject,
   loadRandomOverrides,
   loadCustomizeOverrides,
-  loadUiOptions,
-} from '../GenerateForm.jsx'
+} from '../GenerateForm.helpers'
+import { loadUiOptions } from '../hooks/useUiOptions'
 
 describe('GenerateForm pure helpers', () => {
   it('applyBackgroundFlagsHoisted sets flags for SolidColor', () => {

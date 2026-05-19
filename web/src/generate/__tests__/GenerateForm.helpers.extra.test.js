@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseBooleanWithDefault, scaleSliderValue } from '../GenerateForm'
+import { parseBooleanWithDefault, scaleSliderValue } from '../GenerateForm.helpers'
 
 describe('GenerateForm helpers', () => {
   it('parseBooleanWithDefault prefers mergedRef boolean when uiValue false', () => {

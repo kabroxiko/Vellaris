@@ -198,8 +198,7 @@ export function deriveNortFilenameFromContent(nortContent) {
       // Handle parse error explicitly instead of swallowing it silently.
       // This keeps behavior deterministic while preserving the original
       // fallback of returning null when content isn't valid JSON.
-      // Sonar rule javascript:S2486 requires handling the exception.
-      // Log at debug level so maintainers can inspect parse failures.
+      // Handle parse error explicitly and log a warning.
       /* eslint-disable no-console */
       console.warn('deriveNortFilenameFromContent: JSON.parse failed', e)
       /* eslint-enable no-console */

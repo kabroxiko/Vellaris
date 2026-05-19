@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { setResourceFromRef } from '../GenerateForm'
+import { setResourceFromRef } from '../GenerateForm.helpers'
 
 describe('border helpers', () => {
   it('setResourceFromRef ignores falsy refs and parses valid ones', () => {

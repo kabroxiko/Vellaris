@@ -1,13 +1,6 @@
 import { expect } from 'vitest'
 
-import {
-  serializeNortObject,
-  computeGridOverlayAlpha,
-  computeConcentricWaveCount,
-  scaleSliderValue,
-  loadRandomOverrides,
-  loadCustomizeOverrides,
-} from '../GenerateForm.jsx'
+import { serializeNortObject, computeGridOverlayAlpha, computeConcentricWaveCount, scaleSliderValue, loadRandomOverrides, loadCustomizeOverrides } from '../GenerateForm.helpers'
 
 describe('GenerateForm extra helpers', () => {
   beforeEach(() => {

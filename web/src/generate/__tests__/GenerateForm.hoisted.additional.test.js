@@ -3,7 +3,7 @@ import {
   applyGridAndColoringHoisted,
   applyBordersFrayedAndGrungeHoisted,
   applyRoadsAndScalesHoisted,
-} from '../GenerateForm'
+} from '../GenerateForm.appliers'
 
 describe('GenerateForm additional hoisted applier tests', () => {
   it('applyGridAndColoringHoisted sets gridOverlayColor with alpha from getGridOverlayAlpha', () => {

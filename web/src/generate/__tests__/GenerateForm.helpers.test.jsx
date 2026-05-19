@@ -11,7 +11,7 @@ import {
   persistCustomizeOverrides,
   loadRandomOverrides,
   loadCustomizeOverrides,
-} from '../GenerateForm.jsx'
+} from '../GenerateForm.helpers'
 
 test('serializeNortObject sorts object keys recursively', () => {
   const obj = { b: 1, a: { d: 4, c: 3 }, z: [{ y: 2, x: 1 }] }

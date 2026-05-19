@@ -3,7 +3,7 @@ import {
   applyGridAndColoringHoisted,
   applyBordersFrayedAndGrungeHoisted,
   applyRoadsAndScalesHoisted,
-} from '../GenerateForm'
+} from '../GenerateForm.appliers'
 
 describe('GenerateForm hoisted appliers', () => {
   it('applyGridAndColoringHoisted sets grid and color fields', () => {

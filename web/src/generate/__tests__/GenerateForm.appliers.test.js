@@ -6,8 +6,8 @@ import {
   applyCoastOceanAndWavesHoisted,
   applyRoadsAndScalesHoisted,
   applyTextAndBackgroundHoisted,
-  scaleSliderValue,
-} from '../GenerateForm'
+} from '../GenerateForm.appliers'
+import { scaleSliderValue } from '../GenerateForm.helpers'
 
 describe('GenerateForm applier helpers', () => {
   beforeEach(() => {

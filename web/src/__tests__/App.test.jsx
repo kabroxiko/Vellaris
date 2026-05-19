@@ -1,3 +1,4 @@
+import App from '../App'
 import React from 'react'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { describe, it, expect, vi } from 'vitest'
@@ -10,8 +11,6 @@ vi.mock('../generate/GenerateForm', () => ({
 vi.mock('../Toast', () => ({
   default: () => React.createElement('div', { 'data-testid': 'mock-toast' }, 'Toast'),
 }))
-
-import App from '../App'
 
 describe('App shell', () => {
   it('renders header, language selector, and modal controls', async () => {

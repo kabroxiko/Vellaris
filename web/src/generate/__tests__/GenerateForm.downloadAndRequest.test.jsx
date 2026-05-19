@@ -1,6 +1,7 @@
 import React from 'react'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { vi } from 'vitest'
+import GenerateForm from '../GenerateForm'
 
 // Mock useGenerate hook to avoid real network
 const runGenerateMock = vi.fn().mockResolvedValue(undefined)
@@ -42,8 +43,6 @@ vi.mock('../i18n/webLabels', () => ({
     'ui.button.regenerate': 'Regenerate',
   }),
 }))
-
-import GenerateForm from '../GenerateForm'
 
 describe('GenerateForm download settings', () => {
   beforeEach(() => {

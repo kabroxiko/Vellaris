@@ -7,7 +7,7 @@ import {
   buildCustomizePayload,
   persistCustomizeOverrides,
   loadRandomOverrides,
-} from '../GenerateForm'
+} from '../GenerateForm.helpers'
 
 describe('GenerateForm pure helpers', () => {
   beforeEach(() => {

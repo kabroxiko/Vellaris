@@ -1,6 +1,7 @@
 import React from 'react'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { vi } from 'vitest'
+import GenerateForm from '../GenerateForm'
 
 // Mock useGenerate hook
 const runGenerateMock = vi.fn().mockResolvedValue(undefined)
@@ -35,8 +36,6 @@ vi.mock('../i18n/webLabels', () => ({
     'ui.button.regenerate': 'Regenerate',
   }),
 }))
-
-import GenerateForm from '../GenerateForm'
 
 // Ensure global fetch handles relative URLs used by the app (node fetch needs absolute URLs)
 const originalFetch = globalThis.fetch

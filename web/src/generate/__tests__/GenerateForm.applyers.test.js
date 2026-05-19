@@ -3,7 +3,7 @@ import {
   applyGridAndColoringHoisted,
   applyRoadsAndScalesHoisted,
   applyResourcesAndTopLevelHoisted,
-} from '../GenerateForm.jsx'
+} from '../GenerateForm.appliers'
 
 describe('GenerateForm additional hoisted appliers', () => {
   // Note: `mergeColor` is internal to the module and exercised via the

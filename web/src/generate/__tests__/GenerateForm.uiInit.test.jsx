@@ -1,6 +1,7 @@
 import React from 'react'
 import { render, screen } from '@testing-library/react'
 import { vi } from 'vitest'
+import GenerateForm from '../GenerateForm'
 
 // Mock useGenerate hook
 const runGenerateMock = vi.fn().mockResolvedValue(undefined)
@@ -31,8 +32,6 @@ vi.mock('../i18n/webLabels', () => ({
     'ui.button.downloadSettings': 'Download settings',
   }),
 }))
-
-import GenerateForm from '../GenerateForm'
 
 test('backend labels override frontend labels on initial load', async () => {
   render(<GenerateForm uiLanguage="en" />)

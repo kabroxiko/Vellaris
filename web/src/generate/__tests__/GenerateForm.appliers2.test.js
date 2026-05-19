@@ -1,10 +1,6 @@
 import { expect } from 'chai'
 
-import {
-  applyGridAndColoringHoisted,
-  applyBordersFrayedAndGrungeHoisted,
-  applyCoastOceanAndWavesHoisted,
-} from '../GenerateForm.jsx'
+import { applyGridAndColoringHoisted, applyBordersFrayedAndGrungeHoisted, applyCoastOceanAndWavesHoisted } from '../GenerateForm.appliers'
 
 describe('GenerateForm appliers (grid, borders, coast/ocean)', () => {
   it('applyGridAndColoringHoisted sets region boundary and grid values', () => {
@@ -112,7 +108,7 @@ describe('GenerateForm appliers (grid, borders, coast/ocean)', () => {
       oceanWavesColorHex: '#1a1b1c',
       drawOceanEffectsInLakes: true,
       riverColorHex: '#1d1e1f',
-      parseBooleanWithDefault: (v) => Boolean(v),
+      parseBooleanWithDefault: Boolean,
       mergedSettingsRef: { current: {} },
     }
 

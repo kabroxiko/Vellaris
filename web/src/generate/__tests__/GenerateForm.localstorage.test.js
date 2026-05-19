@@ -3,7 +3,7 @@ import {
   loadRandomOverrides,
   loadCustomizeOverrides,
   persistCustomizeOverrides,
-} from '../GenerateForm'
+} from '../GenerateForm.helpers'
 
 beforeEach(() => {
   localStorage.clear()

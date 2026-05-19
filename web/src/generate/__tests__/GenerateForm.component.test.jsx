@@ -1,6 +1,7 @@
 import React from 'react'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { vi } from 'vitest'
+import GenerateForm from '../GenerateForm'
 
 // Mock useGenerate hook to capture runGenerate calls
 const runGenerateMock = vi.fn().mockResolvedValue(undefined)
@@ -41,8 +42,6 @@ vi.mock('../sharedHelpers', async () => ({
   ...(await vi.importActual('../sharedHelpers')),
   makeProgressToastController: () => ({ show: () => {}, hide: () => {} }),
 }))
-
-import GenerateForm from '../GenerateForm'
 
 describe('GenerateForm component', () => {
   beforeEach(() => {
