@@ -260,19 +260,6 @@ header {
   flex: 1 1 0;
   min-width: 0;
 }
-.fields-column label {
-  font-size: 13px;
-  /* Allow labels to wrap so long text doesn't overlap controls */
-  white-space: normal;
-  word-break: break-word;
-}
-
-/* Disabled label state when a single control is disabled */
-.fields-column label.is-disabled,
-.fields-grid label.is-disabled {
-  opacity: 0.5;
-  color: rgba(43, 31, 21, 0.5);
-}
 
 /* Wrapper used to group related controls without breaking the fields grid layout. */
 .control-group {
@@ -315,41 +302,6 @@ header {
   font-weight: 400;
   color: inherit;
 }
-.fields-column input[type='number'],
-.fields-column input[type='text'],
-.fields-column select {
-  padding: 5px 8px;
-  border-radius: 5px;
-  border: 1px solid rgba(107, 86, 63, 0.2);
-  background: rgba(255, 255, 255, 0.9);
-  color: #2b1f15;
-  font-size: 13px;
-  width: 100%;
-}
-.fields-column input[type='range'] {
-  padding: 0;
-  cursor: pointer;
-  /* Allow the range input to fill available space and shrink on small screens.
-     Don't enforce a minimum fixed width so it can adapt to container size. */
-  width: 100%;
-  max-width: none;
-  min-width: 0;
-}
-
-/* Limit the width of combo/select controls so they don't push into adjacent labels */
-.fields-column select,
-.fields-grid select,
-.font-combo-trigger {
-  max-width: 260px;
-}
-.fields-column input[type='color'] {
-  width: 100%;
-  height: 34px;
-  padding: 2px;
-  border-radius: 5px;
-  border: 1px solid rgba(107, 86, 63, 0.2);
-  background: rgba(255, 255, 255, 0.9);
-}
 .slider-value {
   margin-left: 8px;
   min-width: 44px;
@@ -381,9 +333,6 @@ header {
 
 /* If controls are in a narrow column, ensure the slider/value stay grouped and right-aligned */
 .concentric-options .slider-row,
-.fields-column .slider-row {
-  width: 100%;
-}
 .background-preview-panel {
   display: flex;
   flex-direction: column;
@@ -520,39 +469,6 @@ header {
   filter: saturate(0.7);
 }
 
-/* Responsive adjustments: stack label/control columns on narrow viewports
-   and allow sliders to fill the available width. */
-@media (max-width: 720px) {
-  .fields-grid,
-  .fields-column {
-    grid-template-columns: 1fr;
-  }
-
-  .fields-grid.two-col-layout {
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  .fields-column label,
-  .fields-grid label {
-    width: 100%;
-    min-width: 0;
-  }
-
-  .slider-row {
-    justify-content: space-between;
-  }
-
-  .slider-row input[type='range'] {
-    max-width: none;
-    min-width: 0;
-    margin-right: 8px;
-  }
-
-  .slider-row .slider-value {
-    flex: 0 0 auto;
-  }
-}
 .customize-section.is-disabled .section-fields--disabled,
 .customize-section.is-disabled .section-fields--disabled * {
   cursor: not-allowed;
@@ -905,105 +821,6 @@ header {
   }
   .settings-source-preview-row {
     grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 640px) {
-  .app-root {
-    padding: 10px;
-    margin: 12px auto;
-  }
-
-  .header-top-row {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .language-picker {
-    width: 100%;
-  }
-
-  .language-picker select {
-    width: 100%;
-  }
-
-  .content-card {
-    padding: 12px;
-  }
-
-  .generator-section {
-    padding: 12px 10px;
-  }
-
-  .customize-tabs {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 4px;
-  }
-
-  .customize-tab-button {
-    width: 100%;
-    min-height: 32px;
-    border-radius: 12px 12px 6px 6px;
-    text-align: center;
-    padding: 4px 2px;
-    font-size: 10px;
-    letter-spacing: 0;
-  }
-
-  .customize-section .section-actions {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 8px;
-    align-items: stretch;
-  }
-
-  .customize-section .section-actions button {
-    width: 100%;
-    min-height: 44px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    padding: 8px 6px;
-    line-height: 1.15;
-  }
-
-  .fields-column {
-    grid-template-columns: 1fr;
-    row-gap: 6px;
-  }
-
-  .fields-column > * {
-    min-width: 0;
-  }
-
-  .fields-column label {
-    white-space: normal;
-  }
-
-  .fields-grid.two-col-layout .fields-column label {
-    width: auto;
-    min-width: 0;
-  }
-
-  .fields-column input[type='number'],
-  .fields-column input[type='text'],
-  .fields-column input[type='range'],
-  .fields-column select,
-  .fields-column input[type='color'],
-  .background-preview-panel,
-  .background-preview-panel--full-row,
-  .background-preview-canvas {
-    max-width: 100%;
-  }
-
-  .checkbox-label {
-    width: 100%;
-  }
-
-  .upload-group input[type='file'] {
-    max-width: 100%;
   }
 }
 

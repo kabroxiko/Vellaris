@@ -321,7 +321,7 @@ export default function EffectsTab(props) {
               onChange={(e) => setFadeConcentricWaves(e.target.checked)}
               disabled={oceanWavesType !== concentricWaveValue}
             />
-            <span>{translateLabel('theme.fadeOuterWaves.label')}</span>
+            <span>{translateLabel('theme.fadeOuterWaves')}</span>
           </label>
 
           <label
@@ -333,7 +333,7 @@ export default function EffectsTab(props) {
               onChange={(e) => setJitterToConcentricWaves(e.target.checked)}
               disabled={oceanWavesType !== concentricWaveValue}
             />
-            <span>{translateLabel('theme.jitter.label')}</span>
+            <span>{translateLabel('theme.jitter')}</span>
           </label>
 
           <label
@@ -345,11 +345,11 @@ export default function EffectsTab(props) {
               onChange={(e) => setBrokenLinesForConcentricWaves(e.target.checked)}
               disabled={oceanWavesType !== concentricWaveValue}
             />
-            <span>{translateLabel('theme.brokenLines.label')}</span>
+            <span>{translateLabel('theme.brokenLines')}</span>
           </label>
         </div>
 
-        <label className="checkbox-label">
+        <label className="checkbox-label debug-ocean-lakes">
           <input
             type="checkbox"
             checked={drawOceanEffectsInLakes}

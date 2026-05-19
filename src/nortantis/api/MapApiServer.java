@@ -459,8 +459,9 @@ public class MapApiServer
 
 	private static void populateStandardOptions(Map<String, Object> options)
 	{
-		options.put("tabs", List.of(ApiUtils.option("background", tr("theme.tab.background")), ApiUtils.option("border", tr("theme.tab.border")), ApiUtils.option("effects", tr("theme.tab.effects")),
-			ApiUtils.option("fonts", tr("theme.tab.fonts"))));
+		// `tabs` UI metadata removed: front-end now uses static tab ids and
+		// reads labels from the translation bundle (e.g. `theme.tab.background`).
+		// Avoid returning `options.tabs` to prevent UI fallbacks based on server-provided ids.
 		options.put("dimensions", List.of(ApiUtils.option("Square", tr("GeneratedDimension.Square")), ApiUtils.option("Sixteen_by_9", tr("GeneratedDimension.Sixteen_by_9")),
 			ApiUtils.option("Golden_Ratio", tr("GeneratedDimension.Golden_Ratio"))));
 		options.put("landShapes", List.of(ApiUtils.option("Continents", tr("LandShape.Continents")), ApiUtils.option("Inland_Sea", tr("LandShape.Inland_Sea")), ApiUtils.option("Scattered", tr("LandShape.Scattered"))));

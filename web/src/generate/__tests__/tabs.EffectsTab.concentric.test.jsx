@@ -45,7 +45,7 @@ describe('EffectsTab concentric waves behavior', () => {
     const concentricCount = getByLabelText('theme.waveCount.label')
     expect(concentricCount.disabled).toBeFalsy()
 
-    const fadeCheckbox = getByLabelText('theme.fadeOuterWaves.label')
+    const fadeCheckbox = getByLabelText('theme.fadeOuterWaves')
     fireEvent.click(fadeCheckbox)
     expect(setters.setFadeConcentricWaves).toHaveBeenCalledWith(true)
   })

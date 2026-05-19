@@ -78,6 +78,58 @@ const modalContentStyle = {
   boxShadow: '0 6px 24px rgba(0,0,0,0.3)',
 }
 
+// Custom hook: manage background preview fetching logic extracted
+// from the main component to reduce cognitive complexity.
+function useAutoPreview(
+  previewTriggerKey,
+  previewFields,
+  textures,
+  currentSource,
+  setPreviewFromBlob,
+  clearPreview,
+  hasCustomizationSource
+) {
+  useEffect(() => {
+    const hasRandomPayloadSource = Boolean(
+      currentSource?.type === 'random' && currentSource?.payload
+    )
+
+    if (typeof globalThis !== 'undefined' && globalThis.__prefetchedBackgroundPreviewBlob) {
+      const blob = globalThis.__prefetchedBackgroundPreviewBlob
+      delete globalThis.__prefetchedBackgroundPreviewBlob
+      ;(async () => {
+        await setPreviewFromBlob(blob)
+      })()
+      return
+    }
+
+    if (!hasCustomizationSource && !hasRandomPayloadSource) {
+      clearPreview()
+      return
+    }
+
+    const controller = new AbortController()
+    let timerId = setTimeout(async () => {
+      if (controller.signal.aborted) return
+      const payload = buildPreviewPayload(previewFields, textures, currentSource)
+      const blob = await fetchPreviewBlob(payload, controller)
+      await setPreviewFromBlob(blob)
+    }, 100)
+
+    return () => {
+      clearTimeout(timerId)
+      controller.abort()
+    }
+  }, [
+    previewTriggerKey,
+    currentSource?.nortContent,
+    currentSource?.payload,
+    currentSource?.type,
+    // Intentionally not including `setPreviewFromBlob`/`clearPreview` as
+    // they are stable refs returned by the preview hook.
+  ])
+}
+
 function ColorPickerModal({ open, onClose, children }) {
   const innerRef = React.useRef(null)
   React.useEffect(() => {
@@ -140,7 +192,7 @@ export {
 export { pick, stripHtmlWrapper, removeTags }
 
 export default function CustomizeSettingsSection({ values, handlers, options, ui }) {
-  const [activeTab, setActiveTab] = useState('background')
+  const [activeTab, setActiveTab] = useState(null)
   const [openFontComboId, setOpenFontComboId] = useState(null)
   
 
@@ -439,7 +491,8 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
   const labels = i18n?.labels
   const backendOptions = i18n?.options
 
-  const tabs = backendOptions?.tabs
+  // `options.tabs` removed from backend response; labels come from `i18n.labels`.
+  // Do not read `backendOptions.tabs`.
   const landColoringMethods = backendOptions?.landColoringMethods
   const gridOverlayShapes = backendOptions?.gridOverlayShapes
   const gridOverlayOffsets = backendOptions?.gridOverlayOffsets
@@ -496,11 +549,7 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     ? oceanWaveTypes.find((o) => o?.value && /^(None|No|NoEffect|NoneWaves)$/i.test(o.value))?.value
     : undefined
   const translateLabel = (key) => {
-    const has = Object.hasOwn(labels ?? {}, key) && labels[key]
-    const txt = has ? labels[key] : null
-    const baseKey = !txt && key?.endsWith('.label') ? key.slice(0, -'.label'.length) : null
-    const alternate = baseKey && Object.hasOwn(labels ?? {}, baseKey) ? labels[baseKey] : null
-    const value = txt || alternate || key
+    const value = Object.hasOwn(labels ?? {}, key) && labels[key] ? labels[key] : key
     // If the translation contains literal <br> tags, return React nodes
     // Guard against extremely long inputs to avoid expensive regex operations
     if (typeof value === 'string' && value.length <= 2000 && /<br\s*\/?/i.test(value)) {
@@ -526,14 +575,27 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     return out
   }
 
-  // Ensure seed input fields do not display the literal label as their
-  // value on initial load. If the value equals the translated label,
-  // treat it as empty so the input appears blank.
-  const seedLabelFallback = translateLabel('theme.randomSeed.label')
+  const ALLOWED_TAB_IDS = new Set(['background', 'border', 'effects', 'fonts'])
+
+  const normalizeTabId = (raw) => {
+    if (!raw && raw !== 0) return ''
+    return String(raw).trim().toLowerCase()
+  }
+
+  // Static tab ids the UI expects (server may only supply labels by index).
+  const STATIC_TABS = ['background', 'border', 'effects', 'fonts']
+
+  // Initialize `activeTab`. Prefer an existing valid value; otherwise default
+  // to the first static tab. Re-evaluate when backendOptions change.
+  useEffect(() => {
+    if (activeTab && ALLOWED_TAB_IDS.has(normalizeTabId(activeTab))) return
+    setActiveTab(STATIC_TABS[0])
+  }, [backendOptions])
+
+  // Ensure seed input fields do not display empty/whitespace values.
   const sanitizeSeedValue = (v) => {
     if (!v) return ''
     if (typeof v === 'string' && v.trim() === '') return ''
-    if (v === seedLabelFallback) return ''
     return v
   }
   const sanitizeTranslation = (s) => {
@@ -677,60 +739,17 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     return Object.fromEntries(fontFields.map((field) => [field.id, field.onChange]))
   }, [fontFields])
 
-  useEffect(() => {
-    const hasRandomPayloadSource = Boolean(
-      currentSource?.type === 'random' && currentSource?.payload
-    )
-
-    // If a prefetch was performed on page load, use it and skip the
-    // immediate fetch. This lets the UI show a warm preview without
-    // waiting for the normal fetch cycle.
-    if (typeof globalThis !== 'undefined' && globalThis.__prefetchedBackgroundPreviewBlob) {
-      const blob = globalThis.__prefetchedBackgroundPreviewBlob
-      delete globalThis.__prefetchedBackgroundPreviewBlob
-      ;(async () => {
-        await setPreviewFromBlob(blob)
-      })()
-      return
-    }
-
-    // If there is no customization source available, there's nothing to
-    // preview. However, allow the panel's force-enable flag (used during
-    // development) to permit preview generation even when there's no
-    // `nortContent` source. Use `hasCustomizationSource` which respects the
-    // `FORCE_ENABLE_CUSTOMIZE` override.
-    if (!hasCustomizationSource && !hasRandomPayloadSource) {
-      clearPreview()
-      return
-    }
-
-    const controller = new AbortController()
-
-    // Defer the fetch to the next macrotask. This allows the parent's
-    // hydration effect (which runs synchronously after this effect) to update
-    // all background-related state before the request is built. If a second
-    // effect fires during that window (because hydration changed a dependency),
-    // the cleanup will cancel this timer before it executes, so only one
-    // request is sent with the fully-settled state.
-    let timerId = setTimeout(async () => {
-      if (controller.signal.aborted) return
-      const payload = buildPreviewPayload(previewFields, textures, currentSource)
-      const blob = await fetchPreviewBlob(payload, controller)
-      await setPreviewFromBlob(blob)
-    }, 100)
-
-    return () => {
-      clearTimeout(timerId)
-      controller.abort()
-    }
-  }, [
-    // Keep a single serialized key of all customization values so any change
-    // to the customization UI triggers the background-preview fetch.
+  // Offload background preview logic to a custom hook to keep this
+  // component's top-level complexity lower.
+  useAutoPreview(
     previewTriggerKey,
-    currentSource?.nortContent,
-    currentSource?.payload,
-    currentSource?.type,
-  ])
+    previewFields,
+    textures,
+    currentSource,
+    setPreviewFromBlob,
+    clearPreview,
+    hasCustomizationSource
+  )
 
   function renderColorControl({
     id,
@@ -742,7 +761,6 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     disabled,
     showState,
     setShowState,
-    swatchStyle,
     onClose,
     swatchReplacement,
   }) {
@@ -786,7 +804,6 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
                 cursor: disabled ? 'default' : 'pointer',
                 opacity: disabled ? 0.5 : 1,
                 pointerEvents: disabled ? 'none' : undefined,
-                ...swatchStyle,
               }}
             />
           )}
@@ -1145,6 +1162,23 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     'setShowBoldBackgroundPicker',
   ]
 
+  // Determine which tab index is active by matching normalized ids/labels.
+  const activePanel = (() => {
+    if (!activeTab) return null
+    switch (normalizeTabId(activeTab)) {
+      case 'background':
+        return <BackgroundTab {...pick(tabProps, backgroundKeys)} />
+      case 'border':
+        return <BorderTab {...pick(tabProps, borderKeys)} />
+      case 'effects':
+        return <EffectsTab {...pick(tabProps, effectsKeys)} />
+      case 'fonts':
+        return <FontsTab {...pick(tabProps, fontsKeys)} />
+      default:
+        return null
+    }
+  })()
+
   return (
     <section
       className={`generator-section customize-section${hasCustomizationSource ? '' : ' is-disabled'}`}
@@ -1183,34 +1217,33 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
 
         <fieldset className="customize-disabled-fieldset" disabled={!hasCustomizationSource}>
           <div className="customize-tabs" role="tablist" aria-label="Customization sections">
-            {Array.isArray(tabs)
-              ? tabs.map((tab, idx) => {
-                  let derivedId
-                  if (tab?.id) derivedId = String(tab.id)
-                  else if (tab?.label) derivedId = String(tab.label)
-                  else derivedId = `tab-${idx}`
-                  const normId = derivedId.toLowerCase()
-                  return (
-                    <button
-                      key={derivedId}
-                      type="button"
-                      role="tab"
-                      className={`customize-tab-button${activeTab === normId ? ' is-active' : ''}`}
-                      aria-selected={activeTab === normId}
-                      onClick={() => setActiveTab(normId)}
-                    >
-                      {tab?.label ? tab.label : `Tab ${idx + 1}`}
-                    </button>
-                  )
-                })
-              : null}
+            {STATIC_TABS.map((tabId) => {
+              const normId = normalizeTabId(tabId)
+              const label = translateLabel(`theme.tab.${tabId}`)
+              return (
+                <button
+                  key={normId}
+                  id={`customize-tab-${normId}`}
+                  type="button"
+                  role="tab"
+                  aria-controls={`customize-tabpanel-${normId}`}
+                  className={`customize-tab-button${activeTab === normId ? ' is-active' : ''}`}
+                  aria-selected={activeTab === normId}
+                  onClick={() => setActiveTab(normId)}
+                >
+                  {label}
+                </button>
+              )
+            })}
           </div>
 
-          <div className="customize-tab-panel" role="tabpanel">
-            {activeTab === 'background' && <BackgroundTab {...pick(tabProps, backgroundKeys)} />}
-            {activeTab === 'border' && <BorderTab {...pick(tabProps, borderKeys)} />}
-            {activeTab === 'effects' && <EffectsTab {...pick(tabProps, effectsKeys)} />}
-            {activeTab === 'fonts' && <FontsTab {...pick(tabProps, fontsKeys)} />}
+          <div
+            id={activeTab ? `customize-tabpanel-${activeTab}` : undefined}
+            className="customize-tab-panel"
+            role="tabpanel"
+            aria-labelledby={activeTab ? `customize-tab-${activeTab}` : undefined}
+          >
+            {activePanel}
           </div>
 
           <div className="section-actions">
