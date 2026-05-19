@@ -521,8 +521,6 @@ public class MapApiServer
 		}
 
 		options.put("fonts", filtered);
-		if (!filtered.isEmpty())
-			options.put("defaultFontFamily", filtered.get(0));
 	}
 
 	private static Map<String, String> loadLabels()

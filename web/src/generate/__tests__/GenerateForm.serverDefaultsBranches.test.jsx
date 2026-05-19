@@ -25,7 +25,6 @@ const uiOptsWithDefaults = {
     finalLandColoringMethods: [{ value: 'L1' }],
     lineStyles: [{ value: 'ls' }],
     fonts: ['F1'],
-    defaultFontFamily: 'F1',
     maxCityProbability: 100,
   },
 }

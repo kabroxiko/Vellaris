@@ -25,12 +25,6 @@ class MapApiServerEnumerateFontsTest
         Object fonts = options.get("fonts");
         assertNotNull(fonts);
         assertTrue(fonts instanceof java.util.List);
-        // If non-empty, defaultFontFamily should be set
-        if (!((java.util.List<?>) fonts).isEmpty())
-        {
-            assertTrue(options.containsKey("defaultFontFamily"));
-            assertNotNull(options.get("defaultFontFamily"));
-        }
     }
 
     @Test

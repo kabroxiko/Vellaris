@@ -608,7 +608,6 @@ function GenerateForm({ uiLanguage = 'en' }) {
       setBoolean(setDrawBoldBackground, defs.drawBoldBackground)
       setHex(setBoldBackgroundColorHex, defs.boldBackgroundColor)
       const backendDefaultFont =
-        opts?.defaultFontFamily ??
         (Array.isArray(opts?.fonts) && opts.fonts.length > 0 ? opts.fonts[0] : null)
       if (backendDefaultFont) {
         const fontSetters = [
@@ -879,8 +878,7 @@ function GenerateForm({ uiLanguage = 'en' }) {
     // default if available.
     const opts = uiI18n.options
     let backendDefaultFont = null
-    if (opts?.defaultFontFamily) backendDefaultFont = opts.defaultFontFamily
-    else if (Array.isArray(opts?.fonts) && opts.fonts.length > 0) backendDefaultFont = opts.fonts[0]
+    if (Array.isArray(opts?.fonts) && opts.fonts.length > 0) backendDefaultFont = opts.fonts[0]
     if (backendDefaultFont) {
       setTitleFontFamily(backendDefaultFont)
       setRegionFontFamily(backendDefaultFont)
