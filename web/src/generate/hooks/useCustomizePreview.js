@@ -79,7 +79,11 @@ export default function useCustomizePreview({ previewFields, textures, currentSo
       })
       return
     }
-    const processed = await composeMiniIslandFromBlobModule(lastBaseBlobRef.current, opts, previewFields)
+    const processed = await composeMiniIslandFromBlobModule(
+      lastBaseBlobRef.current,
+      opts,
+      previewFields
+    )
     const url = URL.createObjectURL(processed || lastBaseBlobRef.current)
     setBackgroundPreviewUrl((previous) => {
       if (previous) URL.revokeObjectURL(previous)
@@ -97,7 +101,9 @@ export default function useCustomizePreview({ previewFields, textures, currentSo
   useEffect(() => {
     // If there is no customization source available, there's nothing to preview.
     const hasCustomizationSource = Boolean(currentSource?.nortContent)
-    const hasRandomPayloadSource = Boolean(currentSource?.type === 'random' && currentSource?.payload)
+    const hasRandomPayloadSource = Boolean(
+      currentSource?.type === 'random' && currentSource?.payload
+    )
     if (!hasCustomizationSource && !hasRandomPayloadSource) {
       setBackgroundPreviewUrl((previous) => {
         if (previous) URL.revokeObjectURL(previous)
@@ -118,7 +124,13 @@ export default function useCustomizePreview({ previewFields, textures, currentSo
       clearTimeout(timerId)
       controller.abort()
     }
-  }, [previewTriggerKey, currentSource?.nortContent, currentSource?.payload, currentSource?.type, previewRefreshNonce])
+  }, [
+    previewTriggerKey,
+    currentSource?.nortContent,
+    currentSource?.payload,
+    currentSource?.type,
+    previewRefreshNonce,
+  ])
 
   useEffect(() => {
     return () => {

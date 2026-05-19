@@ -80,13 +80,18 @@ export default function useGenerate({
         if (!res.ok) await handleResponseError(res)
         const contentType = res.headers.get('content-type') || ''
         const bytes = await readResponseBytesWithProgress(res, () => {
-          toast.show(outputMode === 'nort-only' ? 'ui.toast.downloadingSettings' : 'ui.toast.downloadingMap')
+          toast.show(
+            outputMode === 'nort-only' ? 'ui.toast.downloadingSettings' : 'ui.toast.downloadingMap'
+          )
         })
         await processGenerateResponse(bytes, contentType, outputMode, baseName, source)
       } catch (err) {
         setError(err.message)
         try {
-          globalThis.showToast?.({ key: 'ui.toast.error', params: { msg: err.message } }, { type: 'error', duration: 6000 })
+          globalThis.showToast?.(
+            { key: 'ui.toast.error', params: { msg: err.message } },
+            { type: 'error', duration: 6000 }
+          )
         } catch (e) {
           console.warn('showToast failed', e)
         }

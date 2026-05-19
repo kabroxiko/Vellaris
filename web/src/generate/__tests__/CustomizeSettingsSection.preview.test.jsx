@@ -4,7 +4,7 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // Mock backgroundBaseCache before importing the component
-vi.mock('../backgroundBaseCache', () => { 
+vi.mock('../backgroundBaseCache', () => {
   const mget = vi.fn()
   const mpre = vi.fn()
   // expose to the test via globalThis for assertions

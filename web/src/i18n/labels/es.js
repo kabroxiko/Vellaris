@@ -9,7 +9,8 @@ const esLabels = {
   'ui.map.generated': 'Mapa generado',
   'ui.mapLanguage': 'Idioma del mapa',
   'ui.noSource': 'Primero establece un .nort o genera un mapa',
-  'ui.noSourceHint': 'Sube un archivo de configuracion o genera un mapa primero para habilitar los controles de personalizacion.',
+  'ui.noSourceHint':
+    'Sube un archivo de configuracion o genera un mapa primero para habilitar los controles de personalizacion.',
   'ui.preview.empty': 'Vista previa no disponible',
   'ui.preparing': 'Preparando ajustes del mapa...',
   'ui.preparingSettings': 'Preparando ajustes...',
@@ -21,7 +22,8 @@ const esLabels = {
   'ui.texture.noneAvailable': 'No hay texturas disponibles',
   'ui.title': 'Crear o cargar configuracion',
   'ui.title.customize': 'Personalizar mapa',
-  'ui.toast.cannotDownloadMergedSettings': 'No se pueden descargar los ajustes combinados. Abra el panel Personalizar y guarde los ajustes localmente primero.',
+  'ui.toast.cannotDownloadMergedSettings':
+    'No se pueden descargar los ajustes combinados. Abra el panel Personalizar y guarde los ajustes localmente primero.',
   'ui.toast.downloadingMap': 'Descargando mapa...',
   'ui.toast.downloadingSettings': 'Descargando ajustes...',
   'ui.toast.error': 'Error: {msg}',

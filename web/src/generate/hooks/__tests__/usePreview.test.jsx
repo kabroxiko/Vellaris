@@ -5,7 +5,7 @@ import { vi, expect, describe, it, beforeEach, afterEach } from 'vitest'
 // Mock helpers used by the hook before importing it
 vi.mock('../../sharedHelpers', () => ({
   deriveNortFilenameFromContent: (c) => 'derived-name',
-  sanitizeFilenameBase: (b, def) => (b || def),
+  sanitizeFilenameBase: (b, def) => b || def,
 }))
 
 import usePreview from '../usePreview'

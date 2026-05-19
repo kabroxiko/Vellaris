@@ -35,5 +35,12 @@ export default function useApplyMergedSettings({
     ap.applyTextSettings(settings)
 
     if (lastApplierRunRef) lastApplierRunRef.current = Date.now()
-  }, [currentSource?.nortContent, currentSource?.originType, tryParse, appliersRef, mergedSettingsRef, lastApplierRunRef])
+  }, [
+    currentSource?.nortContent,
+    currentSource?.originType,
+    tryParse,
+    appliersRef,
+    mergedSettingsRef,
+    lastApplierRunRef,
+  ])
 }

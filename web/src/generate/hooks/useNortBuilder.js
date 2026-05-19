@@ -52,7 +52,12 @@ export default function useNortBuilder(opts) {
       // Merge UI values into parsed settings using provided applier
       mergeUiIntoParsed(parsedSettings, opts)
 
-      updateSettingsWithDimensions(parsedSettings, opts.finalWidth, opts.finalHeight, opts.finalSeed)
+      updateSettingsWithDimensions(
+        parsedSettings,
+        opts.finalWidth,
+        opts.finalHeight,
+        opts.finalSeed
+      )
 
       if (mapLanguage) parsedSettings.language = mapLanguage
       serializeNortObject(parsedSettings)
@@ -65,14 +70,28 @@ export default function useNortBuilder(opts) {
         },
         baseName: (preview?.filename ?? 'generated-map.png').replace(/\.png$/, ''),
         source: {
-            type: currentSource.type,
-            name: currentSource.name,
-            nortContent: currentSource.nortContent,
-          },
+          type: currentSource.type,
+          name: currentSource.name,
+          nortContent: currentSource.nortContent,
+        },
       }
     },
-    [parseNortSettings, mergeUiIntoParsed, updateSettingsWithDimensions, serializeNortObject, preview, currentSource, mapLanguage, opts]
+    [
+      parseNortSettings,
+      mergeUiIntoParsed,
+      updateSettingsWithDimensions,
+      serializeNortObject,
+      preview,
+      currentSource,
+      mapLanguage,
+      opts,
+    ]
   )
 
-  return { buildNortContentRequest, parseNortSettings, cloneMergedSettings, updateSettingsWithDimensions }
+  return {
+    buildNortContentRequest,
+    parseNortSettings,
+    cloneMergedSettings,
+    updateSettingsWithDimensions,
+  }
 }

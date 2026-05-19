@@ -139,8 +139,9 @@ export async function prepareBitmapsModule(
   const useColorizeOcean =
     typeof opts?.colorizeOcean === 'boolean'
       ? opts.colorizeOcean
-      : previewFields?.colorizeOcean ?? defaults.colorizeOcean
-  const useOceanColorHex = opts?.oceanColorHex || previewFields?.oceanColorHex || defaults.oceanColorHex
+      : (previewFields?.colorizeOcean ?? defaults.colorizeOcean)
+  const useOceanColorHex =
+    opts?.oceanColorHex || previewFields?.oceanColorHex || defaults.oceanColorHex
   const SEPPIA_HEX = '#C8A082'
   if (useColorizeOcean && useOceanColorHex) {
     processed.displayBitmap = await colorizeBitmap(
@@ -158,7 +159,7 @@ export async function prepareBitmapsModule(
   const useColorizeLand =
     typeof opts?.colorizeLand === 'boolean'
       ? opts.colorizeLand
-      : previewFields?.colorizeLand ?? defaults.colorizeLand
+      : (previewFields?.colorizeLand ?? defaults.colorizeLand)
   const useLandColorHex = opts?.landColorHex || previewFields?.landColorHex || defaults.landColorHex
   if (useColorizeLand && useLandColorHex) {
     processed.landBitmap = await colorizeBitmap(
@@ -293,6 +294,7 @@ export function buildPreviewPayload(previewFields = {}, textures = [], currentSo
   }
   if (currentSource?.type === 'random' && currentSource?.payload)
     payload = { ...payload, ...currentSource.payload }
-  if (!payload.cityIconType && previewFields?.cityIconType) payload.cityIconType = previewFields.cityIconType
+  if (!payload.cityIconType && previewFields?.cityIconType)
+    payload.cityIconType = previewFields.cityIconType
   return payload
 }

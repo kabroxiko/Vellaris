@@ -3,16 +3,9 @@ import PropTypes from 'prop-types'
 import CustomizeSettingsSection from './CustomizeSettingsSection'
 import RandomSettingsSection from './RandomSettingsSection'
 import { base64ToBlob, colorToHex, parseColorChannels } from './utils'
-import {
-  selectCityIconType,
-  handleResponseError,
-  tryParseJson as tryParse,
-} from './helpers'
+import { selectCityIconType, handleResponseError, tryParseJson as tryParse } from './helpers'
 import { downloadNortContent } from './responseHandlers'
-import {
-  deriveNortFilenameFromContent,
-  makeProgressToastController,
-} from './sharedHelpers'
+import { deriveNortFilenameFromContent, makeProgressToastController } from './sharedHelpers'
 import useSettingsAppliers from './hooks/useSettingsAppliers'
 import { getFrontendLabels } from '../i18n/webLabels'
 import useGenerate from './hooks/useGenerate'
@@ -28,16 +21,11 @@ import {
 } from './GenerateForm.helpers'
 import useCustomizeSettings from './hooks/useCustomizeSettings'
 import useFileHandler from './hooks/useFileHandler'
-import useUiOptions, {
-  loadUiOptions,
-  loadCityIconTypes,
-} from './hooks/useUiOptions'
+import useUiOptions, { loadUiOptions, loadCityIconTypes } from './hooks/useUiOptions'
 import usePreview from './hooks/usePreview'
 import useDoRandomMap from './hooks/useDoRandomMap'
 import useRunGenerateFromSource from './hooks/useRunGenerateFromSource'
-import {
-  mergeColor,
-} from './GenerateForm.appliers'
+import { mergeColor } from './GenerateForm.appliers'
 import mergeUiIntoParsed from './mergeUiIntoParsed'
 import useNortBuilder from './hooks/useNortBuilder'
 import useApplyMergedSettings from './hooks/useApplyMergedSettings'
@@ -85,7 +73,11 @@ function GenerateForm({ uiLanguage = 'en' }) {
       requestLanguage,
       applyOptionDefaults: (opts, defs) => {
         if (!opts) return
-        if (!backgroundType && Array.isArray(opts.backgroundTypes) && opts.backgroundTypes.length > 0)
+        if (
+          !backgroundType &&
+          Array.isArray(opts.backgroundTypes) &&
+          opts.backgroundTypes.length > 0
+        )
           setBackgroundType(opts.backgroundTypes[0].value)
         if (
           !finalLandColoringMethod &&
@@ -286,7 +278,7 @@ function GenerateForm({ uiLanguage = 'en' }) {
   const [hasGeneratedOnce, setHasGeneratedOnce] = useState(false)
   const dropRef = useRef(null)
   const lastApplierRunRef = useRef(0)
-  
+
   const lastUiDefaultsRef = useRef(null)
   // In-memory canonical merged settings received from server (random/file/or generate)
   const mergedSettingsRef = useRef(null)
@@ -608,7 +600,7 @@ function GenerateForm({ uiLanguage = 'en' }) {
       setBoolean(setDrawBoldBackground, defs.drawBoldBackground)
       setHex(setBoldBackgroundColorHex, defs.boldBackgroundColor)
       const backendDefaultFont =
-        (Array.isArray(opts?.fonts) && opts.fonts.length > 0 ? opts.fonts[0] : null)
+        Array.isArray(opts?.fonts) && opts.fonts.length > 0 ? opts.fonts[0] : null
       if (backendDefaultFont) {
         const fontSetters = [
           [titleFontFamily, setTitleFontFamily],
@@ -737,7 +729,7 @@ function GenerateForm({ uiLanguage = 'en' }) {
       updateRandomOverride('regionCount', value)
     },
     [updateRandomOverride]
-  )  
+  )
 
   const { appliersRef } = useSettingsAppliers(
     {
@@ -1072,7 +1064,10 @@ function GenerateForm({ uiLanguage = 'en' }) {
     await doRandomMap(toast)
       .catch((err) => {
         setError(err.message)
-        globalThis.showToast?.({ key: 'ui.toast.error', params: { msg: err.message } }, { type: 'error', duration: 6000 })
+        globalThis.showToast?.(
+          { key: 'ui.toast.error', params: { msg: err.message } },
+          { type: 'error', duration: 6000 }
+        )
       })
       .finally(() => {
         setLoading(false)
@@ -1118,101 +1113,96 @@ function GenerateForm({ uiLanguage = 'en' }) {
   // Merge current UI theme/visual settings into a parsed settings object.
   // Implemented in mergeUiIntoParsed.js and called with a context object.
 
-  const { buildNortContentRequest } =
-    useNortBuilder({
-      mergedSettingsRef,
-      currentSource,
-      tryParse,
-      serializeNortObject,
-      mergeUiIntoParsed,
-      getGridOverlayAlpha,
-      getConcentricWaveCount,
-      updateSettingsWithDimensions: null,
-      preview,
-      mapLanguage,
-      // all UI values required by mergeUiIntoParsed are passed via GenerateForm when calling mergeUiIntoParsed
-      backgroundType,
-      setResourceFromRef,
-      borderRef,
-      textureRef,
-      backgroundSeed,
-      artPack,
-      worldSize,
-      landShape,
-      regionCount,
-      randomSeed,
-      selectedBooks,
-      regionBoundaryStyle,
-      regionBoundaryWidth,
-      regionBoundaryColorHex,
-      drawRegionBoundaries,
-      colorizeLand,
-      colorizeOcean,
-      oceanColorHex,
-      landColorHex,
-      drawGridOverlay,
-      gridOverlayShape,
-      gridOverlayRowOrColCount,
-      gridOverlayColorHex,
-      gridOverlayXOffset,
-      gridOverlayYOffset,
-      gridOverlayLineWidth,
-      gridOverlayLayer,
-      drawVoronoiGridOverlayOnlyOnLand,
-      resolveLandColoringMethod,
-      finalLandColoringMethod,
-      mergeColor,
-      borderWidth,
-      borderPosition,
-      borderColorOption,
-      borderColorHex,
-      frayedBorder,
-      frayedBorderBlurLevel,
-      frayedBorderSize,
-      frayedBorderSeed,
-      drawGrunge,
-      grungeWidth,
-      frayedBorderColorHex,
-      lineStyle,
-      coastlineWidth,
-      coastlineColorHex,
-      coastShadingLevel,
-      coastShadingColorHex,
-      coastShadingAlpha,
-      oceanShadingLevel,
-      oceanShadingColorHex,
-      oceanShadingAlpha,
-      oceanWavesType,
-      oceanWavesLevel,
-      fadeConcentricWaves,
-      jitterToConcentricWaves,
-      brokenLinesForConcentricWaves,
-      oceanWavesColorHex,
-      drawOceanEffectsInLakes,
-      riverColorHex,
-      parseBooleanWithDefault,
-      drawRoads,
-      roadStyle,
-      roadWidth,
-      roadColorHex,
-      mountainSize,
-      hillSize,
-      duneSize,
-      treeHeight,
-      citySize,
-      scaleSliderValue,
-      drawText,
-      textColorHex,
-      drawBoldBackground,
-      boldBackgroundColorHex,
-      finalWidth,
-      finalHeight,
-      finalSeed,
-    })
-
-  
-
-  
+  const { buildNortContentRequest } = useNortBuilder({
+    mergedSettingsRef,
+    currentSource,
+    tryParse,
+    serializeNortObject,
+    mergeUiIntoParsed,
+    getGridOverlayAlpha,
+    getConcentricWaveCount,
+    updateSettingsWithDimensions: null,
+    preview,
+    mapLanguage,
+    // all UI values required by mergeUiIntoParsed are passed via GenerateForm when calling mergeUiIntoParsed
+    backgroundType,
+    setResourceFromRef,
+    borderRef,
+    textureRef,
+    backgroundSeed,
+    artPack,
+    worldSize,
+    landShape,
+    regionCount,
+    randomSeed,
+    selectedBooks,
+    regionBoundaryStyle,
+    regionBoundaryWidth,
+    regionBoundaryColorHex,
+    drawRegionBoundaries,
+    colorizeLand,
+    colorizeOcean,
+    oceanColorHex,
+    landColorHex,
+    drawGridOverlay,
+    gridOverlayShape,
+    gridOverlayRowOrColCount,
+    gridOverlayColorHex,
+    gridOverlayXOffset,
+    gridOverlayYOffset,
+    gridOverlayLineWidth,
+    gridOverlayLayer,
+    drawVoronoiGridOverlayOnlyOnLand,
+    resolveLandColoringMethod,
+    finalLandColoringMethod,
+    mergeColor,
+    borderWidth,
+    borderPosition,
+    borderColorOption,
+    borderColorHex,
+    frayedBorder,
+    frayedBorderBlurLevel,
+    frayedBorderSize,
+    frayedBorderSeed,
+    drawGrunge,
+    grungeWidth,
+    frayedBorderColorHex,
+    lineStyle,
+    coastlineWidth,
+    coastlineColorHex,
+    coastShadingLevel,
+    coastShadingColorHex,
+    coastShadingAlpha,
+    oceanShadingLevel,
+    oceanShadingColorHex,
+    oceanShadingAlpha,
+    oceanWavesType,
+    oceanWavesLevel,
+    fadeConcentricWaves,
+    jitterToConcentricWaves,
+    brokenLinesForConcentricWaves,
+    oceanWavesColorHex,
+    drawOceanEffectsInLakes,
+    riverColorHex,
+    parseBooleanWithDefault,
+    drawRoads,
+    roadStyle,
+    roadWidth,
+    roadColorHex,
+    mountainSize,
+    hillSize,
+    duneSize,
+    treeHeight,
+    citySize,
+    scaleSliderValue,
+    drawText,
+    textColorHex,
+    drawBoldBackground,
+    boldBackgroundColorHex,
+    finalWidth,
+    finalHeight,
+    finalSeed,
+  })
 
   async function handleGenerateFromSettings(evt) {
     evt.preventDefault()
@@ -1222,16 +1212,13 @@ function GenerateForm({ uiLanguage = 'en' }) {
   async function handleGenerateAndSaveNort(evt) {
     evt.preventDefault()
     // Build merged settings from current UI state and download that
-    let result
-    try {
-      result = buildNortContentRequest()
-    } catch (err) {
-      globalThis.showToast?.('ui.toast.cannotDownloadMergedSettings', { type: 'warning', duration: 6000 })
-      return
-    }
+    const result = buildNortContentRequest()
     const body = result.requestOptions?.body
     if (!body) {
-      globalThis.showToast?.('ui.toast.cannotDownloadMergedSettings', { type: 'warning', duration: 6000 })
+      globalThis.showToast?.('ui.toast.cannotDownloadMergedSettings', {
+        type: 'warning',
+        duration: 6000,
+      })
       return
     }
 
@@ -1241,7 +1228,10 @@ function GenerateForm({ uiLanguage = 'en' }) {
       // Body is a raw .nort JSON (no wrapper).
       const parsed = tryParse(body)
       if (!parsed) {
-        globalThis.showToast?.('ui.toast.cannotDownloadMergedSettings', { type: 'warning', duration: 6000 })
+        globalThis.showToast?.('ui.toast.cannotDownloadMergedSettings', {
+          type: 'warning',
+          duration: 6000,
+        })
         return
       }
       serialized = serializeNortObject(parsed)
@@ -1258,7 +1248,10 @@ function GenerateForm({ uiLanguage = 'en' }) {
         }
         serialized = await nf.text()
       } else {
-        globalThis.showToast?.('ui.toast.cannotDownloadMergedSettings', { type: 'warning', duration: 6000 })
+        globalThis.showToast?.('ui.toast.cannotDownloadMergedSettings', {
+          type: 'warning',
+          duration: 6000,
+        })
         return
       }
     } else {

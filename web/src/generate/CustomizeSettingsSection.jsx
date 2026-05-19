@@ -6,15 +6,11 @@ import BorderTab from './tabs/BorderTab'
 import EffectsTab from './tabs/EffectsTab'
 import FontsTab from './tabs/FontsTab'
 import { hexToRgba, rgbaToHex } from './sharedHelpers'
-import {
-  fetchPreviewBlob,
-  buildPreviewPayload,
-} from './CustomizePreviewHelpers'
+import { fetchPreviewBlob, buildPreviewPayload } from './CustomizePreviewHelpers'
 import useCustomizePreview from './hooks/useCustomizePreview'
 import backgroundBaseCache from './backgroundBaseCache'
 
 const API_BASE = import.meta.env.VITE_API_BASE || '/api'
-
 
 // Utility: strip optional surrounding <html>...</html> wrapper (linear scan)
 function stripHtmlWrapper(str) {
@@ -179,7 +175,11 @@ ColorPickerModal.propTypes = {
 export { modalBackdropStyle, modalContentStyle, ColorPickerModal }
 
 // Re-export payload/preview helpers from the dedicated module for tests and compatibility
-export { pickDefaultTexture, resolveRawTextureRef, buildPreviewPayload } from './CustomizePreviewHelpers'
+export {
+  pickDefaultTexture,
+  resolveRawTextureRef,
+  buildPreviewPayload,
+} from './CustomizePreviewHelpers'
 export {
   colorizeBitmap,
   makeCanvasForBitmap,
@@ -194,7 +194,6 @@ export { pick, stripHtmlWrapper, removeTags }
 export default function CustomizeSettingsSection({ values, handlers, options, ui }) {
   const [activeTab, setActiveTab] = useState(null)
   const [openFontComboId, setOpenFontComboId] = useState(null)
-  
 
   const FORCE_ENABLE_CUSTOMIZE = true
 
@@ -385,8 +384,6 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     // Let errors propagate; caller will observe failures. Trigger preview refresh afterwards.
     triggerPreviewRefresh()
   }
-
-  
 
   // Use a filtered preview key so color toggles/values do not trigger the background preview.
   const previewTriggerKey = useMemo(() => {
@@ -660,9 +657,11 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
   // Regenerate should remain enabled so users can apply manual changes.
   const canSubmit = !loading && hasCustomizationSource
   // Downloads must be disabled if the user manually edited controls after
-  // a prior generation until a new map is generated.
+  // a prior generation until a new map is generated. Also disable download
+  // when there is no generated map available (and no loaded .nort/file).
+  const hasConcreteSource = Boolean(fileObj || currentSource?.nortContent || hasGeneratedOnce)
   const canDownloadSettings =
-    !loading && hasCustomizationSource && !(customizationDirty && hasGeneratedOnce)
+    !loading && hasCustomizationSource && hasConcreteSource && !(customizationDirty && hasGeneratedOnce)
   const canDownloadMap =
     !loading &&
     hasCustomizationSource &&

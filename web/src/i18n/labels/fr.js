@@ -8,7 +8,8 @@ const frLabels = {
   'ui.map.generated': 'Carte générée',
   'ui.mapLanguage': 'Langue de la carte',
   'ui.noSource': "Définissez d'abord .nort ou générez une carte",
-  'ui.noSourceHint': "Chargez un fichier de paramètres ou générez une carte d'abord pour activer les contrôles de personnalisation.",
+  'ui.noSourceHint':
+    "Chargez un fichier de paramètres ou générez une carte d'abord pour activer les contrôles de personnalisation.",
   'ui.preview.empty': 'Aperçu non disponible',
   'ui.preparing': 'Préparation des paramètres de la carte...',
   'ui.preparingSettings': 'Préparation des paramètres...',
@@ -20,7 +21,8 @@ const frLabels = {
   'ui.texture.noneAvailable': 'Aucune texture disponible',
   'ui.title': 'Créer ou charger les paramètres',
   'ui.title.customize': 'Personnaliser la carte',
-  'ui.toast.cannotDownloadMergedSettings': 'Impossible de télécharger les paramètres fusionnés. Ouvrez le panneau Personnaliser et enregistrez les paramètres localement d’abord.',
+  'ui.toast.cannotDownloadMergedSettings':
+    'Impossible de télécharger les paramètres fusionnés. Ouvrez le panneau Personnaliser et enregistrez les paramètres localement d’abord.',
   'ui.toast.downloadingMap': 'Téléchargement de la carte...',
   'ui.toast.downloadingSettings': 'Téléchargement des paramètres...',
   'ui.toast.error': 'Erreur : {msg}',

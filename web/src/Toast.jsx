@@ -49,7 +49,8 @@ export function ToastContainer() {
       // Resolve localized message strictly from localized bundle
       let resolvedMessage = null
       try {
-        const localized = (typeof globalThis !== 'undefined' && globalThis.__localizedFrontendLabels) || {}
+        const localized =
+          (typeof globalThis !== 'undefined' && globalThis.__localizedFrontendLabels) || {}
         if (typeof messageOrKey === 'string') {
           const key = messageOrKey
           resolvedMessage = localized[key]
@@ -77,7 +78,15 @@ export function ToastContainer() {
 
       const id = makeId()
       const now = Date.now()
-      const toast = { id, message: resolvedMessage, type, duration, dismissible, working, createdAt: now }
+      const toast = {
+        id,
+        message: resolvedMessage,
+        type,
+        duration,
+        dismissible,
+        working,
+        createdAt: now,
+      }
       addToast(toast)
 
       if (duration > 0) {

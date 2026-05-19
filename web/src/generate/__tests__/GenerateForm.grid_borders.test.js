@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest'
-import { applyGridAndColoringHoisted, applyBordersFrayedAndGrungeHoisted } from '../GenerateForm.appliers'
+import {
+  applyGridAndColoringHoisted,
+  applyBordersFrayedAndGrungeHoisted,
+} from '../GenerateForm.appliers'
 
 describe('GenerateForm grid/coloring and borders/fray appliers', () => {
   it('applyGridAndColoringHoisted maps grid size and color options', () => {

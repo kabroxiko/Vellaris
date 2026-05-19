@@ -2,7 +2,14 @@ import { useState, useCallback, useEffect } from 'react'
 import { deriveNortFilenameFromContent, sanitizeFilenameBase } from '../sharedHelpers'
 import { tryParseJson as tryParse } from '../helpers'
 
-export default function usePreview({ mergedSettingsRef, setCurrentSource, setHasGeneratedOnce, setCustomizationDirty, setFileName, labels }) {
+export default function usePreview({
+  mergedSettingsRef,
+  setCurrentSource,
+  setHasGeneratedOnce,
+  setCustomizationDirty,
+  setFileName,
+  labels,
+}) {
   const [preview, setPreview] = useState(null)
 
   const handleSuccess = useCallback(
@@ -20,9 +27,7 @@ export default function usePreview({ mergedSettingsRef, setCurrentSource, setHas
           url,
           filename,
           sourceLabel:
-            source?.type === 'random'
-              ? 'Random Map'
-              : (source?.name ?? 'Generated from Settings'),
+            source?.type === 'random' ? 'Random Map' : (source?.name ?? 'Generated from Settings'),
         }
       })
 

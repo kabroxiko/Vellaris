@@ -20,7 +20,8 @@ const zhLabels = {
   'ui.texture.noneAvailable': '没有可用的纹理',
   'ui.title': '创建或加载设置',
   'ui.title.customize': '自定义地图',
-  'ui.toast.cannotDownloadMergedSettings': '无法下载合并的设置。请打开“自定义”面板并先将设置保存到本地。',
+  'ui.toast.cannotDownloadMergedSettings':
+    '无法下载合并的设置。请打开“自定义”面板并先将设置保存到本地。',
   'ui.toast.downloadingMap': '正在下载地图...',
   'ui.toast.downloadingSettings': '正在下载设置...',
   'ui.toast.error': '错误：{msg}',

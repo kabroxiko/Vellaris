@@ -9,7 +9,8 @@ const enLabels = {
   'ui.map.generated': 'Map generated',
   'ui.mapLanguage': 'Map language',
   'ui.noSource': 'Set .nort or generate map first',
-  'ui.noSourceHint': 'Upload a settings file or generate a map first to enable customization controls.',
+  'ui.noSourceHint':
+    'Upload a settings file or generate a map first to enable customization controls.',
   'ui.preview.empty': 'No preview available',
   'ui.preparing': 'Preparing map settings...',
   'ui.preparingSettings': 'Preparing settings...',
@@ -21,7 +22,8 @@ const enLabels = {
   'ui.texture.noneAvailable': 'No textures available',
   'ui.title': 'Create or Load Settings',
   'ui.title.customize': 'Customize Map',
-  'ui.toast.cannotDownloadMergedSettings': 'Cannot download merged settings. Open the Customize panel and save settings locally first.',
+  'ui.toast.cannotDownloadMergedSettings':
+    'Cannot download merged settings. Open the Customize panel and save settings locally first.',
   'ui.toast.downloadingMap': 'Downloading map...',
   'ui.toast.downloadingSettings': 'Downloading settings...',
   'ui.toast.error': 'Error: {msg}',

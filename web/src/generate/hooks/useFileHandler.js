@@ -14,8 +14,7 @@ export default function useFileHandler({
       setFileName(f.name)
       setFileObj(f)
       setCurrentSource({ type: 'nort', name: f.name })
-      f
-        .text()
+      f.text()
         .then(async (text) => {
           const source = { type: 'nort-content', name: f.name, nortContent: text }
           setCurrentSource(source)
@@ -44,9 +43,12 @@ export default function useFileHandler({
     [requestLanguage, runGenerate, setFileName, setFileObj, setCurrentSource, tryParse]
   )
 
-  const handleFileInput = useCallback((e) => {
-    handleFile(e.target.files?.[0])
-  }, [handleFile])
+  const handleFileInput = useCallback(
+    (e) => {
+      handleFile(e.target.files?.[0])
+    },
+    [handleFile]
+  )
 
   const onDrop = useCallback(
     (e) => {

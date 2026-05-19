@@ -1,6 +1,13 @@
 import { useCallback } from 'react'
 
-export default function useRunGenerateFromSource({ fileObj, currentSource, buildNortContentRequest, runGenerate, setError, setLoading }) {
+export default function useRunGenerateFromSource({
+  fileObj,
+  currentSource,
+  buildNortContentRequest,
+  runGenerate,
+  setError,
+  setLoading,
+}) {
   const runGenerateFromCurrentSource = useCallback(
     async (requestBehavior = null, outputMode = 'preview') => {
       const effectiveRequestBehavior = requestBehavior ?? {}
@@ -9,7 +16,10 @@ export default function useRunGenerateFromSource({ fileObj, currentSource, build
       try {
         if (fileObj) {
           const text = await fileObj.text()
-          result = buildNortContentRequest({ ...effectiveRequestBehavior, explicitNortContent: text })
+          result = buildNortContentRequest({
+            ...effectiveRequestBehavior,
+            explicitNortContent: text,
+          })
         } else if (currentSource?.nortContent) {
           result = buildNortContentRequest(effectiveRequestBehavior)
         } else {
@@ -18,7 +28,10 @@ export default function useRunGenerateFromSource({ fileObj, currentSource, build
       } catch (err) {
         const message = err?.message ?? 'Failed to prepare map request.'
         setError(message)
-        globalThis.showToast?.({ key: 'ui.toast.error', params: { msg: message } }, { type: 'error', duration: 6000 })
+        globalThis.showToast?.(
+          { key: 'ui.toast.error', params: { msg: message } },
+          { type: 'error', duration: 6000 }
+        )
         return
       }
 

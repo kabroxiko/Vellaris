@@ -30,12 +30,8 @@ export default function useCustomizeSettings(initialCustomize = {}) {
   const [gridOverlayColorHex, setGridOverlayColorHex] = useState(
     initialCustomize.gridOverlayColorHex
   )
-  const [gridOverlayXOffset, setGridOverlayXOffset] = useState(
-    initialCustomize.gridOverlayXOffset
-  )
-  const [gridOverlayYOffset, setGridOverlayYOffset] = useState(
-    initialCustomize.gridOverlayYOffset
-  )
+  const [gridOverlayXOffset, setGridOverlayXOffset] = useState(initialCustomize.gridOverlayXOffset)
+  const [gridOverlayYOffset, setGridOverlayYOffset] = useState(initialCustomize.gridOverlayYOffset)
   const [gridOverlayLineWidth, setGridOverlayLineWidth] = useState(
     initialCustomize.gridOverlayLineWidth
   )

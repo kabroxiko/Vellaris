@@ -1,6 +1,10 @@
 import { expect } from 'chai'
 
-import { applyGridAndColoringHoisted, applyBordersFrayedAndGrungeHoisted, applyCoastOceanAndWavesHoisted } from '../GenerateForm.appliers'
+import {
+  applyGridAndColoringHoisted,
+  applyBordersFrayedAndGrungeHoisted,
+  applyCoastOceanAndWavesHoisted,
+} from '../GenerateForm.appliers'
 
 describe('GenerateForm appliers (grid, borders, coast/ocean)', () => {
   it('applyGridAndColoringHoisted sets region boundary and grid values', () => {

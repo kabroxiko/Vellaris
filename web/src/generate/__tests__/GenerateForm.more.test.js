@@ -1,11 +1,18 @@
 import { expect } from 'chai'
 
-import { applyBackgroundFlagsHoisted, applyResourcesAndTopLevelHoisted, applyRoadsAndScalesHoisted, applyTextAndBackgroundHoisted } from '../GenerateForm.appliers'
-import { setResourceFromRef,
-scaleSliderValue,
-buildCustomizePayload,
-persistCustomizeOverrides,
-parseBooleanWithDefault } from '../GenerateForm.helpers'
+import {
+  applyBackgroundFlagsHoisted,
+  applyResourcesAndTopLevelHoisted,
+  applyRoadsAndScalesHoisted,
+  applyTextAndBackgroundHoisted,
+} from '../GenerateForm.appliers'
+import {
+  setResourceFromRef,
+  scaleSliderValue,
+  buildCustomizePayload,
+  persistCustomizeOverrides,
+  parseBooleanWithDefault,
+} from '../GenerateForm.helpers'
 
 describe('GenerateForm hoisted helpers (additional)', () => {
   it('applyBackgroundFlagsHoisted sets flags for SolidColor', () => {

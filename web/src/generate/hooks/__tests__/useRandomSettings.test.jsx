@@ -16,7 +16,14 @@ function TestComponent({ initial }) {
       handleSelectedBooksChange: hook.handleSelectedBooksChange,
       booksLoadedRef: hook.booksLoadedRef,
     }
-  }, [hook.randomOverrides, hook.setRandomOverrides, hook.updateRandomOverride, hook.makeRandomHandler, hook.handleSelectedBooksChange, hook.booksLoadedRef])
+  }, [
+    hook.randomOverrides,
+    hook.setRandomOverrides,
+    hook.updateRandomOverride,
+    hook.makeRandomHandler,
+    hook.handleSelectedBooksChange,
+    hook.booksLoadedRef,
+  ])
 
   return null
 }
@@ -86,7 +93,11 @@ describe('useRandomSettings hook', () => {
 
   it('logs a warning when localStorage.setItem throws during persistence', async () => {
     // mock localStorage to throw
-    globalThis.localStorage = { setItem: vi.fn(() => { throw new Error('no storage') }) }
+    globalThis.localStorage = {
+      setItem: vi.fn(() => {
+        throw new Error('no storage')
+      }),
+    }
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
 
     render(<TestComponent initial={{}} />)

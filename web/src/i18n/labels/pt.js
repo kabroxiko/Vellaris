@@ -8,7 +8,8 @@ const ptLabels = {
   'ui.map.generated': 'Mapa gerado',
   'ui.mapLanguage': 'Idioma do mapa',
   'ui.noSource': 'Defina primeiro .nort ou gere um mapa',
-  'ui.noSourceHint': 'Carregue um arquivo de configuração ou gere um mapa primeiro para ativar os controles de personalização.',
+  'ui.noSourceHint':
+    'Carregue um arquivo de configuração ou gere um mapa primeiro para ativar os controles de personalização.',
   'ui.preview.empty': 'Nenhuma pré-visualização disponível',
   'ui.preparing': 'Preparando configurações do mapa...',
   'ui.preparingSettings': 'Preparando configurações...',
@@ -20,7 +21,8 @@ const ptLabels = {
   'ui.texture.noneAvailable': 'Nenhuma textura disponível',
   'ui.title': 'Criar ou carregar configurações',
   'ui.title.customize': 'Personalizar mapa',
-  'ui.toast.cannotDownloadMergedSettings': 'Não é possível baixar as configurações mescladas. Abra o painel Personalizar e salve as configurações localmente primeiro.',
+  'ui.toast.cannotDownloadMergedSettings':
+    'Não é possível baixar as configurações mescladas. Abra o painel Personalizar e salve as configurações localmente primeiro.',
   'ui.toast.downloadingMap': 'Baixando mapa...',
   'ui.toast.downloadingSettings': 'Baixando configurações...',
   'ui.toast.error': 'Erro: {msg}',

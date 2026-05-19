@@ -1,7 +1,14 @@
 import { useCallback } from 'react'
 import { makeProgressToastController } from '../sharedHelpers'
 
-export default function useDoRandomMap({ buildRandomCfg, fetchResolvedNort, applyReturnedSettingsToUi, generateFromNortContent, uiI18n, runGenerate }) {
+export default function useDoRandomMap({
+  buildRandomCfg,
+  fetchResolvedNort,
+  applyReturnedSettingsToUi,
+  generateFromNortContent,
+  uiI18n,
+  runGenerate,
+}) {
   const doRandomMap = useCallback(
     async (toast = null) => {
       const localToast = toast ?? makeProgressToastController()
@@ -15,7 +22,14 @@ export default function useDoRandomMap({ buildRandomCfg, fetchResolvedNort, appl
         // caller will hide toast if it created one
       }
     },
-    [buildRandomCfg, fetchResolvedNort, applyReturnedSettingsToUi, generateFromNortContent, uiI18n, runGenerate]
+    [
+      buildRandomCfg,
+      fetchResolvedNort,
+      applyReturnedSettingsToUi,
+      generateFromNortContent,
+      uiI18n,
+      runGenerate,
+    ]
   )
 
   return { doRandomMap }

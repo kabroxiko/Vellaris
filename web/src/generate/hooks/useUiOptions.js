@@ -52,18 +52,21 @@ export default function useUiOptions() {
 
   // Initialize UI from server-provided options. Caller may pass callbacks
   // to handle side-effects such as selecting books or loading city icon types.
-  async function initializeUiForLanguage(lang, {
-    initialRandomOverrides = {},
-    setSelectedBooks,
-    booksLoadedRef,
-    setArtPack,
-    artPack,
-    cityIconType,
-    handleCityIconTypesLoaded,
-    requestLanguage,
-    applyOptionDefaults,
-    lastUiDefaultsRef,
-  } = {}) {
+  async function initializeUiForLanguage(
+    lang,
+    {
+      initialRandomOverrides = {},
+      setSelectedBooks,
+      booksLoadedRef,
+      setArtPack,
+      artPack,
+      cityIconType,
+      handleCityIconTypesLoaded,
+      requestLanguage,
+      applyOptionDefaults,
+      lastUiDefaultsRef,
+    } = {}
+  ) {
     const uiOpts = await loadUiOptions(lang)
     if (!uiOpts) return null
 
@@ -86,7 +89,8 @@ export default function useUiOptions() {
     populateCityIconTypes(uiOpts.cityIconTypesByPack)
 
     // choose art pack and load city icon types
-    const firstArtPack = Array.isArray(uiOpts.artPacks) && uiOpts.artPacks.length > 0 ? uiOpts.artPacks[0] : null
+    const firstArtPack =
+      Array.isArray(uiOpts.artPacks) && uiOpts.artPacks.length > 0 ? uiOpts.artPacks[0] : null
     const chosenPack = artPack ?? firstArtPack ?? 'nortantis'
     if (!artPack && firstArtPack && setArtPack) setArtPack(firstArtPack)
     const types = await loadCityIconTypes(chosenPack)

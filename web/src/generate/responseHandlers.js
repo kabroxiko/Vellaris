@@ -90,14 +90,20 @@ function requireJson() {
 }
 
 async function showFailureToast(err) {
-    try {
-      globalThis.showToast?.({ key: 'ui.toast.error', params: { msg: err?.message || 'Generate response processing failed' } }, {
+  try {
+    globalThis.showToast?.(
+      {
+        key: 'ui.toast.error',
+        params: { msg: err?.message || 'Generate response processing failed' },
+      },
+      {
         type: 'error',
         duration: 5000,
-      })
-    } catch (error_) {
-      console.error('showToast failed', error_)
-    }
+      }
+    )
+  } catch (error_) {
+    console.error('showToast failed', error_)
+  }
 }
 
 export async function processGenerateResponse(bytes, contentType, options) {
@@ -125,10 +131,13 @@ export async function processGenerateResponse(bytes, contentType, options) {
       downloadNortContent(data.nortContent, baseName)
     } catch (err) {
       try {
-        globalThis.showToast?.({ key: 'ui.toast.error', params: { msg: err?.message || 'Failed to download settings' } }, {
-          type: 'error',
-          duration: 5000,
-        })
+        globalThis.showToast?.(
+          { key: 'ui.toast.error', params: { msg: err?.message || 'Failed to download settings' } },
+          {
+            type: 'error',
+            duration: 5000,
+          }
+        )
       } catch (showErr) {
         console.error('showToast failed', showErr)
       }

@@ -31,7 +31,11 @@ export default function FontsTab(props) {
     <div className="fields-grid two-col-layout customize-fonts-panel">
       <div className="fields-column">
         <label className="checkbox-label">
-          <input type="checkbox" checked={drawText} onChange={(e) => setDrawText(e.target.checked)} />
+          <input
+            type="checkbox"
+            checked={drawText}
+            onChange={(e) => setDrawText(e.target.checked)}
+          />
           <span>{translateLabel('theme.enableText')}</span>
         </label>
 
@@ -105,7 +109,9 @@ export default function FontsTab(props) {
 
           <div
             className={`control-group${drawText && drawBoldBackground ? '' : ' is-disabled'}`}
-            style={drawText && drawBoldBackground ? undefined : { opacity: 0.5, pointerEvents: 'none' }}
+            style={
+              drawText && drawBoldBackground ? undefined : { opacity: 0.5, pointerEvents: 'none' }
+            }
           >
             {renderColorControl({
               id: 'bold-background-color',
