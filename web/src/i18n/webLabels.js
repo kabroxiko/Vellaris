@@ -8,9 +8,17 @@ export async function getFrontendLabels(language) {
   // Only allow known two-letter language codes to avoid unsafe dynamic import paths
   const allowed = new Set(['en', 'de', 'es', 'fr', 'pt', 'ru', 'zh'])
   const safeCode = allowed.has(code) ? code : 'en'
-  if (safeCode === 'en') return { ...enLabels }
+  // Load localized bundle (no fallback merge for the localized store used by toasts)
+  if (safeCode === 'en') {
+    // also expose localized labels for strict i18n consumers
+    if (typeof globalThis !== 'undefined') globalThis.__localizedFrontendLabels = { ...enLabels }
+    return { ...enLabels }
+  }
 
   const module = await import(/* @vite-ignore */ `./labels/${safeCode}.js`)
   const localized = module?.default ?? {}
+  // expose the localized-only labels for consumers that must not fallback
+  if (typeof globalThis !== 'undefined') globalThis.__localizedFrontendLabels = { ...localized }
+  // keep returning merged labels for existing UI code to avoid breaking behavior
   return { ...enLabels, ...localized }
 }

@@ -43,9 +43,8 @@ export default function usePreview({ mergedSettingsRef, setCurrentSource, setHas
         })
       }
 
-      // Use i18n label when available
-      const genMsg = (labels && labels['ui.map.generated']) || 'Map generated'
-      globalThis.showToast?.(genMsg, { type: 'success', duration: 3000 })
+      // Use i18n key for success toast (will resolve without fallback)
+      globalThis.showToast?.('ui.map.generated', { type: 'success', duration: 3000 })
       setHasGeneratedOnce(true)
       setCustomizationDirty(false)
     },
@@ -64,9 +63,8 @@ export default function usePreview({ mergedSettingsRef, setCurrentSource, setHas
     anchor.download = preview.filename ?? 'vellaris-map.png'
     document.body.appendChild(anchor)
     anchor.click()
-    // Notify user that download started (success = green bordered) using i18n when available
-    const dlMsg = (labels && labels['ui.button.downloadMap']) || 'Map download started'
-    globalThis.showToast?.(dlMsg, { type: 'success', duration: 2000 })
+    // Notify user that download completed using i18n key
+    globalThis.showToast?.('ui.toast.mapDownloaded', { type: 'success', duration: 2000 })
     anchor.remove()
   }, [preview])
 

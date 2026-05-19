@@ -220,11 +220,11 @@ export function deriveNortFilenameFromContent(nortContent) {
 
 export function makeProgressToastController() {
   let progressToastId = null
-  const show = (message) => {
+  const show = (keyOrObj) => {
     try {
       if (progressToastId) globalThis.hideToast?.(progressToastId)
       progressToastId =
-        globalThis.showToast?.(message, {
+        globalThis.showToast?.(keyOrObj, {
           type: 'info',
           duration: 0,
           dismissible: false,

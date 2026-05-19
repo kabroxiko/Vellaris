@@ -18,7 +18,7 @@ export default function useRunGenerateFromSource({ fileObj, currentSource, build
       } catch (err) {
         const message = err?.message ?? 'Failed to prepare map request.'
         setError(message)
-        globalThis.showToast?.(message, { type: 'error', duration: 6000 })
+        globalThis.showToast?.({ key: 'ui.toast.error', params: { msg: message } }, { type: 'error', duration: 6000 })
         return
       }
 

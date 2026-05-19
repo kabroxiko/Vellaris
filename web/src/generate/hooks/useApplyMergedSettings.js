@@ -12,7 +12,7 @@ export default function useApplyMergedSettings({
 
     const settings = tryParse(currentSource.nortContent)
     if (!settings) {
-      globalThis.showToast?.('Loaded settings file is not valid JSON.', {
+      globalThis.showToast?.('ui.toast.invalidSettingsJson', {
         type: 'warning',
         duration: 6000,
       })

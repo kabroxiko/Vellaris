@@ -53,7 +53,7 @@ export default function useGenerate({
       }
       downloadNortContent(nortContent, baseName)
       handleSuccessRef.current?.(null, baseName, source, nortContent)
-      globalThis.showToast?.('Settings file downloaded', { type: 'success', duration: 3000 })
+      globalThis.showToast?.('ui.toast.settingsDownloaded', { type: 'success', duration: 3000 })
     },
     [base64ToBlob, downloadNortContent, serializeNortObject, tryParse, handleSuccessRef]
   )
@@ -65,7 +65,7 @@ export default function useGenerate({
       const toast = externalToast ?? makeProgressToastController()
       try {
         if (!externalToast)
-          toast.show(outputMode === 'nort-only' ? 'Preparing settings...' : 'Generating map..')
+          toast.show(outputMode === 'nort-only' ? 'ui.preparingSettings' : 'ui.generating')
         const body = requestOptions.body
         if (
           outputMode === 'nort-only' &&
@@ -80,13 +80,13 @@ export default function useGenerate({
         if (!res.ok) await handleResponseError(res)
         const contentType = res.headers.get('content-type') || ''
         const bytes = await readResponseBytesWithProgress(res, () => {
-          toast.show(outputMode === 'nort-only' ? 'Downloading settings...' : 'Downloading map...')
+          toast.show(outputMode === 'nort-only' ? 'ui.toast.downloadingSettings' : 'ui.toast.downloadingMap')
         })
         await processGenerateResponse(bytes, contentType, outputMode, baseName, source)
       } catch (err) {
         setError(err.message)
         try {
-          globalThis.showToast?.(err.message, { type: 'error', duration: 6000 })
+          globalThis.showToast?.({ key: 'ui.toast.error', params: { msg: err.message } }, { type: 'error', duration: 6000 })
         } catch (e) {
           console.warn('showToast failed', e)
         }

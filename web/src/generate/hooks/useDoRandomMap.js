@@ -6,7 +6,7 @@ export default function useDoRandomMap({ buildRandomCfg, fetchResolvedNort, appl
     async (toast = null) => {
       const localToast = toast ?? makeProgressToastController()
       try {
-        localToast.show(uiI18n?.labels?.['ui.preparing'] || 'Preparing map settings...')
+        localToast.show('ui.preparing')
         const cfg = buildRandomCfg()
         const nortContent = await fetchResolvedNort(cfg)
         applyReturnedSettingsToUi(nortContent)

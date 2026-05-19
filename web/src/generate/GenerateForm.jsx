@@ -636,7 +636,7 @@ function GenerateForm({ uiLanguage = 'en' }) {
 
   // Generate from a .nort JSON string by POSTing it to the generate endpoint.
   const generateFromNortContent = async (nortContent, toast) => {
-    toast.show(uiI18n?.labels?.['ui.generating'])
+    toast.show('ui.generating')
     const parsedReturned = tryParse(nortContent)
     if (parsedReturned && Object.hasOwn(randomOverrides, 'mapLanguage') && mapLanguage)
       parsedReturned.language = mapLanguage
@@ -1074,7 +1074,7 @@ function GenerateForm({ uiLanguage = 'en' }) {
     await doRandomMap(toast)
       .catch((err) => {
         setError(err.message)
-        globalThis.showToast?.(err.message, { type: 'error', duration: 6000 })
+        globalThis.showToast?.({ key: 'ui.toast.error', params: { msg: err.message } }, { type: 'error', duration: 6000 })
       })
       .finally(() => {
         setLoading(false)
@@ -1228,16 +1228,12 @@ function GenerateForm({ uiLanguage = 'en' }) {
     try {
       result = buildNortContentRequest()
     } catch (err) {
-      const message = err?.message ?? 'Cannot download merged settings.'
-      globalThis.showToast?.(message, { type: 'warning', duration: 6000 })
+      globalThis.showToast?.('ui.toast.cannotDownloadMergedSettings', { type: 'warning', duration: 6000 })
       return
     }
     const body = result.requestOptions?.body
     if (!body) {
-      globalThis.showToast?.(
-        'Cannot download merged settings. Open the Customize panel and save settings locally first.',
-        { type: 'warning', duration: 6000 }
-      )
+      globalThis.showToast?.('ui.toast.cannotDownloadMergedSettings', { type: 'warning', duration: 6000 })
       return
     }
 
@@ -1247,10 +1243,7 @@ function GenerateForm({ uiLanguage = 'en' }) {
       // Body is a raw .nort JSON (no wrapper).
       const parsed = tryParse(body)
       if (!parsed) {
-        globalThis.showToast?.(
-          'Cannot download merged settings. Open the Customize panel and save settings locally first.',
-          { type: 'warning', duration: 6000 }
-        )
+        globalThis.showToast?.('ui.toast.cannotDownloadMergedSettings', { type: 'warning', duration: 6000 })
         return
       }
       serialized = serializeNortObject(parsed)
@@ -1267,10 +1260,7 @@ function GenerateForm({ uiLanguage = 'en' }) {
         }
         serialized = await nf.text()
       } else {
-        globalThis.showToast?.(
-          'Cannot download merged settings. Open the Customize panel and save settings locally first.',
-          { type: 'warning', duration: 6000 }
-        )
+        globalThis.showToast?.('ui.toast.cannotDownloadMergedSettings', { type: 'warning', duration: 6000 })
         return
       }
     } else {
@@ -1284,7 +1274,7 @@ function GenerateForm({ uiLanguage = 'en' }) {
     const derived = deriveNortFilenameFromContent(serialized)
     const baseName = derived ?? currentSource?.name ?? 'generated-settings'
     downloadNortContent(serialized, baseName)
-    globalThis.showToast?.('Settings file downloaded', { type: 'success', duration: 3000 })
+    globalThis.showToast?.('ui.toast.settingsDownloaded', { type: 'success', duration: 3000 })
   }
 
   const { runGenerateFromCurrentSource } = useRunGenerateFromSource({
