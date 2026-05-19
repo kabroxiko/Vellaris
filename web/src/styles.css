@@ -329,11 +329,11 @@ header {
 .fields-column input[type='range'] {
   padding: 0;
   cursor: pointer;
-  /* Make sliders narrower to leave space for the numeric value on the right.
-     Use calc against the available control column width so labels remain aligned. */
-  width: calc(100% - 88px);
-  max-width: 420px;
-  min-width: 160px;
+  /* Allow the range input to fill available space and shrink on small screens.
+     Don't enforce a minimum fixed width so it can adapt to container size. */
+  width: 100%;
+  max-width: none;
+  min-width: 0;
 }
 
 /* Limit the width of combo/select controls so they don't push into adjacent labels */
@@ -366,11 +366,11 @@ header {
   justify-content: flex-end; /* push slider+value to right side of control column */
 }
 .slider-row input[type='range'] {
-  /* Let the slider take remaining space but limit it so value stays visible */
+  /* Let the slider take remaining space and allow it to shrink as needed. */
   flex: 1 1 auto;
-  width: auto;
-  max-width: calc(100% - 48px);
-  min-width: 160px;
+  width: 100%;
+  max-width: none;
+  min-width: 0;
 }
 .slider-row .slider-value {
   flex: 0 0 48px;
@@ -518,6 +518,40 @@ header {
 .customize-section.is-disabled .section-fields--disabled {
   opacity: 0.52;
   filter: saturate(0.7);
+}
+
+/* Responsive adjustments: stack label/control columns on narrow viewports
+   and allow sliders to fill the available width. */
+@media (max-width: 720px) {
+  .fields-grid,
+  .fields-column {
+    grid-template-columns: 1fr;
+  }
+
+  .fields-grid.two-col-layout {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .fields-column label,
+  .fields-grid label {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .slider-row {
+    justify-content: space-between;
+  }
+
+  .slider-row input[type='range'] {
+    max-width: none;
+    min-width: 0;
+    margin-right: 8px;
+  }
+
+  .slider-row .slider-value {
+    flex: 0 0 auto;
+  }
 }
 .customize-section.is-disabled .section-fields--disabled,
 .customize-section.is-disabled .section-fields--disabled * {
