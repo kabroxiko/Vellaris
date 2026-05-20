@@ -6,164 +6,15 @@ import BorderTab from './tabs/BorderTab'
 import EffectsTab from './tabs/EffectsTab'
 import FontsTab from './tabs/FontsTab'
 import { hexToRgba, rgbaToHex } from './sharedHelpers'
-import { fetchPreviewBlob, buildPreviewPayload } from './CustomizePreviewHelpers'
 import useCustomizePreview from './hooks/useCustomizePreview'
 import backgroundBaseCache from './backgroundBaseCache'
+import useAutoPreview from './hooks/useAutoPreview'
+import ColorPickerModal from './ColorPickerModal'
+import { stripHtmlWrapper, removeTags, pick } from './customizeHelpers'
 
 const API_BASE = import.meta.env.VITE_API_BASE || '/api'
 
-// Utility: strip optional surrounding <html>...</html> wrapper (linear scan)
-function stripHtmlWrapper(str) {
-  let start = 0
-  let end = str.length
-  while (start < end && /\s/.test(str.charAt(start))) start++
-  while (end > start && /\s/.test(str.charAt(end - 1))) end--
-  if (end - start >= 6 && str.substring(start, start + 6).toLowerCase() === '<html>') {
-    start += 6
-    while (start < end && /\s/.test(str.charAt(start))) start++
-  }
-  if (end - start >= 7 && str.substring(end - 7, end).toLowerCase() === '</html>') {
-    end -= 7
-    while (end > start && /\s/.test(str.charAt(end - 1))) end--
-  }
-  return str.substring(start, end)
-}
-
-// Utility: remove HTML tags using a linear scanner (avoids regex backtracking)
-function removeTags(str) {
-  let out = ''
-  let inTag = false
-  for (let i = 0; i < str.length; i++) {
-    const ch = str.charAt(i)
-    if (!inTag) {
-      if (ch === '<') inTag = true
-      else out += ch
-    } else if (ch === '>') inTag = false
-  }
-  return out
-}
-
-// Utility: pick keys from an object (module scope to avoid re-allocating per render)
-function pick(obj, keys) {
-  const out = {}
-  if (!obj) return out
-  for (const k of keys) {
-    if (Object.hasOwn(obj, k)) out[k] = obj[k]
-  }
-  return out
-}
-
-// Modal styles for color picker
-const modalBackdropStyle = {
-  position: 'fixed',
-  left: 0,
-  top: 0,
-  right: 0,
-  bottom: 0,
-  background: 'rgba(0,0,0,0.4)',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  zIndex: 2000,
-}
-
-const modalContentStyle = {
-  background: '#fff',
-  padding: 12,
-  borderRadius: 6,
-  boxShadow: '0 6px 24px rgba(0,0,0,0.3)',
-}
-
-// Custom hook: manage background preview fetching logic extracted
-// from the main component to reduce cognitive complexity.
-function useAutoPreview(
-  previewTriggerKey,
-  previewFields,
-  textures,
-  currentSource,
-  setPreviewFromBlob,
-  clearPreview,
-  hasCustomizationSource
-) {
-  useEffect(() => {
-    const hasRandomPayloadSource = Boolean(
-      currentSource?.type === 'random' && currentSource?.payload
-    )
-
-    if (typeof globalThis !== 'undefined' && globalThis.__prefetchedBackgroundPreviewBlob) {
-      const blob = globalThis.__prefetchedBackgroundPreviewBlob
-      delete globalThis.__prefetchedBackgroundPreviewBlob
-      ;(async () => {
-        await setPreviewFromBlob(blob)
-      })()
-      return
-    }
-
-    if (!hasCustomizationSource && !hasRandomPayloadSource) {
-      clearPreview()
-      return
-    }
-
-    const controller = new AbortController()
-    let timerId = setTimeout(async () => {
-      if (controller.signal.aborted) return
-      const payload = buildPreviewPayload(previewFields, textures, currentSource)
-      const blob = await fetchPreviewBlob(payload, controller)
-      await setPreviewFromBlob(blob)
-    }, 100)
-
-    return () => {
-      clearTimeout(timerId)
-      controller.abort()
-    }
-  }, [
-    previewTriggerKey,
-    currentSource?.nortContent,
-    currentSource?.payload,
-    currentSource?.type,
-    // Intentionally not including `setPreviewFromBlob`/`clearPreview` as
-    // they are stable refs returned by the preview hook.
-  ])
-}
-
-function ColorPickerModal({ open, onClose, children }) {
-  const innerRef = React.useRef(null)
-  React.useEffect(() => {
-    if (!open) return undefined
-    const onKey = (e) => {
-      if (e.key === 'Escape') onClose()
-    }
-    document.addEventListener('keydown', onKey)
-    const onMouseDown = (e) => {
-      if (innerRef.current && !innerRef.current.contains?.(e.target)) onClose()
-    }
-    document.addEventListener('mousedown', onMouseDown)
-    // focus first focusable element inside modal for accessibility
-    if (innerRef.current) {
-      const btn = innerRef.current.querySelector('button, [tabindex], input, [role="button"]')
-      if (btn && typeof btn.focus === 'function') btn.focus()
-    }
-    return () => {
-      document.removeEventListener('keydown', onKey)
-      document.removeEventListener('mousedown', onMouseDown)
-    }
-  }, [open, onClose])
-
-  if (!open) return null
-  return (
-    <dialog
-      ref={innerRef}
-      style={modalBackdropStyle}
-      open
-      onCancel={(e) => {
-        e.preventDefault()
-        onClose()
-      }}
-    >
-      <div style={modalContentStyle}>{children}</div>
-    </dialog>
-  )
-}
+// helpers and subcomponents extracted to modular files above
 
 ColorPickerModal.propTypes = {
   open: PropTypes.bool,
@@ -172,7 +23,7 @@ ColorPickerModal.propTypes = {
 }
 
 // Export small module-scope helpers and modal styles
-export { modalBackdropStyle, modalContentStyle, ColorPickerModal }
+export { ColorPickerModal }
 
 // Re-export payload/preview helpers from the dedicated module for tests and compatibility
 export {

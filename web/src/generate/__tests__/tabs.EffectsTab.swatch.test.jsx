@@ -41,6 +41,6 @@ describe('EffectsTab swatchReplacement', () => {
 
     const el = screen.getByText('theme.oceanShadingColor.label')
     // element has data-swatch with sanitized replacement containing 'Political'
-    expect(el.getAttribute('data-swatch')).toContain('Political')
+    expect(el.dataset.swatch).toContain('Political')
   })
 })
