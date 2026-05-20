@@ -30,7 +30,7 @@ export function ToastContainer() {
     // showToast now expects an i18n key (string) or an object { key, params }
     // It resolves the message using `globalThis.__localizedFrontendLabels` and
     // will NOT fallback to English when a localized key is missing.
-    globalThis.showToast = (messageOrKey, opts = {}) => {
+    const parseToastOptions = (opts) => {
       let type = 'info'
       let duration = 4000
       let dismissible = true
@@ -39,36 +39,46 @@ export function ToastContainer() {
         type = opts
       } else if (typeof opts === 'number') {
         duration = opts
-      } else if (typeof opts === 'object') {
+      } else if (typeof opts === 'object' && opts !== null) {
         type = opts.type || type
         duration = opts.duration ?? duration
         dismissible = opts.dismissible ?? dismissible
         working = opts.working ?? working
       }
+      return { type, duration, dismissible, working }
+    }
 
-      // Resolve localized message strictly from localized bundle
-      let resolvedMessage = null
+    const resolveLocalizedMessage = (messageOrKey) => {
       try {
-        const localized =
-          (typeof globalThis !== 'undefined' && globalThis.__localizedFrontendLabels) || {}
+        const localized = (typeof globalThis !== 'undefined' && globalThis.__localizedFrontendLabels) || {}
         if (typeof messageOrKey === 'string') {
-          const key = messageOrKey
-          resolvedMessage = localized[key]
-        } else if (messageOrKey && typeof messageOrKey === 'object' && messageOrKey.key) {
-          resolvedMessage = localized[messageOrKey.key]
-          // simple param interpolation: replace {name} with params.name
-          if (resolvedMessage && messageOrKey.params) {
+          return localized[messageOrKey] || null
+        }
+        if (messageOrKey && typeof messageOrKey === 'object' && messageOrKey.key) {
+          let resolved = localized[messageOrKey.key] || null
+          if (resolved && messageOrKey.params) {
             for (const [k, v] of Object.entries(messageOrKey.params)) {
-              resolvedMessage = resolvedMessage.replaceAll(`{${k}}`, String(v))
+              resolved = resolved.replaceAll(`{${k}}`, String(v))
             }
           }
+          return resolved
         }
       } catch (e) {
-        // fall through to safe behavior below
         // eslint-disable-next-line no-console
         console.warn('i18n resolution failed for toast', e)
       }
+      return null
+    }
 
+    const scheduleRemoval = (id, duration) => {
+      if (duration > 0) {
+        setTimeout(() => removeToastById(id), duration)
+      }
+    }
+
+    globalThis.showToast = (messageOrKey, opts = {}) => {
+      const { type, duration, dismissible, working } = parseToastOptions(opts)
+      const resolvedMessage = resolveLocalizedMessage(messageOrKey)
       if (!resolvedMessage) {
         // Enforce no-fallback: do not display a toast when localized key missing
         // eslint-disable-next-line no-console
@@ -78,20 +88,9 @@ export function ToastContainer() {
 
       const id = makeId()
       const now = Date.now()
-      const toast = {
-        id,
-        message: resolvedMessage,
-        type,
-        duration,
-        dismissible,
-        working,
-        createdAt: now,
-      }
+      const toast = { id, message: resolvedMessage, type, duration, dismissible, working, createdAt: now }
       addToast(toast)
-
-      if (duration > 0) {
-        setTimeout(() => removeToastById(id), duration)
-      }
+      scheduleRemoval(id, duration)
       return id
     }
 

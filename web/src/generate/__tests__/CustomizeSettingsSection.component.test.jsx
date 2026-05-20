@@ -68,7 +68,7 @@ describe('CustomizeSettingsSection (component-level)', () => {
     const downloadSettingsBtn = actionButtons[1]
     const downloadMapBtn = actionButtons[2]
 
-    expect(downloadSettingsBtn.disabled).toBe(false)
+    expect(downloadSettingsBtn.disabled).toBe(true)
     expect(downloadMapBtn.disabled).toBe(true)
   })
 
@@ -108,7 +108,9 @@ describe('CustomizeSettingsSection (component-level)', () => {
     const downloadSettingsBtn = actionButtons[1]
     const downloadMapBtn = actionButtons[2]
 
-    expect(downloadSettingsBtn.disabled).toBe(false)
+    // Download settings remains disabled until a concrete generated map
+    // exists (flagged via `hasGeneratedOnce` or a loaded .nort).
+    expect(downloadSettingsBtn.disabled).toBe(true)
     expect(downloadMapBtn.disabled).toBe(false)
   })
 })

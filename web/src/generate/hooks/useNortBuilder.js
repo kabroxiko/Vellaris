@@ -21,7 +21,10 @@ export default function useNortBuilder(opts) {
         const parsed = tryParse(str)
         return parsed ?? mergedSettingsRef.current
       }
-      return tryParse(currentSource?.nortContent)
+      // If there is an active currentSource with nortContent, parse it.
+      // Otherwise return null so callers can handle the "no source" case
+      if (currentSource?.nortContent) return tryParse(currentSource.nortContent)
+      return null
     },
     [mergedSettingsRef, currentSource, tryParse]
   )
@@ -47,7 +50,14 @@ export default function useNortBuilder(opts) {
   const buildNortContentRequest = useCallback(
     ({ explicitNortContent = null } = {}) => {
       const parsedSettings = parseNortSettings(explicitNortContent)
-      if (!parsedSettings) throw new Error('Current settings are not valid JSON.')
+      if (!parsedSettings) {
+        // If the caller supplied explicit content, this is an error condition
+        // (invalid explicit content). Throw so callers can show a helpful
+        // message. If no explicit content was provided, return a null
+        // request so callers can gracefully handle "no source" cases.
+        if (explicitNortContent) throw new Error('Current settings are not valid JSON.')
+        return { requestOptions: null, baseName: null, source: null }
+      }
 
       // Merge UI values into parsed settings using provided applier
       mergeUiIntoParsed(parsedSettings, opts)
