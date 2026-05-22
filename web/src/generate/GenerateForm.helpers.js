@@ -169,3 +169,93 @@ export function loadCustomizeOverrides() {
     return {}
   }
 }
+
+// Small helper apis used by GenerateForm.applyServerDefaults to avoid
+// duplicating simple setter patterns across multiple files.
+export function setHex(setter, value) {
+  if (value) {
+    const h = colorToHex(value)
+    if (h) setter(h)
+  }
+}
+
+export function setNumber(setter, value) {
+  if (Number.isFinite(Number(value))) setter(Number(value))
+}
+
+export function setString(setter, value) {
+  if (value !== undefined && value !== null) setter(String(value))
+}
+
+export function setBoolean(setter, value) {
+  if (typeof value === 'boolean') setter(value)
+}
+
+export function setAlphaFromValueOrColor(alphaVal, colorVal, setter) {
+  if (alphaVal !== undefined && alphaVal !== null) {
+    setter(alphaVal)
+    return
+  }
+  if (colorVal) {
+    const ch = parseColorChannels(colorVal)
+    if (ch?.a !== undefined && Number.isFinite(Number(ch.a))) setter(Number(ch.a))
+  }
+}
+
+export function convertScaleToSlider(scale) {
+  const s = Number(scale)
+  if (!Number.isFinite(s)) return undefined
+  const sliderValueFor1Scale = 5
+  const scaleMax = 3
+  const scaleMin = 0.5
+  const minScaleSliderValue = 1
+  const maxScaleSliderValue = 15
+  const v1Slope = (sliderValueFor1Scale - minScaleSliderValue) / (1 - scaleMin)
+  const v1YIntercept = sliderValueFor1Scale - v1Slope
+  const v2Slope = (maxScaleSliderValue - sliderValueFor1Scale) / (scaleMax - 1)
+  const v2YIntercept = sliderValueFor1Scale - v2Slope * 1
+  let v
+  if (s <= 1) v = v1Slope * s + v1YIntercept
+  else v = v2Slope * s + v2YIntercept
+  v = Math.round(v)
+  if (v < minScaleSliderValue) v = minScaleSliderValue
+  if (v > maxScaleSliderValue) v = maxScaleSliderValue
+  return v
+}
+
+export function applyRoadStyleHelper(defs, setRoadStyle, setRoadWidth, setRoadColorHex) {
+  if (typeof defs.roadStyle === 'object' && defs.roadStyle !== null) {
+    if (typeof defs.roadStyle.type === 'string') setString(setRoadStyle, defs.roadStyle.type)
+    if (Number.isFinite(Number(defs.roadStyle.width))) setNumber(setRoadWidth, Number(defs.roadStyle.width))
+  } else if (typeof defs.roadStyle === 'string') {
+    setString(setRoadStyle, defs.roadStyle)
+  }
+  if (Number.isFinite(Number(defs.roadWidth))) setNumber(setRoadWidth, defs.roadWidth)
+  setHex(setRoadColorHex, defs.roadColor)
+}
+
+export function applyBasicSettings(defs, opts, setters) {
+  const {
+    setWorldSize,
+    setRegionCount,
+    setCityFrequency,
+    setFinalWidth,
+    setFinalHeight,
+    setMapLanguage,
+    setDimension,
+    setLandShape,
+  } = setters
+  setNumber(setWorldSize, defs.worldSize)
+  setNumber(setRegionCount, defs.regionCount)
+  if (defs.cityProbability !== undefined && opts?.maxCityProbability !== undefined) {
+    setNumber(
+      setCityFrequency,
+      (Number(defs.cityProbability) / Number(opts.maxCityProbability)) * 100
+    )
+  }
+  setNumber(setFinalWidth, defs.generatedWidth)
+  setNumber(setFinalHeight, defs.generatedHeight)
+  setString(setMapLanguage, defs.mapLanguage)
+  setString(setDimension, defs.dimension)
+  setString(setLandShape, defs.landShape)
+}

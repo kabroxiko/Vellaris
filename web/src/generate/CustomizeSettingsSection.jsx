@@ -11,7 +11,7 @@ import backgroundBaseCache from './backgroundBaseCache'
 import useAutoPreview from './hooks/useAutoPreview'
 import ColorPickerModal from './ColorPickerModal'
 import { stripHtmlWrapper, removeTags, pick } from './customizeHelpers'
-
+import { computePreviewTriggerKey, PREVIEW_TRIGGER_KEYS } from './previewHelpers'
 const API_BASE = import.meta.env.VITE_API_BASE || '/api'
 
 // helpers and subcomponents extracted to modular files above
@@ -40,7 +40,6 @@ export {
   composeMiniIslandFromBlobModule,
   fetchPreviewBlob,
 } from './CustomizePreviewHelpers'
-export { pick, stripHtmlWrapper, removeTags }
 
 export default function CustomizeSettingsSection({ values, handlers, options, ui }) {
   const [activeTab, setActiveTab] = useState(null)
@@ -227,6 +226,12 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
 
   const previewFields = collectPreviewFields()
 
+  // Use a filtered preview key so color toggles/values do not trigger the background preview.
+  const previewTriggerKey = useMemo(
+    () => computePreviewTriggerKey(previewFields),
+    PREVIEW_TRIGGER_KEYS.map((k) => previewFields?.[k])
+  )
+
   async function onSubmitGenerate(e) {
     if (e && typeof e.preventDefault === 'function') e.preventDefault()
     if (typeof handlers.handleGenerateFromSettings === 'function') {
@@ -236,45 +241,7 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     triggerPreviewRefresh()
   }
 
-  // Use a filtered preview key so color toggles/values do not trigger the background preview.
-  const previewTriggerKey = useMemo(() => {
-    const { colorizeLand, colorizeOcean, landColorHex, oceanColorHex, ...rest } =
-      previewFields || {}
-    return JSON.stringify(rest)
-  }, [
-    previewFields?.backgroundType,
-    previewFields?.textureRef,
-    previewFields?.backgroundSeed,
-    previewFields?.randomSeed,
-    previewFields?.finalWidth,
-    previewFields?.finalHeight,
-    previewFields?.drawBorder,
-    previewFields?.drawGridOverlay,
-    previewFields?.gridOverlayShape,
-    previewFields?.gridOverlayRowOrColCount,
-    previewFields?.gridOverlayColorHex,
-    previewFields?.gridOverlayXOffset,
-    previewFields?.gridOverlayYOffset,
-    previewFields?.gridOverlayLineWidth,
-    previewFields?.borderRef,
-    previewFields?.borderWidth,
-    previewFields?.borderPosition,
-    previewFields?.borderColorOption,
-    previewFields?.borderColorHex,
-    previewFields?.frayedBorder,
-    previewFields?.frayedBorderBlurLevel,
-    previewFields?.frayedBorderSize,
-    previewFields?.frayedBorderSeed,
-    previewFields?.frayedBorderColorHex,
-    previewFields?.roadStyle,
-    previewFields?.roadWidth,
-    previewFields?.roadColorHex,
-    previewFields?.mountainSize,
-    previewFields?.hillSize,
-    previewFields?.duneSize,
-    previewFields?.treeHeight,
-    previewFields?.citySize,
-  ])
+
 
   // Use the `handlers` object directly; accessors below will reference `handlers.<name>`.
 

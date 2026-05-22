@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react'
 import { fetchJson } from '../helpers'
 import { getFrontendLabels } from '../../i18n/webLabels'
 
-const API_BASE = import.meta?.env?.VITE_API_BASE || '/api'
+const API_BASE = import.meta.env.VITE_API_BASE || '/api'
 const cityIconTypesRequestByPack = new Map()
 const uiOptionsCache = new Map()
 

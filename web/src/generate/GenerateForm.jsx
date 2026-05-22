@@ -2,7 +2,7 @@ import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import PropTypes from 'prop-types'
 import CustomizeSettingsSection from './CustomizeSettingsSection'
 import RandomSettingsSection from './RandomSettingsSection'
-import { base64ToBlob, colorToHex, parseColorChannels } from './utils'
+import { base64ToBlob } from './utils'
 import { selectCityIconType, handleResponseError, tryParseJson as tryParse } from './helpers'
 import { downloadNortContent } from './responseHandlers'
 import { deriveNortFilenameFromContent, makeProgressToastController } from './sharedHelpers'
@@ -18,6 +18,14 @@ import {
   setResourceFromRef,
   parseBooleanWithDefault,
   loadRandomOverrides,
+  setHex,
+  setNumber,
+  setString,
+  setBoolean,
+  setAlphaFromValueOrColor,
+  convertScaleToSlider,
+  applyRoadStyleHelper,
+  applyBasicSettings,
 } from './GenerateForm.helpers'
 import useCustomizeSettings from './hooks/useCustomizeSettings'
 import useFileHandler from './hooks/useFileHandler'
@@ -29,7 +37,9 @@ import { mergeColor } from './GenerateForm.appliers'
 import mergeUiIntoParsed from './mergeUiIntoParsed'
 import useNortBuilder from './hooks/useNortBuilder'
 import useApplyMergedSettings from './hooks/useApplyMergedSettings'
-const API_BASE = import.meta?.env?.VITE_API_BASE || '/api'
+const API_BASE = import.meta.env.VITE_API_BASE || '/api'
+
+
 const RANDOM_OVERRIDES_STORAGE_KEY = 'vellaris-random-manual-overrides'
 const CUSTOMIZE_OVERRIDES_STORAGE_KEY = 'vellaris-customize-overrides'
 // Helpers to apply UI values into parsed settings. These accept a
@@ -118,7 +128,7 @@ function GenerateForm({ uiLanguage = 'en' }) {
   const [finalSeed, setFinalSeed] = useState('')
 
   // --- Generate from Settings: theme overrides ---
-  const { values: customizeValues, setters: customizeSetters } =
+  const { values: customizeValues, setters: customizeSetters, customizeDeps } =
     useCustomizeSettings(initialCustomize)
 
   const {
@@ -313,79 +323,6 @@ function GenerateForm({ uiLanguage = 'en' }) {
     [hookHandleSelectedBooksChange]
   )
 
-  const customizeDeps = [
-    backgroundType,
-    textureRef,
-    backgroundSeed,
-    drawRegionBoundaries,
-    colorizeLand,
-    colorizeOcean,
-    oceanColorHex,
-    landColorHex,
-    regionBoundaryStyle,
-    regionBoundaryWidth,
-    regionBoundaryColorHex,
-    drawBorder,
-    drawGridOverlay,
-    finalLandColoringMethod,
-    borderRef,
-    borderWidth,
-    borderPosition,
-    borderColorOption,
-    borderColorHex,
-    frayedBorder,
-    frayedBorderBlurLevel,
-    frayedBorderSize,
-    frayedBorderSeed,
-    drawGrunge,
-    grungeWidth,
-    frayedBorderColorHex,
-    lineStyle,
-    coastlineWidth,
-    coastlineColorHex,
-    coastShadingLevel,
-    coastShadingColorHex,
-    coastShadingAlpha,
-    oceanShadingAlpha,
-    oceanShadingLevel,
-    oceanShadingColorHex,
-    oceanWavesType,
-    oceanWavesLevel,
-    oceanWavesColorHex,
-    oceanWavesAlpha,
-    concentricWaveCount,
-    fadeConcentricWaves,
-    jitterToConcentricWaves,
-    brokenLinesForConcentricWaves,
-    drawOceanEffectsInLakes,
-    riverColorHex,
-    drawRoads,
-    roadStyle,
-    roadWidth,
-    roadColorHex,
-    mountainSize,
-    hillSize,
-    duneSize,
-    treeHeight,
-    citySize,
-    drawText,
-    titleFontFamily,
-    regionFontFamily,
-    mountainRangeFontFamily,
-    otherMountainsFontFamily,
-    citiesFontFamily,
-    riverFontFamily,
-    textColorHex,
-    drawBoldBackground,
-    boldBackgroundColorHex,
-  ]
-
-  // `useCustomizeSettings` manages/collects and persists customize values.
-
-  // Load UI option labels and resource lists on mount so the Customize
-  // panel can display meaningful options instead of random placeholder
-  // text. If the user has no saved customize overrides, apply sensible
-  // defaults from the server-provided options.
   useEffect(() => {
     initializeUiForLanguage(requestLanguage)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -393,87 +330,7 @@ function GenerateForm({ uiLanguage = 'en' }) {
 
   // Apply backend `defaults` to the UI using the existing setters.
   function applyServerDefaults(defs, opts) {
-    // Helper setters shared across appliers
-    const setHex = (setter, value) => {
-      if (value) {
-        const h = colorToHex(value)
-        if (h) setter(h)
-      }
-    }
-    const setNumber = (setter, value) => {
-      if (Number.isFinite(Number(value))) setter(Number(value))
-    }
-    const setString = (setter, value) => {
-      if (value !== undefined && value !== null) setter(String(value))
-    }
-    const setBoolean = (setter, value) => {
-      if (typeof value === 'boolean') setter(value)
-    }
-
-    // Helper to set alpha either from explicit alpha value or by parsing color channels
-    const setAlphaFromValueOrColor = (alphaVal, colorVal, setter) => {
-      if (alphaVal !== undefined && alphaVal !== null) {
-        setter(alphaVal)
-        return
-      }
-      if (colorVal) {
-        const ch = parseColorChannels(colorVal)
-        if (ch?.a !== undefined && Number.isFinite(Number(ch.a))) setter(Number(ch.a))
-      }
-    }
-
-    // Convert a scale (e.g. 0.5-3) to the UI slider range [1..15]
-    const convertScaleToSlider = (scale) => {
-      const s = Number(scale)
-      if (!Number.isFinite(s)) return undefined
-      const sliderValueFor1Scale = 5
-      const scaleMax = 3
-      const scaleMin = 0.5
-      const minScaleSliderValue = 1
-      const maxScaleSliderValue = 15
-      const v1Slope = (sliderValueFor1Scale - minScaleSliderValue) / (1 - scaleMin)
-      const v1YIntercept = sliderValueFor1Scale - v1Slope
-      const v2Slope = (maxScaleSliderValue - sliderValueFor1Scale) / (scaleMax - 1)
-      const v2YIntercept = sliderValueFor1Scale - v2Slope * 1
-      let v
-      if (s <= 1) v = v1Slope * s + v1YIntercept
-      else v = v2Slope * s + v2YIntercept
-      v = Math.round(v)
-      if (v < minScaleSliderValue) v = minScaleSliderValue
-      if (v > maxScaleSliderValue) v = maxScaleSliderValue
-      return v
-    }
-
-    // Handle flexible roadStyle formats and color/width properties
-    const applyRoadStyleHelper = (defs) => {
-      if (typeof defs.roadStyle === 'object' && defs.roadStyle !== null) {
-        if (typeof defs.roadStyle.type === 'string') setString(setRoadStyle, defs.roadStyle.type)
-        if (Number.isFinite(Number(defs.roadStyle.width)))
-          setNumber(setRoadWidth, Number(defs.roadStyle.width))
-      } else if (typeof defs.roadStyle === 'string') {
-        setString(setRoadStyle, defs.roadStyle)
-      }
-      if (Number.isFinite(Number(defs.roadWidth))) setNumber(setRoadWidth, defs.roadWidth)
-      setHex(setRoadColorHex, defs.roadColor)
-    }
-
-    const applyBasicSettings = (defs, opts) => {
-      setNumber(setWorldSize, defs.worldSize)
-      setNumber(setRegionCount, defs.regionCount)
-      if (defs.cityProbability !== undefined && opts?.maxCityProbability !== undefined) {
-        setNumber(
-          setCityFrequency,
-          (Number(defs.cityProbability) / Number(opts.maxCityProbability)) * 100
-        )
-      }
-      setNumber(setFinalWidth, defs.generatedWidth)
-      setNumber(setFinalHeight, defs.generatedHeight)
-      setString(setMapLanguage, defs.mapLanguage)
-      setString(setDimension, defs.dimension)
-      setString(setLandShape, defs.landShape)
-      setString(setArtPack, defs.artPack)
-      setString(setCityIconType, defs.cityIconType ?? defs.cityIconSetName)
-    }
+    // Use shared helper appliers from GenerateForm.helpers.js
 
     const applyGridAndBorders = (defs) => {
       setString(setBackgroundType, defs.backgroundType)
@@ -551,7 +408,7 @@ function GenerateForm({ uiLanguage = 'en' }) {
       setBoolean(setDrawOceanEffectsInLakes, defs.drawOceanEffectsInLakes)
       setHex(setRiverColorHex, defs.riverColor)
       setBoolean(setDrawRoads, defs.drawRoads)
-      applyRoadStyleHelper(defs)
+      applyRoadStyleHelper(defs, setRoadStyle, setRoadWidth, setRoadColorHex)
     }
 
     // Apply a scale-or-size mapping for standard elements
@@ -618,7 +475,16 @@ function GenerateForm({ uiLanguage = 'en' }) {
     }
 
     // Delegate to smaller appliers
-    applyBasicSettings(defs, opts)
+    applyBasicSettings(defs, opts, {
+      setWorldSize,
+      setRegionCount,
+      setCityFrequency,
+      setFinalWidth,
+      setFinalHeight,
+      setMapLanguage,
+      setDimension,
+      setLandShape,
+    })
     applyGridAndBorders(defs)
     applyOceanAndRoads(defs)
     applySizeMappings(defs)

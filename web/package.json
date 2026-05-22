@@ -3,8 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "npm run make-favicon && vite",
-    "build": "npm run make-favicon && vite build",
+    "dev": "npm run copy-assets && npm run make-favicon && vite",
+    "build": "npm run copy-assets && npm run make-favicon && vite build",
+    "copy-assets": "sh scripts/copy-assets.sh",
     "preview": "vite preview",
     "make-favicon": "sh scripts/make-favicon.sh",
     "format": "prettier --write \"src/**/*.{js,jsx,ts,tsx,css,md,json}\"",

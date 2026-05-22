@@ -1,53 +1,17 @@
 import { useEffect, useRef, useState, useMemo } from 'react'
-import {
-  fetchPreviewBlob,
-  composeMiniIslandFromBlobModule,
-  buildPreviewPayload,
-} from '../CustomizePreviewHelpers'
+import { composeMiniIslandFromBlobModule } from '../CustomizePreviewHelpers'
+import { schedulePreviewFetch } from '../previewPoller'
+import { computePreviewTriggerKey, PREVIEW_TRIGGER_KEYS } from '../previewHelpers'
 
 export default function useCustomizePreview({ previewFields, textures, currentSource }) {
   const [backgroundPreviewUrl, setBackgroundPreviewUrl] = useState(null)
   const [previewRefreshNonce, setPreviewRefreshNonce] = useState(0)
   const lastBaseBlobRef = useRef(null)
 
-  const previewTriggerKey = useMemo(() => {
-    const { colorizeLand, colorizeOcean, landColorHex, oceanColorHex, ...rest } =
-      previewFields || {}
-    return JSON.stringify(rest)
-  }, [
-    previewFields?.backgroundType,
-    previewFields?.textureRef,
-    previewFields?.backgroundSeed,
-    previewFields?.randomSeed,
-    previewFields?.finalWidth,
-    previewFields?.finalHeight,
-    previewFields?.drawBorder,
-    previewFields?.drawGridOverlay,
-    previewFields?.gridOverlayShape,
-    previewFields?.gridOverlayRowOrColCount,
-    previewFields?.gridOverlayColorHex,
-    previewFields?.gridOverlayXOffset,
-    previewFields?.gridOverlayYOffset,
-    previewFields?.gridOverlayLineWidth,
-    previewFields?.borderRef,
-    previewFields?.borderWidth,
-    previewFields?.borderPosition,
-    previewFields?.borderColorOption,
-    previewFields?.borderColorHex,
-    previewFields?.frayedBorder,
-    previewFields?.frayedBorderBlurLevel,
-    previewFields?.frayedBorderSize,
-    previewFields?.frayedBorderSeed,
-    previewFields?.frayedBorderColorHex,
-    previewFields?.roadStyle,
-    previewFields?.roadWidth,
-    previewFields?.roadColorHex,
-    previewFields?.mountainSize,
-    previewFields?.hillSize,
-    previewFields?.duneSize,
-    previewFields?.treeHeight,
-    previewFields?.citySize,
-  ])
+  const previewTriggerKey = useMemo(
+    () => computePreviewTriggerKey(previewFields),
+    PREVIEW_TRIGGER_KEYS.map((k) => previewFields?.[k])
+  )
 
   const triggerPreviewRefresh = () => setPreviewRefreshNonce((n) => n + 1)
 
@@ -112,17 +76,16 @@ export default function useCustomizePreview({ previewFields, textures, currentSo
       return
     }
 
-    const controller = new AbortController()
-    let timerId = setTimeout(async () => {
-      if (controller.signal.aborted) return
-      const payload = buildPreviewPayload(previewFields, textures, currentSource)
-      const blob = await fetchPreviewBlob(payload, controller)
-      await setPreviewFromBlob(blob)
-    }, 100)
+    const cleanup = schedulePreviewFetch({
+      previewFields,
+      textures,
+      currentSource,
+      setPreviewFromBlob,
+      delay: 100,
+    })
 
     return () => {
-      clearTimeout(timerId)
-      controller.abort()
+      cleanup()
     }
   }, [
     previewTriggerKey,

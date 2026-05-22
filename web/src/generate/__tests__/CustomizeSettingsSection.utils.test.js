@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { pick, stripHtmlWrapper, removeTags } from '../CustomizeSettingsSection'
+import { pick, stripHtmlWrapper, removeTags } from '../customizeHelpers'
 
 describe('CustomizeSettingsSection utils', () => {
   it('pick returns only specified keys present in object', () => {

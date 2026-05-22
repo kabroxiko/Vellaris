@@ -66,7 +66,10 @@ async function fetchWithRetries(url, opts, attempts = 3, delayMs = 300) {
   }
 }
 
-const API_BASE = import.meta?.env?.VITE_API_BASE || '/api'
+const API_BASE =
+  import.meta.env.VITE_API_BASE ||
+  (typeof location !== 'undefined' && location?.origin) ||
+  'http://localhost'
 
 async function _doFetchBase(payload, signal) {
   await acquireSlot()

@@ -110,3 +110,17 @@ export function base64ToBlob(base64, mimeType) {
   const bytes = Uint8Array.from(atob(base64), (char) => char.codePointAt(0) ?? 0)
   return new Blob([bytes], { type: mimeType })
 }
+
+export function makeId() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID().replaceAll('-', '').slice(0, 8)
+  }
+  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+    const arr = new Uint8Array(6)
+    crypto.getRandomValues(arr)
+    return Array.from(arr, (b) => b.toString(36).padStart(2, '0'))
+      .join('')
+      .slice(0, 8)
+  }
+  throw new Error('crypto unavailable: makeId requires crypto.randomUUID or crypto.getRandomValues')
+}

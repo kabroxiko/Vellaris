@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { buildPreviewPayload, fetchPreviewBlob } from '../CustomizePreviewHelpers'
+import { schedulePreviewFetch } from '../previewPoller'
 
 export default function useAutoPreview(
   previewTriggerKey,
@@ -29,17 +29,16 @@ export default function useAutoPreview(
       return
     }
 
-    const controller = new AbortController()
-    let timerId = setTimeout(async () => {
-      if (controller.signal.aborted) return
-      const payload = buildPreviewPayload(previewFields, textures, currentSource)
-      const blob = await fetchPreviewBlob(payload, controller)
-      await setPreviewFromBlob(blob)
-    }, 100)
+    const cleanup = schedulePreviewFetch({
+      previewFields,
+      textures,
+      currentSource,
+      setPreviewFromBlob,
+      delay: 100,
+    })
 
     return () => {
-      clearTimeout(timerId)
-      controller.abort()
+      cleanup()
     }
   }, [
     previewTriggerKey,

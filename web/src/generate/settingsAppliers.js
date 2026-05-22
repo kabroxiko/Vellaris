@@ -1,4 +1,4 @@
-import { colorToHex, colorToAlphaPercent, fontSpecToFamily } from './utils'
+import { colorToHex, colorToAlphaPercent, fontSpecToFamily, makeId } from './utils'
 import { seedStringOrEmpty, stringValueOrEmpty, dimensionFromSize } from './helpers'
 
 // Lightweight runtime instrumentation to record where applier functions
@@ -47,21 +47,7 @@ function inverseGetTreeHeightSliderFromScale(scale) {
 
 export function createSettingsAppliers(setters, currentValues = {}) {
   // Per-applier instrumentation: record creation and calls.
-  const randomPart = (() => {
-    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-      return crypto.randomUUID().replaceAll('-', '').slice(0, 8)
-    }
-    if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
-      const arr = new Uint8Array(6)
-      crypto.getRandomValues(arr)
-      return Array.from(arr, (b) => b.toString(36).padStart(2, '0'))
-        .join('')
-        .slice(0, 8)
-    }
-    throw new Error(
-      'crypto unavailable: randomPart requires crypto.randomUUID or crypto.getRandomValues'
-    )
-  })()
+  const randomPart = makeId()
   const applierId = `applier-${Date.now()}-${randomPart}`
   const createdStack = new Error('applier-created').stack
   applierCallCache.set(applierId, { createdAt: Date.now(), createdStack, calls: [] })

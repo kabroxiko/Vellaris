@@ -105,6 +105,15 @@ vi.mock('../GenerateForm.helpers', () => ({
   loadRandomOverrides: () => ({}),
   loadCustomizeOverrides: () => ({}),
   buildCustomizePayload: () => ({}),
+  // New helpers added by refactor; provide minimal mocks for tests
+  setHex: () => {},
+  setNumber: () => {},
+  setString: () => {},
+  setBoolean: () => {},
+  setAlphaFromValueOrColor: () => {},
+  convertScaleToSlider: () => 1,
+  applyRoadStyleHelper: () => {},
+  applyBasicSettings: () => {},
 }))
 vi.mock('../GenerateForm.appliers', () => ({
   applyBackgroundFlagsHoisted: () => {},
