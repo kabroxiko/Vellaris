@@ -33,7 +33,7 @@ describe('settingsAppliers helpers', () => {
     expect(setters.setDrawRoads).toHaveBeenCalledWith(true)
     expect(setters.setRoadStyle).toHaveBeenCalled()
     expect(setters.setRoadWidth).toHaveBeenCalled()
-      expect(setters.setRoadColor).toHaveBeenCalled()
+    expect(setters.setRoadColor).toHaveBeenCalled()
     // mountainScale 1 -> slider 5
     expect(setters.setMountainSize.mock.calls[0][0]).toBe(5)
     // hillScale 3 -> slider 15
@@ -75,7 +75,7 @@ describe('settingsAppliers helpers', () => {
     expect(setters.setDrawGridOverlay).toHaveBeenCalledWith(true)
     expect(setters.setGridOverlayShape).toHaveBeenCalledWith('hex')
     expect(setters.setGridOverlayRowOrColCount).toHaveBeenCalledWith(8)
-      expect(setters.setGridOverlayColor).toHaveBeenCalled()
+    expect(setters.setGridOverlayColor).toHaveBeenCalled()
     expect(setters.setGridOverlayXOffset).toHaveBeenCalled()
     expect(setters.setGridOverlayYOffset).toHaveBeenCalled()
     expect(setters.setGridOverlayLineWidth).toHaveBeenCalled()

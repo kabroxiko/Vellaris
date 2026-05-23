@@ -1,4 +1,10 @@
-import { colorToHex, colorToHexWithAlpha, colorToAlphaPercent, fontSpecToFamily, makeId } from './utils'
+import {
+  colorToHex,
+  colorToHexWithAlpha,
+  colorToAlphaPercent,
+  fontSpecToFamily,
+  makeId,
+} from './utils'
 import { seedStringOrEmpty, stringValueOrEmpty, dimensionFromSize } from './helpers'
 
 // Lightweight runtime instrumentation to record where applier functions
@@ -214,15 +220,24 @@ export function createSettingsAppliers(setters, currentValues = {}) {
       } = setters
 
       if (settings.oceanColor) {
-        const hex = colorToHexWithAlpha(settings.oceanColor) || colorToHex(settings.oceanColor) || settings.oceanColor
+        const hex =
+          colorToHexWithAlpha(settings.oceanColor) ||
+          colorToHex(settings.oceanColor) ||
+          settings.oceanColor
         setIfChanged(setOceanColor, 'oceanColor', hex)
       }
       if (settings.landColor) {
-        const hex = colorToHexWithAlpha(settings.landColor) || colorToHex(settings.landColor) || settings.landColor
+        const hex =
+          colorToHexWithAlpha(settings.landColor) ||
+          colorToHex(settings.landColor) ||
+          settings.landColor
         setIfChanged(setLandColor, 'landColor', hex)
       }
       if (settings.regionBoundaryColor) {
-        const hex = colorToHexWithAlpha(settings.regionBoundaryColor) || colorToHex(settings.regionBoundaryColor) || settings.regionBoundaryColor
+        const hex =
+          colorToHexWithAlpha(settings.regionBoundaryColor) ||
+          colorToHex(settings.regionBoundaryColor) ||
+          settings.regionBoundaryColor
         setIfChanged(setRegionBoundaryColor, 'regionBoundaryColor', hex)
       }
       this.applyRegionBoundaryStyle(settings.regionBoundaryStyle)
@@ -314,14 +329,18 @@ export function createSettingsAppliers(setters, currentValues = {}) {
         setIfChanged(setLineStyle, 'lineStyle', settings.lineStyle)
       if (Number.isFinite(Number(settings.coastlineWidth)))
         setIfChanged(setCoastlineWidth, 'coastlineWidth', Number(settings.coastlineWidth))
-      if (settings.coastlineColor) setIfChanged(setCoastlineColor, 'coastlineColor', settings.coastlineColor)
+      if (settings.coastlineColor)
+        setIfChanged(setCoastlineColor, 'coastlineColor', settings.coastlineColor)
       if (Number.isFinite(Number(settings.coastShadingLevel)))
         setIfChanged(setCoastShadingLevel, 'coastShadingLevel', Number(settings.coastShadingLevel))
       // Prefer numeric RGBA fields from backend (always use rgba when present).
       // suppressed verbose coast shading debug logs
 
       if (settings.coastShadingColor) {
-        const hex = colorToHexWithAlpha(settings.coastShadingColor) || colorToHex(settings.coastShadingColor) || settings.coastShadingColor
+        const hex =
+          colorToHexWithAlpha(settings.coastShadingColor) ||
+          colorToHex(settings.coastShadingColor) ||
+          settings.coastShadingColor
         setIfChanged(setCoastShadingColor, 'coastShadingColor', hex)
       }
     },
@@ -350,7 +369,8 @@ export function createSettingsAppliers(setters, currentValues = {}) {
           'gridOverlayRowOrColCount',
           Number(settings.gridOverlayRowOrColCount)
         )
-      if (settings.gridOverlayColor) setIfChanged(setGridOverlayColor, 'gridOverlayColor', settings.gridOverlayColor)
+      if (settings.gridOverlayColor)
+        setIfChanged(setGridOverlayColor, 'gridOverlayColor', settings.gridOverlayColor)
       if (typeof settings.gridOverlayXOffset === 'string')
         setIfChanged(setGridOverlayXOffset, 'gridOverlayXOffset', settings.gridOverlayXOffset)
       if (typeof settings.gridOverlayYOffset === 'string')
@@ -389,7 +409,8 @@ export function createSettingsAppliers(setters, currentValues = {}) {
 
       if (Number.isFinite(Number(settings.oceanShadingLevel)))
         setIfChanged(setOceanShadingLevel, 'oceanShadingLevel', Number(settings.oceanShadingLevel))
-      if (settings.oceanShadingColor) setIfChanged(setOceanShadingColor, 'oceanShadingColor', settings.oceanShadingColor)
+      if (settings.oceanShadingColor)
+        setIfChanged(setOceanShadingColor, 'oceanShadingColor', settings.oceanShadingColor)
       // Prefer the newer `oceanWavesType` field, but fall back to the
       // legacy `oceanEffect` when present so uploaded .nort files that
       // contain `oceanEffect` still update the UI correctly.
@@ -401,7 +422,10 @@ export function createSettingsAppliers(setters, currentValues = {}) {
       if (Number.isFinite(Number(settings.oceanWavesLevel)))
         setIfChanged(setOceanWavesLevel, 'oceanWavesLevel', Number(settings.oceanWavesLevel))
       if (settings.oceanWavesColor) {
-        const hex = colorToHexWithAlpha(settings.oceanWavesColor) || colorToHex(settings.oceanWavesColor) || settings.oceanWavesColor
+        const hex =
+          colorToHexWithAlpha(settings.oceanWavesColor) ||
+          colorToHex(settings.oceanWavesColor) ||
+          settings.oceanWavesColor
         setIfChanged(setOceanWavesColor, 'oceanWavesColor', hex)
       }
       if (typeof settings.drawOceanEffectsInLakes === 'boolean')
@@ -411,7 +435,10 @@ export function createSettingsAppliers(setters, currentValues = {}) {
           settings.drawOceanEffectsInLakes
         )
       if (settings.riverColor) {
-        const hex = colorToHexWithAlpha(settings.riverColor) || colorToHex(settings.riverColor) || settings.riverColor
+        const hex =
+          colorToHexWithAlpha(settings.riverColor) ||
+          colorToHex(settings.riverColor) ||
+          settings.riverColor
         setIfChanged(setRiverColor, 'riverColor', hex)
       }
 
@@ -472,13 +499,19 @@ export function createSettingsAppliers(setters, currentValues = {}) {
       setIfChanged(setCitiesFontFamily, 'citiesFontFamily', fontSpecToFamily(settings.citiesFont))
       setIfChanged(setRiverFontFamily, 'riverFontFamily', fontSpecToFamily(settings.riverFont))
       if (settings.textColor) {
-        const hex = colorToHexWithAlpha(settings.textColor) || colorToHex(settings.textColor) || settings.textColor
+        const hex =
+          colorToHexWithAlpha(settings.textColor) ||
+          colorToHex(settings.textColor) ||
+          settings.textColor
         setIfChanged(setTextColor, 'textColor', hex)
       }
       if (typeof settings.drawBoldBackground === 'boolean')
         setIfChanged(setDrawBoldBackground, 'drawBoldBackground', settings.drawBoldBackground)
       if (settings.boldBackgroundColor) {
-        const hex = colorToHexWithAlpha(settings.boldBackgroundColor) || colorToHex(settings.boldBackgroundColor) || settings.boldBackgroundColor
+        const hex =
+          colorToHexWithAlpha(settings.boldBackgroundColor) ||
+          colorToHex(settings.boldBackgroundColor) ||
+          settings.boldBackgroundColor
         setIfChanged(setBoldBackgroundColor, 'boldBackgroundColor', hex)
       }
     },

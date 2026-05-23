@@ -235,8 +235,6 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     triggerPreviewRefresh()
   }
 
-
-
   // Use the `handlers` object directly; accessors below will reference `handlers.<name>`.
 
   // Consolidated map of setter functions so they can be spread into `tabProps`.
@@ -470,7 +468,10 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
   // when there is no generated map available (and no loaded .nort/file).
   const hasConcreteSource = Boolean(fileObj || currentSource?.nortContent || hasGeneratedOnce)
   const canDownloadSettings =
-    !loading && hasCustomizationSource && hasConcreteSource && !(customizationDirty && hasGeneratedOnce)
+    !loading &&
+    hasCustomizationSource &&
+    hasConcreteSource &&
+    !(customizationDirty && hasGeneratedOnce)
   const canDownloadMap =
     !loading &&
     hasCustomizationSource &&
@@ -609,14 +610,13 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
                 height: 28,
                 // Use CSS-friendly rgba() for consistent rendering even when
                 // the stored value is canonical 8-digit hex (#RRGGBBAA).
-                background:
-                  (function () {
-                    if (!hexValue) return '#000000'
-                    const ch = parseColorChannels(hexValue)
-                    if (!ch) return '#000000'
-                    const a = (ch.a ?? 255) / 255
-                    return `rgba(${ch.r}, ${ch.g}, ${ch.b}, ${a})`
-                  })(),
+                background: (function () {
+                  if (!hexValue) return '#000000'
+                  const ch = parseColorChannels(hexValue)
+                  if (!ch) return '#000000'
+                  const a = (ch.a ?? 255) / 255
+                  return `rgba(${ch.r}, ${ch.g}, ${ch.b}, ${a})`
+                })(),
                 border: '1px solid #bbb',
                 cursor: disabled ? 'default' : 'pointer',
                 opacity: disabled ? 0.5 : 1,

@@ -37,7 +37,6 @@ import useNortBuilder from './hooks/useNortBuilder'
 import useApplyMergedSettings from './hooks/useApplyMergedSettings'
 const API_BASE = import.meta.env.VITE_API_BASE || '/api'
 
-
 const RANDOM_OVERRIDES_STORAGE_KEY = 'vellaris-random-manual-overrides'
 const CUSTOMIZE_OVERRIDES_STORAGE_KEY = 'vellaris-customize-overrides'
 // Helpers to apply UI values into parsed settings. These accept a
@@ -126,8 +125,11 @@ function GenerateForm({ uiLanguage = 'en' }) {
   const [finalSeed, setFinalSeed] = useState('')
 
   // --- Generate from Settings: theme overrides ---
-  const { values: customizeValues, setters: customizeSetters, customizeDeps } =
-    useCustomizeSettings(initialCustomize)
+  const {
+    values: customizeValues,
+    setters: customizeSetters,
+    customizeDeps,
+  } = useCustomizeSettings(initialCustomize)
 
   const {
     backgroundType,
@@ -433,8 +435,8 @@ function GenerateForm({ uiLanguage = 'en' }) {
       setString(setOtherMountainsFontFamily, defs.otherMountainsFontFamily)
       setString(setCitiesFontFamily, defs.citiesFontFamily)
       setString(setRiverFontFamily, defs.riverFontFamily)
-        setString(setTextColor, defs.textColor)
-        setString(setBoldBackgroundColor, defs.boldBackgroundColor)
+      setString(setTextColor, defs.textColor)
+      setString(setBoldBackgroundColor, defs.boldBackgroundColor)
       const backendDefaultFont =
         Array.isArray(opts?.fonts) && opts.fonts.length > 0 ? opts.fonts[0] : null
       if (backendDefaultFont) {
@@ -978,10 +980,7 @@ function GenerateForm({ uiLanguage = 'en' }) {
   // Use helper functions
   // Helper: preserve grid overlay alpha from prior settings if color unchanged
   function getGridOverlayAlpha() {
-    return computeGridOverlayAlpha(
-      mergedSettingsRef?.current?.gridOverlayColor,
-      gridOverlayColor
-    )
+    return computeGridOverlayAlpha(mergedSettingsRef?.current?.gridOverlayColor, gridOverlayColor)
   }
 
   // Helper: handle wave count preservation

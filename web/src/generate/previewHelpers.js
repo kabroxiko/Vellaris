@@ -34,8 +34,7 @@ export const PREVIEW_TRIGGER_KEYS = [
 ]
 
 export function computePreviewTriggerKey(previewFields) {
-  const { colorizeLand, colorizeOcean, landColor, oceanColor, ...rest } =
-    previewFields || {}
+  const { colorizeLand, colorizeOcean, landColor, oceanColor, ...rest } = previewFields || {}
   return JSON.stringify(rest)
 }
 

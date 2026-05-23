@@ -140,11 +140,17 @@ export async function prepareBitmapsModule(
     typeof opts?.colorizeOcean === 'boolean'
       ? opts.colorizeOcean
       : (previewFields?.colorizeOcean ?? defaults.colorizeOcean)
-  const useOceanColor =
-    opts?.oceanColor || previewFields?.oceanColor || defaults.oceanColor
+  const useOceanColor = opts?.oceanColor || previewFields?.oceanColor || defaults.oceanColor
   const SEPPIA_HEX = '#C8A082'
   if (useColorizeOcean && useOceanColor) {
-    processed.displayBitmap = await colorizeBitmap(imgBitmap, useOceanColor, w, h, previewFields, opts)
+    processed.displayBitmap = await colorizeBitmap(
+      imgBitmap,
+      useOceanColor,
+      w,
+      h,
+      previewFields,
+      opts
+    )
   } else {
     processed.displayBitmap = await colorizeBitmap(imgBitmap, SEPPIA_HEX, w, h, previewFields, opts)
   }

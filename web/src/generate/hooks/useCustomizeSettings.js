@@ -91,8 +91,10 @@ export default function useCustomizeSettings(initialCustomize = {}) {
     })
   )
 
-
-  const customizeDeps = useMemo(() => keys.map((k) => values[k]), keys.map((k) => values[k]))
+  const customizeDeps = useMemo(
+    () => keys.map((k) => values[k]),
+    keys.map((k) => values[k])
+  )
 
   useEffect(() => {
     persistCustomizeOverrides(values)

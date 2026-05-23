@@ -4,7 +4,8 @@ import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest'
 
 // Mock tab components similar to other CustomizeSettingsSection tests
 vi.mock('../tabs/BackgroundTab', () => ({
-  default: (props) => React.createElement('div', {}, 'BackgroundTab:' + (props.backgroundType || '')),
+  default: (props) =>
+    React.createElement('div', {}, 'BackgroundTab:' + (props.backgroundType || '')),
 }))
 vi.mock('../tabs/BorderTab', () => ({
   default: () => React.createElement('div', {}, 'BorderTab'),
@@ -52,13 +53,26 @@ describe('CustomizeSettingsSection tabs', () => {
           'theme.tab.effects': 'EF',
           'theme.tab.fonts': 'FN',
         },
-        options: { fonts: [], gridOverlayShapes: [], gridOverlayOffsets: [], gridOverlayLayers: [], backgroundTypes: [], strokeTypes: [], borderPositions: [], borderColorOptions: [], lineStyles: [], oceanWaveTypes: [] },
+        options: {
+          fonts: [],
+          gridOverlayShapes: [],
+          gridOverlayOffsets: [],
+          gridOverlayLayers: [],
+          backgroundTypes: [],
+          strokeTypes: [],
+          borderPositions: [],
+          borderColorOptions: [],
+          lineStyles: [],
+          oceanWaveTypes: [],
+        },
       },
       textures: [],
     }
     const ui = { loading: false, customizationDirty: false, hasGeneratedOnce: false }
 
-    render(<CustomizeSettingsSection values={values} handlers={handlers} options={options} ui={ui} />)
+    render(
+      <CustomizeSettingsSection values={values} handlers={handlers} options={options} ui={ui} />
+    )
 
     // By default first tab (background) should be active and show BackgroundTab mock
     expect(screen.getByText(/^BackgroundTab/)).toBeTruthy()

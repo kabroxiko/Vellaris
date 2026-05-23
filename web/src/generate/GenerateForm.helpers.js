@@ -171,7 +171,9 @@ export function loadCustomizeOverrides() {
 // duplicating simple setter patterns across multiple files.
 export function setHex(setter, value) {
   if (value) {
-    const h = colorToHexWithAlpha ? colorToHexWithAlpha(value) || colorToHex(value) : colorToHex(value)
+    const h = colorToHexWithAlpha
+      ? colorToHexWithAlpha(value) || colorToHex(value)
+      : colorToHex(value)
     if (h) setter(h)
   }
 }
@@ -223,7 +225,8 @@ export function convertScaleToSlider(scale) {
 export function applyRoadStyleHelper(defs, setRoadStyle, setRoadWidth, setRoadColor) {
   if (typeof defs.roadStyle === 'object' && defs.roadStyle !== null) {
     if (typeof defs.roadStyle.type === 'string') setString(setRoadStyle, defs.roadStyle.type)
-    if (Number.isFinite(Number(defs.roadStyle.width))) setNumber(setRoadWidth, Number(defs.roadStyle.width))
+    if (Number.isFinite(Number(defs.roadStyle.width)))
+      setNumber(setRoadWidth, Number(defs.roadStyle.width))
   } else if (typeof defs.roadStyle === 'string') {
     setString(setRoadStyle, defs.roadStyle)
   }

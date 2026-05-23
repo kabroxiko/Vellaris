@@ -4,7 +4,8 @@ import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest'
 
 // Mock tab components to keep tests focused and lightweight
 vi.mock('../tabs/BackgroundTab', () => ({
-  default: (props) => React.createElement('div', {}, 'BackgroundTab:' + (props.backgroundType || '')),
+  default: (props) =>
+    React.createElement('div', {}, 'BackgroundTab:' + (props.backgroundType || '')),
 }))
 vi.mock('../tabs/BorderTab', () => ({
   default: () => React.createElement('div', {}, 'BorderTab'),
@@ -55,11 +56,34 @@ describe('CustomizeSettingsSection', () => {
   it('renders section title, tabs and preview empty when no preview', () => {
     const values = { preview: null, fileObj: null, currentSource: null }
     const options = {
-      i18n: { labels: { 'ui.title.customize': 'Customize', 'ui.preview.empty': 'No preview', 'theme.tab.background': 'BG', 'theme.tab.border': 'BR', 'theme.tab.effects': 'EF', 'theme.tab.fonts': 'FN' }, options: { fonts: [], gridOverlayShapes: [], gridOverlayOffsets: [], gridOverlayLayers: [], backgroundTypes: [], strokeTypes: [], borderPositions: [], borderColorOptions: [], lineStyles: [], oceanWaveTypes: [] } },
+      i18n: {
+        labels: {
+          'ui.title.customize': 'Customize',
+          'ui.preview.empty': 'No preview',
+          'theme.tab.background': 'BG',
+          'theme.tab.border': 'BR',
+          'theme.tab.effects': 'EF',
+          'theme.tab.fonts': 'FN',
+        },
+        options: {
+          fonts: [],
+          gridOverlayShapes: [],
+          gridOverlayOffsets: [],
+          gridOverlayLayers: [],
+          backgroundTypes: [],
+          strokeTypes: [],
+          borderPositions: [],
+          borderColorOptions: [],
+          lineStyles: [],
+          oceanWaveTypes: [],
+        },
+      },
       textures: [],
     }
     const ui = { loading: false, customizationDirty: false, hasGeneratedOnce: false }
-    render(<CustomizeSettingsSection values={values} handlers={handlers} options={options} ui={ui} />)
+    render(
+      <CustomizeSettingsSection values={values} handlers={handlers} options={options} ui={ui} />
+    )
     expect(screen.getByText('Customize')).toBeTruthy()
     // tabs should render labels from i18n
     expect(screen.getByText('BG')).toBeTruthy()
@@ -71,13 +95,41 @@ describe('CustomizeSettingsSection', () => {
   })
 
   it('shows preview image and opens modal on click, and enables download when generated', () => {
-    const values = { preview: { url: 'blob://u3', filename: 'map.png' }, fileObj: null, currentSource: null }
+    const values = {
+      preview: { url: 'blob://u3', filename: 'map.png' },
+      fileObj: null,
+      currentSource: null,
+    }
     const options = {
-      i18n: { labels: { 'ui.title.customize': 'Customize', 'ui.preview.empty': 'No preview', 'ui.preview.open': 'Open', 'ui.button.downloadMap': 'Download Map', 'ui.button.downloadSettings': 'Download Settings', 'ui.button.regenerate': 'Regenerate', 'ui.generating': 'Generating' }, options: { fonts: [], gridOverlayShapes: [], gridOverlayOffsets: [], gridOverlayLayers: [], backgroundTypes: [], strokeTypes: [], borderPositions: [], borderColorOptions: [], lineStyles: [], oceanWaveTypes: [] } },
+      i18n: {
+        labels: {
+          'ui.title.customize': 'Customize',
+          'ui.preview.empty': 'No preview',
+          'ui.preview.open': 'Open',
+          'ui.button.downloadMap': 'Download Map',
+          'ui.button.downloadSettings': 'Download Settings',
+          'ui.button.regenerate': 'Regenerate',
+          'ui.generating': 'Generating',
+        },
+        options: {
+          fonts: [],
+          gridOverlayShapes: [],
+          gridOverlayOffsets: [],
+          gridOverlayLayers: [],
+          backgroundTypes: [],
+          strokeTypes: [],
+          borderPositions: [],
+          borderColorOptions: [],
+          lineStyles: [],
+          oceanWaveTypes: [],
+        },
+      },
       textures: [],
     }
     const ui = { loading: false, customizationDirty: false, hasGeneratedOnce: true }
-    render(<CustomizeSettingsSection values={values} handlers={handlers} options={options} ui={ui} />)
+    render(
+      <CustomizeSettingsSection values={values} handlers={handlers} options={options} ui={ui} />
+    )
     // preview image is present
     const img = screen.getByRole('img')
     expect(img).toBeTruthy()
@@ -94,9 +146,36 @@ describe('CustomizeSettingsSection', () => {
 
   it('disables regenerate while loading and shows generating label', () => {
     const values = { preview: null, fileObj: null, currentSource: null }
-    const options = { i18n: { labels: { 'ui.generating': 'Generating', 'ui.title.customize': 'Customize', 'ui.preview.empty': 'No preview', 'theme.tab.background': 'BG', 'theme.tab.border': 'BR', 'theme.tab.effects': 'EF', 'theme.tab.fonts': 'FN' }, options: { fonts: [], gridOverlayShapes: [], gridOverlayOffsets: [], gridOverlayLayers: [], backgroundTypes: [], strokeTypes: [], borderPositions: [], borderColorOptions: [], lineStyles: [], oceanWaveTypes: [] } }, textures: [] }
+    const options = {
+      i18n: {
+        labels: {
+          'ui.generating': 'Generating',
+          'ui.title.customize': 'Customize',
+          'ui.preview.empty': 'No preview',
+          'theme.tab.background': 'BG',
+          'theme.tab.border': 'BR',
+          'theme.tab.effects': 'EF',
+          'theme.tab.fonts': 'FN',
+        },
+        options: {
+          fonts: [],
+          gridOverlayShapes: [],
+          gridOverlayOffsets: [],
+          gridOverlayLayers: [],
+          backgroundTypes: [],
+          strokeTypes: [],
+          borderPositions: [],
+          borderColorOptions: [],
+          lineStyles: [],
+          oceanWaveTypes: [],
+        },
+      },
+      textures: [],
+    }
     const ui = { loading: true, customizationDirty: false, hasGeneratedOnce: false }
-    render(<CustomizeSettingsSection values={values} handlers={handlers} options={options} ui={ui} />)
+    render(
+      <CustomizeSettingsSection values={values} handlers={handlers} options={options} ui={ui} />
+    )
     const submitBtn = screen.getByRole('button', { name: /Generating/i })
     expect(submitBtn.disabled).toBe(true)
   })

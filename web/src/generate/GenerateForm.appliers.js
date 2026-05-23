@@ -110,7 +110,9 @@ export function applyGridAndColoringHoisted(parsedSettings, ctx) {
   if (gridOverlayColor) {
     const alpha = getGridOverlayAlpha()
     parsedSettings.gridOverlayColor =
-      colorToHexWithAlpha(gridOverlayColor, alpha) || colorToHex(gridOverlayColor) || gridOverlayColor
+      colorToHexWithAlpha(gridOverlayColor, alpha) ||
+      colorToHex(gridOverlayColor) ||
+      gridOverlayColor
   }
   if (gridOverlayXOffset) parsedSettings.gridOverlayXOffset = gridOverlayXOffset
   if (gridOverlayYOffset) parsedSettings.gridOverlayYOffset = gridOverlayYOffset
@@ -185,7 +187,8 @@ export function applyCoastOceanAndWavesHoisted(parsedSettings, ctx) {
   if (Number.isFinite(Number(coastShadingLevel)))
     parsedSettings.coastShadingLevel = Number(coastShadingLevel)
   if (coastShadingColor) parsedSettings.coastShadingColor = coastShadingColor
-  if (Number.isFinite(Number(oceanShadingLevel))) parsedSettings.oceanShadingLevel = Number(oceanShadingLevel)
+  if (Number.isFinite(Number(oceanShadingLevel)))
+    parsedSettings.oceanShadingLevel = Number(oceanShadingLevel)
   if (oceanShadingColor) parsedSettings.oceanShadingColor = oceanShadingColor
   if (oceanWavesType) parsedSettings.oceanEffect = oceanWavesType
   if (Number.isFinite(Number(oceanWavesLevel)))

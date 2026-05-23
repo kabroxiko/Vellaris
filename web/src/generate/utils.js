@@ -99,7 +99,8 @@ export function colorToHexWithAlpha(value, alphaOverride = undefined) {
   }
 
   if (!channels) return null
-  const a = alphaOverride !== undefined && alphaOverride !== null ? Number(alphaOverride) : channels.a
+  const a =
+    alphaOverride !== undefined && alphaOverride !== null ? Number(alphaOverride) : channels.a
   const rHex = channels.r.toString(16).padStart(2, '0')
   const gHex = channels.g.toString(16).padStart(2, '0')
   const bHex = channels.b.toString(16).padStart(2, '0')

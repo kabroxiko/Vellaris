@@ -157,15 +157,17 @@ export default function EffectsTab(props) {
             max={100}
             step={1}
             value={coastShadingColor ? 100 - colorToAlphaPercent(coastShadingColor) : 0}
-              onChange={(e) => {
-                const v = Number(e.target.value)
-                const alphaPercent = 100 - v
-                const combined = formatColorString(coastShadingColor, alphaPercent)
-                setCoastShadingColor(combined)
-              }}
+            onChange={(e) => {
+              const v = Number(e.target.value)
+              const alphaPercent = 100 - v
+              const combined = formatColorString(coastShadingColor, alphaPercent)
+              setCoastShadingColor(combined)
+            }}
             disabled={finalLandColoringMethod === 'SingleColor'}
           />
-          <span className="slider-value">{Math.round(coastShadingColor ? 100 - colorToAlphaPercent(coastShadingColor) : 0)}</span>
+          <span className="slider-value">
+            {Math.round(coastShadingColor ? 100 - colorToAlphaPercent(coastShadingColor) : 0)}
+          </span>
         </div>
 
         <label htmlFor="ocean-shading-level-input">
@@ -222,12 +224,12 @@ export default function EffectsTab(props) {
             label: translateLabel('theme.oceanShadingColor.label'),
             hexValue: oceanShadingColor,
             onHexChange: setOceanShadingColor,
-              alphaValue: oceanShadingColor ? 100 - colorToAlphaPercent(oceanShadingColor) : 0,
-              onAlphaChange: (v) => {
-                const alphaPercent = 100 - Number(v)
-                const combined = formatColorString(oceanShadingColor, alphaPercent)
-                setOceanShadingColor(combined)
-              },
+            alphaValue: oceanShadingColor ? 100 - colorToAlphaPercent(oceanShadingColor) : 0,
+            onAlphaChange: (v) => {
+              const alphaPercent = 100 - Number(v)
+              const combined = formatColorString(oceanShadingColor, alphaPercent)
+              setOceanShadingColor(combined)
+            },
             showState: showOceanPicker,
             setShowState: setShowOceanPicker,
             disabled: shouldReplace,
