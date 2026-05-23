@@ -1,15 +1,17 @@
 import backgroundBaseCache from './backgroundBaseCache'
-import { hexToHSB, mulberry32, hsbToRgb, hexWithAlpha } from './sharedHelpers'
+import { hexToHSB, mulberry32, hsbToRgb } from './sharedHelpers'
+import { colorToHex } from './utils'
 
 // Helpers extracted from CustomizeSettingsSection to allow reuse and smaller component files
 // Exported for tests and for the preview hook.
-export async function colorizeBitmap(sourceBitmap, colorHex, w, h, previewFieldsLocal, opts) {
+export async function colorizeBitmap(sourceBitmap, color, w, h, previewFieldsLocal, opts) {
   const alg = String(previewFieldsLocal?.backgroundType || '')
     .toLowerCase()
     .includes('fractal')
     ? 'algorithm2'
     : 'algorithm3'
-  const hsb = hexToHSB(colorHex)
+  const hex = colorToHex(color) || color
+  const hsb = hexToHSB(hex)
   const tmp = document.createElement('canvas')
   tmp.width = w
   tmp.height = h
@@ -85,7 +87,7 @@ export function drawIslandShape(opts) {
     displayBitmap,
     imgBitmap,
     coastlineWidth = undefined,
-    coastlineColorHex = undefined,
+    coastlineColor = undefined,
   } = opts || {}
   const points = 32
   const jitterX = Math.max(6, Math.round(xRadius * 0.18))
@@ -113,9 +115,7 @@ export function drawIslandShape(opts) {
     const computedDefaultWidth = Math.max(1, Math.round(baseRadius * 0.03))
     const strokeW = typeof coastlineWidth === 'number' ? coastlineWidth : computedDefaultWidth
     if (strokeW > 0) {
-      ctx.strokeStyle = coastlineColorHex
-        ? hexWithAlpha(coastlineColorHex, 100)
-        : 'rgba(255,255,240,0.55)'
+      ctx.strokeStyle = coastlineColor
       ctx.lineWidth = strokeW
       ctx.lineJoin = 'round'
       ctx.stroke()
@@ -140,18 +140,11 @@ export async function prepareBitmapsModule(
     typeof opts?.colorizeOcean === 'boolean'
       ? opts.colorizeOcean
       : (previewFields?.colorizeOcean ?? defaults.colorizeOcean)
-  const useOceanColorHex =
-    opts?.oceanColorHex || previewFields?.oceanColorHex || defaults.oceanColorHex
+  const useOceanColor =
+    opts?.oceanColor || previewFields?.oceanColor || defaults.oceanColor
   const SEPPIA_HEX = '#C8A082'
-  if (useColorizeOcean && useOceanColorHex) {
-    processed.displayBitmap = await colorizeBitmap(
-      imgBitmap,
-      useOceanColorHex,
-      w,
-      h,
-      previewFields,
-      opts
-    )
+  if (useColorizeOcean && useOceanColor) {
+    processed.displayBitmap = await colorizeBitmap(imgBitmap, useOceanColor, w, h, previewFields, opts)
   } else {
     processed.displayBitmap = await colorizeBitmap(imgBitmap, SEPPIA_HEX, w, h, previewFields, opts)
   }
@@ -160,16 +153,9 @@ export async function prepareBitmapsModule(
     typeof opts?.colorizeLand === 'boolean'
       ? opts.colorizeLand
       : (previewFields?.colorizeLand ?? defaults.colorizeLand)
-  const useLandColorHex = opts?.landColorHex || previewFields?.landColorHex || defaults.landColorHex
-  if (useColorizeLand && useLandColorHex) {
-    processed.landBitmap = await colorizeBitmap(
-      imgBitmap,
-      useLandColorHex,
-      w,
-      h,
-      previewFields,
-      opts
-    )
+  const useLandColor = opts?.landColor || previewFields?.landColor || defaults.landColor
+  if (useColorizeLand && useLandColor) {
+    processed.landBitmap = await colorizeBitmap(imgBitmap, useLandColor, w, h, previewFields, opts)
   } else {
     processed.landBitmap = await colorizeBitmap(imgBitmap, SEPPIA_HEX, w, h, previewFields, opts)
   }
@@ -231,7 +217,7 @@ export async function composeMiniIslandFromBlobModule(
     displayBitmap,
     imgBitmap,
     coastlineWidth: previewFields?.coastlineWidth,
-    coastlineColorHex: previewFields?.coastlineColorHex,
+    coastlineColor: previewFields?.coastlineColor,
   })
 
   return await new Promise((resolve) => canvas.toBlob(resolve))

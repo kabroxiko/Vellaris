@@ -39,7 +39,7 @@ describe('BackgroundTab component', () => {
 
   it('calls recomposeUsingLastBase when land color control onClose runs', () => {
     const recomposeUsingLastBase = vi.fn()
-    const setLandColorHex = vi.fn()
+    const setLandColor = vi.fn()
     const notifyManualChange = vi.fn()
     const renderColorControl = ({ id, onClose, onHexChange, hexValue }) => {
       if (id !== 'land-color') return null
@@ -64,12 +64,12 @@ describe('BackgroundTab component', () => {
       recomposeUsingLastBase,
       colorizeLand: true,
       finalLandColoringMethod: 'SingleColor',
-      landColorHex: '#001122',
-      setLandColorHex,
+      landColor: '#001122',
+      setLandColor,
     }
 
     const { getByTestId } = render(<BackgroundTab {...props} />)
     fireEvent.click(getByTestId('color-close'))
-    expect(recomposeUsingLastBase).toHaveBeenCalledWith({ landColorHex: '#001122' })
+    expect(recomposeUsingLastBase).toHaveBeenCalledWith({ landColor: '#001122' })
   })
 })

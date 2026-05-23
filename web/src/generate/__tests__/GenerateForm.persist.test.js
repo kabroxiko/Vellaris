@@ -20,7 +20,7 @@ describe('GenerateForm persistCustomizeOverrides', () => {
       width: 100,
       height: 200,
       drawText: true,
-      textColorHex: '#112233',
+      textColor: '#112233',
     }
     const payload = buildCustomizePayload(values)
     persistCustomizeOverrides(values)

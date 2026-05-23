@@ -11,8 +11,8 @@ function RegionBoundaryControls({
   setRegionBoundaryStyle,
   regionBoundaryWidth,
   setRegionBoundaryWidth,
-  regionBoundaryColorHex,
-  setRegionBoundaryColorHex,
+  regionBoundaryColor,
+  setRegionBoundaryColor,
   showRegionBoundaryPicker,
   setShowRegionBoundaryPicker,
   renderColorControl,
@@ -57,8 +57,8 @@ function RegionBoundaryControls({
       {renderColorControl({
         id: 'region-boundary-color',
         label: translateLabel('theme.regionBoundaryColor.title'),
-        hexValue: regionBoundaryColorHex,
-        onHexChange: setRegionBoundaryColorHex,
+        hexValue: regionBoundaryColor,
+        onHexChange: setRegionBoundaryColor,
         showState: showRegionBoundaryPicker,
         setShowState: setShowRegionBoundaryPicker,
         disabled: !drawRegionBoundaries,
@@ -75,8 +75,8 @@ function LandColorControls({
   colorizeLand,
   finalLandColoringMethod,
   setFinalLandColoringMethod,
-  landColorHex,
-  setLandColorHex,
+  landColor,
+  setLandColor,
   showLandPicker,
   setShowLandPicker,
   notifyManualChange,
@@ -112,9 +112,9 @@ function LandColorControls({
       {renderColorControl({
         id: 'land-color',
         label: translateLabel('theme.landColor.label'),
-        hexValue: landColorHex,
+        hexValue: landColor,
         onHexChange: (hex) => {
-          setLandColorHex(hex)
+          setLandColor(hex)
           notifyManualChange()
         },
         showState: showLandPicker,
@@ -122,7 +122,7 @@ function LandColorControls({
         disabled: !colorizeLand || finalLandColoringMethod === 'ColorPoliticalRegions',
         onClose: () => {
           try {
-            recomposeUsingLastBase({ landColorHex: landColorHex })
+            recomposeUsingLastBase({ landColor: landColor })
           } catch (err) {
             if (typeof console !== 'undefined' && console.debug)
               console.debug('BackgroundTab: recomposeUsingLastBase failed', err)
@@ -137,8 +137,8 @@ function OceanColorControls({
   translateLabel,
   renderColorControl,
   colorizeOcean,
-  oceanColorHex,
-  setOceanColorHex,
+  oceanColor,
+  setOceanColor,
   showOceanPicker,
   setShowOceanPicker,
   notifyManualChange,
@@ -152,9 +152,9 @@ function OceanColorControls({
       {renderColorControl({
         id: 'ocean-color',
         label: translateLabel('theme.oceanColor.label'),
-        hexValue: oceanColorHex,
+        hexValue: oceanColor,
         onHexChange: (hex) => {
-          setOceanColorHex(hex)
+          setOceanColor(hex)
           notifyManualChange()
         },
         showState: showOceanPicker,
@@ -162,7 +162,7 @@ function OceanColorControls({
         disabled: !colorizeOcean,
         onClose: () => {
           try {
-            recomposeUsingLastBase({ oceanColorHex: oceanColorHex })
+            recomposeUsingLastBase({ oceanColor: oceanColor })
           } catch (err) {
             if (typeof console !== 'undefined' && console.debug)
               console.debug('BackgroundTab: recomposeUsingLastBase failed', err)
@@ -428,8 +428,8 @@ function GridOverlayControls({
   setGridOverlayRowOrColCount,
   gridOverlayLineWidth,
   setGridOverlayLineWidth,
-  gridOverlayColorHex,
-  setGridOverlayColorHex,
+  gridOverlayColor,
+  setGridOverlayColor,
   showGridPicker,
   setShowGridPicker,
   gridOverlayOffsets,
@@ -476,8 +476,8 @@ function GridOverlayControls({
       {renderColorControl({
         id: 'grid-color',
         label: translateLabel('theme.color.label'),
-        hexValue: gridOverlayColorHex,
-        onHexChange: setGridOverlayColorHex,
+        hexValue: gridOverlayColor,
+        onHexChange: setGridOverlayColor,
         showState: showGridPicker,
         setShowState: setShowGridPicker,
         disabled: !drawGridOverlay,
@@ -539,24 +539,24 @@ export default function BackgroundTab(props) {
     setRegionBoundaryStyle,
     regionBoundaryWidth = 0,
     setRegionBoundaryWidth,
-    regionBoundaryColorHex,
-    setRegionBoundaryColorHex,
+    regionBoundaryColor,
+    setRegionBoundaryColor,
     showRegionBoundaryPicker = false,
     setShowRegionBoundaryPicker,
     colorizeLand = false,
     setColorizeLand,
     finalLandColoringMethod,
     setFinalLandColoringMethod,
-    landColorHex,
-    setLandColorHex,
+    landColor,
+    setLandColor,
     showLandPicker = false,
     setShowLandPicker,
     colorizeOcean = false,
     setColorizeOcean,
     showOceanPicker = false,
     setShowOceanPicker,
-    oceanColorHex,
-    setOceanColorHex,
+    oceanColor,
+    setOceanColor,
     backgroundSeed,
     sanitizeSeedValue = (v) => v,
     setBackgroundSeed,
@@ -568,8 +568,8 @@ export default function BackgroundTab(props) {
     setGridOverlayRowOrColCount,
     gridOverlayLineWidth = 0,
     setGridOverlayLineWidth,
-    gridOverlayColorHex,
-    setGridOverlayColorHex,
+    gridOverlayColor,
+    setGridOverlayColor,
     gridOverlayOffsets = [],
     gridOverlayXOffset,
     setGridOverlayXOffset,
@@ -642,8 +642,8 @@ export default function BackgroundTab(props) {
           setRegionBoundaryStyle={setRegionBoundaryStyle}
           regionBoundaryWidth={regionBoundaryWidth}
           setRegionBoundaryWidth={setRegionBoundaryWidth}
-          regionBoundaryColorHex={regionBoundaryColorHex}
-          setRegionBoundaryColorHex={setRegionBoundaryColorHex}
+          regionBoundaryColor={regionBoundaryColor}
+          setRegionBoundaryColor={setRegionBoundaryColor}
           showRegionBoundaryPicker={showRegionBoundaryPicker}
           setShowRegionBoundaryPicker={setShowRegionBoundaryPicker}
           renderColorControl={renderColorControl}
@@ -679,8 +679,8 @@ export default function BackgroundTab(props) {
           colorizeLand={colorizeLand}
           finalLandColoringMethod={finalLandColoringMethod}
           setFinalLandColoringMethod={setFinalLandColoringMethod}
-          landColorHex={landColorHex}
-          setLandColorHex={setLandColorHex}
+          landColor={landColor}
+          setLandColor={setLandColor}
           showLandPicker={showLandPicker}
           setShowLandPicker={setShowLandPicker}
           notifyManualChange={notifyManualChange}
@@ -714,8 +714,8 @@ export default function BackgroundTab(props) {
           translateLabel={translateLabel}
           renderColorControl={renderColorControl}
           colorizeOcean={colorizeOcean}
-          oceanColorHex={oceanColorHex}
-          setOceanColorHex={setOceanColorHex}
+          oceanColor={oceanColor}
+          setOceanColor={setOceanColor}
           showOceanPicker={showOceanPicker}
           setShowOceanPicker={setShowOceanPicker}
           notifyManualChange={notifyManualChange}
@@ -756,8 +756,8 @@ export default function BackgroundTab(props) {
           setGridOverlayRowOrColCount={setGridOverlayRowOrColCount}
           gridOverlayLineWidth={gridOverlayLineWidth}
           setGridOverlayLineWidth={setGridOverlayLineWidth}
-          gridOverlayColorHex={gridOverlayColorHex}
-          setGridOverlayColorHex={setGridOverlayColorHex}
+          gridOverlayColor={gridOverlayColor}
+          setGridOverlayColor={setGridOverlayColor}
           showGridPicker={showGridPicker}
           setShowGridPicker={setShowGridPicker}
           gridOverlayOffsets={gridOverlayOffsets}
@@ -818,8 +818,8 @@ BackgroundTab.propTypes = {
   setRegionBoundaryStyle: PropTypes.func,
   regionBoundaryWidth: PropTypes.number,
   setRegionBoundaryWidth: PropTypes.func,
-  regionBoundaryColorHex: PropTypes.string,
-  setRegionBoundaryColorHex: PropTypes.func,
+  regionBoundaryColor: PropTypes.string,
+  setRegionBoundaryColor: PropTypes.func,
   showRegionBoundaryPicker: PropTypes.bool,
   setShowRegionBoundaryPicker: PropTypes.func,
 
@@ -827,8 +827,8 @@ BackgroundTab.propTypes = {
   setColorizeLand: PropTypes.func,
   finalLandColoringMethod: PropTypes.string,
   setFinalLandColoringMethod: PropTypes.func,
-  landColorHex: PropTypes.string,
-  setLandColorHex: PropTypes.func,
+  landColor: PropTypes.string,
+  setLandColor: PropTypes.func,
   showLandPicker: PropTypes.bool,
   setShowLandPicker: PropTypes.func,
 
@@ -836,8 +836,8 @@ BackgroundTab.propTypes = {
   setColorizeOcean: PropTypes.func,
   showOceanPicker: PropTypes.bool,
   setShowOceanPicker: PropTypes.func,
-  oceanColorHex: PropTypes.string,
-  setOceanColorHex: PropTypes.func,
+  oceanColor: PropTypes.string,
+  setOceanColor: PropTypes.func,
 
   backgroundSeed: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
   sanitizeSeedValue: PropTypes.func,
@@ -851,8 +851,8 @@ BackgroundTab.propTypes = {
   setGridOverlayRowOrColCount: PropTypes.func,
   gridOverlayLineWidth: PropTypes.number,
   setGridOverlayLineWidth: PropTypes.func,
-  gridOverlayColorHex: PropTypes.string,
-  setGridOverlayColorHex: PropTypes.func,
+  gridOverlayColor: PropTypes.string,
+  setGridOverlayColor: PropTypes.func,
   gridOverlayOffsets: PropTypes.array,
   gridOverlayXOffset: PropTypes.string,
   setGridOverlayXOffset: PropTypes.func,
@@ -880,8 +880,8 @@ RegionBoundaryControls.propTypes = {
   setRegionBoundaryStyle: PropTypes.func,
   regionBoundaryWidth: PropTypes.number,
   setRegionBoundaryWidth: PropTypes.func,
-  regionBoundaryColorHex: PropTypes.string,
-  setRegionBoundaryColorHex: PropTypes.func,
+  regionBoundaryColor: PropTypes.string,
+  setRegionBoundaryColor: PropTypes.func,
   showRegionBoundaryPicker: PropTypes.bool,
   setShowRegionBoundaryPicker: PropTypes.func,
   renderColorControl: PropTypes.func,
@@ -895,8 +895,8 @@ LandColorControls.propTypes = {
   colorizeLand: PropTypes.bool,
   finalLandColoringMethod: PropTypes.string,
   setFinalLandColoringMethod: PropTypes.func,
-  landColorHex: PropTypes.string,
-  setLandColorHex: PropTypes.func,
+  landColor: PropTypes.string,
+  setLandColor: PropTypes.func,
   showLandPicker: PropTypes.bool,
   setShowLandPicker: PropTypes.func,
   notifyManualChange: PropTypes.func,
@@ -908,8 +908,8 @@ OceanColorControls.propTypes = {
   translateLabel: PropTypes.func,
   renderColorControl: PropTypes.func,
   colorizeOcean: PropTypes.bool,
-  oceanColorHex: PropTypes.string,
-  setOceanColorHex: PropTypes.func,
+  oceanColor: PropTypes.string,
+  setOceanColor: PropTypes.func,
   showOceanPicker: PropTypes.bool,
   setShowOceanPicker: PropTypes.func,
   notifyManualChange: PropTypes.func,
@@ -941,8 +941,8 @@ GridOverlayControls.propTypes = {
   setGridOverlayRowOrColCount: PropTypes.func,
   gridOverlayLineWidth: PropTypes.number,
   setGridOverlayLineWidth: PropTypes.func,
-  gridOverlayColorHex: PropTypes.string,
-  setGridOverlayColorHex: PropTypes.func,
+  gridOverlayColor: PropTypes.string,
+  setGridOverlayColor: PropTypes.func,
   showGridPicker: PropTypes.bool,
   setShowGridPicker: PropTypes.func,
   gridOverlayOffsets: PropTypes.array,

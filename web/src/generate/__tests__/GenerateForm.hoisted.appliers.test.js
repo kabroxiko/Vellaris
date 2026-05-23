@@ -11,16 +11,16 @@ describe('GenerateForm hoisted appliers', () => {
     const ctx = {
       regionBoundaryStyle: 'solid',
       regionBoundaryWidth: '3',
-      regionBoundaryColorHex: '#112233',
+      regionBoundaryColor: '#112233',
       drawRegionBoundaries: true,
       colorizeLand: true,
       colorizeOcean: false,
-      oceanColorHex: '#000000',
-      landColorHex: '#ffffff',
+      oceanColor: '#000000',
+      landColor: '#ffffff',
       drawGridOverlay: true,
       gridOverlayShape: 'hex',
       gridOverlayRowOrColCount: '7',
-      gridOverlayColorHex: '#123456',
+      gridOverlayColor: '#123456',
       gridOverlayXOffset: '10',
       gridOverlayYOffset: '20',
       gridOverlayLineWidth: '2',
@@ -37,9 +37,9 @@ describe('GenerateForm hoisted appliers', () => {
     applyGridAndColoringHoisted(parsed, ctx)
     expect(parsed.regionBoundaryStyle).toBeDefined()
     expect(parsed.regionBoundaryStyle.width).toBe(3)
-    // gridOverlayColor is produced as a numeric rgba string ("r,g,b,a")
+    // gridOverlayColor is produced as canonical '#RRGGBBAA'
     expect(typeof parsed.gridOverlayColor).toBe('string')
-    expect(parsed.gridOverlayColor).toContain('128')
+    expect(parsed.gridOverlayColor).toBe('#12345680')
     expect(parsed.drawRegionColors).toBe(true)
   })
 
@@ -49,14 +49,14 @@ describe('GenerateForm hoisted appliers', () => {
       borderWidth: '12',
       borderPosition: 'inside',
       borderColorOption: 'Choose_color',
-      borderColorHex: '#010203',
+      borderColor: '#010203',
       frayedBorder: true,
       frayedBorderBlurLevel: '5',
       frayedBorderSize: '4',
       frayedBorderSeed: '42',
       drawGrunge: true,
       grungeWidth: '33',
-      frayedBorderColorHex: '#abcdef',
+      frayedBorderColor: '#abcdef',
       mergeColor: (out, key, hex) => {
         if (hex) out[key] = hex
       },
@@ -75,7 +75,7 @@ describe('GenerateForm hoisted appliers', () => {
       drawRoads: true,
       roadStyle: 'dashed',
       roadWidth: '2',
-      roadColorHex: '#123123',
+      roadColor: '#123123',
       mountainSize: '5',
       hillSize: '6',
       duneSize: '7',

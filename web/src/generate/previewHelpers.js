@@ -9,7 +9,7 @@ export const PREVIEW_TRIGGER_KEYS = [
   'drawGridOverlay',
   'gridOverlayShape',
   'gridOverlayRowOrColCount',
-  'gridOverlayColorHex',
+  'gridOverlayColor',
   'gridOverlayXOffset',
   'gridOverlayYOffset',
   'gridOverlayLineWidth',
@@ -17,15 +17,15 @@ export const PREVIEW_TRIGGER_KEYS = [
   'borderWidth',
   'borderPosition',
   'borderColorOption',
-  'borderColorHex',
+  'borderColor',
   'frayedBorder',
   'frayedBorderBlurLevel',
   'frayedBorderSize',
   'frayedBorderSeed',
-  'frayedBorderColorHex',
+  'frayedBorderColor',
   'roadStyle',
   'roadWidth',
-  'roadColorHex',
+  'roadColor',
   'mountainSize',
   'hillSize',
   'duneSize',
@@ -34,7 +34,7 @@ export const PREVIEW_TRIGGER_KEYS = [
 ]
 
 export function computePreviewTriggerKey(previewFields) {
-  const { colorizeLand, colorizeOcean, landColorHex, oceanColorHex, ...rest } =
+  const { colorizeLand, colorizeOcean, landColor, oceanColor, ...rest } =
     previewFields || {}
   return JSON.stringify(rest)
 }

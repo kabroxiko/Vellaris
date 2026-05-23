@@ -52,15 +52,15 @@ describe('GenerateForm helpers (focused)', () => {
   })
 
   it('buildCustomizePayload and persist/load customize overrides via localStorage', () => {
-    const values = { backgroundType: 'SolidColor', drawGridOverlay: true, oceanColorHex: '#112233' }
+    const values = { backgroundType: 'SolidColor', drawGridOverlay: true, oceanColor: '#112233' }
     persistCustomizeOverrides(values)
     const raw = localStorage.getItem('vellaris-customize-overrides')
     expect(raw).toBeTruthy()
     const parsed = JSON.parse(raw)
     expect(parsed.backgroundType).toBe('SolidColor')
-    expect(buildCustomizePayload(values).oceanColorHex).toBe(values.oceanColorHex)
+    expect(buildCustomizePayload(values).oceanColor).toBe(values.oceanColor)
     const loaded = loadCustomizeOverrides()
-    expect(loaded.oceanColorHex).toBe(values.oceanColorHex)
+    expect(loaded.oceanColor).toBe(values.oceanColor)
   })
 
   it('loadRandomOverrides returns empty object when none set and parses stored value', () => {

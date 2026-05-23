@@ -37,17 +37,17 @@ describe('EffectsTab swatchReplacement sanitization', () => {
         brokenLinesForConcentricWaves={false}
         drawOceanEffectsInLakes={false}
         // color fields
-        coastlineColorHex={null}
-        oceanShadingColorHex={null}
+        coastlineColor={null}
+        oceanShadingColor={null}
         showOceanPicker={false}
       />
     )
 
     const oceanColor = screen.getByTestId('color-ocean-shading-color')
     // swatchReplacement should have had HTML removed and placeholder replaced
-    expect(oceanColor.getAttribute('data-swatch')).toContain('PolReg')
-    expect(oceanColor.getAttribute('data-swatch')).not.toMatch(/[<>]/)
+    expect(oceanColor.dataset.swatch).toContain('PolReg')
+    expect(oceanColor.dataset.swatch).not.toMatch(/[<>]/)
     // when replaced, disabled flag should be set
-    expect(oceanColor.getAttribute('data-disabled')).toBe('1')
+    expect(oceanColor.dataset.disabled).toBe('1')
   })
 })

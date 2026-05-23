@@ -17,8 +17,8 @@ describe('FontsTab', () => {
       openFontComboId: null,
       setOpenFontComboId,
       handleFontOptionClick,
-      textColorHex: '#000',
-      setTextColorHex: vi.fn(),
+      textColor: '#000',
+      setTextColor: vi.fn(),
     }
 
     const { rerender } = render(<FontsTab {...props} />)

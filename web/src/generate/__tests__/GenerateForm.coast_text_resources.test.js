@@ -12,16 +12,13 @@ describe('GenerateForm coast/ocean, text/background, and resources appliers', ()
     const ctx = {
       lineStyle: 'dashed',
       coastlineWidth: '3',
-      coastlineColorHex: '#123456',
+      coastlineColor: '#123456',
       coastShadingLevel: '10',
-      coastShadingColorHex: '#abcdef',
-      coastShadingAlpha: '20',
+      coastShadingColor: '#abcdef',
       oceanShadingLevel: '5',
-      oceanShadingColorHex: '#010203',
-      oceanShadingAlpha: '30',
+      oceanShadingColor: '#010203',
       oceanWavesType: 'concentric',
       oceanWavesLevel: '40',
-      oceanWavesAlpha: '12',
       getConcentricWaveCount: () => 4,
       fadeConcentricWaves: true,
       jitterToConcentricWaves: false,
@@ -29,9 +26,9 @@ describe('GenerateForm coast/ocean, text/background, and resources appliers', ()
       mergeColor: (out, key, hex) => {
         if (hex) out[key] = hex
       },
-      oceanWavesColorHex: '#112233',
+      oceanWavesColor: '#112233',
       drawOceanEffectsInLakes: true,
-      riverColorHex: '#445566',
+      riverColor: '#445566',
       parseBooleanWithDefault: Boolean,
       mergedSettingsRef: { current: {} },
     }
@@ -57,9 +54,9 @@ describe('GenerateForm coast/ocean, text/background, and resources appliers', ()
     const parsed = {}
     const ctx = {
       drawText: true,
-      textColorHex: '#000000',
+      textColor: '#000000',
       drawBoldBackground: true,
-      boldBackgroundColorHex: '#ffffff',
+      boldBackgroundColor: '#ffffff',
       mergeColor: (out, key, hex) => {
         if (hex) out[key] = hex
       },

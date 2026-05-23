@@ -14,15 +14,15 @@ export default function FontsTab(props) {
     setOpenFontComboId,
     handleFontOptionClick,
 
-    textColorHex,
-    setTextColorHex,
+    textColor,
+    setTextColor,
     showTextColorPicker = false,
     setShowTextColorPicker,
 
     drawBoldBackground = false,
     setDrawBoldBackground,
-    boldBackgroundColorHex,
-    setBoldBackgroundColorHex,
+    boldBackgroundColor,
+    setBoldBackgroundColor,
     showBoldBackgroundPicker = false,
     setShowBoldBackgroundPicker,
   } = props
@@ -90,8 +90,8 @@ export default function FontsTab(props) {
           {renderColorControl({
             id: 'text-color',
             label: translateLabel('theme.textColor.label'),
-            hexValue: textColorHex,
-            onHexChange: setTextColorHex,
+            hexValue: textColor,
+            onHexChange: setTextColor,
             showState: showTextColorPicker,
             setShowState: setShowTextColorPicker,
             disabled: !drawText,
@@ -116,8 +116,8 @@ export default function FontsTab(props) {
             {renderColorControl({
               id: 'bold-background-color',
               label: translateLabel('theme.boldBackgroundColor.label'),
-              hexValue: boldBackgroundColorHex,
-              onHexChange: setBoldBackgroundColorHex,
+              hexValue: boldBackgroundColor,
+              onHexChange: setBoldBackgroundColor,
               showState: showBoldBackgroundPicker,
               setShowState: setShowBoldBackgroundPicker,
               disabled: !drawText || !drawBoldBackground,
@@ -141,15 +141,15 @@ FontsTab.propTypes = {
   setOpenFontComboId: PropTypes.func,
   handleFontOptionClick: PropTypes.func,
 
-  textColorHex: PropTypes.string,
-  setTextColorHex: PropTypes.func,
+  textColor: PropTypes.string,
+  setTextColor: PropTypes.func,
   showTextColorPicker: PropTypes.bool,
   setShowTextColorPicker: PropTypes.func,
 
   drawBoldBackground: PropTypes.bool,
   setDrawBoldBackground: PropTypes.func,
-  boldBackgroundColorHex: PropTypes.string,
-  setBoldBackgroundColorHex: PropTypes.func,
+  boldBackgroundColor: PropTypes.string,
+  setBoldBackgroundColor: PropTypes.func,
   showBoldBackgroundPicker: PropTypes.bool,
   setShowBoldBackgroundPicker: PropTypes.func,
 }

@@ -1,5 +1,6 @@
 import React from 'react'
 import PropTypes from 'prop-types'
+import { colorToAlphaPercent, formatColorString } from '../utils'
 
 export default function EffectsTab(props) {
   if (props == null) return <div />
@@ -11,22 +12,20 @@ export default function EffectsTab(props) {
     setLineStyle,
     coastlineWidth,
     setCoastlineWidth,
-    coastlineColorHex,
-    setCoastlineColorHex,
+    coastlineColor,
+    setCoastlineColor,
     showCoastlinePicker,
     setShowCoastlinePicker,
     coastShadingLevel,
     setCoastShadingLevel,
-    coastShadingAlpha,
-    setCoastShadingAlpha,
+    coastShadingColor,
+    setCoastShadingColor,
     finalLandColoringMethod,
 
     oceanShadingLevel,
     setOceanShadingLevel,
-    oceanShadingColorHex,
-    setOceanShadingColorHex,
-    oceanShadingAlpha,
-    setOceanShadingAlpha,
+    oceanShadingColor,
+    setOceanShadingColor,
     showOceanPicker,
     setShowOceanPicker,
 
@@ -37,10 +36,8 @@ export default function EffectsTab(props) {
     noneWaveValue,
     oceanWavesLevel,
     setOceanWavesLevel,
-    oceanWavesAlpha,
-    setOceanWavesAlpha,
-    oceanWavesColorHex,
-    setOceanWavesColorHex,
+    oceanWavesColor,
+    setOceanWavesColor,
     showOceanWavesPicker,
     setShowOceanWavesPicker,
 
@@ -56,8 +53,8 @@ export default function EffectsTab(props) {
     drawOceanEffectsInLakes,
     setDrawOceanEffectsInLakes,
 
-    riverColorHex,
-    setRiverColorHex,
+    riverColor,
+    setRiverColor,
     showRiverPicker,
     setShowRiverPicker,
 
@@ -68,8 +65,8 @@ export default function EffectsTab(props) {
     strokeTypes,
     roadWidth,
     setRoadWidth,
-    roadColorHex,
-    setRoadColorHex,
+    roadColor,
+    setRoadColor,
     showRoadPicker,
     setShowRoadPicker,
 
@@ -126,8 +123,8 @@ export default function EffectsTab(props) {
         {renderColorControl({
           id: 'coastline-color',
           label: translateLabel('theme.coastlineColor.label'),
-          hexValue: coastlineColorHex,
-          onHexChange: setCoastlineColorHex,
+          hexValue: coastlineColor,
+          onHexChange: setCoastlineColor,
           showState: showCoastlinePicker,
           setShowState: setShowCoastlinePicker,
           disabled: false,
@@ -159,11 +156,16 @@ export default function EffectsTab(props) {
             min={0}
             max={100}
             step={1}
-            value={coastShadingAlpha}
-            onChange={(e) => setCoastShadingAlpha(Number(e.target.value))}
+            value={coastShadingColor ? 100 - colorToAlphaPercent(coastShadingColor) : 0}
+              onChange={(e) => {
+                const v = Number(e.target.value)
+                const alphaPercent = 100 - v
+                const combined = formatColorString(coastShadingColor, alphaPercent)
+                setCoastShadingColor(combined)
+              }}
             disabled={finalLandColoringMethod === 'SingleColor'}
           />
-          <span className="slider-value">{Math.round(coastShadingAlpha)}</span>
+          <span className="slider-value">{Math.round(coastShadingColor ? 100 - colorToAlphaPercent(coastShadingColor) : 0)}</span>
         </div>
 
         <label htmlFor="ocean-shading-level-input">
@@ -218,10 +220,14 @@ export default function EffectsTab(props) {
           return renderColorControl({
             id: 'ocean-shading-color',
             label: translateLabel('theme.oceanShadingColor.label'),
-            hexValue: oceanShadingColorHex,
-            onHexChange: setOceanShadingColorHex,
-            alphaValue: oceanShadingAlpha,
-            onAlphaChange: setOceanShadingAlpha,
+            hexValue: oceanShadingColor,
+            onHexChange: setOceanShadingColor,
+              alphaValue: oceanShadingColor ? 100 - colorToAlphaPercent(oceanShadingColor) : 0,
+              onAlphaChange: (v) => {
+                const alphaPercent = 100 - Number(v)
+                const combined = formatColorString(oceanShadingColor, alphaPercent)
+                setOceanShadingColor(combined)
+              },
             showState: showOceanPicker,
             setShowState: setShowOceanPicker,
             disabled: shouldReplace,
@@ -273,10 +279,14 @@ export default function EffectsTab(props) {
         {renderColorControl({
           id: 'ocean-waves-color',
           label: translateLabel('theme.waveColor.label'),
-          hexValue: oceanWavesColorHex,
-          onHexChange: setOceanWavesColorHex,
-          alphaValue: oceanWavesAlpha,
-          onAlphaChange: setOceanWavesAlpha,
+          hexValue: oceanWavesColor,
+          onHexChange: setOceanWavesColor,
+          alphaValue: oceanWavesColor ? 100 - colorToAlphaPercent(oceanWavesColor) : 0,
+          onAlphaChange: (v) => {
+            const alphaPercent = 100 - Number(v)
+            const combined = formatColorString(oceanWavesColor, alphaPercent)
+            setOceanWavesColor(combined)
+          },
           showState: showOceanWavesPicker,
           setShowState: setShowOceanWavesPicker,
           disabled: oceanWavesType === noneWaveValue,
@@ -361,8 +371,8 @@ export default function EffectsTab(props) {
         {renderColorControl({
           id: 'river-color',
           label: translateLabel('theme.riverColor.label'),
-          hexValue: riverColorHex,
-          onHexChange: setRiverColorHex,
+          hexValue: riverColor,
+          onHexChange: setRiverColor,
           showState: showRiverPicker,
           setShowState: setShowRiverPicker,
           disabled: false,
@@ -419,8 +429,8 @@ export default function EffectsTab(props) {
           {renderColorControl({
             id: 'road-color',
             label: translateLabel('theme.roadColor.label'),
-            hexValue: roadColorHex,
-            onHexChange: setRoadColorHex,
+            hexValue: roadColor,
+            onHexChange: setRoadColor,
             showState: showRoadPicker,
             setShowState: setShowRoadPicker,
             disabled: !drawRoads,
@@ -514,22 +524,20 @@ EffectsTab.propTypes = {
   setLineStyle: PropTypes.func,
   coastlineWidth: PropTypes.number,
   setCoastlineWidth: PropTypes.func,
-  coastlineColorHex: PropTypes.string,
-  setCoastlineColorHex: PropTypes.func,
+  coastlineColor: PropTypes.string,
+  setCoastlineColor: PropTypes.func,
   showCoastlinePicker: PropTypes.bool,
   setShowCoastlinePicker: PropTypes.func,
   coastShadingLevel: PropTypes.number,
   setCoastShadingLevel: PropTypes.func,
-  coastShadingAlpha: PropTypes.number,
-  setCoastShadingAlpha: PropTypes.func,
+  coastShadingColor: PropTypes.string,
+  setCoastShadingColor: PropTypes.func,
   finalLandColoringMethod: PropTypes.string,
 
   oceanShadingLevel: PropTypes.number,
   setOceanShadingLevel: PropTypes.func,
-  oceanShadingColorHex: PropTypes.string,
-  setOceanShadingColorHex: PropTypes.func,
-  oceanShadingAlpha: PropTypes.number,
-  setOceanShadingAlpha: PropTypes.func,
+  oceanShadingColor: PropTypes.string,
+  setOceanShadingColor: PropTypes.func,
   showOceanPicker: PropTypes.bool,
   setShowOceanPicker: PropTypes.func,
 
@@ -540,10 +548,8 @@ EffectsTab.propTypes = {
   noneWaveValue: PropTypes.any,
   oceanWavesLevel: PropTypes.number,
   setOceanWavesLevel: PropTypes.func,
-  oceanWavesAlpha: PropTypes.number,
-  setOceanWavesAlpha: PropTypes.func,
-  oceanWavesColorHex: PropTypes.string,
-  setOceanWavesColorHex: PropTypes.func,
+  oceanWavesColor: PropTypes.string,
+  setOceanWavesColor: PropTypes.func,
   showOceanWavesPicker: PropTypes.bool,
   setShowOceanWavesPicker: PropTypes.func,
 
@@ -559,8 +565,8 @@ EffectsTab.propTypes = {
   drawOceanEffectsInLakes: PropTypes.bool,
   setDrawOceanEffectsInLakes: PropTypes.func,
 
-  riverColorHex: PropTypes.string,
-  setRiverColorHex: PropTypes.func,
+  riverColor: PropTypes.string,
+  setRiverColor: PropTypes.func,
   showRiverPicker: PropTypes.bool,
   setShowRiverPicker: PropTypes.func,
 
@@ -571,8 +577,8 @@ EffectsTab.propTypes = {
   strokeTypes: PropTypes.array,
   roadWidth: PropTypes.number,
   setRoadWidth: PropTypes.func,
-  roadColorHex: PropTypes.string,
-  setRoadColorHex: PropTypes.func,
+  roadColor: PropTypes.string,
+  setRoadColor: PropTypes.func,
   showRoadPicker: PropTypes.bool,
   setShowRoadPicker: PropTypes.func,
 

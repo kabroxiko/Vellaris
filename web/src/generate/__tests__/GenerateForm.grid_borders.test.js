@@ -10,7 +10,7 @@ describe('GenerateForm grid/coloring and borders/fray appliers', () => {
     const ctx = {
       drawGridOverlay: true,
       gridOverlayRowOrColCount: '32',
-      gridOverlayColorHex: '#ff00ff',
+      gridOverlayColor: '#ff00ff',
       gridOverlayLineWidth: '2',
       gridOverlayLayer: 'above',
       gridOverlayXOffset: '1',
@@ -41,14 +41,14 @@ describe('GenerateForm grid/coloring and borders/fray appliers', () => {
       borderWidth: '2',
       borderPosition: 'inside',
       borderColorOption: 'solid',
-      borderColorHex: '#001122',
+      borderColor: '#001122',
       frayedBorder: true,
       frayedBorderBlurLevel: '4',
       frayedBorderSize: '7',
       frayedBorderSeed: '11',
       drawGrunge: true,
       grungeWidth: '30',
-      frayedBorderColorHex: '#001122',
+      frayedBorderColor: '#001122',
       mergeColor: (out, key, hex) => {
         if (hex) out[key] = hex
       },

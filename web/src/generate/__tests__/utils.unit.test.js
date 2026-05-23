@@ -27,7 +27,7 @@ describe('utils pure helpers', () => {
     expect(colorToHex('#123456')).toBe('#123456')
     expect(colorToHex('18,52,86,128')).toBe('#123456')
     expect(colorToAlphaPercent('18,52,86,128')).toBe(Math.round((128 / 255) * 100))
-    expect(formatColorString('#010203', 50)).toMatch(/\d+,\d+,\d+,\d+/)
+    expect(formatColorString('#010203', 50)).toBe('#01020380')
     expect(formatColorString('invalid', 50)).toBeNull()
   })
 

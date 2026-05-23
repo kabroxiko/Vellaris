@@ -37,22 +37,28 @@ export function pick(obj, keys) {
   return out
 }
 
-export const modalBackdropStyle = {
+export const modalBackdropStyle = Object.freeze({
   position: 'fixed',
   left: 0,
   top: 0,
   right: 0,
   bottom: 0,
-  background: 'rgba(0,0,0,0.4)',
+  background: 'transparent',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
   zIndex: 2000,
-}
+  padding: 0,
+  border: 'none',
+})
 
 export const modalContentStyle = {
   background: '#fff',
   padding: 12,
-  borderRadius: 6,
-  boxShadow: '0 6px 24px rgba(0,0,0,0.3)',
+  borderRadius: 8,
+  boxShadow: '0 6px 12px rgba(0,0,0,0.08)',
+  overflow: 'hidden',
+  border: 'none',
+  backgroundClip: 'padding-box',
+  WebkitBackgroundClip: 'padding-box',
 }

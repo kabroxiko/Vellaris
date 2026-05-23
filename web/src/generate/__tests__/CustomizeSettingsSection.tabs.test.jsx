@@ -33,9 +33,9 @@ describe('CustomizeSettingsSection tabs', () => {
       setOtherMountainsFontFamily: vi.fn(),
       setCitiesFontFamily: vi.fn(),
       setRiverFontFamily: vi.fn(),
-      setTextColorHex: vi.fn(),
+      setTextColor: vi.fn(),
       setDrawBoldBackground: vi.fn(),
-      setBoldBackgroundColorHex: vi.fn(),
+      setBoldBackgroundColor: vi.fn(),
     }
   })
 

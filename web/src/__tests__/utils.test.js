@@ -41,9 +41,9 @@ describe('generate/utils', () => {
     expect(colorToAlphaPercent('invalid', 77)).toBe(77)
   })
 
-  it('formats stable color strings with alpha', () => {
-    expect(formatColorString('#0a0b0c', 50)).toBe('10,11,12,128')
-    expect(formatColorString('10,20,30', 100)).toBe('10,20,30,255')
+  it('formats stable color strings with alpha (8-digit hex)', () => {
+    expect(formatColorString('#0a0b0c', 50)).toBe('#0a0b0c80')
+    expect(formatColorString('10,20,30', 100)).toBe('#0a141eff')
     expect(formatColorString('invalid', 50)).toBeNull()
   })
 

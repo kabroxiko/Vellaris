@@ -14,9 +14,12 @@ class MapApiServerTest
 	private Object invokePrivate(String name, Class<?>[] paramTypes, Object... args) throws Exception
 	{
 		Method m;
-		try {
+		try
+		{
 			m = ApiUtils.class.getDeclaredMethod(name, paramTypes);
-		} catch (NoSuchMethodException nsme) {
+		}
+		catch (NoSuchMethodException nsme)
+		{
 			m = MapApiServer.class.getDeclaredMethod(name, paramTypes);
 		}
 		m.setAccessible(true);

@@ -5,9 +5,9 @@ describe('settingsAppliers - color applier helpers', () => {
   it('applies color hex and booleans via setters', () => {
     const captured = {}
     const setters = {
-      setOceanColorHex: (v) => (captured.oceanColorHex = v),
-      setLandColorHex: (v) => (captured.landColorHex = v),
-      setRegionBoundaryColorHex: (v) => (captured.regionBoundaryColorHex = v),
+      setOceanColor: (v) => (captured.oceanColor = v),
+      setLandColor: (v) => (captured.landColor = v),
+      setRegionBoundaryColor: (v) => (captured.regionBoundaryColor = v),
       setDrawBorder: (v) => (captured.drawBorder = v),
       setDrawGridOverlay: (v) => (captured.drawGridOverlay = v),
       setLandColoringMethod: (v) => (captured.landColoringMethod = v),
@@ -22,9 +22,9 @@ describe('settingsAppliers - color applier helpers', () => {
       drawGridOverlay: false,
       drawRegionColors: true,
     })
-    expect(captured.oceanColorHex).toBe('#112233')
-    expect(captured.landColorHex).toBe('#112233')
-    expect(captured.regionBoundaryColorHex).toBe('#000000')
+    expect(captured.oceanColor).toBe('#112233ff')
+    expect(captured.landColor).toBe('#112233ff')
+    expect(captured.regionBoundaryColor).toBe('#000000ff')
     expect(captured.drawBorder).toBe(true)
     expect(captured.drawGridOverlay).toBe(false)
     expect(captured.landColoringMethod).toBe('ColorPoliticalRegions')

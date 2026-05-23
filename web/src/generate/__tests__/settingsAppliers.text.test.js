@@ -12,9 +12,9 @@ describe('settingsAppliers text settings', () => {
       setOtherMountainsFontFamily: vi.fn(),
       setCitiesFontFamily: vi.fn(),
       setRiverFontFamily: vi.fn(),
-      setTextColorHex: vi.fn(),
+      setTextColor: vi.fn(),
       setDrawBoldBackground: vi.fn(),
-      setBoldBackgroundColorHex: vi.fn(),
+      setBoldBackgroundColor: vi.fn(),
     }
     const appliers = createSettingsAppliers(setters)
 
@@ -41,8 +41,8 @@ describe('settingsAppliers text settings', () => {
     expect(setters.setOtherMountainsFontFamily).toHaveBeenCalledWith('OtherFam')
     expect(setters.setCitiesFontFamily).toHaveBeenCalledWith('CitiesFam')
     expect(setters.setRiverFontFamily).toHaveBeenCalledWith('RiverFam')
-    expect(setters.setTextColorHex).toHaveBeenCalledWith('#112233')
+    expect(setters.setTextColor).toHaveBeenCalledWith('#112233ff')
     expect(setters.setDrawBoldBackground).toHaveBeenCalledWith(true)
-    expect(setters.setBoldBackgroundColorHex).toHaveBeenCalledWith('#ff00ff')
+    expect(setters.setBoldBackgroundColor).toHaveBeenCalledWith('#ff00ffff')
   })
 })

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { appendIfSet, fetchJson, tryParseJson } from '../helpers.js'
+import { appendIfSet, tryParseJson } from '../helpers.js'
 import { base64ToBlob, formatColorString } from '../utils.js'
 
 beforeEach(() => {
@@ -15,8 +15,8 @@ describe('small helpers', () => {
     expect(fd.append).not.toHaveBeenCalledWith('k2', '')
   })
 
-  it('formatColorString returns r,g,b,a for hex input', () => {
-    expect(formatColorString('#010203', 50)).toBe('1,2,3,128')
+  it('formatColorString returns 8-digit hex for hex input', () => {
+    expect(formatColorString('#010203', 50)).toBe('#01020380')
     expect(formatColorString('not-a-hex', 50)).toBeNull()
   })
 

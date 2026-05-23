@@ -40,9 +40,9 @@ describe('prepareBitmapsModule and composeMiniIslandFromBlobModule', () => {
     vi.stubGlobal('createImageBitmap', async (c) => 'MOCK_BITMAP')
     const defaults = {
       colorizeOcean: true,
-      oceanColorHex: '#010101',
+      oceanColor: '#010101',
       colorizeLand: true,
-      landColorHex: '#020202',
+      landColor: '#020202',
     }
     const res = await prepareBitmapsModule('IMG', 8, 8, {}, { backgroundSeed: 1 }, defaults)
     expect(res.displayBitmap).toBeTruthy()

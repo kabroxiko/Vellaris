@@ -7,6 +7,15 @@ export function parseColorChannels(value) {
 
   if (typeof value === 'string') {
     const trimmed = value.trim()
+    if (/^#[0-9a-fA-F]{8}$/.test(trimmed)) {
+      return {
+        r: Number.parseInt(trimmed.slice(1, 3), 16),
+        g: Number.parseInt(trimmed.slice(3, 5), 16),
+        b: Number.parseInt(trimmed.slice(5, 7), 16),
+        a: Number.parseInt(trimmed.slice(7, 9), 16),
+      }
+    }
+
     if (/^#[0-9a-fA-F]{6}$/.test(trimmed)) {
       return {
         r: Number.parseInt(trimmed.slice(1, 3), 16),
@@ -59,6 +68,45 @@ export function colorToHex(value) {
   )
 }
 
+export function colorToHexWithAlpha(value, alphaOverride = undefined) {
+  if (!value && alphaOverride === undefined) return null
+  // Handle 8-digit hex input: #RRGGBBAA
+  if (typeof value === 'string') {
+    const v = value.trim()
+    if (/^#[0-9a-fA-F]{8}$/.test(v)) {
+      return v.toLowerCase()
+    }
+  }
+
+  const channels = parseColorChannels(value)
+  if (!channels && typeof value === 'string') {
+    // Try parsing 8-digit hex manually
+    const s = value.replace(/^#/, '')
+    if (/^[0-9a-fA-F]{8}$/.test(s)) {
+      const r = Number.parseInt(s.slice(0, 2), 16)
+      const g = Number.parseInt(s.slice(2, 4), 16)
+      const b = Number.parseInt(s.slice(4, 6), 16)
+      const a = Number.parseInt(s.slice(6, 8), 16)
+      return (
+        '#' +
+        r.toString(16).padStart(2, '0') +
+        g.toString(16).padStart(2, '0') +
+        b.toString(16).padStart(2, '0') +
+        a.toString(16).padStart(2, '0')
+      )
+    }
+    return null
+  }
+
+  if (!channels) return null
+  const a = alphaOverride !== undefined && alphaOverride !== null ? Number(alphaOverride) : channels.a
+  const rHex = channels.r.toString(16).padStart(2, '0')
+  const gHex = channels.g.toString(16).padStart(2, '0')
+  const bHex = channels.b.toString(16).padStart(2, '0')
+  const aHex = clampColorChannel(Number(a)).toString(16).padStart(2, '0')
+  return `#${rHex}${gHex}${bHex}${aHex}`.toLowerCase()
+}
+
 export function colorToAlphaPercent(value, fallback = 100) {
   const channels = parseColorChannels(value)
   if (!channels) return fallback
@@ -70,8 +118,8 @@ export function formatColorString(hex, alphaPercent = 100) {
   if (!channels) return null
 
   const alpha = clampColorChannel(Math.round((Number(alphaPercent) / 100) * 255))
-  // Always include alpha channel to produce a stable `r,g,b,a` export
-  return `${channels.r},${channels.g},${channels.b},${alpha}`
+  // Return combined 8-digit hex string (#RRGGBBAA)
+  return colorToHexWithAlpha(hex, alpha)
 }
 
 export function parseFontSpec(value) {

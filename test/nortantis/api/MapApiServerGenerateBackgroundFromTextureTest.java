@@ -19,53 +19,54 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 class MapApiServerGenerateBackgroundFromTextureTest
 {
-    private Assets.AssetInputStreamProvider originalProvider;
+	private Assets.AssetInputStreamProvider originalProvider;
 
-    @AfterEach
-    void tearDown()
-    {
-        // restore provider
-        Assets.setAssetInputStreamProvider(originalProvider);
-    }
+	@AfterEach
+	void tearDown()
+	{
+		// restore provider
+		Assets.setAssetInputStreamProvider(originalProvider);
+	}
 
-    @Test
-    void testGenerateBackgroundFromTexture_withInjectedAssetStream_returnsImage() throws Exception
-    {
-        // Save original and inject provider that returns a tiny PNG for any asset path
-        originalProvider = null;
+	@Test
+	void testGenerateBackgroundFromTexture_withInjectedAssetStream_returnsImage() throws Exception
+	{
+		// Save original and inject provider that returns a tiny PNG for any asset path
+		originalProvider = null;
 
-        Assets.setAssetInputStreamProvider(new Assets.AssetInputStreamProvider()
-        {
-            @Override
-            public InputStream open(String assetPath) {
-                try
-                {
-                    BufferedImage img = new BufferedImage(8, 8, BufferedImage.TYPE_INT_RGB);
-                    ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                    ImageIO.write(img, "png", baos);
-                    return new ByteArrayInputStream(baos.toByteArray());
-                }
-                catch (Exception e)
-                {
-                    throw new RuntimeException(e);
-                }
-            }
-        });
+		Assets.setAssetInputStreamProvider(new Assets.AssetInputStreamProvider()
+		{
+			@Override
+			public InputStream open(String assetPath)
+			{
+				try
+				{
+					BufferedImage img = new BufferedImage(8, 8, BufferedImage.TYPE_INT_RGB);
+					ByteArrayOutputStream baos = new ByteArrayOutputStream();
+					ImageIO.write(img, "png", baos);
+					return new ByteArrayInputStream(baos.toByteArray());
+				}
+				catch (Exception e)
+				{
+					throw new RuntimeException(e);
+				}
+			}
+		});
 
-        // Ensure AWT-backed platform is available for reading image streams
-        PlatformFactory.setInstance(new AwtFactory());
+		// Ensure AWT-backed platform is available for reading image streams
+		PlatformFactory.setInstance(new AwtFactory());
 
-        // Call private static generateBackgroundFromTexture(String, String, int, int)
-        Method m = MapApiServer.class.getDeclaredMethod("generateBackgroundFromTexture", String.class, String.class, int.class, int.class);
-        m.setAccessible(true);
-        Object result = m.invoke(null, "dummyTexture.png", "nortantis", 32, 32);
+		// Call private static generateBackgroundFromTexture(String, String, int, int)
+		Method m = MapApiServer.class.getDeclaredMethod("generateBackgroundFromTexture", String.class, String.class, int.class, int.class);
+		m.setAccessible(true);
+		Object result = m.invoke(null, "dummyTexture.png", "nortantis", 32, 32);
 
-        assertNotNull(result, "generateBackgroundFromTexture should return an Image when asset input stream is provided");
+		assertNotNull(result, "generateBackgroundFromTexture should return an Image when asset input stream is provided");
 
-        // Close the image if possible
-        if (result instanceof Image)
-        {
-            ((Image) result).close();
-        }
-    }
+		// Close the image if possible
+		if (result instanceof Image)
+		{
+			((Image) result).close();
+		}
+	}
 }

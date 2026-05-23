@@ -11,16 +11,16 @@ describe('GenerateForm additional hoisted applier tests', () => {
     const ctx = {
       regionBoundaryStyle: 'thin',
       regionBoundaryWidth: '2',
-      regionBoundaryColorHex: '#010203',
+      regionBoundaryColor: '#010203',
       drawRegionBoundaries: true,
       colorizeLand: true,
       colorizeOcean: false,
-      oceanColorHex: '#112233',
-      landColorHex: '#445566',
+      oceanColor: '#112233',
+      landColor: '#445566',
       drawGridOverlay: true,
       gridOverlayShape: 'hex',
       gridOverlayRowOrColCount: '8',
-      gridOverlayColorHex: '#abcdef',
+      gridOverlayColor: '#abcdef',
       gridOverlayXOffset: '1',
       gridOverlayYOffset: '2',
       gridOverlayLineWidth: '3',
@@ -36,7 +36,8 @@ describe('GenerateForm additional hoisted applier tests', () => {
 
     applyGridAndColoringHoisted(parsed, ctx)
     expect(parsed.drawGridOverlay).toBe(true)
-    expect(parsed.gridOverlayColor).toBe('171,205,239,128')
+    // '#abcdef' with alpha 128 -> '#abcdef80'
+    expect(parsed.gridOverlayColor).toBe('#abcdef80')
     expect(parsed.gridOverlayRowOrColCount).toBe(8)
   })
 
@@ -46,14 +47,14 @@ describe('GenerateForm additional hoisted applier tests', () => {
       borderWidth: '5',
       borderPosition: 'inside',
       borderColorOption: 'solid',
-      borderColorHex: '#010203',
+      borderColor: '#010203',
       frayedBorder: true,
       frayedBorderBlurLevel: '2',
       frayedBorderSize: '6',
       frayedBorderSeed: '11',
       drawGrunge: true,
       grungeWidth: '4',
-      frayedBorderColorHex: '#112233',
+      frayedBorderColor: '#112233',
       mergeColor: (out, k, hex) => {
         if (hex) out[k] = hex
       },
@@ -79,7 +80,7 @@ describe('GenerateForm additional hoisted applier tests', () => {
       mergeColor: (out, k, hex) => {
         if (hex) out[k] = hex
       },
-      roadColorHex: '#010101',
+      roadColor: '#010101',
       mountainSize: '3',
       hillSize: '4',
       duneSize: '5',

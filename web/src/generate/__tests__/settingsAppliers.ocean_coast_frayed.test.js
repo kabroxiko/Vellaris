@@ -5,14 +5,12 @@ describe('settingsAppliers ocean/coast/frayed', () => {
   it('applyOceanSettings maps legacy oceanEffect to oceanWavesType and sets alpha/hex values', () => {
     const setters = {
       setOceanShadingLevel: vi.fn(),
-      setOceanShadingAlpha: vi.fn(),
-      setOceanShadingColorHex: vi.fn(),
+      setOceanShadingColor: vi.fn(),
       setOceanWavesType: vi.fn(),
       setOceanWavesLevel: vi.fn(),
-      setOceanWavesAlpha: vi.fn(),
-      setOceanWavesColorHex: vi.fn(),
+      setOceanWavesColor: vi.fn(),
       setDrawOceanEffectsInLakes: vi.fn(),
-      setRiverColorHex: vi.fn(),
+      setRiverColor: vi.fn(),
       setConcentricWaveCount: vi.fn(),
       setFadeConcentricWaves: vi.fn(),
       setJitterToConcentricWaves: vi.fn(),
@@ -35,11 +33,9 @@ describe('settingsAppliers ocean/coast/frayed', () => {
     appliers.applyOceanSettings(settings)
 
     expect(setters.setOceanWavesType).toHaveBeenCalledWith('legacy-wave')
-    // rgba alpha 0.25 -> 25% opacity -> oceanWavesAlpha = 100 - 25 = 75
-    expect(setters.setOceanWavesAlpha).toHaveBeenCalledWith(75)
     expect(setters.setOceanWavesLevel).toHaveBeenCalledWith(2)
-    expect(setters.setOceanWavesColorHex).toHaveBeenCalledWith('#112233')
-    expect(setters.setRiverColorHex).toHaveBeenCalledWith('#445566')
+    expect(setters.setOceanWavesColor).toHaveBeenCalledWith('#11223340')
+    expect(setters.setRiverColor).toHaveBeenCalledWith('#445566ff')
     expect(setters.setConcentricWaveCount).toHaveBeenCalledWith(4)
     expect(setters.setFadeConcentricWaves).toHaveBeenCalledWith(true)
     expect(setters.setJitterToConcentricWaves).toHaveBeenCalledWith(false)
@@ -50,10 +46,9 @@ describe('settingsAppliers ocean/coast/frayed', () => {
     const setters = {
       setLineStyle: vi.fn(),
       setCoastlineWidth: vi.fn(),
-      setCoastlineColorHex: vi.fn(),
+      setCoastlineColor: vi.fn(),
       setCoastShadingLevel: vi.fn(),
-      setCoastShadingColorHex: vi.fn(),
-      setCoastShadingAlpha: vi.fn(),
+      setCoastShadingColor: vi.fn(),
     }
     const appliers = createSettingsAppliers(setters)
 
@@ -66,9 +61,9 @@ describe('settingsAppliers ocean/coast/frayed', () => {
 
     appliers.applyCoastlineSettings(settings)
 
-    expect(setters.setCoastlineColorHex).toHaveBeenCalledWith('#010203')
-    // coastShadingColor alpha 0.4 -> 40% -> stored as inverted (100-40)=60
-    expect(setters.setCoastShadingAlpha).toHaveBeenCalledWith(60)
+    expect(setters.setCoastlineColor).toHaveBeenCalledWith('#010203')
+    // coastShadingColor alpha 102 -> stored as combined #RRGGBBAA
+    expect(setters.setCoastShadingColor).toHaveBeenCalledWith('#ff000066')
     expect(setters.setCoastShadingLevel).toHaveBeenCalledWith(3)
   })
 
@@ -80,7 +75,7 @@ describe('settingsAppliers ocean/coast/frayed', () => {
       setFrayedBorderSeed: vi.fn(),
       setDrawGrunge: vi.fn(),
       setGrungeWidth: vi.fn(),
-      setFrayedBorderColorHex: vi.fn(),
+      setFrayedBorderColor: vi.fn(),
     }
     const appliers = createSettingsAppliers(setters)
 
@@ -91,7 +86,7 @@ describe('settingsAppliers ocean/coast/frayed', () => {
       frayedBorderSeed: 'seed42',
       drawGrunge: true,
       grungeWidth: 7,
-      frayedBorderColor: '#ABCDEF',
+      frayedBorderColor: '#abcdef',
     }
 
     appliers.applyFrayedBorderSettings(settings)
@@ -102,6 +97,6 @@ describe('settingsAppliers ocean/coast/frayed', () => {
     expect(setters.setFrayedBorderSeed).toHaveBeenCalledWith('seed42')
     expect(setters.setDrawGrunge).toHaveBeenCalledWith(true)
     expect(setters.setGrungeWidth).toHaveBeenCalledWith(7)
-    expect(setters.setFrayedBorderColorHex).toHaveBeenCalledWith('#abcdef')
+    expect(setters.setFrayedBorderColor).toHaveBeenCalledWith('#abcdef')
   })
 })

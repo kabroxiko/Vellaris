@@ -61,9 +61,9 @@ describe('GenerateForm hoisted helpers (additional)', () => {
     const parsed = {}
     const ctx = {
       drawText: true,
-      textColorHex: '#112233',
+      textColor: '#112233',
       drawBoldBackground: true,
-      boldBackgroundColorHex: '#445566',
+      boldBackgroundColor: '#445566',
       mergeColor: (parsedSettings, key, hex) => {
         parsedSettings[key] = `merged:${hex}`
       },
@@ -84,7 +84,7 @@ describe('GenerateForm hoisted helpers (additional)', () => {
       mergeColor: (parsedSettings, key, hex) => {
         parsedSettings[key] = `merged:${hex}`
       },
-      roadColorHex: '#010203',
+      roadColor: '#010203',
       mountainSize: '5',
       hillSize: '2',
       duneSize: '1',
@@ -116,11 +116,11 @@ describe('GenerateForm additional helpers', () => {
       backgroundSeed: 's1',
       drawRegionBoundaries: true,
       colorizeLand: false,
-      oceanColorHex: '#010203',
-      landColorHex: '#040506',
+      oceanColor: '#010203',
+      landColor: '#040506',
       regionBoundaryStyle: { type: 'thin' },
       regionBoundaryWidth: 2,
-      regionBoundaryColorHex: '#000000',
+      regionBoundaryColor: '#000000',
       drawBorder: true,
       drawGridOverlay: false,
       finalLandColoringMethod: 'ColorPoliticalRegions',
@@ -128,14 +128,14 @@ describe('GenerateForm additional helpers', () => {
       borderWidth: 3,
       borderPosition: 'inside',
       borderColorOption: 'auto',
-      borderColorHex: '#111111',
+      borderColor: '#111111',
       frayedBorder: true,
       frayedBorderBlurLevel: 1,
       frayedBorderSize: 2,
       frayedBorderSeed: 'fs',
       drawGrunge: false,
       grungeWidth: 4,
-      frayedBorderColorHex: '#222222',
+      frayedBorderColor: '#222222',
     }
     const out = buildCustomizePayload(values)
     expect(out.backgroundType).toBe('SolidColor')

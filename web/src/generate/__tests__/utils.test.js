@@ -18,7 +18,7 @@ describe('utils module', () => {
     })
     expect(utils.colorToHex('#0a0b0c')).toBe('#0a0b0c')
     expect(utils.colorToAlphaPercent('#010203')).toBe(100)
-    expect(utils.formatColorString('#010203', 50)).toBe('1,2,3,128')
+    expect(utils.formatColorString('#010203', 50)).toBe('#01020380')
   })
 
   it('parses and updates font specs', () => {

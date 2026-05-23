@@ -47,16 +47,16 @@ describe('GenerateForm applier helpers', () => {
     const ctx = {
       regionBoundaryStyle: 'dashed',
       regionBoundaryWidth: '2',
-      regionBoundaryColorHex: '#010101',
+      regionBoundaryColor: '#010101',
       drawRegionBoundaries: true,
       colorizeLand: true,
       colorizeOcean: false,
-      oceanColorHex: '#020202',
-      landColorHex: '#030303',
+      oceanColor: '#020202',
+      landColor: '#030303',
       drawGridOverlay: true,
       gridOverlayShape: 'hex',
       gridOverlayRowOrColCount: '4',
-      gridOverlayColorHex: null,
+      gridOverlayColor: null,
       gridOverlayXOffset: '1',
       gridOverlayYOffset: '2',
       gridOverlayLineWidth: '3',
@@ -92,14 +92,14 @@ describe('GenerateForm applier helpers', () => {
       borderWidth: '5',
       borderPosition: 'inside',
       borderColorOption: 'auto',
-      borderColorHex: '#111111',
+      borderColor: '#111111',
       frayedBorder: true,
       frayedBorderBlurLevel: '2',
       frayedBorderSize: '3',
       frayedBorderSeed: '7',
       drawGrunge: true,
       grungeWidth: '4',
-      frayedBorderColorHex: '#222222',
+      frayedBorderColor: '#222222',
       mergeColor: (ps, key, hex) => {
         if (hex) ps[key] = `MERGED:${hex}`
       },
@@ -123,13 +123,11 @@ describe('GenerateForm applier helpers', () => {
     const ctx = {
       lineStyle: 'solid',
       coastlineWidth: '1',
-      coastlineColorHex: '#010101',
+      coastlineColor: '#010101',
       coastShadingLevel: '2',
-      coastShadingColorHex: '#020202',
-      coastShadingAlpha: '20',
+      coastShadingColor: '#020202',
       oceanShadingLevel: '3',
-      oceanShadingColorHex: '#030303',
-      oceanShadingAlpha: '30',
+      oceanShadingColor: '#030303',
       oceanWavesType: 'ripple',
       oceanWavesLevel: '2',
       getConcentricWaveCount: () => 7,
@@ -139,12 +137,11 @@ describe('GenerateForm applier helpers', () => {
       mergeColor: (ps, key, hex, percent, useFormatter) => {
         if (hex) ps[key] = `MERGED:${hex}:${percent}:${useFormatter}`
       },
-      oceanWavesColorHex: null,
+      oceanWavesColor: null,
       drawOceanEffectsInLakes: true,
-      riverColorHex: '#050505',
+      riverColor: '#050505',
       parseBooleanWithDefault: Boolean,
       mergedSettingsRef: { current: {} },
-      oceanWavesAlpha: '10',
     }
     applyCoastOceanAndWavesHoisted(parsed, ctx)
     expect(parsed.lineStyle).toBe('solid')
@@ -170,7 +167,7 @@ describe('GenerateForm applier helpers', () => {
       mergeColor: (ps, key, hex) => {
         if (hex) ps[key] = `MERGED:${hex}`
       },
-      roadColorHex: '#060606',
+      roadColor: '#060606',
       mountainSize: '5',
       hillSize: '6',
       duneSize: '7',
@@ -192,9 +189,9 @@ describe('GenerateForm applier helpers', () => {
 
     const ctxText = {
       drawText: true,
-      textColorHex: '#070707',
+      textColor: '#070707',
       drawBoldBackground: true,
-      boldBackgroundColorHex: '#080808',
+      boldBackgroundColor: '#080808',
       mergeColor: (ps, key, hex) => {
         if (hex) ps[key] = `MERGED:${hex}`
       },
@@ -242,16 +239,16 @@ describe('GenerateForm appliers', () => {
     const ctx = {
       regionBoundaryStyle: 'Dashed',
       regionBoundaryWidth: '3',
-      regionBoundaryColorHex: '#112233',
+      regionBoundaryColor: '#112233',
       drawRegionBoundaries: true,
       colorizeLand: true,
       colorizeOcean: false,
-      oceanColorHex: '#aabbcc',
-      landColorHex: '#ddeeff',
+      oceanColor: '#aabbcc',
+      landColor: '#ddeeff',
       drawGridOverlay: true,
       gridOverlayShape: 'hex',
       gridOverlayRowOrColCount: '8',
-      gridOverlayColorHex: '#010203',
+      gridOverlayColor: '#010203',
       gridOverlayXOffset: '10',
       gridOverlayYOffset: '20',
       gridOverlayLineWidth: '2',
@@ -266,8 +263,8 @@ describe('GenerateForm appliers', () => {
     }
 
     applyGridAndColoringHoisted(parsed, ctx)
-    // hexToRgbaString returns 'r,g,b,alpha' for '#010203' -> 1,2,3,128
-    expect(parsed.gridOverlayColor).toBe('1,2,3,128')
+    // grid overlay color is now canonical '#RRGGBBAA' -> '#01020380'
+    expect(parsed.gridOverlayColor).toBe('#01020380')
     expect(parsed.drawRegionBoundaries).toBe(true)
     expect(parsed.drawVoronoiGridOverlayOnlyOnLand).toBe(true)
   })
@@ -281,7 +278,7 @@ describe('GenerateForm appliers', () => {
       mergeColor: (ps, k, v) => {
         if (v) ps[k] = v
       },
-      roadColorHex: '#0a0b0c',
+      roadColor: '#0a0b0c',
       mountainSize: '5',
       hillSize: '3',
       duneSize: '2',

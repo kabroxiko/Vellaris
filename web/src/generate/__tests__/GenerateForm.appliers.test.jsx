@@ -13,8 +13,7 @@ describe('GenerateForm appliers', () => {
   it('mergeColor formats and sets color', () => {
     const parsed = {}
     mergeColor(parsed, 'x', '#112233', 50, true)
-    expect(parsed.x).toBeDefined()
-    expect(parsed.x.includes(',')).toBe(true)
+    expect(parsed.x).toBe('#11223380')
   })
 
   it('applyBackgroundFlagsHoisted sets proper flags', () => {
@@ -57,16 +56,16 @@ describe('GenerateForm appliers', () => {
     const ctx = {
       regionBoundaryStyle: 'dashed',
       regionBoundaryWidth: '2',
-      regionBoundaryColorHex: '#010203',
+      regionBoundaryColor: '#010203',
       drawRegionBoundaries: true,
       colorizeLand: false,
       colorizeOcean: true,
-      oceanColorHex: '#0000ff',
-      landColorHex: '#00ff00',
+      oceanColor: '#0000ff',
+      landColor: '#00ff00',
       drawGridOverlay: true,
       gridOverlayShape: 'square',
       gridOverlayRowOrColCount: '4',
-      gridOverlayColorHex: '#abcdef',
+      gridOverlayColor: '#abcdef',
       gridOverlayXOffset: '3',
       gridOverlayYOffset: '4',
       gridOverlayLineWidth: '1',
@@ -83,7 +82,8 @@ describe('GenerateForm appliers', () => {
     expect(parsed.drawRegionBoundaries).toBe(true)
     expect(parsed.gridOverlayShape).toBe('square')
     expect(parsed.gridOverlayRowOrColCount).toBe(4)
-    expect(parsed.gridOverlayColor).toContain(',')
+    // gridOverlayColor now uses canonical '#RRGGBBAA'
+    expect(parsed.gridOverlayColor).toBe('#abcdef80')
     expect(parsed.drawVoronoiGridOverlayOnlyOnLand).toBe(true)
   })
 
@@ -93,14 +93,14 @@ describe('GenerateForm appliers', () => {
       borderWidth: '5',
       borderPosition: 'inside',
       borderColorOption: 'auto',
-      borderColorHex: '#112233',
+      borderColor: '#112233',
       frayedBorder: true,
       frayedBorderBlurLevel: '2',
       frayedBorderSize: '3',
       frayedBorderSeed: '9',
       drawGrunge: true,
       grungeWidth: '6',
-      frayedBorderColorHex: '#ffffff',
+      frayedBorderColor: '#ffffff',
     }
     applyBordersFrayedAndGrungeHoisted(parsed, ctx)
     expect(parsed.borderWidth).toBe(5)
@@ -115,23 +115,20 @@ describe('GenerateForm appliers', () => {
     const ctx = {
       lineStyle: 'solid',
       coastlineWidth: '4',
-      coastlineColorHex: '#123456',
+      coastlineColor: '#123456',
       coastShadingLevel: '2',
-      coastShadingColorHex: '#112233',
-      coastShadingAlpha: '10',
+      coastShadingColor: '#112233',
       oceanShadingLevel: '3',
-      oceanShadingColorHex: '#223344',
-      oceanShadingAlpha: '20',
+      oceanShadingColor: '#223344',
       oceanWavesType: 'concentric',
       oceanWavesLevel: '7',
-      oceanWavesAlpha: '5',
       getConcentricWaveCount: () => 8,
       fadeConcentricWaves: true,
       jitterToConcentricWaves: false,
       brokenLinesForConcentricWaves: true,
-      oceanWavesColorHex: '#00ff00',
+      oceanWavesColor: '#00ff00',
       drawOceanEffectsInLakes: true,
-      riverColorHex: '#010101',
+      riverColor: '#010101',
       parseBooleanWithDefault: Boolean,
       mergedSettingsRef: {},
     }
@@ -151,7 +148,7 @@ describe('GenerateForm appliers', () => {
       drawRoads: true,
       roadStyle: 'major',
       roadWidth: '3',
-      roadColorHex: '#010203',
+      roadColor: '#010203',
       mountainSize: '2',
       hillSize: '3',
       duneSize: '4',
@@ -171,9 +168,9 @@ describe('GenerateForm appliers', () => {
     const parsed = {}
     const ctx = {
       drawText: true,
-      textColorHex: '#abcdef',
+      textColor: '#abcdef',
       drawBoldBackground: true,
-      boldBackgroundColorHex: '#010101',
+      boldBackgroundColor: '#010101',
     }
     applyTextAndBackgroundHoisted(parsed, ctx)
     expect(parsed.drawText).toBe(true)

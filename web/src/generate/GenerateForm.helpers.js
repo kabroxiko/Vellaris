@@ -1,4 +1,4 @@
-import { colorToHex, parseColorChannels } from './utils'
+import { colorToHex, parseColorChannels, colorToHexWithAlpha } from './utils'
 
 export function serializeNortObject(obj) {
   function sortRec(v) {
@@ -50,13 +50,13 @@ export function scaleSliderValue(
   }
 }
 
-export function computeGridOverlayAlpha(origColor, uiGridOverlayColorHex) {
+export function computeGridOverlayAlpha(origColor, uiGridOverlayColor) {
   if (!origColor) return 255
   const origHex = colorToHex(origColor)
   if (
     origHex &&
-    uiGridOverlayColorHex &&
-    origHex.toLowerCase() === String(uiGridOverlayColorHex).toLowerCase()
+    uiGridOverlayColor &&
+    origHex.toLowerCase() === String(uiGridOverlayColor).toLowerCase()
   ) {
     const ch = parseColorChannels(origColor)
     if (ch?.a !== undefined && Number.isFinite(Number(ch.a))) return Number(ch.a)
@@ -82,11 +82,11 @@ export function buildCustomizePayload(values) {
     drawRegionBoundaries: values.drawRegionBoundaries,
     colorizeLand: values.colorizeLand,
     colorizeOcean: values.colorizeOcean,
-    oceanColorHex: values.oceanColorHex,
-    landColorHex: values.landColorHex,
+    oceanColor: values.oceanColor,
+    landColor: values.landColor,
     regionBoundaryStyle: values.regionBoundaryStyle,
     regionBoundaryWidth: values.regionBoundaryWidth,
-    regionBoundaryColorHex: values.regionBoundaryColorHex,
+    regionBoundaryColor: values.regionBoundaryColor,
     drawBorder: values.drawBorder,
     drawGridOverlay: values.drawGridOverlay,
     finalLandColoringMethod: values.finalLandColoringMethod,
@@ -94,37 +94,34 @@ export function buildCustomizePayload(values) {
     borderWidth: values.borderWidth,
     borderPosition: values.borderPosition,
     borderColorOption: values.borderColorOption,
-    borderColorHex: values.borderColorHex,
+    borderColor: values.borderColor,
     frayedBorder: values.frayedBorder,
     frayedBorderBlurLevel: values.frayedBorderBlurLevel,
     frayedBorderSize: values.frayedBorderSize,
     frayedBorderSeed: values.frayedBorderSeed,
     drawGrunge: values.drawGrunge,
     grungeWidth: values.grungeWidth,
-    frayedBorderColorHex: values.frayedBorderColorHex,
+    frayedBorderColor: values.frayedBorderColor,
     lineStyle: values.lineStyle,
     coastlineWidth: values.coastlineWidth,
-    coastlineColorHex: values.coastlineColorHex,
+    coastlineColor: values.coastlineColor,
     coastShadingLevel: values.coastShadingLevel,
-    coastShadingColorHex: values.coastShadingColorHex,
-    coastShadingAlpha: values.coastShadingAlpha,
-    oceanShadingAlpha: values.oceanShadingAlpha,
+    coastShadingColor: values.coastShadingColor,
     oceanShadingLevel: values.oceanShadingLevel,
-    oceanShadingColorHex: values.oceanShadingColorHex,
+    oceanShadingColor: values.oceanShadingColor,
     oceanWavesType: values.oceanWavesType,
     oceanWavesLevel: values.oceanWavesLevel,
-    oceanWavesColorHex: values.oceanWavesColorHex,
-    oceanWavesAlpha: values.oceanWavesAlpha,
+    oceanWavesColor: values.oceanWavesColor,
     concentricWaveCount: values.concentricWaveCount,
     fadeConcentricWaves: values.fadeConcentricWaves,
     jitterToConcentricWaves: values.jitterToConcentricWaves,
     brokenLinesForConcentricWaves: values.brokenLinesForConcentricWaves,
     drawOceanEffectsInLakes: values.drawOceanEffectsInLakes,
-    riverColorHex: values.riverColorHex,
+    riverColor: values.riverColor,
     drawRoads: values.drawRoads,
     roadStyle: values.roadStyle,
     roadWidth: values.roadWidth,
-    roadColorHex: values.roadColorHex,
+    roadColor: values.roadColor,
     mountainSize: values.mountainSize,
     hillSize: values.hillSize,
     duneSize: values.duneSize,
@@ -137,9 +134,9 @@ export function buildCustomizePayload(values) {
     otherMountainsFontFamily: values.otherMountainsFontFamily,
     citiesFontFamily: values.citiesFontFamily,
     riverFontFamily: values.riverFontFamily,
-    textColorHex: values.textColorHex,
+    textColor: values.textColor,
     drawBoldBackground: values.drawBoldBackground,
-    boldBackgroundColorHex: values.boldBackgroundColorHex,
+    boldBackgroundColor: values.boldBackgroundColor,
   }
 }
 
@@ -174,7 +171,7 @@ export function loadCustomizeOverrides() {
 // duplicating simple setter patterns across multiple files.
 export function setHex(setter, value) {
   if (value) {
-    const h = colorToHex(value)
+    const h = colorToHexWithAlpha ? colorToHexWithAlpha(value) || colorToHex(value) : colorToHex(value)
     if (h) setter(h)
   }
 }
@@ -223,7 +220,7 @@ export function convertScaleToSlider(scale) {
   return v
 }
 
-export function applyRoadStyleHelper(defs, setRoadStyle, setRoadWidth, setRoadColorHex) {
+export function applyRoadStyleHelper(defs, setRoadStyle, setRoadWidth, setRoadColor) {
   if (typeof defs.roadStyle === 'object' && defs.roadStyle !== null) {
     if (typeof defs.roadStyle.type === 'string') setString(setRoadStyle, defs.roadStyle.type)
     if (Number.isFinite(Number(defs.roadStyle.width))) setNumber(setRoadWidth, Number(defs.roadStyle.width))
@@ -231,7 +228,7 @@ export function applyRoadStyleHelper(defs, setRoadStyle, setRoadWidth, setRoadCo
     setString(setRoadStyle, defs.roadStyle)
   }
   if (Number.isFinite(Number(defs.roadWidth))) setNumber(setRoadWidth, defs.roadWidth)
-  setHex(setRoadColorHex, defs.roadColor)
+  setHex(setRoadColor, defs.roadColor)
 }
 
 export function applyBasicSettings(defs, opts, setters) {

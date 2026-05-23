@@ -20,8 +20,7 @@ describe('EffectsTab swatchReplacement', () => {
       renderColorControl,
       finalLandColoringMethod: 'ColorPoliticalRegions',
       oceanShadingLevel: 1,
-      oceanShadingColorHex: '#112233',
-      oceanShadingAlpha: 10,
+      oceanShadingColor: '#112233',
       showOceanPicker: false,
       oceanWaveTypes: [],
       oceanWavesType: null,
@@ -29,12 +28,12 @@ describe('EffectsTab swatchReplacement', () => {
       noneWaveValue: 'none',
       oceanWavesLevel: 0,
       oceanWavesAlpha: 0,
-      oceanWavesColorHex: '#000000',
+      oceanWavesColor: '#000000',
       showOceanWavesPicker: false,
       coastShadingLevel: 0,
       coastShadingAlpha: 0,
       coastlineWidth: 0,
-      coastlineColorHex: '#000',
+      coastlineColor: '#000',
     }
 
     render(<EffectsTab {...props} />)

@@ -22,14 +22,13 @@ describe('CustomizeSettingsSection', () => {
   let handlers
   beforeEach(() => {
     handlers = {
-      setOceanWavesAlpha: vi.fn(),
-      setOceanWavesColorHex: vi.fn(),
+      setOceanWavesColor: vi.fn(),
       setConcentricWaveCount: vi.fn(),
       setFadeConcentricWaves: vi.fn(),
       setJitterToConcentricWaves: vi.fn(),
       setBrokenLinesForConcentricWaves: vi.fn(),
       setDrawOceanEffectsInLakes: vi.fn(),
-      setRiverColorHex: vi.fn(),
+      setRiverColor: vi.fn(),
       setDrawRoads: vi.fn(),
       setDrawText: vi.fn(),
       setTitleFontFamily: vi.fn(),
@@ -38,9 +37,9 @@ describe('CustomizeSettingsSection', () => {
       setOtherMountainsFontFamily: vi.fn(),
       setCitiesFontFamily: vi.fn(),
       setRiverFontFamily: vi.fn(),
-      setTextColorHex: vi.fn(),
+      setTextColor: vi.fn(),
       setDrawBoldBackground: vi.fn(),
-      setBoldBackgroundColorHex: vi.fn(),
+      setBoldBackgroundColor: vi.fn(),
       notifyManualChange: vi.fn(),
       handleGenerateFromSettings: vi.fn(),
       handleGenerateAndSaveNort: vi.fn(),

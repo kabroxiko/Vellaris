@@ -58,10 +58,10 @@ describe('GenerateForm pure helpers', () => {
   })
 
   it('buildCustomizePayload copies expected keys', () => {
-    const vals = { backgroundType: 'SolidColor', oceanColorHex: '#aabbcc', drawRoads: true }
+    const vals = { backgroundType: 'SolidColor', oceanColor: '#aabbcc', drawRoads: true }
     const p = buildCustomizePayload(vals)
     expect(p.backgroundType).toBe('SolidColor')
-    expect(p.oceanColorHex).toBe('#aabbcc')
+    expect(p.oceanColor).toBe('#aabbcc')
     expect(p.drawRoads).toBe(true)
   })
 })
@@ -114,7 +114,7 @@ describe('GenerateForm helpers', () => {
   })
 
   it('persistCustomizeOverrides stores serialized payload in localStorage', () => {
-    const vals = { backgroundType: 'SolidColor', oceanColorHex: '#abcdef', drawRoads: false }
+    const vals = { backgroundType: 'SolidColor', oceanColor: '#abcdef', drawRoads: false }
     // ensure no previous value
     localStorage.removeItem('vellaris-customize-overrides')
     persistCustomizeOverrides(vals)
@@ -122,7 +122,7 @@ describe('GenerateForm helpers', () => {
     expect(raw).toBeTruthy()
     const parsed = JSON.parse(raw)
     expect(parsed.backgroundType).toBe('SolidColor')
-    expect(parsed.oceanColorHex).toBe('#abcdef')
+    expect(parsed.oceanColor).toBe('#abcdef')
   })
 
   it('loadRandomOverrides returns empty object for invalid JSON', () => {

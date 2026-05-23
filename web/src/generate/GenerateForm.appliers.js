@@ -1,5 +1,4 @@
-import { formatColorString } from './utils'
-import { hexToRgbaString } from './sharedHelpers'
+import { formatColorString, colorToHexWithAlpha, colorToHex } from './utils'
 
 export function mergeColor(
   parsedSettings,
@@ -16,7 +15,7 @@ export function mergeColor(
       return
     }
   }
-  parsedSettings[key] = hexToRgbaString(hexStr, 255)
+  parsedSettings[key] = colorToHexWithAlpha(hexStr) || colorToHex(hexStr) || hexStr
 }
 
 export function applyBackgroundFlagsHoisted(parsedSettings, backgroundType) {
@@ -71,16 +70,16 @@ export function applyGridAndColoringHoisted(parsedSettings, ctx) {
   const {
     regionBoundaryStyle,
     regionBoundaryWidth,
-    regionBoundaryColorHex,
+    regionBoundaryColor,
     drawRegionBoundaries,
     colorizeLand,
     colorizeOcean,
-    oceanColorHex,
-    landColorHex,
+    oceanColor,
+    landColor,
     drawGridOverlay,
     gridOverlayShape,
     gridOverlayRowOrColCount,
-    gridOverlayColorHex,
+    gridOverlayColor,
     gridOverlayXOffset,
     gridOverlayYOffset,
     gridOverlayLineWidth,
@@ -98,19 +97,20 @@ export function applyGridAndColoringHoisted(parsedSettings, ctx) {
   if (regionBoundaryStyle) parsedSettings.regionBoundaryStyle.type = regionBoundaryStyle
   if (Number.isFinite(Number(regionBoundaryWidth)))
     parsedSettings.regionBoundaryStyle.width = Number(regionBoundaryWidth)
-  merge(parsedSettings, 'regionBoundaryColor', regionBoundaryColorHex)
+  merge(parsedSettings, 'regionBoundaryColor', regionBoundaryColor)
   parsedSettings.drawRegionBoundaries = Boolean(drawRegionBoundaries)
   parsedSettings.colorizeLand = Boolean(colorizeLand)
   parsedSettings.colorizeOcean = Boolean(colorizeOcean)
-  mergeColor(parsedSettings, 'oceanColor', oceanColorHex, 100, true)
-  mergeColor(parsedSettings, 'landColor', landColorHex, 100, true)
+  mergeColor(parsedSettings, 'oceanColor', oceanColor, 100, true)
+  mergeColor(parsedSettings, 'landColor', landColor, 100, true)
   parsedSettings.drawGridOverlay = Boolean(drawGridOverlay)
   if (gridOverlayShape) parsedSettings.gridOverlayShape = gridOverlayShape
   if (Number.isFinite(Number(gridOverlayRowOrColCount)))
     parsedSettings.gridOverlayRowOrColCount = Number(gridOverlayRowOrColCount)
-  if (gridOverlayColorHex) {
+  if (gridOverlayColor) {
     const alpha = getGridOverlayAlpha()
-    parsedSettings.gridOverlayColor = hexToRgbaString(gridOverlayColorHex, alpha)
+    parsedSettings.gridOverlayColor =
+      colorToHexWithAlpha(gridOverlayColor, alpha) || colorToHex(gridOverlayColor) || gridOverlayColor
   }
   if (gridOverlayXOffset) parsedSettings.gridOverlayXOffset = gridOverlayXOffset
   if (gridOverlayYOffset) parsedSettings.gridOverlayYOffset = gridOverlayYOffset
@@ -128,21 +128,21 @@ export function applyBordersFrayedAndGrungeHoisted(parsedSettings, ctx) {
     borderWidth,
     borderPosition,
     borderColorOption,
-    borderColorHex,
+    borderColor,
     frayedBorder,
     frayedBorderBlurLevel,
     frayedBorderSize,
     frayedBorderSeed,
     drawGrunge,
     grungeWidth,
-    frayedBorderColorHex,
+    frayedBorderColor,
     mergeColor: mergeColorFromCtx,
   } = ctx
   const merge = mergeColorFromCtx || mergeColor
   parsedSettings.borderWidth = Number(borderWidth)
   parsedSettings.borderPosition = borderPosition
   parsedSettings.borderColorOption = borderColorOption
-  merge(parsedSettings, 'borderColor', borderColorHex)
+  merge(parsedSettings, 'borderColor', borderColor)
   parsedSettings.frayedBorder = Boolean(frayedBorder)
   if (Number.isFinite(Number(frayedBorderBlurLevel)))
     parsedSettings.frayedBorderBlurLevel = Number(frayedBorderBlurLevel)
@@ -151,30 +151,28 @@ export function applyBordersFrayedAndGrungeHoisted(parsedSettings, ctx) {
   if (frayedBorderSeed) parsedSettings.frayedBorderSeed = Number(frayedBorderSeed)
   parsedSettings.drawGrunge = Boolean(drawGrunge)
   if (Number.isFinite(Number(grungeWidth))) parsedSettings.grungeWidth = Number(grungeWidth)
-  merge(parsedSettings, 'frayedBorderColor', frayedBorderColorHex)
+  merge(parsedSettings, 'frayedBorderColor', frayedBorderColor)
 }
 
 export function applyCoastOceanAndWavesHoisted(parsedSettings, ctx) {
   const {
     lineStyle,
     coastlineWidth,
-    coastlineColorHex,
+    coastlineColor,
     coastShadingLevel,
-    coastShadingColorHex,
-    coastShadingAlpha,
+    coastShadingColor,
     oceanShadingLevel,
-    oceanShadingColorHex,
-    oceanShadingAlpha,
+    oceanShadingColor,
     oceanWavesType,
     oceanWavesLevel,
-    oceanWavesAlpha,
+    oceanWavesColor,
     getConcentricWaveCount,
     fadeConcentricWaves,
     jitterToConcentricWaves,
     brokenLinesForConcentricWaves,
-    oceanWavesColorHex,
+    // oceanWavesColor handled above
     drawOceanEffectsInLakes,
-    riverColorHex,
+    riverColor,
     parseBooleanWithDefault,
     mergedSettingsRef,
     mergeColor: mergeColorFromCtx,
@@ -183,19 +181,12 @@ export function applyCoastOceanAndWavesHoisted(parsedSettings, ctx) {
   if (lineStyle) parsedSettings.lineStyle = lineStyle
   if (Number.isFinite(Number(coastlineWidth)))
     parsedSettings.coastlineWidth = Number(coastlineWidth)
-  merge(parsedSettings, 'coastlineColor', coastlineColorHex)
+  merge(parsedSettings, 'coastlineColor', coastlineColor)
   if (Number.isFinite(Number(coastShadingLevel)))
     parsedSettings.coastShadingLevel = Number(coastShadingLevel)
-  if (coastShadingColorHex) {
-    const opacityPercent = 100 - Number(coastShadingAlpha ?? 0)
-    merge(parsedSettings, 'coastShadingColor', coastShadingColorHex, opacityPercent, true)
-  }
-  if (Number.isFinite(Number(oceanShadingLevel)))
-    parsedSettings.oceanShadingLevel = Number(oceanShadingLevel)
-  if (oceanShadingColorHex) {
-    const oceanOpacityPercent = 100 - Number(oceanShadingAlpha ?? 0)
-    merge(parsedSettings, 'oceanShadingColor', oceanShadingColorHex, oceanOpacityPercent, true)
-  }
+  if (coastShadingColor) parsedSettings.coastShadingColor = coastShadingColor
+  if (Number.isFinite(Number(oceanShadingLevel))) parsedSettings.oceanShadingLevel = Number(oceanShadingLevel)
+  if (oceanShadingColor) parsedSettings.oceanShadingColor = oceanShadingColor
   if (oceanWavesType) parsedSettings.oceanEffect = oceanWavesType
   if (Number.isFinite(Number(oceanWavesLevel)))
     parsedSettings.oceanWavesLevel = Number(oceanWavesLevel)
@@ -213,12 +204,9 @@ export function applyCoastOceanAndWavesHoisted(parsedSettings, ctx) {
     'brokenLinesForConcentricWaves',
     brokenLinesForConcentricWaves
   )
-  if (oceanWavesColorHex) {
-    const opacityPercent = 100 - Number(oceanWavesAlpha ?? 0)
-    merge(parsedSettings, 'oceanWavesColor', oceanWavesColorHex, opacityPercent, true)
-  }
+  if (oceanWavesColor) merge(parsedSettings, 'oceanWavesColor', oceanWavesColor, 100, true)
   parsedSettings.drawOceanEffectsInLakes = Boolean(drawOceanEffectsInLakes)
-  merge(parsedSettings, 'riverColor', riverColorHex)
+  merge(parsedSettings, 'riverColor', riverColor)
 }
 
 export function applyRoadsAndScalesHoisted(parsedSettings, ctx) {
@@ -226,7 +214,7 @@ export function applyRoadsAndScalesHoisted(parsedSettings, ctx) {
     drawRoads,
     roadStyle,
     roadWidth,
-    roadColorHex,
+    roadColor,
     mountainSize,
     hillSize,
     duneSize,
@@ -245,7 +233,7 @@ export function applyRoadsAndScalesHoisted(parsedSettings, ctx) {
   } else if (Number.isFinite(Number(roadWidth))) {
     parsedSettings.roadStyle = { width: Number(roadWidth) }
   }
-  merge(parsedSettings, 'roadColor', roadColorHex)
+  merge(parsedSettings, 'roadColor', roadColor)
   if (Number.isFinite(Number(mountainSize)))
     parsedSettings.mountainScale = scaleSliderValue(mountainSize)
   if (Number.isFinite(Number(hillSize))) parsedSettings.hillScale = scaleSliderValue(hillSize)
@@ -258,14 +246,14 @@ export function applyRoadsAndScalesHoisted(parsedSettings, ctx) {
 export function applyTextAndBackgroundHoisted(parsedSettings, ctx) {
   const {
     drawText,
-    textColorHex,
+    textColor,
     drawBoldBackground,
-    boldBackgroundColorHex,
+    boldBackgroundColor,
     mergeColor: mergeColorFromCtx,
   } = ctx
   const merge = mergeColorFromCtx || mergeColor
   parsedSettings.drawText = Boolean(drawText)
-  merge(parsedSettings, 'textColor', textColorHex)
+  merge(parsedSettings, 'textColor', textColor)
   parsedSettings.drawBoldBackground = Boolean(drawBoldBackground)
-  merge(parsedSettings, 'boldBackgroundColor', boldBackgroundColorHex)
+  merge(parsedSettings, 'boldBackgroundColor', boldBackgroundColor)
 }

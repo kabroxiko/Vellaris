@@ -16,11 +16,11 @@ describe('GenerateForm pure helpers', () => {
   })
 
   it('buildCustomizePayload maps values to payload shape', () => {
-    const v = { backgroundType: 'SolidColor', drawRegionBoundaries: true, oceanColorHex: '#123456' }
+    const v = { backgroundType: 'SolidColor', drawRegionBoundaries: true, oceanColor: '#123456' }
     const payload = buildCustomizePayload(v)
     expect(payload.backgroundType).toBe('SolidColor')
     expect(payload.drawRegionBoundaries).toBe(true)
-    expect(payload.oceanColorHex).toBe('#123456')
+    expect(payload.oceanColor).toBe('#123456')
   })
 
   it('serializeNortObject produces stable JSON ordering', () => {

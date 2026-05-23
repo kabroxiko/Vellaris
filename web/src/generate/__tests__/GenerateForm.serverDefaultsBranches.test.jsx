@@ -70,19 +70,23 @@ test('applyServerDefaults: roadStyle object and scale mapping applied to persist
   expect(Number(parsed.hillSize)).to.be.a('number')
 })
 
-test('applyServerDefaults: coastShadingAlpha extracted from rgba color', async () => {
+test('applyServerDefaults: coastShadingColor persisted as #RRGGBBAA', async () => {
   render(<GenerateForm uiLanguage="en" />)
   await waitFor(() => {
     const raw = localStorage.getItem('vellaris-customize-overrides')
     if (!raw) throw new Error('localStorage not populated yet')
     const parsed = JSON.parse(raw)
-    if (parsed.coastShadingAlpha === undefined) throw new Error('coastShadingAlpha not applied')
+    if (!parsed.coastShadingColor) throw new Error('coastShadingColor not applied')
   })
   const raw = localStorage.getItem('vellaris-customize-overrides')
   const parsed = JSON.parse(raw)
-  // alpha should be a finite channel value (0-255)
-  expect(Number.isFinite(Number(parsed.coastShadingAlpha))).to.equal(true)
-  expect(Number(parsed.coastShadingAlpha)).to.be.within(0, 255)
+  // should be an 8-digit hex string with alpha
+  expect(/^#[0-9a-f]{8}$/i.test(parsed.coastShadingColor)).to.equal(true)
+  // decode alpha channel and ensure within 0-255
+  const alphaHex = parsed.coastShadingColor.slice(7, 9)
+  const alpha = Number.parseInt(alphaHex, 16)
+  expect(Number.isFinite(alpha)).to.equal(true)
+  expect(alpha).to.be.within(0, 255)
 })
 
 // Also ensure loadUiOptions throws on network error (covering caching branch)

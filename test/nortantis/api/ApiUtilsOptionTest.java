@@ -7,22 +7,22 @@ import java.util.Map;
 
 class ApiUtilsOptionTest
 {
-    @Test
-    void testOptionCreatesMap()
-    {
-        Map<String, String> m = ApiUtils.option("x", "label");
-        assertEquals("x", m.get("value"));
-        assertEquals("label", m.get("label"));
-    }
+	@Test
+	void testOptionCreatesMap()
+	{
+		Map<String, String> m = ApiUtils.option("x", "label");
+		assertEquals("x", m.get("value"));
+		assertEquals("label", m.get("label"));
+	}
 
-    @Test
-    void testParseGeneratedDimension()
-    {
-        nortantis.GeneratedDimension gd = ApiUtils.parseGeneratedDimension("Square");
-        assertNotNull(gd);
-        assertEquals(nortantis.GeneratedDimension.Square, gd);
+	@Test
+	void testParseGeneratedDimension()
+	{
+		nortantis.GeneratedDimension gd = ApiUtils.parseGeneratedDimension("Square");
+		assertNotNull(gd);
+		assertEquals(nortantis.GeneratedDimension.Square, gd);
 
-        assertNull(ApiUtils.parseGeneratedDimension("Nonexistent"));
-        assertNull(ApiUtils.parseGeneratedDimension(null));
-    }
+		assertNull(ApiUtils.parseGeneratedDimension("Nonexistent"));
+		assertNull(ApiUtils.parseGeneratedDimension(null));
+	}
 }

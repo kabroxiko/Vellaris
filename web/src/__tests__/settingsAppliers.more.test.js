@@ -15,13 +15,13 @@ describe('settingsAppliers broader behavior', () => {
     setters.setTextureRef = record('textureRef')
     setters.setBackgroundType = record('backgroundType')
     setters.setBackgroundSeed = record('backgroundSeed')
-    setters.setOceanColorHex = record('oceanColorHex')
-    setters.setLandColorHex = record('landColorHex')
-    setters.setRegionBoundaryColorHex = record('regionBoundaryColorHex')
+    setters.setOceanColor = record('oceanColor')
+    setters.setLandColor = record('landColor')
+    setters.setRegionBoundaryColor = record('regionBoundaryColor')
     setters.setBorderRef = record('borderRef')
     setters.setBorderWidth = record('borderWidth')
     setters.setBorderPosition = record('borderPosition')
-    setters.setBorderColorHex = record('borderColorHex')
+    setters.setBorderColor = record('borderColor')
 
     const appliers = createSettingsAppliers(setters, {})
 
@@ -60,9 +60,9 @@ describe('settingsAppliers broader behavior', () => {
       drawGridOverlay: false,
       drawRegionColors: true,
     })
-    expect(setters._oceanColorHex).toBe('#010203')
-    expect(setters._landColorHex).toBe('#0a0b0c')
-    expect(setters._regionBoundaryColorHex).toBe('#0f0f0f')
+    expect(setters._oceanColor).toBe('#010203ff')
+    expect(setters._landColor).toBe('#0a0b0cff')
+    expect(setters._regionBoundaryColor).toBe('#0f0f0fff')
 
     appliers.applyBorderSettings({
       borderResource: { artPack: 'b', name: 'x' },
@@ -73,6 +73,6 @@ describe('settingsAppliers broader behavior', () => {
     expect(setters._borderRef).toBe('b|x')
     expect(setters._borderWidth).toBe(3)
     expect(setters._borderPosition).toBe('inside')
-    expect(setters._borderColorHex).toBe('#020202')
+    expect(setters._borderColor).toBe('#020202')
   })
 })

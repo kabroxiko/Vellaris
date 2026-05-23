@@ -2,7 +2,7 @@ import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import PropTypes from 'prop-types'
 import CustomizeSettingsSection from './CustomizeSettingsSection'
 import RandomSettingsSection from './RandomSettingsSection'
-import { base64ToBlob } from './utils'
+import { base64ToBlob, colorToHexWithAlpha, parseColorChannels } from './utils'
 import { selectCityIconType, handleResponseError, tryParseJson as tryParse } from './helpers'
 import { downloadNortContent } from './responseHandlers'
 import { deriveNortFilenameFromContent, makeProgressToastController } from './sharedHelpers'
@@ -18,11 +18,9 @@ import {
   setResourceFromRef,
   parseBooleanWithDefault,
   loadRandomOverrides,
-  setHex,
   setNumber,
   setString,
   setBoolean,
-  setAlphaFromValueOrColor,
   convertScaleToSlider,
   applyRoadStyleHelper,
   applyBasicSettings,
@@ -138,16 +136,16 @@ function GenerateForm({ uiLanguage = 'en' }) {
     drawRegionBoundaries,
     colorizeLand,
     colorizeOcean,
-    oceanColorHex,
-    landColorHex,
+    oceanColor,
+    landColor,
     regionBoundaryStyle,
     regionBoundaryWidth,
-    regionBoundaryColorHex,
+    regionBoundaryColor,
     drawBorder,
     drawGridOverlay,
     gridOverlayShape,
     gridOverlayRowOrColCount,
-    gridOverlayColorHex,
+    gridOverlayColor,
     gridOverlayXOffset,
     gridOverlayYOffset,
     gridOverlayLineWidth,
@@ -158,37 +156,34 @@ function GenerateForm({ uiLanguage = 'en' }) {
     borderWidth,
     borderPosition,
     borderColorOption,
-    borderColorHex,
+    borderColor,
     frayedBorder,
     frayedBorderBlurLevel,
     frayedBorderSize,
     frayedBorderSeed,
     drawGrunge,
     grungeWidth,
-    frayedBorderColorHex,
+    frayedBorderColor,
     lineStyle,
     coastlineWidth,
-    coastlineColorHex,
+    coastlineColor,
     coastShadingLevel,
-    coastShadingColorHex,
-    coastShadingAlpha,
-    oceanShadingAlpha,
+    coastShadingColor,
     oceanShadingLevel,
-    oceanShadingColorHex,
+    oceanShadingColor,
     oceanWavesType,
     oceanWavesLevel,
-    oceanWavesColorHex,
-    oceanWavesAlpha,
+    oceanWavesColor,
     concentricWaveCount,
     fadeConcentricWaves,
     jitterToConcentricWaves,
     brokenLinesForConcentricWaves,
     drawOceanEffectsInLakes,
-    riverColorHex,
+    riverColor,
     drawRoads,
     roadStyle,
     roadWidth,
-    roadColorHex,
+    roadColor,
     mountainSize,
     hillSize,
     duneSize,
@@ -201,9 +196,9 @@ function GenerateForm({ uiLanguage = 'en' }) {
     otherMountainsFontFamily,
     citiesFontFamily,
     riverFontFamily,
-    textColorHex,
+    textColor,
     drawBoldBackground,
-    boldBackgroundColorHex,
+    boldBackgroundColor,
   } = customizeValues
 
   const {
@@ -213,16 +208,16 @@ function GenerateForm({ uiLanguage = 'en' }) {
     setDrawRegionBoundaries,
     setColorizeLand,
     setColorizeOcean,
-    setOceanColorHex,
-    setLandColorHex,
+    setOceanColor,
+    setLandColor,
     setRegionBoundaryStyle,
     setRegionBoundaryWidth,
-    setRegionBoundaryColorHex,
+    setRegionBoundaryColor,
     setDrawBorder,
     setDrawGridOverlay,
     setGridOverlayShape,
     setGridOverlayRowOrColCount,
-    setGridOverlayColorHex,
+    setGridOverlayColor,
     setGridOverlayXOffset,
     setGridOverlayYOffset,
     setGridOverlayLineWidth,
@@ -233,37 +228,34 @@ function GenerateForm({ uiLanguage = 'en' }) {
     setBorderWidth,
     setBorderPosition,
     setBorderColorOption,
-    setBorderColorHex,
+    setBorderColor,
     setFrayedBorder,
     setFrayedBorderBlurLevel,
     setFrayedBorderSize,
     setFrayedBorderSeed,
     setDrawGrunge,
     setGrungeWidth,
-    setFrayedBorderColorHex,
+    setFrayedBorderColor,
     setLineStyle,
     setCoastlineWidth,
-    setCoastlineColorHex,
+    setCoastlineColor,
     setCoastShadingLevel,
-    setCoastShadingColorHex,
-    setCoastShadingAlpha,
-    setOceanShadingAlpha,
+    setCoastShadingColor,
     setOceanShadingLevel,
-    setOceanShadingColorHex,
+    setOceanShadingColor,
     setOceanWavesType,
     setOceanWavesLevel,
-    setOceanWavesColorHex,
-    setOceanWavesAlpha,
+    setOceanWavesColor,
     setConcentricWaveCount,
     setFadeConcentricWaves,
     setJitterToConcentricWaves,
     setBrokenLinesForConcentricWaves,
     setDrawOceanEffectsInLakes,
-    setRiverColorHex,
+    setRiverColor,
     setDrawRoads,
     setRoadStyle,
     setRoadWidth,
-    setRoadColorHex,
+    setRoadColor,
     setMountainSize,
     setHillSize,
     setDuneSize,
@@ -276,9 +268,9 @@ function GenerateForm({ uiLanguage = 'en' }) {
     setOtherMountainsFontFamily,
     setCitiesFontFamily,
     setRiverFontFamily,
-    setTextColorHex,
+    setTextColor,
     setDrawBoldBackground,
-    setBoldBackgroundColorHex,
+    setBoldBackgroundColor,
   } = customizeSetters
 
   // --- Shared state ---
@@ -339,15 +331,15 @@ function GenerateForm({ uiLanguage = 'en' }) {
       setBoolean(setDrawRegionBoundaries, defs.drawRegionBoundaries)
       setBoolean(setColorizeLand, defs.colorizeLand)
       setBoolean(setColorizeOcean, defs.colorizeOcean)
-      setHex(setOceanColorHex, defs.oceanColor)
-      setHex(setLandColorHex, defs.landColor)
-      setHex(setRegionBoundaryColorHex, defs.regionBoundaryColor)
+      setString(setOceanColor, defs.oceanColor)
+      setString(setLandColor, defs.landColor)
+      setString(setRegionBoundaryColor, defs.regionBoundaryColor)
       setNumber(setRegionBoundaryWidth, defs.regionBoundaryWidth)
       setBoolean(setDrawBorder, defs.drawBorder)
       setBoolean(setDrawGridOverlay, defs.drawGridOverlay)
       setString(setGridOverlayShape, defs.gridOverlayShape)
       setNumber(setGridOverlayRowOrColCount, defs.gridOverlayRowOrColCount)
-      setHex(setGridOverlayColorHex, defs.gridOverlayColor)
+      setString(setGridOverlayColor, defs.gridOverlayColor)
       if (defs.gridOverlayXOffset !== undefined && defs.gridOverlayXOffset !== null)
         setGridOverlayXOffset(defs.gridOverlayXOffset)
       if (defs.gridOverlayYOffset !== undefined && defs.gridOverlayYOffset !== null)
@@ -365,50 +357,38 @@ function GenerateForm({ uiLanguage = 'en' }) {
       setNumber(setBorderWidth, defs.borderWidth)
       setString(setBorderPosition, defs.borderPosition)
       setString(setBorderColorOption, defs.borderColorOption)
-      setHex(setBorderColorHex, defs.borderColor)
+      setString(setBorderColor, defs.borderColor)
       setBoolean(setFrayedBorder, defs.frayedBorder)
       setNumber(setFrayedBorderBlurLevel, defs.frayedBorderBlurLevel)
       setNumber(setFrayedBorderSize, defs.frayedBorderSize)
       setString(setFrayedBorderSeed, defs.frayedBorderSeed)
       setBoolean(setDrawGrunge, defs.drawGrunge)
       setNumber(setGrungeWidth, defs.grungeWidth)
-      setHex(setFrayedBorderColorHex, defs.frayedBorderColor)
+      setString(setFrayedBorderColor, defs.frayedBorderColor)
       setString(setLineStyle, defs.lineStyle)
       setNumber(setCoastlineWidth, defs.coastlineWidth)
-      setHex(setCoastlineColorHex, defs.coastlineColor)
+      setString(setCoastlineColor, defs.coastlineColor)
     }
 
     const applyOceanAndRoads = (defs) => {
       setNumber(setCoastShadingLevel, defs.coastShadingLevel)
-      setHex(setCoastShadingColorHex, defs.coastShadingColor)
-      setAlphaFromValueOrColor(
-        defs.coastShadingAlpha,
-        defs.coastShadingColor,
-        setNumber.bind(null, setCoastShadingAlpha)
-      )
-      setAlphaFromValueOrColor(
-        defs.oceanShadingAlpha,
-        defs.oceanShadingColor,
-        setNumber.bind(null, setOceanShadingAlpha)
-      )
+      // Ensure coast shading color is stored as combined #RRGGBBAA when possible
+      const combined = colorToHexWithAlpha(defs.coastShadingColor, defs.coastShadingAlpha)
+      if (combined) setString(setCoastShadingColor, combined)
+      else setString(setCoastShadingColor, defs.coastShadingColor)
       setNumber(setOceanShadingLevel, defs.oceanShadingLevel)
-      setHex(setOceanShadingColorHex, defs.oceanShadingColor)
+      setString(setOceanShadingColor, defs.oceanShadingColor)
       setString(setOceanWavesType, defs.oceanWavesType)
       setNumber(setOceanWavesLevel, defs.oceanWavesLevel)
-      setHex(setOceanWavesColorHex, defs.oceanWavesColor)
-      setAlphaFromValueOrColor(
-        defs.oceanWavesAlpha,
-        defs.oceanWavesColor,
-        setNumber.bind(null, setOceanWavesAlpha)
-      )
+      setString(setOceanWavesColor, defs.oceanWavesColor)
       setNumber(setConcentricWaveCount, defs.concentricWaveCount)
       setBoolean(setFadeConcentricWaves, defs.fadeConcentricWaves)
       setBoolean(setJitterToConcentricWaves, defs.jitterToConcentricWaves)
       setBoolean(setBrokenLinesForConcentricWaves, defs.brokenLinesForConcentricWaves)
       setBoolean(setDrawOceanEffectsInLakes, defs.drawOceanEffectsInLakes)
-      setHex(setRiverColorHex, defs.riverColor)
+      setString(setRiverColor, defs.riverColor)
       setBoolean(setDrawRoads, defs.drawRoads)
-      applyRoadStyleHelper(defs, setRoadStyle, setRoadWidth, setRoadColorHex)
+      applyRoadStyleHelper(defs, setRoadStyle, setRoadWidth, setRoadColor)
     }
 
     // Apply a scale-or-size mapping for standard elements
@@ -453,9 +433,8 @@ function GenerateForm({ uiLanguage = 'en' }) {
       setString(setOtherMountainsFontFamily, defs.otherMountainsFontFamily)
       setString(setCitiesFontFamily, defs.citiesFontFamily)
       setString(setRiverFontFamily, defs.riverFontFamily)
-      setHex(setTextColorHex, defs.textColor)
-      setBoolean(setDrawBoldBackground, defs.drawBoldBackground)
-      setHex(setBoldBackgroundColorHex, defs.boldBackgroundColor)
+        setString(setTextColor, defs.textColor)
+        setString(setBoldBackgroundColor, defs.boldBackgroundColor)
       const backendDefaultFont =
         Array.isArray(opts?.fonts) && opts.fonts.length > 0 ? opts.fonts[0] : null
       if (backendDefaultFont) {
@@ -618,9 +597,9 @@ function GenerateForm({ uiLanguage = 'en' }) {
       setDrawRegionBoundaries,
       setColorizeLand,
       setColorizeOcean,
-      setOceanColorHex,
-      setLandColorHex,
-      setRegionBoundaryColorHex,
+      setOceanColor,
+      setLandColor,
+      setRegionBoundaryColor,
       setDrawBorder,
       setDrawGridOverlay,
       setLandColoringMethod,
@@ -629,37 +608,34 @@ function GenerateForm({ uiLanguage = 'en' }) {
       setBorderWidth,
       setBorderPosition,
       setBorderColorOption,
-      setBorderColorHex,
+      setBorderColor,
       setFrayedBorder,
       setFrayedBorderBlurLevel,
       setFrayedBorderSize,
       setFrayedBorderSeed,
       setDrawGrunge,
       setGrungeWidth,
-      setFrayedBorderColorHex,
+      setFrayedBorderColor,
       setLineStyle,
       setCoastlineWidth,
-      setCoastlineColorHex,
+      setCoastlineColor,
       setCoastShadingLevel,
-      setCoastShadingColorHex,
-      setCoastShadingAlpha,
+      setCoastShadingColor,
       setOceanShadingLevel,
-      setOceanShadingAlpha,
-      setOceanShadingColorHex,
-      setOceanWavesAlpha,
+      setOceanShadingColor,
       setOceanWavesType,
       setOceanWavesLevel,
-      setOceanWavesColorHex,
+      setOceanWavesColor,
       setConcentricWaveCount,
       setFadeConcentricWaves,
       setJitterToConcentricWaves,
       setBrokenLinesForConcentricWaves,
       setDrawOceanEffectsInLakes,
-      setRiverColorHex,
+      setRiverColor,
       setDrawRoads,
       setRoadStyle,
       setRoadWidth,
-      setRoadColorHex,
+      setRoadColor,
       setMountainSize,
       setHillSize,
       setDuneSize,
@@ -672,9 +648,9 @@ function GenerateForm({ uiLanguage = 'en' }) {
       setOtherMountainsFontFamily,
       setCitiesFontFamily,
       setRiverFontFamily,
-      setTextColorHex,
+      setTextColor,
       setDrawBoldBackground,
-      setBoldBackgroundColorHex,
+      setBoldBackgroundColor,
     },
     customizeValues,
     customizeDeps
@@ -906,14 +882,54 @@ function GenerateForm({ uiLanguage = 'en' }) {
   }
 
   const fetchResolvedNort = async (cfg) => {
-    const settingsRes = await fetch(`${API_BASE}/generate-settings`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(cfg),
-    })
-    if (!settingsRes.ok) await handleResponseError(settingsRes)
-    const resolvedTxt = await settingsRes.text()
-    return resolvedTxt
+    try {
+      // Normalize colors in the cfg to {r,g,b,a} objects expected by backend
+      function normalizeColors(v) {
+        if (v === null || v === undefined) return v
+        if (Array.isArray(v)) return v.map(normalizeColors)
+        if (typeof v === 'object') {
+          const keys = Object.keys(v)
+          if (keys.includes('r') && keys.includes('g') && keys.includes('b')) {
+            const r = Number(v.r)
+            const g = Number(v.g)
+            const b = Number(v.b)
+            const a = Number(v.a ?? v.alpha ?? 255)
+            return `${r},${g},${b},${a}`
+          }
+          const out = {}
+          for (const k of Object.keys(v)) out[k] = normalizeColors(v[k])
+          return out
+        }
+        if (typeof v === 'string') {
+          const ch = parseColorChannels(v)
+          if (ch) return `${ch.r},${ch.g},${ch.b},${ch.a}`
+          return v
+        }
+        return v
+      }
+
+      const normalized = normalizeColors(cfg)
+      if (typeof console !== 'undefined' && typeof console.debug === 'function') {
+        try {
+          console.debug('POST /generate-settings payload:', JSON.stringify(normalized))
+        } catch (e) {
+          console.debug('POST /generate-settings payload (non-serializable):', normalized)
+        }
+      }
+      const settingsRes = await fetch(`${API_BASE}/generate-settings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(normalized),
+      })
+      if (!settingsRes.ok) await handleResponseError(settingsRes)
+      const resolvedTxt = await settingsRes.text()
+      return resolvedTxt
+    } catch (err) {
+      if (typeof console !== 'undefined' && typeof console.error === 'function') {
+        console.error('Error posting /generate-settings', err, cfg)
+      }
+      throw err
+    }
   }
   const applyReturnedSettingsToUi = (nortContent) => {
     const parsed = tryParse(nortContent)
@@ -964,7 +980,7 @@ function GenerateForm({ uiLanguage = 'en' }) {
   function getGridOverlayAlpha() {
     return computeGridOverlayAlpha(
       mergedSettingsRef?.current?.gridOverlayColor,
-      gridOverlayColorHex
+      gridOverlayColor
     )
   }
 
@@ -1004,16 +1020,16 @@ function GenerateForm({ uiLanguage = 'en' }) {
     selectedBooks,
     regionBoundaryStyle,
     regionBoundaryWidth,
-    regionBoundaryColorHex,
+    regionBoundaryColor,
     drawRegionBoundaries,
     colorizeLand,
     colorizeOcean,
-    oceanColorHex,
-    landColorHex,
+    oceanColor,
+    landColor,
     drawGridOverlay,
     gridOverlayShape,
     gridOverlayRowOrColCount,
-    gridOverlayColorHex,
+    gridOverlayColor,
     gridOverlayXOffset,
     gridOverlayYOffset,
     gridOverlayLineWidth,
@@ -1025,36 +1041,34 @@ function GenerateForm({ uiLanguage = 'en' }) {
     borderWidth,
     borderPosition,
     borderColorOption,
-    borderColorHex,
+    borderColor,
     frayedBorder,
     frayedBorderBlurLevel,
     frayedBorderSize,
     frayedBorderSeed,
     drawGrunge,
     grungeWidth,
-    frayedBorderColorHex,
+    frayedBorderColor,
     lineStyle,
     coastlineWidth,
-    coastlineColorHex,
+    coastlineColor,
     coastShadingLevel,
-    coastShadingColorHex,
-    coastShadingAlpha,
+    coastShadingColor,
     oceanShadingLevel,
-    oceanShadingColorHex,
-    oceanShadingAlpha,
+    oceanShadingColor,
     oceanWavesType,
     oceanWavesLevel,
     fadeConcentricWaves,
     jitterToConcentricWaves,
     brokenLinesForConcentricWaves,
-    oceanWavesColorHex,
+    oceanWavesColor,
     drawOceanEffectsInLakes,
-    riverColorHex,
+    riverColor,
     parseBooleanWithDefault,
     drawRoads,
     roadStyle,
     roadWidth,
-    roadColorHex,
+    roadColor,
     mountainSize,
     hillSize,
     duneSize,
@@ -1062,9 +1076,9 @@ function GenerateForm({ uiLanguage = 'en' }) {
     citySize,
     scaleSliderValue,
     drawText,
-    textColorHex,
+    textColor,
     drawBoldBackground,
-    boldBackgroundColorHex,
+    boldBackgroundColor,
     finalWidth,
     finalHeight,
     finalSeed,
@@ -1224,9 +1238,9 @@ function GenerateForm({ uiLanguage = 'en' }) {
           finalLandColoringMethod,
           regionBoundaryStyle,
           regionBoundaryWidth,
-          regionBoundaryColorHex,
-          landColorHex,
-          oceanColorHex,
+          regionBoundaryColor,
+          landColor,
+          oceanColor,
           backgroundSeed,
           finalSeed,
           finalWidth,
@@ -1238,37 +1252,34 @@ function GenerateForm({ uiLanguage = 'en' }) {
           borderWidth,
           borderPosition,
           borderColorOption,
-          borderColorHex,
+          borderColor,
           frayedBorder,
           frayedBorderBlurLevel,
           frayedBorderSize,
           frayedBorderSeed,
           drawGrunge,
           grungeWidth,
-          frayedBorderColorHex,
+          frayedBorderColor,
           lineStyle,
           coastlineWidth,
-          coastlineColorHex,
+          coastlineColor,
           coastShadingLevel,
-          coastShadingColorHex,
-          coastShadingAlpha,
-          oceanShadingAlpha,
+          coastShadingColor,
           oceanShadingLevel,
-          oceanShadingColorHex,
+          oceanShadingColor,
           oceanWavesType,
           oceanWavesLevel,
-          oceanWavesAlpha,
-          oceanWavesColorHex,
+          oceanWavesColor,
           concentricWaveCount,
           fadeConcentricWaves,
           jitterToConcentricWaves,
           brokenLinesForConcentricWaves,
           drawOceanEffectsInLakes,
-          riverColorHex,
+          riverColor,
           drawRoads,
           roadStyle,
           roadWidth,
-          roadColorHex,
+          roadColor,
           mountainSize,
           hillSize,
           duneSize,
@@ -1281,12 +1292,12 @@ function GenerateForm({ uiLanguage = 'en' }) {
           otherMountainsFontFamily,
           citiesFontFamily,
           riverFontFamily,
-          textColorHex,
+          textColor,
           drawBoldBackground,
-          boldBackgroundColorHex,
+          boldBackgroundColor,
           gridOverlayShape,
           gridOverlayRowOrColCount,
-          gridOverlayColorHex,
+          gridOverlayColor,
           gridOverlayXOffset,
           gridOverlayYOffset,
           gridOverlayLineWidth,
@@ -1303,9 +1314,9 @@ function GenerateForm({ uiLanguage = 'en' }) {
           setFinalLandColoringMethod,
           setRegionBoundaryStyle,
           setRegionBoundaryWidth,
-          setRegionBoundaryColorHex,
-          setLandColorHex,
-          setOceanColorHex,
+          setRegionBoundaryColor,
+          setLandColor,
+          setOceanColor,
           setBackgroundSeed,
           setFinalSeed,
           setFinalWidth,
@@ -1317,10 +1328,10 @@ function GenerateForm({ uiLanguage = 'en' }) {
           setBorderWidth,
           setBorderPosition,
           setBorderColorOption,
-          setBorderColorHex,
+          setBorderColor,
           setGridOverlayShape,
           setGridOverlayRowOrColCount,
-          setGridOverlayColorHex,
+          setGridOverlayColor,
           setGridOverlayXOffset,
           setGridOverlayYOffset,
           setGridOverlayLineWidth,
@@ -1332,30 +1343,27 @@ function GenerateForm({ uiLanguage = 'en' }) {
           setFrayedBorderSeed,
           setDrawGrunge,
           setGrungeWidth,
-          setFrayedBorderColorHex,
+          setFrayedBorderColor,
           setLineStyle,
           setCoastlineWidth,
-          setCoastlineColorHex,
+          setCoastlineColor,
           setCoastShadingLevel,
-          setCoastShadingColorHex,
-          setCoastShadingAlpha,
-          setOceanShadingAlpha,
+          setCoastShadingColor,
           setOceanShadingLevel,
-          setOceanShadingColorHex,
+          setOceanShadingColor,
           setOceanWavesType,
           setOceanWavesLevel,
-          setOceanWavesAlpha,
-          setOceanWavesColorHex,
+          setOceanWavesColor,
           setConcentricWaveCount,
           setFadeConcentricWaves,
           setJitterToConcentricWaves,
           setBrokenLinesForConcentricWaves,
           setDrawOceanEffectsInLakes,
-          setRiverColorHex,
+          setRiverColor,
           setDrawRoads,
           setRoadStyle,
           setRoadWidth,
-          setRoadColorHex,
+          setRoadColor,
           setMountainSize,
           setHillSize,
           setDuneSize,
@@ -1368,9 +1376,9 @@ function GenerateForm({ uiLanguage = 'en' }) {
           setOtherMountainsFontFamily,
           setCitiesFontFamily,
           setRiverFontFamily,
-          setTextColorHex,
+          setTextColor,
           setDrawBoldBackground,
-          setBoldBackgroundColorHex,
+          setBoldBackgroundColor,
           handleGenerateFromSettings,
           handleGenerateAndSaveNort,
           openPreviewModal,

@@ -50,15 +50,15 @@ describe('GenerateForm pure helpers', () => {
   })
 
   it('buildCustomizePayload copies expected keys', () => {
-    const values = { backgroundType: 'paper', oceanColorHex: '#ffffff', drawGridOverlay: true }
+    const values = { backgroundType: 'paper', oceanColor: '#ffffff', drawGridOverlay: true }
     const payload = buildCustomizePayload(values)
     expect(payload.backgroundType).toBe('paper')
-    expect(payload.oceanColorHex).toBe('#ffffff')
+    expect(payload.oceanColor).toBe('#ffffff')
     expect(payload.drawGridOverlay).toBe(true)
   })
 
   it('persistCustomizeOverrides writes payload to localStorage and loadRandomOverrides reads overrides', () => {
-    const values = { backgroundType: 'foo', oceanColorHex: '#010203' }
+    const values = { backgroundType: 'foo', oceanColor: '#010203' }
     persistCustomizeOverrides(values)
     const stored = JSON.parse(localStorage.getItem('vellaris-customize-overrides'))
     expect(stored.backgroundType).toBe('foo')
