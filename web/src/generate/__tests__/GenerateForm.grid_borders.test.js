@@ -19,9 +19,9 @@ describe('GenerateForm grid/coloring and borders/fray appliers', () => {
         if (hex) out[key] = { hex, alphaPct }
       },
       parseBooleanWithDefault: (v, d = false) => (v === undefined ? d : Boolean(v)),
-      // provide land coloring resolver expected by the hoisted applier
-      resolveLandColoringMethod: () => null,
-      finalLandColoringMethod: null,
+      // land coloring method values passed directly now
+      landColoringMethod: null,
+      landColoringMethod: null,
       getGridOverlayAlpha: () => 50,
     }
 

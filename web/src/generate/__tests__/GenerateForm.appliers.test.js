@@ -62,8 +62,7 @@ describe('GenerateForm applier helpers', () => {
       gridOverlayLineWidth: '3',
       gridOverlayLayer: 'top',
       drawVoronoiGridOverlayOnlyOnLand: true,
-      resolveLandColoringMethod: () => 'ColorPoliticalRegions',
-      finalLandColoringMethod: undefined,
+      landColoringMethod: 'ColorPoliticalRegions',
       mergeColor: (ps, key, hex) => {
         if (hex) ps[key] = `MERGED:${hex}`
       },
@@ -254,8 +253,9 @@ describe('GenerateForm appliers', () => {
       gridOverlayLineWidth: '2',
       gridOverlayLayer: 'top',
       drawVoronoiGridOverlayOnlyOnLand: true,
-      resolveLandColoringMethod: () => (v) => v || 'SingleColor',
-      finalLandColoringMethod: 'ColorPoliticalRegions',
+      // previous resolver wrapper replaced by explicit values
+      landColoringMethod: undefined,
+      landColoringMethod: 'ColorPoliticalRegions',
       mergeColor: (ps, k, v) => {
         if (v) ps[k] = v
       },

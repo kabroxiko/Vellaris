@@ -11,7 +11,6 @@ describe('settingsAppliers - color applier helpers', () => {
       setDrawBorder: (v) => (captured.drawBorder = v),
       setDrawGridOverlay: (v) => (captured.drawGridOverlay = v),
       setLandColoringMethod: (v) => (captured.landColoringMethod = v),
-      setFinalLandColoringMethod: (v) => (captured.finalLandColoringMethod = v),
     }
     const appliers = createSettingsAppliers(setters, {})
     appliers.applyColorAndBoundarySettings({
@@ -28,6 +27,5 @@ describe('settingsAppliers - color applier helpers', () => {
     expect(captured.drawBorder).toBe(true)
     expect(captured.drawGridOverlay).toBe(false)
     expect(captured.landColoringMethod).toBe('ColorPoliticalRegions')
-    expect(captured.finalLandColoringMethod).toBe('ColorPoliticalRegions')
   })
 })

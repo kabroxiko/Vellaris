@@ -92,11 +92,6 @@ export function createSettingsAppliers(setters, currentValues = {}) {
     // Instrument setter invocation
     try {
       recordCall(`set:${key}`)
-      if (key === 'oceanShadingColor' || key === 'coastShadingColor' || key === 'oceanWavesColor') {
-        try {
-          console.debug('applier:setIfChanged', { key, newValue })
-        } catch (e) {}
-      }
       setter(newValue)
       recordCall(`set:${key}:done`)
     } catch (e) {
@@ -209,6 +204,18 @@ export function createSettingsAppliers(setters, currentValues = {}) {
 
     applyColorAndBoundarySettings(settings) {
       recordCall('applyColorAndBoundarySettings')
+      // Debug: report incoming drawRegionColors and current UI value for landColoringMethod
+      try {
+        if (typeof console !== 'undefined' && typeof console.debug === 'function')
+          console.debug(
+            '[applier] applyColorAndBoundarySettings drawRegionColors=',
+            settings.drawRegionColors,
+            'currentValues.landColoringMethod=',
+            currentValues?.landColoringMethod
+          )
+      } catch (e) {
+        /* ignore debug errors */
+      }
       const {
         setOceanColor,
         setLandColor,
@@ -216,7 +223,6 @@ export function createSettingsAppliers(setters, currentValues = {}) {
         setDrawBorder,
         setDrawGridOverlay,
         setLandColoringMethod,
-        setFinalLandColoringMethod,
       } = setters
 
       if (settings.oceanColor) {
@@ -247,8 +253,14 @@ export function createSettingsAppliers(setters, currentValues = {}) {
         setIfChanged(setDrawGridOverlay, 'drawGridOverlay', settings.drawGridOverlay)
       if (typeof settings.drawRegionColors === 'boolean') {
         const method = settings.drawRegionColors ? 'ColorPoliticalRegions' : 'SingleColor'
+        // Debug: log the resolved method before setting
+        try {
+          if (typeof console !== 'undefined' && typeof console.debug === 'function')
+            console.debug('[applier] setting landColoringMethod ->', method)
+        } catch (e) {
+          /* ignore debug errors */
+        }
         setIfChanged(setLandColoringMethod, 'landColoringMethod', method)
-        setIfChanged(setFinalLandColoringMethod, 'finalLandColoringMethod', method)
       }
     },
 

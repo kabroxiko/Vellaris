@@ -22,7 +22,7 @@ const uiOptsWithDefaults = {
   labels: {},
   options: {
     backgroundTypes: [{ value: 'MyBg' }],
-    finalLandColoringMethods: [{ value: 'L1' }],
+    landColoringMethods: [{ value: 'L1' }],
     lineStyles: [{ value: 'ls' }],
     fonts: ['F1'],
     maxCityProbability: 100,

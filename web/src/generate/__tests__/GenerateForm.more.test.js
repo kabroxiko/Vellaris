@@ -123,7 +123,7 @@ describe('GenerateForm additional helpers', () => {
       regionBoundaryColor: '#000000',
       drawBorder: true,
       drawGridOverlay: false,
-      finalLandColoringMethod: 'ColorPoliticalRegions',
+      landColoringMethod: 'ColorPoliticalRegions',
       borderRef: 'pack|b',
       borderWidth: 3,
       borderPosition: 'inside',

@@ -28,7 +28,7 @@ export default function useCustomizeSettings(initialCustomize = {}) {
     'gridOverlayLineWidth',
     'gridOverlayLayer',
     'drawVoronoiGridOverlayOnlyOnLand',
-    'finalLandColoringMethod',
+    'landColoringMethod',
     'borderRef',
     'borderWidth',
     'borderPosition',
@@ -99,6 +99,16 @@ export default function useCustomizeSettings(initialCustomize = {}) {
   useEffect(() => {
     persistCustomizeOverrides(values)
   }, [customizeDeps])
+
+  // Debug: log when customize landColoringMethod changes
+  useEffect(() => {
+    try {
+      if (typeof console !== 'undefined' && typeof console.debug === 'function')
+        console.debug('[customize] customize landColoringMethod ->', values.landColoringMethod)
+    } catch (e) {
+      /* ignore */
+    }
+  }, [values.landColoringMethod])
 
   return { values, setters, customizeDeps }
 }

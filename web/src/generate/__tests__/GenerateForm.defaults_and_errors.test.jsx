@@ -15,7 +15,7 @@ const uiOptsWithDefaults = {
   labels: {},
   options: {
     backgroundTypes: [{ value: 'MyBg' }],
-    finalLandColoringMethods: [{ value: 'L1' }],
+    landColoringMethods: [{ value: 'L1' }],
     lineStyles: [{ value: 'ls' }],
   },
 }
@@ -54,7 +54,7 @@ test('mounting GenerateForm with defaults persists customized overrides', async 
   const parsed = JSON.parse(raw)
   expect(Number(parsed.coastlineWidth)).to.equal(12)
   // options-based defaults should be reflected where possible
-  expect(parsed.finalLandColoringMethod).to.equal('L1')
+  expect(parsed.landColoringMethod).to.equal('L1')
 })
 
 test('loadUiOptions propagates fetchJson errors', async () => {

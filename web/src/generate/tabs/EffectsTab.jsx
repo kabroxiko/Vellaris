@@ -20,7 +20,7 @@ export default function EffectsTab(props) {
     setCoastShadingLevel,
     coastShadingColor,
     setCoastShadingColor,
-    finalLandColoringMethod,
+    landColoringMethod,
 
     oceanShadingLevel,
     setOceanShadingLevel,
@@ -163,7 +163,7 @@ export default function EffectsTab(props) {
               const combined = formatColorString(coastShadingColor, alphaPercent)
               setCoastShadingColor(combined)
             }}
-            disabled={finalLandColoringMethod === 'SingleColor'}
+            disabled={landColoringMethod === 'SingleColor'}
           />
           <span className="slider-value">
             {Math.round(coastShadingColor ? 100 - colorToAlphaPercent(coastShadingColor) : 0)}
@@ -187,7 +187,7 @@ export default function EffectsTab(props) {
         </div>
 
         {(() => {
-          const shouldReplace = finalLandColoringMethod === 'ColorPoliticalRegions'
+          const shouldReplace = landColoringMethod === 'ColorPoliticalRegions'
           let swatchReplacement
           if (shouldReplace) {
             let txt = translateLabel('theme.coastShadingColor.disabled')
@@ -214,7 +214,7 @@ export default function EffectsTab(props) {
               txt = removeTags(txt)
               txt = txt.replaceAll("''", "'")
             }
-            const methodLabel = translateLabel(`LandColoringMethod.${finalLandColoringMethod}`)
+            const methodLabel = translateLabel(`LandColoringMethod.${landColoringMethod}`)
             if (typeof txt === 'string' && txt.includes('{0}'))
               txt = txt.replace('{0}', methodLabel)
             swatchReplacement = txt
@@ -534,7 +534,7 @@ EffectsTab.propTypes = {
   setCoastShadingLevel: PropTypes.func,
   coastShadingColor: PropTypes.string,
   setCoastShadingColor: PropTypes.func,
-  finalLandColoringMethod: PropTypes.string,
+  landColoringMethod: PropTypes.string,
 
   oceanShadingLevel: PropTypes.number,
   setOceanShadingLevel: PropTypes.func,

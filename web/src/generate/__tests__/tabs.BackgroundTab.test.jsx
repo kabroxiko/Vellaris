@@ -63,7 +63,7 @@ describe('BackgroundTab component', () => {
       notifyManualChange,
       recomposeUsingLastBase,
       colorizeLand: true,
-      finalLandColoringMethod: 'SingleColor',
+      landColoringMethod: 'SingleColor',
       landColor: '#001122',
       setLandColor,
     }

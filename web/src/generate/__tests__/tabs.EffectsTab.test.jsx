@@ -48,7 +48,7 @@ describe('EffectsTab', () => {
       coastlineColor: '#000000',
       coastShadingLevel: 10,
       coastShadingColor: '#001122',
-      finalLandColoringMethod: 'Other',
+      landColoringMethod: 'Other',
       oceanShadingLevel: 5,
       oceanShadingColor: '#001122',
       showOceanPicker: false,

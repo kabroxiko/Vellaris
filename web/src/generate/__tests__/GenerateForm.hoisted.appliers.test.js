@@ -26,8 +26,8 @@ describe('GenerateForm hoisted appliers', () => {
       gridOverlayLineWidth: '2',
       gridOverlayLayer: 'top',
       drawVoronoiGridOverlayOnlyOnLand: true,
-      resolveLandColoringMethod: () => 'ColorPoliticalRegions',
-      finalLandColoringMethod: 'ColorPoliticalRegions',
+      landColoringMethod: 'ColorPoliticalRegions',
+      landColoringMethod: 'ColorPoliticalRegions',
       mergeColor: (out, key, hex) => {
         if (hex) out[key] = hex
       },

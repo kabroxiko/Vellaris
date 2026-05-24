@@ -45,8 +45,7 @@ describe('applyGridAndColoringHoisted', () => {
       gridOverlayLineWidth: '1',
       gridOverlayLayer: 'top',
       drawVoronoiGridOverlayOnlyOnLand: 'false',
-      resolveLandColoringMethod: () => 'ColorPoliticalRegions',
-      finalLandColoringMethod: 'whatever',
+      landColoringMethod: 'ColorPoliticalRegions',
       // delegate to the module mergeColor so the formatting path is used
       mergeColor: moduleMergeColor,
       getGridOverlayAlpha: () => 123,

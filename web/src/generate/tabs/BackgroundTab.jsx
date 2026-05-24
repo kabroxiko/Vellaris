@@ -73,8 +73,8 @@ function LandColorControls({
   emptyComboOption,
   renderColorControl,
   colorizeLand,
-  finalLandColoringMethod,
-  setFinalLandColoringMethod,
+  landColoringMethod,
+  setLandColoringMethod,
   landColor,
   setLandColor,
   showLandPicker,
@@ -83,18 +83,24 @@ function LandColorControls({
   recomposeUsingLastBase,
   landColoringMethods,
 }) {
+  // Only disable the wrapper when global colorize is off; when the selected
+  // method is `ColorPoliticalRegions` we must keep the method select enabled
+  // but disable/grey out the `Land color` label and color picker.
+  const wrapperDisabled = !colorizeLand
+  const isPoliticalRegions = landColoringMethod === 'ColorPoliticalRegions'
+
   return (
     <div
-      className={`control-group${colorizeLand ? '' : ' is-disabled'}`}
-      style={colorizeLand ? undefined : { opacity: 0.5, pointerEvents: 'none' }}
+      className={`control-group${wrapperDisabled ? ' is-disabled' : ''}`}
+      style={wrapperDisabled ? { opacity: 0.5, pointerEvents: 'none' } : undefined}
     >
       <label htmlFor="final-land-coloring-input">
         {translateLabel('theme.landColoringMethod.label')}
       </label>
       <select
         id="final-land-coloring-input"
-        value={gatedControlValue(finalLandColoringMethod)}
-        onChange={(e) => setFinalLandColoringMethod(e.target.value)}
+        value={gatedControlValue(landColoringMethod)}
+        onChange={(e) => setLandColoringMethod(e.target.value)}
         disabled={!colorizeLand}
       >
         {emptyComboOption}
@@ -112,6 +118,7 @@ function LandColorControls({
       {renderColorControl({
         id: 'land-color',
         label: translateLabel('theme.landColor.label'),
+        labelProps: isPoliticalRegions ? { style: { opacity: 0.5 } } : undefined,
         hexValue: landColor,
         onHexChange: (hex) => {
           setLandColor(hex)
@@ -119,7 +126,7 @@ function LandColorControls({
         },
         showState: showLandPicker,
         setShowState: setShowLandPicker,
-        disabled: !colorizeLand || finalLandColoringMethod === 'ColorPoliticalRegions',
+        disabled: !colorizeLand || isPoliticalRegions,
         onClose: () => {
           try {
             recomposeUsingLastBase({ landColor: landColor })
@@ -129,7 +136,7 @@ function LandColorControls({
           }
         },
       })}
-    </div>
+      </div>
   )
 }
 
@@ -545,8 +552,8 @@ export default function BackgroundTab(props) {
     setShowRegionBoundaryPicker,
     colorizeLand = false,
     setColorizeLand,
-    finalLandColoringMethod,
-    setFinalLandColoringMethod,
+    landColoringMethod,
+    setLandColoringMethod,
     landColor,
     setLandColor,
     showLandPicker = false,
@@ -588,6 +595,24 @@ export default function BackgroundTab(props) {
     landColoringMethods,
   } = props
 
+  React.useEffect(() => {
+    try {
+      const hasMethods = Array.isArray(landColoringMethods)
+      const selected = landColoringMethod
+      const contains = hasMethods && landColoringMethods.some((m) => m && m.value === selected)
+      if (typeof console !== 'undefined' && typeof console.debug === 'function')
+        console.debug('[dom-diagnose] BackgroundTab props:', {
+          colorizeLand,
+          landColoringMethod: selected,
+          hasMethods,
+          containsSelected: contains,
+          methodsPreview: hasMethods ? landColoringMethods.map((m) => m && m.value) : null,
+        })
+    } catch (e) {
+      /* ignore */
+    }
+  }, [colorizeLand, landColoringMethod, landColoringMethods])
+
   const isVoronoi = String(gridOverlayShape || '')
     .toLowerCase()
     .includes('voronoi')
@@ -606,22 +631,22 @@ export default function BackgroundTab(props) {
         >
           {emptyComboOption}
           {backgroundTypes.map((item) => (
-            <option key={item.value} value={item.value}>
-              {item.label}
-            </option>
-          ))}
-        </select>
+              <option key={item.value} value={item.value}>
+                {item.label}
+              </option>
+            ))}
+          </select>
 
-        <TextureSelect
-          emptyComboOption={emptyComboOption}
-          textures={textures}
-          hasTextures={hasTextures}
-          showTextureOptions={showTextureOptions}
-          translateLabel={translateLabel}
-          gatedControlValue={gatedControlValue}
-          textureRef={textureRef}
-          setTextureRef={setTextureRef}
-        />
+          <TextureSelect
+            emptyComboOption={emptyComboOption}
+            textures={textures}
+            hasTextures={hasTextures}
+            showTextureOptions={showTextureOptions}
+            translateLabel={translateLabel}
+            gatedControlValue={gatedControlValue}
+            textureRef={textureRef}
+            setTextureRef={setTextureRef}
+          />
 
         <label className="checkbox-label">
           <input
@@ -677,8 +702,8 @@ export default function BackgroundTab(props) {
           emptyComboOption={emptyComboOption}
           renderColorControl={renderColorControl}
           colorizeLand={colorizeLand}
-          finalLandColoringMethod={finalLandColoringMethod}
-          setFinalLandColoringMethod={setFinalLandColoringMethod}
+          landColoringMethod={landColoringMethod}
+          setLandColoringMethod={setLandColoringMethod}
           landColor={landColor}
           setLandColor={setLandColor}
           showLandPicker={showLandPicker}
@@ -825,8 +850,8 @@ BackgroundTab.propTypes = {
 
   colorizeLand: PropTypes.bool,
   setColorizeLand: PropTypes.func,
-  finalLandColoringMethod: PropTypes.string,
-  setFinalLandColoringMethod: PropTypes.func,
+  landColoringMethod: PropTypes.string,
+  setLandColoringMethod: PropTypes.func,
   landColor: PropTypes.string,
   setLandColor: PropTypes.func,
   showLandPicker: PropTypes.bool,
@@ -893,8 +918,8 @@ LandColorControls.propTypes = {
   emptyComboOption: PropTypes.node,
   renderColorControl: PropTypes.func,
   colorizeLand: PropTypes.bool,
-  finalLandColoringMethod: PropTypes.string,
-  setFinalLandColoringMethod: PropTypes.func,
+  landColoringMethod: PropTypes.string,
+  setLandColoringMethod: PropTypes.func,
   landColor: PropTypes.string,
   setLandColor: PropTypes.func,
   showLandPicker: PropTypes.bool,
@@ -904,14 +929,14 @@ LandColorControls.propTypes = {
   landColoringMethods: PropTypes.array,
 }
 
-OceanColorControls.propTypes = {
+LandColorControls.propTypes = {
   translateLabel: PropTypes.func,
   renderColorControl: PropTypes.func,
   colorizeOcean: PropTypes.bool,
   oceanColor: PropTypes.string,
   setOceanColor: PropTypes.func,
-  showOceanPicker: PropTypes.bool,
-  setShowOceanPicker: PropTypes.func,
+  landColoringMethod: PropTypes.string,
+  setLandColoringMethod: PropTypes.func,
   notifyManualChange: PropTypes.func,
   recomposeUsingLastBase: PropTypes.func,
 }

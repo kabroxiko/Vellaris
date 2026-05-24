@@ -280,6 +280,13 @@ header {
   color: rgba(43, 31, 21, 0.5);
 }
 
+/* Also style labels that are individually marked disabled (not via wrapper). */
+.fields-grid label.is-disabled,
+.fields-column label.is-disabled {
+  color: rgba(43, 31, 21, 0.5);
+  opacity: 0.5;
+}
+
 /* Replacement text shown where a color swatch would be when the control is disabled by policy */
 .disabled-color-replacement {
   padding: 6px 10px;

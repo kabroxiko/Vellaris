@@ -84,6 +84,7 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     gridOverlayYOffset,
     gridOverlayLineWidth,
     drawVoronoiGridOverlayOnlyOnLand,
+    landColoringMethod,
     borderRef,
     borderWidth,
     borderPosition,
@@ -137,6 +138,27 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     fileObj,
     currentSource,
   } = values
+
+  // Debug: log customize mount and landColoringMethod changes
+  React.useEffect(() => {
+    try {
+      if (typeof console !== 'undefined' && typeof console.debug === 'function')
+        console.debug('[customize] CustomizeSettingsSection mount/props', {
+          valuesPreview: { landColoringMethod },
+          uiPreview: { fileObj, currentSource, preview },
+        })
+    } catch (e) {}
+  }, [])
+
+  React.useEffect(() => {
+    try {
+      if (typeof console !== 'undefined' && typeof console.debug === 'function')
+        console.debug('[customize] landed landColoringMethod prop ->', landColoringMethod)
+    } catch (e) {}
+  }, [landColoringMethod])
+
+  // Wrap the incoming setter to trace calls
+  // Do not mutate handlers prop; leave setter tracing to parent/debug hooks.
 
   // Runtime debug: log received `drawGrunge` value from parent `values`
 
@@ -634,11 +656,6 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
                   return { r: ch.r, g: ch.g, b: ch.b, a: (ch.a ?? 255) / 255 }
                 })()}
                 onChange={(col) => {
-                  if (typeof console !== 'undefined' && console.debug) {
-                    try {
-                      console.debug('renderColorControl:RgbaColorPicker onChange', id, col)
-                    } catch (e) {}
-                  }
                   const r = Math.round(col.r || 0)
                   const g = Math.round(col.g || 0)
                   const b = Math.round(col.b || 0)
@@ -722,6 +739,8 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
       drawVoronoiGridOverlayOnlyOnLand,
       // setters and preview values (canonicalized)
       ...previewFields,
+      // ensure BackgroundTab receives the active landColoringMethod value
+      landColoringMethod: values.landColoringMethod,
       // Explicit setters/handlers (not part of previewFields)
       setTextureRef: handlers.setTextureRef,
       setBackgroundType: handlers.setBackgroundType,
@@ -731,7 +750,7 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
       setRegionBoundaryWidth: handlers.setRegionBoundaryWidth,
       setRegionBoundaryColor: handlers.setRegionBoundaryColor,
       setColorizeLand: handlers.setColorizeLand,
-      setFinalLandColoringMethod: handlers.setFinalLandColoringMethod,
+      setLandColoringMethod: handlers.setLandColoringMethod,
       setLandColor: handlers.setLandColor,
       setColorizeOcean: handlers.setColorizeOcean,
       setOceanColor: handlers.setOceanColor,
@@ -812,8 +831,8 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     'setShowRegionBoundaryPicker',
     'colorizeLand',
     'setColorizeLand',
-    'finalLandColoringMethod',
-    'setFinalLandColoringMethod',
+    'landColoringMethod',
+    'setLandColoringMethod',
     'landColor',
     'setLandColor',
     'showLandPicker',
@@ -911,7 +930,7 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     'setCoastShadingLevel',
     'coastShadingColor',
     'setCoastShadingColor',
-    'finalLandColoringMethod',
+    'landColoringMethod',
     'oceanShadingLevel',
     'setOceanShadingLevel',
     'oceanShadingColor',

@@ -42,8 +42,7 @@ export default function mergeUiIntoParsed(parsedSettings, opts) {
     gridOverlayLineWidth: opts.gridOverlayLineWidth,
     gridOverlayLayer: opts.gridOverlayLayer,
     drawVoronoiGridOverlayOnlyOnLand: opts.drawVoronoiGridOverlayOnlyOnLand,
-    resolveLandColoringMethod: opts.resolveLandColoringMethod,
-    finalLandColoringMethod: opts.finalLandColoringMethod,
+    landColoringMethod: opts.landColoringMethod,
     mergeColor: opts.mergeColor,
     getGridOverlayAlpha: opts.getGridOverlayAlpha,
   })

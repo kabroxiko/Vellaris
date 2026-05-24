@@ -71,8 +71,8 @@ describe('GenerateForm appliers', () => {
       gridOverlayLineWidth: '1',
       gridOverlayLayer: 'top',
       drawVoronoiGridOverlayOnlyOnLand: true,
-      resolveLandColoringMethod: () => 'SingleColor',
-      finalLandColoringMethod: null,
+      landColoringMethod: 'SingleColor',
+      landColoringMethod: null,
       mergeColor,
       getGridOverlayAlpha: () => 128,
     }

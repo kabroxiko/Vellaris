@@ -26,7 +26,7 @@ describe('EffectsTab swatchReplacement sanitization', () => {
         emptyComboOption={<option value="">-</option>}
         renderColorControl={renderColorControl}
         // props used by the swatch replacement path
-        finalLandColoringMethod={'ColorPoliticalRegions'}
+        landColoringMethod={'ColorPoliticalRegions'}
         oceanWavesType={null}
         concentricWaveValue={'concentric'}
         noneWaveValue={'none'}

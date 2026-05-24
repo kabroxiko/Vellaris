@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react'
 import EffectsTab from '../tabs/EffectsTab'
 
 describe('EffectsTab swatchReplacement', () => {
-  it('passes sanitized swatchReplacement when finalLandColoringMethod is ColorPoliticalRegions', () => {
+  it('passes sanitized swatchReplacement when landColoringMethod is ColorPoliticalRegions', () => {
     const renderColorControl = (opts) => (
       <div data-swatch={opts.swatchReplacement}>{opts.label}</div>
     )
@@ -18,7 +18,7 @@ describe('EffectsTab swatchReplacement', () => {
       gatedControlValue: (v) => v,
       emptyComboOption: null,
       renderColorControl,
-      finalLandColoringMethod: 'ColorPoliticalRegions',
+      landColoringMethod: 'ColorPoliticalRegions',
       oceanShadingLevel: 1,
       oceanShadingColor: '#112233',
       showOceanPicker: false,

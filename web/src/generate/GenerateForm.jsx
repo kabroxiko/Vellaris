@@ -80,6 +80,19 @@ function GenerateForm({ uiLanguage = 'en' }) {
       requestLanguage,
       applyOptionDefaults: (opts, defs) => {
         if (!opts) return
+        try {
+          if (typeof console !== 'undefined' && typeof console.debug === 'function')
+            console.debug('[ui-init] applyOptionDefaults:', {
+              initialRandomOverrides,
+              optsPreview: {
+                landColoringMethods: opts?.landColoringMethods,
+              },
+              defsPreview: { drawRegionColors: defs?.drawRegionColors },
+              currentLandColoringMethod: landColoringMethod,
+            })
+        } catch (e) {
+          /* ignore debug errors */
+        }
         if (
           !backgroundType &&
           Array.isArray(opts.backgroundTypes) &&
@@ -87,11 +100,24 @@ function GenerateForm({ uiLanguage = 'en' }) {
         )
           setBackgroundType(opts.backgroundTypes[0].value)
         if (
-          !finalLandColoringMethod &&
-          Array.isArray(opts.finalLandColoringMethods) &&
-          opts.finalLandColoringMethods.length > 0
-        )
-          setFinalLandColoringMethod(opts.finalLandColoringMethods[0].value)
+          !landColoringMethod &&
+          Array.isArray(opts.landColoringMethods) &&
+          opts.landColoringMethods.length > 0
+        ) {
+          // Only initialize from explicit server boolean `drawRegionColors` when present.
+          // Avoid silently falling back to the first `opts` value which can overwrite
+          // server-backed or user-customized state during HMR / re-init sequences.
+          if (defs && typeof defs.drawRegionColors === 'boolean') {
+            const method = defs.drawRegionColors ? 'ColorPoliticalRegions' : 'SingleColor'
+            setLandColoringMethod(method)
+            try {
+              if (typeof console !== 'undefined' && typeof console.debug === 'function')
+                console.debug('[ui-init] setLandColoringMethod(random) -> (from defs.drawRegionColors)', method)
+            } catch (e) {
+              /* ignore debug errors */
+            }
+          }
+        }
         if (!regionBoundaryStyle && Array.isArray(opts.lineStyles) && opts.lineStyles.length > 0)
           setRegionBoundaryStyle(opts.lineStyles[0].value)
         if (defs) applyServerDefaults(defs, opts)
@@ -140,6 +166,8 @@ function GenerateForm({ uiLanguage = 'en' }) {
     colorizeOcean,
     oceanColor,
     landColor,
+    // Rename customize copy to avoid shadowing the random-state variables
+    landColoringMethod: customizeLandColoringMethod,
     regionBoundaryStyle,
     regionBoundaryWidth,
     regionBoundaryColor,
@@ -153,7 +181,6 @@ function GenerateForm({ uiLanguage = 'en' }) {
     gridOverlayLineWidth,
     gridOverlayLayer,
     drawVoronoiGridOverlayOnlyOnLand,
-    finalLandColoringMethod,
     borderRef,
     borderWidth,
     borderPosition,
@@ -225,7 +252,8 @@ function GenerateForm({ uiLanguage = 'en' }) {
     setGridOverlayLineWidth,
     setGridOverlayLayer,
     setDrawVoronoiGridOverlayOnlyOnLand,
-    setFinalLandColoringMethod,
+    // Alias customize setter to avoid duplicate declaration with random-state setter
+    setLandColoringMethod: setCustomizeLandColoringMethod,
     setBorderRef,
     setBorderWidth,
     setBorderPosition,
@@ -349,11 +377,24 @@ function GenerateForm({ uiLanguage = 'en' }) {
       setNumber(setGridOverlayLineWidth, defs.gridOverlayLineWidth)
       setString(setGridOverlayLayer, defs.gridOverlayLayer)
       setBoolean(setDrawVoronoiGridOverlayOnlyOnLand, defs.drawVoronoiGridOverlayOnlyOnLand)
-      setString(setFinalLandColoringMethod, defs.finalLandColoringMethod)
       if (typeof defs.drawRegionColors === 'boolean') {
         const method = defs.drawRegionColors ? 'ColorPoliticalRegions' : 'SingleColor'
-        setString(setLandColoringMethod, method)
-        setString(setFinalLandColoringMethod, method)
+        try {
+          if (typeof console !== 'undefined' && typeof console.debug === 'function')
+            console.debug('[ui-init] applyServerDefaults -> setCustomizeLandColoringMethod ->', method)
+        } catch (e) {
+          /* ignore */
+        }
+        // Set both the customize-state and the random-state landColoringMethod
+        // to keep the UI in sync and avoid transient mismatches between tabs.
+        setString(setCustomizeLandColoringMethod, method)
+        try {
+          setString(setLandColoringMethod, method)
+          if (typeof console !== 'undefined' && typeof console.debug === 'function')
+            console.debug('[ui-init] applyServerDefaults -> setLandColoringMethod (random) ->', method)
+        } catch (e) {
+          /* setLandColoringMethod may not be defined in some contexts; ignore */
+        }
       }
       setString(setBorderRef, defs.borderRef)
       setNumber(setBorderWidth, defs.borderWidth)
@@ -578,6 +619,16 @@ function GenerateForm({ uiLanguage = 'en' }) {
     [updateRandomOverride]
   )
 
+  // Build a currentValues snapshot for appliers that includes both
+  // customize values and the Random-state `landColoringMethod` so
+  // `setIfChanged` compares against the right current value.
+  const currentValuesForAppliers = useMemo(() => ({ ...customizeValues, landColoringMethod }), [
+    customizeValues,
+    landColoringMethod,
+  ])
+
+  const appliersDeps = Array.isArray(customizeDeps) ? [...customizeDeps, landColoringMethod] : [landColoringMethod]
+
   const { appliersRef } = useSettingsAppliers(
     {
       setFinalWidth,
@@ -605,7 +656,6 @@ function GenerateForm({ uiLanguage = 'en' }) {
       setDrawBorder,
       setDrawGridOverlay,
       setLandColoringMethod,
-      setFinalLandColoringMethod,
       setBorderRef,
       setBorderWidth,
       setBorderPosition,
@@ -654,8 +704,8 @@ function GenerateForm({ uiLanguage = 'en' }) {
       setDrawBoldBackground,
       setBoldBackgroundColor,
     },
-    customizeValues,
-    customizeDeps
+    currentValuesForAppliers,
+    appliersDeps
   )
 
   // If backend defaults were captured during UI load, apply them now
@@ -876,9 +926,16 @@ function GenerateForm({ uiLanguage = 'en' }) {
       ],
     ]
 
+    // Apply current UI values for all supported generation params so
+    // "Create or Load Settings" UI changes are reflected in the
+    // POST /generate-settings payload. Manual overrides (from
+    // localStorage) are still honored by the applier functions when
+    // they prefer override values.
     for (const [key, apply] of appliers) {
-      if (isManual(key)) apply()
+      apply()
     }
+
+    // No fallback injection: send exactly the UI values collected above.
 
     return cfg
   }
@@ -938,6 +995,7 @@ function GenerateForm({ uiLanguage = 'en' }) {
     if (parsed) mergedSettingsRef.current = parsed
     appliersRef.current.applyMapSizeAndSeedSettings(mergedSettingsRef.current)
     appliersRef.current.applyBackgroundTypeSettings(mergedSettingsRef.current)
+    appliersRef.current.applyColorAndBoundarySettings(mergedSettingsRef.current)
   }
 
   async function handleRandomMap(evt) {
@@ -968,14 +1026,7 @@ function GenerateForm({ uiLanguage = 'en' }) {
     runGenerate,
   })
 
-  function resolveLandColoringMethod(fallbackMethod) {
-    // Server-side region shading expects region index data; when texture land colorization
-    // is disabled, forcing SingleColor avoids an invalid drawRegionColors combination.
-    if (backgroundType === 'GeneratedFromTexture' && !colorizeLand) {
-      return 'SingleColor'
-    }
-    return finalLandColoringMethod ?? fallbackMethod
-  }
+  // `resolveLandColoringMethod` removed — frontend uses `landColoringMethod` only.
 
   // Use helper functions
   // Helper: preserve grid overlay alpha from prior settings if color unchanged
@@ -1034,8 +1085,7 @@ function GenerateForm({ uiLanguage = 'en' }) {
     gridOverlayLineWidth,
     gridOverlayLayer,
     drawVoronoiGridOverlayOnlyOnLand,
-    resolveLandColoringMethod,
-    finalLandColoringMethod,
+    landColoringMethod,
     mergeColor,
     borderWidth,
     borderPosition,
@@ -1234,7 +1284,7 @@ function GenerateForm({ uiLanguage = 'en' }) {
           textureRef,
           colorizeLand,
           colorizeOcean,
-          finalLandColoringMethod,
+          landColoringMethod: customizeLandColoringMethod,
           regionBoundaryStyle,
           regionBoundaryWidth,
           regionBoundaryColor,
@@ -1307,10 +1357,11 @@ function GenerateForm({ uiLanguage = 'en' }) {
         }}
         handlers={{
           setBackgroundType,
+          setLandColoringMethod: setCustomizeLandColoringMethod,
           setTextureRef,
           setColorizeLand,
           setColorizeOcean,
-          setFinalLandColoringMethod,
+          // other handlers continue
           setRegionBoundaryStyle,
           setRegionBoundaryWidth,
           setRegionBoundaryColor,

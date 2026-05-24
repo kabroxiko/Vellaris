@@ -45,6 +45,40 @@ export default function RandomSettingsSection({ values, handlers, options, ui })
   const { artPacks, cityIconTypes, allBooks, i18n } = options
   const { loading } = ui
 
+  // Debug: Log props and initial values for the Random block (distinct from Customize)
+  React.useEffect(() => {
+    try {
+      if (typeof console !== 'undefined' && typeof console.debug === 'function')
+        console.debug('[random] RandomSettingsSection mount/props', {
+          valuesPreview: { landColoringMethod, dimension, worldSize, regionCount },
+          uiPreview: { loading },
+          optionsPreview: { landColoringMethods },
+        })
+    } catch (e) {
+      /* ignore debug errors */
+    }
+  }, [])
+
+  React.useEffect(() => {
+    try {
+      if (typeof console !== 'undefined' && typeof console.debug === 'function')
+        console.debug('[random] landColoringMethod changed ->', landColoringMethod)
+    } catch (e) {
+      /* ignore debug errors */
+    }
+  }, [landColoringMethod])
+
+  // Wrap the setter so we can observe when the Random control changes the value
+  const setLandColoringMethodWrapped = (val) => {
+    try {
+      if (typeof console !== 'undefined' && typeof console.debug === 'function')
+        console.debug('[random] setLandColoringMethod called ->', val)
+    } catch (e) {
+      /* ignore debug errors */
+    }
+    return setLandColoringMethod(val)
+  }
+
   const labels = i18n?.labels
   const backendOptions = i18n?.options
   const translateLabel = (key) => {

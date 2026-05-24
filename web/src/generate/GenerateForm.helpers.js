@@ -89,7 +89,7 @@ export function buildCustomizePayload(values) {
     regionBoundaryColor: values.regionBoundaryColor,
     drawBorder: values.drawBorder,
     drawGridOverlay: values.drawGridOverlay,
-    finalLandColoringMethod: values.finalLandColoringMethod,
+    landColoringMethod: values.landColoringMethod,
     borderRef: values.borderRef,
     borderWidth: values.borderWidth,
     borderPosition: values.borderPosition,
