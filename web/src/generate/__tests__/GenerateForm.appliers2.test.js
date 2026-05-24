@@ -28,7 +28,6 @@ describe('GenerateForm appliers (grid, borders, coast/ocean)', () => {
       gridOverlayLayer: 'main',
       drawVoronoiGridOverlayOnlyOnLand: true,
       landColoringMethod: 'ColorPoliticalRegions',
-      landColoringMethod: undefined,
       mergeColor: (p, k, hex) => {
         p[k] = `merged:${hex}`
       },

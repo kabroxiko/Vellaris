@@ -521,8 +521,7 @@ function GridOverlayControls({
   )
 }
 
-export default function BackgroundTab(props) {
-  if (props == null) return <div />
+export default function BackgroundTab(props = {}) {
   const {
     translateLabel,
     gatedControlValue,
@@ -929,14 +928,14 @@ LandColorControls.propTypes = {
   landColoringMethods: PropTypes.array,
 }
 
-LandColorControls.propTypes = {
+OceanColorControls.propTypes = {
   translateLabel: PropTypes.func,
   renderColorControl: PropTypes.func,
   colorizeOcean: PropTypes.bool,
+  showOceanPicker: PropTypes.bool,
+  setShowOceanPicker: PropTypes.func,
   oceanColor: PropTypes.string,
   setOceanColor: PropTypes.func,
-  landColoringMethod: PropTypes.string,
-  setLandColoringMethod: PropTypes.func,
   notifyManualChange: PropTypes.func,
   recomposeUsingLastBase: PropTypes.func,
 }

@@ -17,11 +17,11 @@ const baseProps = {
   strokeTypes: [],
 }
 
-test('returns empty div when props are null/undefined', () => {
-  // call the component function directly with null to exercise the early-return branch
-  const el = BackgroundTab(null)
-  // should return a React element for a div
-  expect(el?.type).to.equal('div')
+test('renders with minimal props and returns a top-level div', () => {
+  // render the component with baseProps to provide translateLabel and others
+  const { container } = render(<BackgroundTab {...baseProps} />)
+  // should render a top-level div element
+  expect(container.firstChild.tagName).to.equal('DIV')
 })
 
 test('TextureSelect renders no-textures option and is disabled when hasTextures=false', () => {

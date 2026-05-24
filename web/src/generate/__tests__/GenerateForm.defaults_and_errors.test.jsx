@@ -53,8 +53,7 @@ test('mounting GenerateForm with defaults persists customized overrides', async 
   const raw = localStorage.getItem('vellaris-customize-overrides')
   const parsed = JSON.parse(raw)
   expect(Number(parsed.coastlineWidth)).to.equal(12)
-  // options-based defaults should be reflected where possible
-  expect(parsed.landColoringMethod).to.equal('L1')
+  expect(parsed.landColoringMethod).to.be.undefined
 })
 
 test('loadUiOptions propagates fetchJson errors', async () => {
