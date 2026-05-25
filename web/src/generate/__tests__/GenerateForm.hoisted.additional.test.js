@@ -27,7 +27,6 @@ describe('GenerateForm additional hoisted applier tests', () => {
       gridOverlayLayer: 'top',
       drawVoronoiGridOverlayOnlyOnLand: true,
       landColoringMethod: null,
-      landColoringMethod: null,
       mergeColor: (out, k, hex) => {
         if (hex) out[k] = hex
       },

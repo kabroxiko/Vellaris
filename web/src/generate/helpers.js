@@ -38,8 +38,12 @@ export function tryParseJson(s) {
     }
     return s
   } catch (e) {
-    if (typeof console !== 'undefined' && typeof console.debug === 'function')
-      console.debug('tryParseJson failed', e)
+    // Log parse failures so they are visible to diagnostics instead of
+    // silently swallowing the error (Sonar S2486: avoid empty catch).
+    // Returning null preserves previous behaviour for callers that expect
+    // non-JSON to produce null.
+    // eslint-disable-next-line no-console
+    console.warn('tryParseJson: JSON.parse failed', e)
     return null
   }
 }

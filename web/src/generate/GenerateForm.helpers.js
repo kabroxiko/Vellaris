@@ -1,4 +1,5 @@
 import { colorToHex, parseColorChannels, colorToHexWithAlpha } from './utils'
+import { computeCityFrequencyPercentFromProbability } from './cityProbabilityUtils'
 
 export function serializeNortObject(obj) {
   function sortRec(v) {
@@ -234,7 +235,7 @@ export function applyRoadStyleHelper(defs, setRoadStyle, setRoadWidth, setRoadCo
   setHex(setRoadColor, defs.roadColor)
 }
 
-export function applyBasicSettings(defs, opts, setters) {
+export function applyBasicSettings(defs, setters, options = {}) {
   const {
     setWorldSize,
     setRegionCount,
@@ -247,11 +248,14 @@ export function applyBasicSettings(defs, opts, setters) {
   } = setters
   setNumber(setWorldSize, defs.worldSize)
   setNumber(setRegionCount, defs.regionCount)
-  if (defs.cityProbability !== undefined && opts?.maxCityProbability !== undefined) {
-    setNumber(
-      setCityFrequency,
-      (Number(defs.cityProbability) / Number(opts.maxCityProbability)) * 100
+  if (defs.cityProbability !== undefined && Number.isFinite(Number(defs.cityProbability))) {
+    // Server-provided cityProbability is authoritative. Map it to the UI
+    // slider percent using `options.maxCityProbability` when available.
+    const percent = computeCityFrequencyPercentFromProbability(
+      defs.cityProbability,
+      options?.maxCityProbability
     )
+    setNumber(setCityFrequency, percent)
   }
   setNumber(setFinalWidth, defs.generatedWidth)
   setNumber(setFinalHeight, defs.generatedHeight)

@@ -215,10 +215,10 @@ describe('GenerateForm basic flows', () => {
     const rbtn = getByTestId('trigger-random')
     fireEvent.click(rbtn)
     // localStorage key should be present (GenerateForm writes randomOverrides)
+    // Manual random overrides are ephemeral and should NOT be persisted to localStorage
     await waitFor(() => {
       const stored = localStorage.getItem('vellaris-random-manual-overrides')
-      // may be present as JSON string
-      expect(stored).not.toBeNull()
+      expect(stored).toBeNull()
     })
   })
 

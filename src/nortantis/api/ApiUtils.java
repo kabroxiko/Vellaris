@@ -26,7 +26,7 @@ public final class ApiUtils
         String landShape;
         Integer regionCount;
         Boolean drawRegionColors;
-        Integer cityFrequency;
+        Double cityProbability;
         List<String> books;
         String artPack;
         String cityIconSetName;
@@ -72,8 +72,8 @@ public final class ApiUtils
         }
         if (p.regionCount != null)
             settings.regionCount = p.regionCount;
-        if (p.cityFrequency != null)
-            settings.cityProbability = p.cityFrequency / 100.0 * nortantis.SettingsGenerator.maxCityProbability;
+        if (p.cityProbability != null)
+            settings.cityProbability = p.cityProbability;
         if (p.books != null && !p.books.isEmpty())
             settings.books = new java.util.HashSet<>(p.books);
         applyDimensionOverride(p, settings);

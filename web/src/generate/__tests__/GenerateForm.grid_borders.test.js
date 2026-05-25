@@ -21,7 +21,6 @@ describe('GenerateForm grid/coloring and borders/fray appliers', () => {
       parseBooleanWithDefault: (v, d = false) => (v === undefined ? d : Boolean(v)),
       // land coloring method values passed directly now
       landColoringMethod: null,
-      landColoringMethod: null,
       getGridOverlayAlpha: () => 50,
     }
 

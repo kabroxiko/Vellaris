@@ -2,6 +2,215 @@ import React from 'react'
 import PropTypes from 'prop-types'
 import { colorToAlphaPercent, formatColorString } from '../utils'
 
+function removeHtmlTagsLinear(s) {
+  let out = ''
+  let inTag = false
+  for (let i = 0; i < s.length; i++) {
+    const ch = s.charAt(i)
+    if (!inTag) {
+      if (ch === '<') inTag = true
+      else out += ch
+    } else if (ch === '>') inTag = false
+  }
+  return out
+}
+
+function renderOceanShadingControl({
+  translateLabel,
+  renderColorControl,
+  oceanShadingColor,
+  setOceanShadingColor,
+  showOceanPicker,
+  setShowOceanPicker,
+  landColoringMethod,
+}) {
+  const shouldReplace = landColoringMethod === 'ColorPoliticalRegions'
+  let swatchReplacement
+  if (shouldReplace) {
+    let txt = translateLabel('theme.coastShadingColor.disabled')
+    const MAX_SANITIZE_LENGTH = 2000
+    if (typeof txt === 'string' && txt.length > MAX_SANITIZE_LENGTH) txt = txt.slice(0, MAX_SANITIZE_LENGTH)
+    if (typeof txt === 'string') {
+      txt = removeHtmlTagsLinear(txt)
+      txt = txt.replaceAll("''", "'")
+    }
+    const methodLabel = translateLabel(`LandColoringMethod.${landColoringMethod}`)
+    if (typeof txt === 'string' && txt.includes('{0}')) txt = txt.replace('{0}', methodLabel)
+    swatchReplacement = txt
+  }
+
+  return renderColorControl({
+    id: 'ocean-shading-color',
+    label: translateLabel('theme.oceanShadingColor.label'),
+    hexValue: oceanShadingColor,
+    onHexChange: setOceanShadingColor,
+    alphaValue: oceanShadingColor ? 100 - colorToAlphaPercent(oceanShadingColor) : 0,
+    onAlphaChange: (v) => {
+      const alphaPercent = 100 - Number(v)
+      const combined = formatColorString(oceanShadingColor, alphaPercent)
+      setOceanShadingColor(combined)
+    },
+    showState: showOceanPicker,
+    setShowState: setShowOceanPicker,
+    disabled: shouldReplace,
+    swatchReplacement,
+  })
+}
+
+function renderOceanWavesControls({
+  translateLabel,
+  gatedControlValue,
+  emptyComboOption,
+  renderColorControl,
+  oceanWaveTypes,
+  oceanWavesType,
+  setOceanWavesType,
+  concentricWaveValue,
+  noneWaveValue,
+  oceanWavesLevel,
+  setOceanWavesLevel,
+  oceanWavesColor,
+  setOceanWavesColor,
+  showOceanWavesPicker,
+  setShowOceanWavesPicker,
+  concentricWaveCount,
+  setConcentricWaveCount,
+  fadeConcentricWaves,
+  setFadeConcentricWaves,
+  jitterToConcentricWaves,
+  setJitterToConcentricWaves,
+  brokenLinesForConcentricWaves,
+  setBrokenLinesForConcentricWaves,
+  colorToAlphaPercent,
+  formatColorString,
+}) {
+  return (
+    <>
+      <label htmlFor="ocean-waves-type-input">{translateLabel('theme.waveType.label')}</label>
+      <select
+        id="ocean-waves-type-input"
+        value={gatedControlValue(oceanWavesType)}
+        onChange={(e) => setOceanWavesType(e.target.value)}
+      >
+        {emptyComboOption}
+        {Array.isArray(oceanWaveTypes)
+          ? oceanWaveTypes.map((item) => {
+              if (item?.value === undefined) return null
+              return (
+                <option key={String(item.value)} value={item.value}>
+                  {item.label}
+                </option>
+              )
+            })
+          : null}
+      </select>
+
+      <label
+        htmlFor="ocean-waves-level-input"
+        className={oceanWavesType === concentricWaveValue ? 'is-disabled' : ''}
+      >
+        {translateLabel('theme.waveWidth.label')}
+      </label>
+      <div className="slider-row">
+        <input
+          id="ocean-waves-level-input"
+          type="range"
+          min={0}
+          max={100}
+          step={1}
+          value={oceanWavesLevel}
+          onChange={(e) => setOceanWavesLevel(Number(e.target.value))}
+          disabled={oceanWavesType === concentricWaveValue}
+        />
+        <span className="slider-value">{Math.round(oceanWavesLevel)}</span>
+      </div>
+
+      {renderColorControl({
+        id: 'ocean-waves-color',
+        label: translateLabel('theme.waveColor.label'),
+        hexValue: oceanWavesColor,
+        onHexChange: setOceanWavesColor,
+        alphaValue: oceanWavesColor ? 100 - colorToAlphaPercent(oceanWavesColor) : 0,
+        onAlphaChange: (v) => {
+          const alphaPercent = 100 - Number(v)
+          const combined = formatColorString(oceanWavesColor, alphaPercent)
+          setOceanWavesColor(combined)
+        },
+        showState: showOceanWavesPicker,
+        setShowState: setShowOceanWavesPicker,
+        disabled: oceanWavesType === noneWaveValue,
+      })}
+
+      <label
+        htmlFor="concentric-wave-count"
+        className={oceanWavesType === concentricWaveValue ? '' : 'is-disabled'}
+      >
+        {translateLabel('theme.waveCount.label')}
+      </label>
+      <div className="slider-row">
+        <input
+          id="concentric-wave-count"
+          type="range"
+          min={1}
+          max={5}
+          step={1}
+          value={concentricWaveCount}
+          onChange={(e) => setConcentricWaveCount(Number(e.target.value))}
+          disabled={oceanWavesType !== concentricWaveValue}
+        />
+        <span className="slider-value">{concentricWaveCount}</span>
+      </div>
+
+      <label
+        htmlFor="fade-concentric-waves-checkbox"
+        className={`section-subheading ${oceanWavesType === concentricWaveValue ? '' : 'is-disabled'}`}
+        style={{ marginTop: '0.5rem' }}
+      >
+        Style options:
+      </label>
+
+      <div className="style-options">
+        <label
+          className={`checkbox-label ${oceanWavesType === concentricWaveValue ? '' : 'is-disabled'}`}
+        >
+          <input
+            id="fade-concentric-waves-checkbox"
+            type="checkbox"
+            checked={fadeConcentricWaves}
+            onChange={(e) => setFadeConcentricWaves(e.target.checked)}
+            disabled={oceanWavesType !== concentricWaveValue}
+          />
+          <span>{translateLabel('theme.fadeOuterWaves')}</span>
+        </label>
+
+        <label
+          className={`checkbox-label ${oceanWavesType === concentricWaveValue ? '' : 'is-disabled'}`}
+        >
+          <input
+            type="checkbox"
+            checked={jitterToConcentricWaves}
+            onChange={(e) => setJitterToConcentricWaves(e.target.checked)}
+            disabled={oceanWavesType !== concentricWaveValue}
+          />
+          <span>{translateLabel('theme.jitter')}</span>
+        </label>
+
+        <label
+          className={`checkbox-label ${oceanWavesType === concentricWaveValue ? '' : 'is-disabled'}`}
+        >
+          <input
+            type="checkbox"
+            checked={brokenLinesForConcentricWaves}
+            onChange={(e) => setBrokenLinesForConcentricWaves(e.target.checked)}
+            disabled={oceanWavesType !== concentricWaveValue}
+          />
+          <span>{translateLabel('theme.brokenLines')}</span>
+        </label>
+      </div>
+    </>
+  )
+}
+
 export default function EffectsTab(props) {
   if (props == null) return <div />
   const { translateLabel, gatedControlValue, emptyComboOption, renderColorControl } = props
@@ -186,180 +395,45 @@ export default function EffectsTab(props) {
           <span className="slider-value">{Math.round(oceanShadingLevel)}</span>
         </div>
 
-        {(() => {
-          const shouldReplace = landColoringMethod === 'ColorPoliticalRegions'
-          let swatchReplacement
-          if (shouldReplace) {
-            let txt = translateLabel('theme.coastShadingColor.disabled')
-            const MAX_SANITIZE_LENGTH = 2000
-            if (typeof txt === 'string' && txt.length > MAX_SANITIZE_LENGTH)
-              txt = txt.slice(0, MAX_SANITIZE_LENGTH)
-            if (typeof txt === 'string') {
-              // Remove HTML tags using a linear-time scanner to avoid ReDoS
-              const removeTags = (s) => {
-                let out = ''
-                let inTag = false
-                for (let i = 0; i < s.length; i++) {
-                  const ch = s.charAt(i)
-                  if (!inTag) {
-                    if (ch === '<') {
-                      inTag = true
-                    } else {
-                      out += ch
-                    }
-                  } else if (ch === '>') inTag = false
-                }
-                return out
-              }
-              txt = removeTags(txt)
-              txt = txt.replaceAll("''", "'")
-            }
-            const methodLabel = translateLabel(`LandColoringMethod.${landColoringMethod}`)
-            if (typeof txt === 'string' && txt.includes('{0}'))
-              txt = txt.replace('{0}', methodLabel)
-            swatchReplacement = txt
-          }
-          return renderColorControl({
-            id: 'ocean-shading-color',
-            label: translateLabel('theme.oceanShadingColor.label'),
-            hexValue: oceanShadingColor,
-            onHexChange: setOceanShadingColor,
-            alphaValue: oceanShadingColor ? 100 - colorToAlphaPercent(oceanShadingColor) : 0,
-            onAlphaChange: (v) => {
-              const alphaPercent = 100 - Number(v)
-              const combined = formatColorString(oceanShadingColor, alphaPercent)
-              setOceanShadingColor(combined)
-            },
-            showState: showOceanPicker,
-            setShowState: setShowOceanPicker,
-            disabled: shouldReplace,
-            swatchReplacement,
-          })
-        })()}
+        {renderOceanShadingControl({
+          translateLabel,
+          renderColorControl,
+          oceanShadingColor,
+          setOceanShadingColor,
+          showOceanPicker,
+          setShowOceanPicker,
+          landColoringMethod,
+        })}
       </div>
 
       <div className="fields-column">
-        <label htmlFor="ocean-waves-type-input">{translateLabel('theme.waveType.label')}</label>
-        <select
-          id="ocean-waves-type-input"
-          value={gatedControlValue(oceanWavesType)}
-          onChange={(e) => setOceanWavesType(e.target.value)}
-        >
-          {emptyComboOption}
-          {Array.isArray(oceanWaveTypes)
-            ? oceanWaveTypes.map((item) => {
-                if (item?.value === undefined) return null
-                return (
-                  <option key={String(item.value)} value={item.value}>
-                    {item.label}
-                  </option>
-                )
-              })
-            : null}
-        </select>
-
-        <label
-          htmlFor="ocean-waves-level-input"
-          className={oceanWavesType === concentricWaveValue ? 'is-disabled' : ''}
-        >
-          {translateLabel('theme.waveWidth.label')}
-        </label>
-        <div className="slider-row">
-          <input
-            id="ocean-waves-level-input"
-            type="range"
-            min={0}
-            max={100}
-            step={1}
-            value={oceanWavesLevel}
-            onChange={(e) => setOceanWavesLevel(Number(e.target.value))}
-            disabled={oceanWavesType === concentricWaveValue}
-          />
-          <span className="slider-value">{Math.round(oceanWavesLevel)}</span>
-        </div>
-
-        {renderColorControl({
-          id: 'ocean-waves-color',
-          label: translateLabel('theme.waveColor.label'),
-          hexValue: oceanWavesColor,
-          onHexChange: setOceanWavesColor,
-          alphaValue: oceanWavesColor ? 100 - colorToAlphaPercent(oceanWavesColor) : 0,
-          onAlphaChange: (v) => {
-            const alphaPercent = 100 - Number(v)
-            const combined = formatColorString(oceanWavesColor, alphaPercent)
-            setOceanWavesColor(combined)
-          },
-          showState: showOceanWavesPicker,
-          setShowState: setShowOceanWavesPicker,
-          disabled: oceanWavesType === noneWaveValue,
+        {renderOceanWavesControls({
+          translateLabel,
+          gatedControlValue,
+          emptyComboOption,
+          renderColorControl,
+          oceanWaveTypes,
+          oceanWavesType,
+          setOceanWavesType,
+          concentricWaveValue,
+          noneWaveValue,
+          oceanWavesLevel,
+          setOceanWavesLevel,
+          oceanWavesColor,
+          setOceanWavesColor,
+          showOceanWavesPicker,
+          setShowOceanWavesPicker,
+          concentricWaveCount,
+          setConcentricWaveCount,
+          fadeConcentricWaves,
+          setFadeConcentricWaves,
+          jitterToConcentricWaves,
+          setJitterToConcentricWaves,
+          brokenLinesForConcentricWaves,
+          setBrokenLinesForConcentricWaves,
+          colorToAlphaPercent,
+          formatColorString,
         })}
-
-        <label
-          htmlFor="concentric-wave-count"
-          className={oceanWavesType === concentricWaveValue ? '' : 'is-disabled'}
-        >
-          {translateLabel('theme.waveCount.label')}
-        </label>
-        <div className="slider-row">
-          <input
-            id="concentric-wave-count"
-            type="range"
-            min={1}
-            max={5}
-            step={1}
-            value={concentricWaveCount}
-            onChange={(e) => setConcentricWaveCount(Number(e.target.value))}
-            disabled={oceanWavesType !== concentricWaveValue}
-          />
-          <span className="slider-value">{concentricWaveCount}</span>
-        </div>
-
-        <label
-          htmlFor="fade-concentric-waves-checkbox"
-          className={`section-subheading ${oceanWavesType === concentricWaveValue ? '' : 'is-disabled'}`}
-          style={{ marginTop: '0.5rem' }}
-        >
-          Style options:
-        </label>
-
-        <div className="style-options">
-          <label
-            className={`checkbox-label ${oceanWavesType === concentricWaveValue ? '' : 'is-disabled'}`}
-          >
-            <input
-              id="fade-concentric-waves-checkbox"
-              type="checkbox"
-              checked={fadeConcentricWaves}
-              onChange={(e) => setFadeConcentricWaves(e.target.checked)}
-              disabled={oceanWavesType !== concentricWaveValue}
-            />
-            <span>{translateLabel('theme.fadeOuterWaves')}</span>
-          </label>
-
-          <label
-            className={`checkbox-label ${oceanWavesType === concentricWaveValue ? '' : 'is-disabled'}`}
-          >
-            <input
-              type="checkbox"
-              checked={jitterToConcentricWaves}
-              onChange={(e) => setJitterToConcentricWaves(e.target.checked)}
-              disabled={oceanWavesType !== concentricWaveValue}
-            />
-            <span>{translateLabel('theme.jitter')}</span>
-          </label>
-
-          <label
-            className={`checkbox-label ${oceanWavesType === concentricWaveValue ? '' : 'is-disabled'}`}
-          >
-            <input
-              type="checkbox"
-              checked={brokenLinesForConcentricWaves}
-              onChange={(e) => setBrokenLinesForConcentricWaves(e.target.checked)}
-              disabled={oceanWavesType !== concentricWaveValue}
-            />
-            <span>{translateLabel('theme.brokenLines')}</span>
-          </label>
-        </div>
 
         <label className="checkbox-label debug-ocean-lakes">
           <input

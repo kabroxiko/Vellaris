@@ -102,8 +102,11 @@ describe('useRandomSettings hook', () => {
 
     render(<TestComponent initial={{}} />)
 
+    // Since we no longer persist manual overrides to localStorage,
+    // setRandomOverrides should not attempt to call localStorage.setItem,
+    // therefore no warning should be logged.
     globalThis.__useRandom.setRandomOverrides({ z: 1 })
 
-    await waitFor(() => expect(warn).toHaveBeenCalled())
+    await waitFor(() => expect(warn).not.toHaveBeenCalled())
   })
 })

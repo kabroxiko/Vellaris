@@ -1,16 +1,6 @@
-import {
-  colorToHex,
-  colorToHexWithAlpha,
-  colorToAlphaPercent,
-  fontSpecToFamily,
-  makeId,
-} from './utils'
+import { colorToHex, colorToHexWithAlpha, fontSpecToFamily } from './utils'
 import { seedStringOrEmpty, stringValueOrEmpty, dimensionFromSize } from './helpers'
-
-// Lightweight runtime instrumentation to record where applier functions
-// are created and invoked. Useful for debugging duplicate invocation
-// paths under React StrictMode. Inspect via `globalThis.__applierCallCache`.
-const applierCallCache = new Map()
+import { computeCityFrequencyPercentFromProbability } from './cityProbabilityUtils'
 
 // NOTE: `setIfChanged` is defined inside `createSettingsAppliers` so it
 // can access the `currentValues` parameter for idempotent comparisons.
@@ -51,26 +41,9 @@ function inverseGetTreeHeightSliderFromScale(scale) {
   return v
 }
 
-export function createSettingsAppliers(setters, currentValues = {}) {
-  // Per-applier instrumentation: record creation and calls.
-  const randomPart = makeId()
-  const applierId = `applier-${Date.now()}-${randomPart}`
-  const createdStack = new Error('applier-created').stack
-  applierCallCache.set(applierId, { createdAt: Date.now(), createdStack, calls: [] })
-  if (typeof globalThis !== 'undefined') {
-    globalThis.__applierCallCache = applierCallCache
-  }
-
-  const recordCall = (name) => {
-    const info = applierCallCache.get(applierId) || {
-      createdAt: Date.now(),
-      createdStack,
-      calls: [],
-    }
-    const entry = { name, ts: Date.now(), stack: new Error(`applier:${name}`).stack }
-    info.calls.push(entry)
-    applierCallCache.set(applierId, info)
-  }
+export function createSettingsAppliers(setters, currentValues = {}, options = {}) {
+  // No-op instrumentation in production: keep a stub for `recordCall`.
+  const recordCall = () => {}
 
   function setIfChanged(setter, key, newValue) {
     const oldValue = currentValues ? currentValues[key] : undefined
@@ -110,6 +83,9 @@ export function createSettingsAppliers(setters, currentValues = {}) {
     if (v !== undefined) setIfChanged(setter, keyName, v)
   }
 
+  // Use shared helper to compute percent from server probability
+  // to avoid duplicating logic across files.
+
   return {
     applyMapSizeAndSeedSettings(settings) {
       recordCall('applyMapSizeAndSeedSettings')
@@ -123,6 +99,7 @@ export function createSettingsAppliers(setters, currentValues = {}) {
         setRegionCount,
         setWorldSize,
         setCityIconType,
+        setCityFrequency,
         setSelectedBooks,
         setDimension,
       } = setters
@@ -149,6 +126,15 @@ export function createSettingsAppliers(setters, currentValues = {}) {
       const height = Number(settings.generatedHeight)
       if (Number.isFinite(width) && Number.isFinite(height))
         setIfChanged(setDimension, 'dimension', dimensionFromSize(width, height))
+
+      // Map server `cityProbability` to UI slider percent using the
+      // backend-provided `maxCityProbability` option when available.
+      const cityFreqPercent = computeCityFrequencyPercentFromProbability(
+        settings.cityProbability,
+        options?.maxCityProbability
+      )
+      if (Number.isFinite(Number(cityFreqPercent)))
+        setIfChanged(setCityFrequency, 'cityFrequency', cityFreqPercent)
     },
 
     applyRegionBoundaryStyle(regionStyle) {
@@ -204,18 +190,7 @@ export function createSettingsAppliers(setters, currentValues = {}) {
 
     applyColorAndBoundarySettings(settings) {
       recordCall('applyColorAndBoundarySettings')
-      // Debug: report incoming drawRegionColors and current UI value for landColoringMethod
-      try {
-        if (typeof console !== 'undefined' && typeof console.debug === 'function')
-          console.debug(
-            '[applier] applyColorAndBoundarySettings drawRegionColors=',
-            settings.drawRegionColors,
-            'currentValues.landColoringMethod=',
-            currentValues?.landColoringMethod
-          )
-      } catch (e) {
-        /* ignore debug errors */
-      }
+      // (debug logging removed)
       const {
         setOceanColor,
         setLandColor,
@@ -253,14 +228,16 @@ export function createSettingsAppliers(setters, currentValues = {}) {
         setIfChanged(setDrawGridOverlay, 'drawGridOverlay', settings.drawGridOverlay)
       if (typeof settings.drawRegionColors === 'boolean') {
         const method = settings.drawRegionColors ? 'ColorPoliticalRegions' : 'SingleColor'
-        // Debug: log the resolved method before setting
-        try {
-          if (typeof console !== 'undefined' && typeof console.debug === 'function')
-            console.debug('[applier] setting landColoringMethod ->', method)
-        } catch (e) {
-          /* ignore debug errors */
-        }
+        // Ensure both random-state and customize-state controls update so
+        // the two tabs stay in sync when server returns a canonical value.
         setIfChanged(setLandColoringMethod, 'landColoringMethod', method)
+        // If a customize setter was provided, update it as well. Use a
+        // direct call instead of `setIfChanged` because `currentValues`
+        // merges customize values with random-state and may not contain
+        // the customize-specific current value for an accurate compare.
+        if (typeof setters.setCustomizeLandColoringMethod === 'function') {
+          setters.setCustomizeLandColoringMethod(method)
+        }
       }
     },
 

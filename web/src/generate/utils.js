@@ -173,3 +173,23 @@ export function makeId() {
   }
   throw new Error('crypto unavailable: makeId requires crypto.randomUUID or crypto.getRandomValues')
 }
+
+// Recursively normalize color values to CSV decimal strings "r,g,b,a".
+export function normalizeColors(v) {
+  if (v === null || v === undefined) return v
+  if (Array.isArray(v)) return v.map(normalizeColors)
+  if (typeof v === 'object') {
+    // If the object itself represents a color, parse and return CSV
+    const ch = parseColorChannels(v)
+    if (ch) return `${ch.r},${ch.g},${ch.b},${ch.a}`
+    const out = {}
+    for (const k of Object.keys(v)) out[k] = normalizeColors(v[k])
+    return out
+  }
+  if (typeof v === 'string') {
+    const ch = parseColorChannels(v)
+    if (ch) return `${ch.r},${ch.g},${ch.b},${ch.a}`
+    return v
+  }
+  return v
+}

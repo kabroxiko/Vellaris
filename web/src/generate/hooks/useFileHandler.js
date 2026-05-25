@@ -35,9 +35,15 @@ export default function useFileHandler({
             source
           )
         })
-        .catch((e) => {
-          if (typeof console !== 'undefined' && typeof console.debug === 'function')
-            console.debug('GenerateForm: file read failed', e)
+        .catch((err) => {
+          // Surface file-loading errors via a visible toast and log for diagnostics.
+          // Do not re-throw to avoid unhandled promise rejections in tests.
+          // eslint-disable-next-line no-console
+          console.warn('useFileHandler: failed to process file', err)
+          globalThis.showToast?.(
+            { key: 'ui.toast.error', params: { msg: err?.message || 'Failed to load file' } },
+            { type: 'error', duration: 5000 }
+          )
         })
     },
     [requestLanguage, runGenerate, setFileName, setFileObj, setCurrentSource, tryParse]

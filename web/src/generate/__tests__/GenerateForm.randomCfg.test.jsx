@@ -52,16 +52,8 @@ describe('GenerateForm buildRandomCfg', () => {
   })
 
   it('sends manual overrides to /generate-settings when generate is clicked', async () => {
-    // set manual overrides in localStorage so loadRandomOverrides picks them up
-    localStorage.setItem(
-      'vellaris-random-manual-overrides',
-      JSON.stringify({
-        mapLanguage: 'zz',
-        artPack: 'packX',
-        selectedBooks: ['bookB'],
-        regionCount: 7,
-      })
-    )
+    // Manual overrides are no longer cached on reload; ensure default UI
+    // values are sent when no session overrides are present.
 
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, opts) => {
       const urlStr = getUrlString(url)
@@ -93,10 +85,12 @@ describe('GenerateForm buildRandomCfg', () => {
     expect(called).toBeTruthy()
     const opts = called[1]
     const body = JSON.parse(opts.body)
-    // Manual overrides should appear in the config (only keys the UI maps from overrides)
-    expect(body.language).to.equal('zz')
-    expect(body.artPack).to.equal('packX')
-    expect(body.books).to.deep.equal(['bookB'])
+    // Since manual overrides are not cached, the default language should be sent
+    // and no artPack/books should be present in the payload.
+    expect(body.language).to.equal('en')
+    // Unset artPack may be represented as undefined or an empty string
+    expect([undefined, '']).to.include(body.artPack)
+    expect(body.books).to.equal(undefined)
 
     fetchMock.mockRestore()
   })

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { loadRandomOverrides } from '../GenerateForm.helpers'
 
 const RANDOM_OVERRIDES_STORAGE_KEY = 'vellaris-random-manual-overrides'
@@ -8,20 +8,8 @@ export default function useRandomSettings(initialOverrides) {
   const [randomOverrides, setRandomOverrides] = useState(initial)
   const booksLoadedRef = useRef(false)
 
-  useEffect(() => {
-    try {
-      globalThis?.localStorage?.setItem(
-        RANDOM_OVERRIDES_STORAGE_KEY,
-        JSON.stringify(randomOverrides)
-      )
-    } catch (e) {
-      // Handle storage failures: quota exceeded, unavailable storage (e.g. private
-      // browsing), or other DOMExceptions. Don't rethrow — persistence is best-effort.
-      // Always log the failure so it can be observed in logs and during testing.
-      // eslint-disable-next-line no-console
-      console.warn('useRandomSettings: failed to persist overrides to localStorage', e)
-    }
-  }, [randomOverrides])
+  // Do not persist manual overrides to localStorage — they should be
+  // ephemeral and not survive a full page reload. Persistence code removed.
 
   const updateRandomOverride = useCallback((key, value) => {
     setRandomOverrides((previous) => {
@@ -35,6 +23,22 @@ export default function useRandomSettings(initialOverrides) {
         delete next[key]
       } else {
         next[key] = value
+      }
+      // Persist `mapLanguage` across page reloads only.
+      try {
+        if (key === 'mapLanguage') {
+          if (value === null || value === undefined || value === '') {
+            localStorage.removeItem('vellaris-map-language')
+          } else {
+            // Persist as a plain string to simplify retrieval (avoid JSON.parse)
+            localStorage.setItem('vellaris-map-language', String(value))
+          }
+        }
+      } catch (e) {
+        // Log storage errors so they are visible during development and in CI
+        // while avoiding a hard failure for non-persistent environments.
+        // eslint-disable-next-line no-console
+        console.warn('useRandomSettings: failed to access localStorage for mapLanguage', e)
       }
       return next
     })

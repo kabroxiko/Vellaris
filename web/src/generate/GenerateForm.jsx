@@ -2,7 +2,7 @@ import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import PropTypes from 'prop-types'
 import CustomizeSettingsSection from './CustomizeSettingsSection'
 import RandomSettingsSection from './RandomSettingsSection'
-import { base64ToBlob, colorToHexWithAlpha, parseColorChannels } from './utils'
+import { base64ToBlob, colorToHexWithAlpha, normalizeColors } from './utils'
 import { selectCityIconType, handleResponseError, tryParseJson as tryParse } from './helpers'
 import { downloadNortContent } from './responseHandlers'
 import { deriveNortFilenameFromContent, makeProgressToastController } from './sharedHelpers'
@@ -17,7 +17,6 @@ import {
   computeConcentricWaveCount,
   setResourceFromRef,
   parseBooleanWithDefault,
-  loadRandomOverrides,
   setNumber,
   setString,
   setBoolean,
@@ -35,6 +34,7 @@ import { mergeColor } from './GenerateForm.appliers'
 import mergeUiIntoParsed from './mergeUiIntoParsed'
 import useNortBuilder from './hooks/useNortBuilder'
 import useApplyMergedSettings from './hooks/useApplyMergedSettings'
+import { computeCityProbabilityFromFrequency } from './cityProbabilityUtils'
 const API_BASE = import.meta.env.VITE_API_BASE || '/api'
 
 const RANDOM_OVERRIDES_STORAGE_KEY = 'vellaris-random-manual-overrides'
@@ -45,7 +45,27 @@ const CUSTOMIZE_OVERRIDES_STORAGE_KEY = 'vellaris-customize-overrides'
 // Applier and background helper functions are moved to GenerateForm.appliers.js
 
 function GenerateForm({ uiLanguage = 'en' }) {
-  const initialRandomOverrides = useMemo(() => loadRandomOverrides(), [])
+  const initialRandomOverrides = useMemo(() => {
+    const raw = localStorage.getItem('vellaris-map-language')
+    if (!raw) return {}
+
+    // If the stored value looks like JSON (object/array/string), attempt to parse it.
+    // Otherwise treat it as a plain string to avoid noisy parse errors for simple values
+    const trimmed = String(raw).trim()
+    const firstChar = trimmed[0]
+    if (firstChar === '{' || firstChar === '[' || firstChar === '"') {
+      try {
+        const parsed = JSON.parse(raw)
+        return { mapLanguage: parsed }
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.warn('Failed to parse persisted mapLanguage, using raw value', e)
+        return { mapLanguage: raw }
+      }
+    }
+
+    return { mapLanguage: raw }
+  }, [])
   // Always start with empty customize overrides so UI resets to backend defaults on load
   const initialCustomize = useMemo(() => ({}), [])
   const [currentSource, setCurrentSource] = useState(null)
@@ -64,66 +84,34 @@ function GenerateForm({ uiLanguage = 'en' }) {
     setAllBooks,
     uiI18n,
     setUiI18n,
+    uiOptions,
+    setUiOptions,
     uiLoaded,
   } = useUiOptions()
 
   // Delegate UI initialization to hook; pass callbacks that affect GenerateForm state
   useEffect(() => {
-    initializeUiForLanguage(requestLanguage, {
-      initialRandomOverrides,
-      setSelectedBooks,
-      booksLoadedRef,
-      setArtPack,
-      artPack,
-      cityIconType,
-      handleCityIconTypesLoaded,
-      requestLanguage,
-      applyOptionDefaults: (opts, defs) => {
-        if (!opts) return
-        try {
-          if (typeof console !== 'undefined' && typeof console.debug === 'function')
-            console.debug('[ui-init] applyOptionDefaults:', {
-              initialRandomOverrides,
-              optsPreview: {
-                landColoringMethods: opts?.landColoringMethods,
-              },
-              defsPreview: { drawRegionColors: defs?.drawRegionColors },
-              currentLandColoringMethod: landColoringMethod,
-            })
-        } catch (e) {
-          /* ignore debug errors */
-        }
-        if (
-          !backgroundType &&
-          Array.isArray(opts.backgroundTypes) &&
-          opts.backgroundTypes.length > 0
-        )
-          setBackgroundType(opts.backgroundTypes[0].value)
-        if (
-          !landColoringMethod &&
-          Array.isArray(opts.landColoringMethods) &&
-          opts.landColoringMethods.length > 0
-        ) {
-          // Only initialize from explicit server boolean `drawRegionColors` when present.
-          // Avoid silently falling back to the first `opts` value which can overwrite
-          // server-backed or user-customized state during HMR / re-init sequences.
-          if (defs && typeof defs.drawRegionColors === 'boolean') {
-            const method = defs.drawRegionColors ? 'ColorPoliticalRegions' : 'SingleColor'
-            setLandColoringMethod(method)
-            try {
-              if (typeof console !== 'undefined' && typeof console.debug === 'function')
-                console.debug('[ui-init] setLandColoringMethod(random) -> (from defs.drawRegionColors)', method)
-            } catch (e) {
-              /* ignore debug errors */
-            }
-          }
-        }
-        if (!regionBoundaryStyle && Array.isArray(opts.lineStyles) && opts.lineStyles.length > 0)
-          setRegionBoundaryStyle(opts.lineStyles[0].value)
-        if (defs) applyServerDefaults(defs, opts)
-      },
-      lastUiDefaultsRef,
-    })
+    ;(async () => {
+      const uiOpts = await initializeUiForLanguage(requestLanguage, {
+        initialRandomOverrides,
+        setSelectedBooks,
+        booksLoadedRef,
+        setArtPack,
+        artPack,
+        cityIconType,
+        handleCityIconTypesLoaded,
+        requestLanguage,
+      })
+
+      // Apply server-provided defaults via our appliers so the UI resets
+      // to canonical backend values on load. Persist the raw defaults so
+      // other logic can read them if necessary.
+      const defs = uiOpts?.defaults ?? null
+      if (defs) {
+        applyServerDefaults(defs)
+        lastUiDefaultsRef.current = defs
+      }
+    })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [requestLanguage])
 
@@ -345,13 +333,8 @@ function GenerateForm({ uiLanguage = 'en' }) {
     [hookHandleSelectedBooksChange]
   )
 
-  useEffect(() => {
-    initializeUiForLanguage(requestLanguage)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [requestLanguage])
-
   // Apply backend `defaults` to the UI using the existing setters.
-  function applyServerDefaults(defs, opts) {
+  function applyServerDefaults(defs) {
     // Use shared helper appliers from GenerateForm.helpers.js
 
     const applyGridAndBorders = (defs) => {
@@ -379,21 +362,12 @@ function GenerateForm({ uiLanguage = 'en' }) {
       setBoolean(setDrawVoronoiGridOverlayOnlyOnLand, defs.drawVoronoiGridOverlayOnlyOnLand)
       if (typeof defs.drawRegionColors === 'boolean') {
         const method = defs.drawRegionColors ? 'ColorPoliticalRegions' : 'SingleColor'
-        try {
-          if (typeof console !== 'undefined' && typeof console.debug === 'function')
-            console.debug('[ui-init] applyServerDefaults -> setCustomizeLandColoringMethod ->', method)
-        } catch (e) {
-          /* ignore */
-        }
         // Set both the customize-state and the random-state landColoringMethod
         // to keep the UI in sync and avoid transient mismatches between tabs.
         setString(setCustomizeLandColoringMethod, method)
-        try {
+        if (typeof setLandColoringMethod === 'function') {
           setString(setLandColoringMethod, method)
-          if (typeof console !== 'undefined' && typeof console.debug === 'function')
-            console.debug('[ui-init] applyServerDefaults -> setLandColoringMethod (random) ->', method)
-        } catch (e) {
-          /* setLandColoringMethod may not be defined in some contexts; ignore */
+          setString(setLandColoringMethod, method)
         }
       }
       setString(setBorderRef, defs.borderRef)
@@ -468,7 +442,7 @@ function GenerateForm({ uiLanguage = 'en' }) {
       applyScaleOrSize('cityScale', 'citySize', (v) => setNumber(setCitySize, v))
     }
 
-    const applyTextAndFonts = (defs, opts) => {
+    const applyTextAndFonts = (defs) => {
       setBoolean(setDrawText, defs.drawText)
       setString(setTitleFontFamily, defs.titleFontFamily)
       setString(setRegionFontFamily, defs.regionFontFamily)
@@ -478,26 +452,11 @@ function GenerateForm({ uiLanguage = 'en' }) {
       setString(setRiverFontFamily, defs.riverFontFamily)
       setString(setTextColor, defs.textColor)
       setString(setBoldBackgroundColor, defs.boldBackgroundColor)
-      const backendDefaultFont =
-        Array.isArray(opts?.fonts) && opts.fonts.length > 0 ? opts.fonts[0] : null
-      if (backendDefaultFont) {
-        const fontSetters = [
-          [titleFontFamily, setTitleFontFamily],
-          [regionFontFamily, setRegionFontFamily],
-          [mountainRangeFontFamily, setMountainRangeFontFamily],
-          [otherMountainsFontFamily, setOtherMountainsFontFamily],
-          [citiesFontFamily, setCitiesFontFamily],
-          [riverFontFamily, setRiverFontFamily],
-        ]
-        fontSetters.forEach(([current, setter]) => {
-          if (!current) setter(backendDefaultFont)
-        })
-      }
       if (Array.isArray(defs.books)) setSelectedBooks(new Set(defs.books))
     }
 
     // Delegate to smaller appliers
-    applyBasicSettings(defs, opts, {
+    applyBasicSettings(defs, {
       setWorldSize,
       setRegionCount,
       setCityFrequency,
@@ -510,7 +469,7 @@ function GenerateForm({ uiLanguage = 'en' }) {
     applyGridAndBorders(defs)
     applyOceanAndRoads(defs)
     applySizeMappings(defs)
-    applyTextAndFonts(defs, opts)
+    applyTextAndFonts(defs)
   }
 
   // Generate from a .nort JSON string by POSTing it to the generate endpoint.
@@ -562,6 +521,7 @@ function GenerateForm({ uiLanguage = 'en' }) {
         setAllBooks(uiOpts.books)
         setTextures(uiOpts.textures)
         setBorderTypes(uiOpts.borderTypes)
+        if (setUiOptions) setUiOptions(uiOpts.options ?? {})
         const defs = uiOpts.defaults
 
         const byPack = uiOpts.cityIconTypesByPack
@@ -577,7 +537,8 @@ function GenerateForm({ uiLanguage = 'en' }) {
         const mergedLabels = { ...frontendLabels }
         if (backendLabels) Object.assign(mergedLabels, backendLabels)
         // Pass backend options through exactly as received (no mapping).
-        setUiI18n({ labels: mergedLabels, options: uiOpts.options })
+        setUiI18n({ labels: mergedLabels })
+        // store options separately via hook's setUiOptions (hook will set uiOptions)
 
         // Persist the raw backend defaults so appliers can apply them
         lastUiDefaultsRef.current = defs
@@ -622,13 +583,14 @@ function GenerateForm({ uiLanguage = 'en' }) {
   // Build a currentValues snapshot for appliers that includes both
   // customize values and the Random-state `landColoringMethod` so
   // `setIfChanged` compares against the right current value.
-  const currentValuesForAppliers = useMemo(() => ({ ...customizeValues, landColoringMethod }), [
-    customizeValues,
-    landColoringMethod,
-  ])
+  const currentValuesForAppliers = useMemo(
+    () => ({ ...customizeValues, landColoringMethod }),
+    [customizeValues, landColoringMethod]
+  )
 
-  const appliersDeps = Array.isArray(customizeDeps) ? [...customizeDeps, landColoringMethod] : [landColoringMethod]
-
+  const appliersDeps = Array.isArray(customizeDeps)
+    ? [...customizeDeps, landColoringMethod]
+    : [landColoringMethod]
   const { appliersRef } = useSettingsAppliers(
     {
       setFinalWidth,
@@ -640,6 +602,7 @@ function GenerateForm({ uiLanguage = 'en' }) {
       setRegionCount,
       setWorldSize,
       setCityIconType,
+      setCityFrequency,
       setSelectedBooks,
       setDimension,
       setRegionBoundaryStyle,
@@ -656,6 +619,7 @@ function GenerateForm({ uiLanguage = 'en' }) {
       setDrawBorder,
       setDrawGridOverlay,
       setLandColoringMethod,
+      setCustomizeLandColoringMethod,
       setBorderRef,
       setBorderWidth,
       setBorderPosition,
@@ -705,7 +669,8 @@ function GenerateForm({ uiLanguage = 'en' }) {
       setBoldBackgroundColor,
     },
     currentValuesForAppliers,
-    appliersDeps
+    appliersDeps,
+    uiOptions
   )
 
   // If backend defaults were captured during UI load, apply them now
@@ -759,20 +724,6 @@ function GenerateForm({ uiLanguage = 'en' }) {
     const seedVal = defs?.randomSeed == null ? '' : String(defs.randomSeed)
     setRandomSeed(seedVal)
     updateRandomOverride('randomSeed', seedVal || null)
-
-    // Ensure font family controls are initialized to backend canonical
-    // default if available.
-    const opts = uiI18n.options
-    let backendDefaultFont = null
-    if (Array.isArray(opts?.fonts) && opts.fonts.length > 0) backendDefaultFont = opts.fonts[0]
-    if (backendDefaultFont) {
-      setTitleFontFamily(backendDefaultFont)
-      setRegionFontFamily(backendDefaultFont)
-      setMountainRangeFontFamily(backendDefaultFont)
-      setOtherMountainsFontFamily(backendDefaultFont)
-      setCitiesFontFamily(backendDefaultFont)
-      setRiverFontFamily(backendDefaultFont)
-    }
 
     // Clear stored defaults after applying once.
     lastUiDefaultsRef.current = null
@@ -842,88 +793,56 @@ function GenerateForm({ uiLanguage = 'en' }) {
     tryParse,
   })
 
-  // handleSuccess implemented by usePreview
-  // expose handleSuccess to the generate hook
   handleSuccessRef.current = handleSuccess
-
-  // processGenerateResponse and runGenerate are provided by the `useGenerate` hook.
-
-  // `runGenerate` is provided by the `useGenerate` hook above.
 
   // Build the random configuration payload from current UI state and manual overrides
   const buildRandomCfg = () => {
     const isManual = (k) => Object.hasOwn(randomOverrides, k)
     const cfg = {}
 
+    // Helper: prefer manual overrides when present, otherwise read from UI
+    const getVal = (key, getter) => (isManual(key) ? randomOverrides[key] : getter())
+
     const appliers = [
-      [
-        'mapLanguage',
-        () => {
-          cfg.language = mapLanguage
-        },
-      ],
-      [
-        'randomSeed',
-        () => {
-          cfg.randomSeed = randomSeed ? Number(randomSeed) : undefined
-        },
-      ],
-      [
-        'artPack',
-        () => {
-          cfg.artPack = artPack
-        },
-      ],
-      [
-        'dimension',
-        () => {
-          cfg.dimension = dimension
-        },
-      ],
-      [
-        'worldSize',
-        () => {
-          cfg.worldSize = worldSize
-        },
-      ],
-      [
-        'landShape',
-        () => {
-          cfg.landShape = landShape
-        },
-      ],
-      [
-        'regionCount',
-        () => {
-          cfg.regionCount = regionCount
-        },
-      ],
-      [
-        'landColoringMethod',
-        () => {
-          cfg.drawRegionColors = landColoringMethod
-            ? landColoringMethod === 'ColorPoliticalRegions'
-            : undefined
-        },
-      ],
-      [
-        'cityFrequency',
-        () => {
-          cfg.cityFrequency = cityFrequency
-        },
-      ],
-      [
-        'cityIconType',
-        () => {
-          cfg.cityIconSetName = cityIconType
-        },
-      ],
-      [
-        'selectedBooks',
-        () => {
-          if (selectedBooks && selectedBooks.size > 0) cfg.books = Array.from(selectedBooks)
-        },
-      ],
+      () => {
+        cfg.language = getVal('mapLanguage', () => mapLanguage)
+      },
+      () => {
+        const val = getVal('randomSeed', () => randomSeed)
+        cfg.randomSeed = val ? Number(val) : undefined
+      },
+      () => {
+        cfg.artPack = getVal('artPack', () => artPack)
+      },
+      () => {
+        cfg.dimension = getVal('dimension', () => dimension)
+      },
+      () => {
+        cfg.worldSize = Number(getVal('worldSize', () => worldSize))
+      },
+      () => {
+        cfg.landShape = getVal('landShape', () => landShape)
+      },
+      () => {
+        cfg.regionCount = Number(getVal('regionCount', () => regionCount))
+      },
+      () => {
+        const val = getVal('landColoringMethod', () => landColoringMethod)
+        cfg.drawRegionColors = val ? val === 'ColorPoliticalRegions' : undefined
+      },
+      () => {
+        const freq = Number(getVal('cityFrequency', () => cityFrequency))
+        if (!Number.isFinite(freq)) return
+        cfg.cityProbability = computeCityProbabilityFromFrequency(freq, uiOptions?.maxCityProbability)
+      },
+      () => {
+        cfg.cityIconSetName = getVal('cityIconType', () => cityIconType)
+      },
+      () => {
+        const val = getVal('selectedBooks', () => selectedBooks)
+        if (Array.isArray(val)) cfg.books = val
+        else if (val && typeof val.size === 'number' && val.size > 0) cfg.books = Array.from(val)
+      },
     ]
 
     // Apply current UI values for all supported generation params so
@@ -931,7 +850,7 @@ function GenerateForm({ uiLanguage = 'en' }) {
     // POST /generate-settings payload. Manual overrides (from
     // localStorage) are still honored by the applier functions when
     // they prefer override values.
-    for (const [key, apply] of appliers) {
+    for (const apply of appliers) {
       apply()
     }
 
@@ -942,39 +861,23 @@ function GenerateForm({ uiLanguage = 'en' }) {
 
   const fetchResolvedNort = async (cfg) => {
     try {
-      // Normalize colors in the cfg to {r,g,b,a} objects expected by backend
-      function normalizeColors(v) {
-        if (v === null || v === undefined) return v
-        if (Array.isArray(v)) return v.map(normalizeColors)
-        if (typeof v === 'object') {
-          const keys = Object.keys(v)
-          if (keys.includes('r') && keys.includes('g') && keys.includes('b')) {
-            const r = Number(v.r)
-            const g = Number(v.g)
-            const b = Number(v.b)
-            const a = Number(v.a ?? v.alpha ?? 255)
-            return `${r},${g},${b},${a}`
-          }
-          const out = {}
-          for (const k of Object.keys(v)) out[k] = normalizeColors(v[k])
-          return out
+      // Deep-clone helper: prefer native structuredClone when available;
+      // otherwise perform a simple recursive clone for plain objects/arrays.
+      function deepClone(v) {
+        if (typeof structuredClone === 'function') return structuredClone(v)
+        if (v === null || typeof v !== 'object') return v
+        if (Array.isArray(v)) return v.map(deepClone)
+        if (v instanceof Date) return new Date(v)
+        if (v instanceof RegExp) return new RegExp(v)
+        const out = {}
+        for (const k of Object.keys(v)) {
+          if (Object.hasOwn(v, k)) out[k] = deepClone(v[k])
         }
-        if (typeof v === 'string') {
-          const ch = parseColorChannels(v)
-          if (ch) return `${ch.r},${ch.g},${ch.b},${ch.a}`
-          return v
-        }
-        return v
+        return out
       }
-
-      const normalized = normalizeColors(cfg)
-      if (typeof console !== 'undefined' && typeof console.debug === 'function') {
-        try {
-          console.debug('POST /generate-settings payload:', JSON.stringify(normalized))
-        } catch (e) {
-          console.debug('POST /generate-settings payload (non-serializable):', normalized)
-        }
-      }
+      const payload = deepClone(cfg)
+      if (payload && Object.hasOwn(payload, 'randomSeed')) delete payload.randomSeed
+      const normalized = normalizeColors(payload)
       const settingsRes = await fetch(`${API_BASE}/generate-settings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1208,17 +1111,8 @@ function GenerateForm({ uiLanguage = 'en' }) {
 
   // Expose helpers to globalThis for tests
   if (typeof globalThis !== 'undefined') {
-    try {
-      globalThis.__test_buildNortContentRequest = buildNortContentRequest
-      globalThis.__test_handleGenerateAndSaveNort = handleGenerateAndSaveNort
-    } catch (e) {
-      if (typeof console !== 'undefined' && typeof console.debug === 'function') {
-        console.debug(
-          'GenerateForm: cannot expose test hooks on globalThis — assignment skipped',
-          e
-        )
-      }
-    }
+    globalThis.__test_buildNortContentRequest = buildNortContentRequest
+    globalThis.__test_handleGenerateAndSaveNort = handleGenerateAndSaveNort
   }
 
   // preview handlers provided by usePreview
@@ -1266,7 +1160,7 @@ function GenerateForm({ uiLanguage = 'en' }) {
           cityIconTypes,
           allBooks,
           i18n: uiI18n,
-          landColoringMethods: uiI18n?.options?.landColoringMethods,
+          backendOptions: uiOptions,
         }}
         ui={{
           loading,
@@ -1441,7 +1335,7 @@ function GenerateForm({ uiLanguage = 'en' }) {
           textures,
           borderTypes,
           i18n: uiI18n,
-          landColoringMethods: uiI18n?.options?.landColoringMethods,
+          backendOptions: uiOptions,
         }}
         ui={{
           loading,

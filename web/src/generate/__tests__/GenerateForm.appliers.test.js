@@ -253,8 +253,6 @@ describe('GenerateForm appliers', () => {
       gridOverlayLineWidth: '2',
       gridOverlayLayer: 'top',
       drawVoronoiGridOverlayOnlyOnLand: true,
-      // previous resolver wrapper replaced by explicit values
-      landColoringMethod: undefined,
       landColoringMethod: 'ColorPoliticalRegions',
       mergeColor: (ps, k, v) => {
         if (v) ps[k] = v

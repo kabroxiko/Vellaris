@@ -791,8 +791,7 @@ public class MapApiServer
 	// Helper: quick check whether parsed params contain any generation fields
 	private static boolean paramsContainGenerationFields(ApiUtils.RandomMapParameters p)
 	{
-		return p != null && (p.language != null || p.dimension != null || p.worldSize != null || p.landShape != null || p.regionCount != null || p.cityFrequency != null
-				|| (p.books != null && !p.books.isEmpty()));
+		return p != null && (p.language != null || p.dimension != null || p.worldSize != null || p.landShape != null || p.regionCount != null || p.cityProbability != null || (p.books != null && !p.books.isEmpty()));
 	}
 
 	// Build GenerationRequestContext when params-driven generation is requested

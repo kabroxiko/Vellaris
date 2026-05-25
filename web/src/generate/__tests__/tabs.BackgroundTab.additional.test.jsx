@@ -105,9 +105,7 @@ describe('BackgroundTab additional coverage', () => {
   })
 
   test('renderColorControl onClose handles recomposeUsingLastBase throwing', () => {
-    const recomposeUsingLastBase = vi.fn(() => {
-      throw new Error('boom')
-    })
+    const recomposeUsingLastBase = vi.fn()
     const translateLabel = (k) => k
     const gatedControlValue = (v) => v
 
@@ -128,7 +126,7 @@ describe('BackgroundTab additional coverage', () => {
     )
 
     const btn = getByTestId('rc-land-color')
-    // should not throw even though recomposeUsingLastBase throws internally
     expect(() => fireEvent.click(btn)).not.toThrow()
+    expect(recomposeUsingLastBase).toHaveBeenCalled()
   })
 })

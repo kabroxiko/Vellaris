@@ -121,12 +121,8 @@ function preload(payload) {
 function clear() {
   for (const v of cache.values()) {
     if (v?.objectUrl) {
-      try {
+      if (typeof URL !== 'undefined' && typeof URL.revokeObjectURL === 'function') {
         URL.revokeObjectURL(v.objectUrl)
-      } catch (e) {
-        /* eslint-disable no-console */
-        console.debug('backgroundBaseCache: revokeObjectURL failed', e)
-        /* eslint-enable no-console */
       }
     }
   }

@@ -128,15 +128,10 @@ function LandColorControls({
         setShowState: setShowLandPicker,
         disabled: !colorizeLand || isPoliticalRegions,
         onClose: () => {
-          try {
-            recomposeUsingLastBase({ landColor: landColor })
-          } catch (err) {
-            if (typeof console !== 'undefined' && console.debug)
-              console.debug('BackgroundTab: recomposeUsingLastBase failed', err)
-          }
+          recomposeUsingLastBase({ landColor: landColor })
         },
       })}
-      </div>
+    </div>
   )
 }
 
@@ -168,12 +163,7 @@ function OceanColorControls({
         setShowState: setShowOceanPicker,
         disabled: !colorizeOcean,
         onClose: () => {
-          try {
-            recomposeUsingLastBase({ oceanColor: oceanColor })
-          } catch (err) {
-            if (typeof console !== 'undefined' && console.debug)
-              console.debug('BackgroundTab: recomposeUsingLastBase failed', err)
-          }
+          recomposeUsingLastBase({ oceanColor: oceanColor })
         },
       })}
     </div>
@@ -594,24 +584,6 @@ export default function BackgroundTab(props = {}) {
     landColoringMethods,
   } = props
 
-  React.useEffect(() => {
-    try {
-      const hasMethods = Array.isArray(landColoringMethods)
-      const selected = landColoringMethod
-      const contains = hasMethods && landColoringMethods.some((m) => m && m.value === selected)
-      if (typeof console !== 'undefined' && typeof console.debug === 'function')
-        console.debug('[dom-diagnose] BackgroundTab props:', {
-          colorizeLand,
-          landColoringMethod: selected,
-          hasMethods,
-          containsSelected: contains,
-          methodsPreview: hasMethods ? landColoringMethods.map((m) => m && m.value) : null,
-        })
-    } catch (e) {
-      /* ignore */
-    }
-  }, [colorizeLand, landColoringMethod, landColoringMethods])
-
   const isVoronoi = String(gridOverlayShape || '')
     .toLowerCase()
     .includes('voronoi')
@@ -630,22 +602,22 @@ export default function BackgroundTab(props = {}) {
         >
           {emptyComboOption}
           {backgroundTypes.map((item) => (
-              <option key={item.value} value={item.value}>
-                {item.label}
-              </option>
-            ))}
-          </select>
+            <option key={item.value} value={item.value}>
+              {item.label}
+            </option>
+          ))}
+        </select>
 
-          <TextureSelect
-            emptyComboOption={emptyComboOption}
-            textures={textures}
-            hasTextures={hasTextures}
-            showTextureOptions={showTextureOptions}
-            translateLabel={translateLabel}
-            gatedControlValue={gatedControlValue}
-            textureRef={textureRef}
-            setTextureRef={setTextureRef}
-          />
+        <TextureSelect
+          emptyComboOption={emptyComboOption}
+          textures={textures}
+          hasTextures={hasTextures}
+          showTextureOptions={showTextureOptions}
+          translateLabel={translateLabel}
+          gatedControlValue={gatedControlValue}
+          textureRef={textureRef}
+          setTextureRef={setTextureRef}
+        />
 
         <label className="checkbox-label">
           <input
@@ -684,12 +656,7 @@ export default function BackgroundTab(props = {}) {
               const v = e.target.checked
               setColorizeLand(v)
               notifyManualChange()
-              try {
-                recomposeUsingLastBase({ colorizeLand: v })
-              } catch (err) {
-                if (typeof console !== 'undefined' && console.debug)
-                  console.debug('BackgroundTab: recomposeUsingLastBase failed', err)
-              }
+              recomposeUsingLastBase({ colorizeLand: v })
             }}
           />
           <span>{translateLabel('theme.colorLand')}</span>
@@ -723,12 +690,7 @@ export default function BackgroundTab(props = {}) {
               const v = e.target.checked
               setColorizeOcean(v)
               notifyManualChange()
-              try {
-                recomposeUsingLastBase({ colorizeOcean: v })
-              } catch (err) {
-                if (typeof console !== 'undefined' && console.debug)
-                  console.debug('BackgroundTab: recomposeUsingLastBase failed', err)
-              }
+              recomposeUsingLastBase({ colorizeOcean: v })
             }}
           />
           <span>{translateLabel('theme.colorOcean')}</span>

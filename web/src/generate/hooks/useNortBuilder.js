@@ -1,5 +1,5 @@
 import { useCallback } from 'react'
-import { parseColorChannels } from '../utils'
+import { normalizeColors } from '../utils'
 
 export default function useNortBuilder(opts) {
   const {
@@ -71,32 +71,6 @@ export default function useNortBuilder(opts) {
       )
 
       if (mapLanguage) parsedSettings.language = mapLanguage
-      // Normalize color values to decimal objects {r,g,b,a} expected by backend
-      function normalizeColors(v) {
-        if (v === null || v === undefined) return v
-        if (Array.isArray(v)) return v.map(normalizeColors)
-        if (typeof v === 'object') {
-          const keys = Object.keys(v)
-          // If object already looks like a color, convert to CSV string
-          if (keys.includes('r') && keys.includes('g') && keys.includes('b')) {
-            const r = Number(v.r)
-            const g = Number(v.g)
-            const b = Number(v.b)
-            const a = Number(v.a ?? v.alpha ?? 255)
-            return `${r},${g},${b},${a}`
-          }
-          const out = {}
-          for (const k of Object.keys(v)) out[k] = normalizeColors(v[k])
-          return out
-        }
-        if (typeof v === 'string') {
-          const ch = parseColorChannels(v)
-          if (ch) return `${ch.r},${ch.g},${ch.b},${ch.a}`
-          return v
-        }
-        return v
-      }
-
       const normalized = normalizeColors(parsedSettings)
       serializeNortObject(normalized)
 

@@ -84,7 +84,6 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     gridOverlayYOffset,
     gridOverlayLineWidth,
     drawVoronoiGridOverlayOnlyOnLand,
-    landColoringMethod,
     borderRef,
     borderWidth,
     borderPosition,
@@ -138,24 +137,6 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     fileObj,
     currentSource,
   } = values
-
-  // Debug: log customize mount and landColoringMethod changes
-  React.useEffect(() => {
-    try {
-      if (typeof console !== 'undefined' && typeof console.debug === 'function')
-        console.debug('[customize] CustomizeSettingsSection mount/props', {
-          valuesPreview: { landColoringMethod },
-          uiPreview: { fileObj, currentSource, preview },
-        })
-    } catch (e) {}
-  }, [])
-
-  React.useEffect(() => {
-    try {
-      if (typeof console !== 'undefined' && typeof console.debug === 'function')
-        console.debug('[customize] landed landColoringMethod prop ->', landColoringMethod)
-    } catch (e) {}
-  }, [landColoringMethod])
 
   // Wrap the incoming setter to trace calls
   // Do not mutate handlers prop; leave setter tracing to parent/debug hooks.
@@ -312,10 +293,10 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     setBoldBackgroundColor: handlers.setBoldBackgroundColor,
   }
 
-  const { textures, borderTypes, i18n } = options
+  const { textures, borderTypes, i18n, backendOptions: passedBackendOptions } = options
   const { loading } = ui
   const labels = i18n?.labels
-  const backendOptions = i18n?.options
+  const backendOptions = passedBackendOptions ?? i18n?.options
 
   // `options.tabs` removed from backend response; labels come from `i18n.labels`.
   // Do not read `backendOptions.tabs`.
@@ -1121,7 +1102,12 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
 CustomizeSettingsSection.propTypes = {
   values: PropTypes.object.isRequired,
   handlers: PropTypes.object.isRequired,
-  options: PropTypes.object.isRequired,
+  options: PropTypes.shape({
+    textures: PropTypes.array,
+    borderTypes: PropTypes.array,
+    i18n: PropTypes.object,
+    backendOptions: PropTypes.object,
+  }).isRequired,
   ui: PropTypes.shape({
     loading: PropTypes.bool.isRequired,
     customizationDirty: PropTypes.bool,

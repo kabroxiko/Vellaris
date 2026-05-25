@@ -29,7 +29,8 @@ export async function loadUiOptions(lang) {
 }
 
 export default function useUiOptions() {
-  const [uiI18n, setUiI18n] = useState({ labels: {}, options: {} })
+  const [uiI18n, setUiI18n] = useState({ labels: {} })
+  const [uiOptions, setUiOptions] = useState({})
   const [uiLoaded, setUiLoaded] = useState(false)
   const [artPacks, setArtPacks] = useState([])
   const [textures, setTextures] = useState([])
@@ -47,7 +48,8 @@ export default function useUiOptions() {
     const frontendLabels = await getFrontendLabels(requestLanguage)
     const backendLabels = uiOpts?.labels
     const mergedLabels = backendLabels ? { ...frontendLabels, ...backendLabels } : frontendLabels
-    setUiI18n({ labels: mergedLabels, options: uiOpts.options })
+    setUiI18n({ labels: mergedLabels })
+    setUiOptions(uiOpts.options ?? {})
   }
 
   // Initialize UI from server-provided options. Caller may pass callbacks
@@ -63,8 +65,6 @@ export default function useUiOptions() {
       cityIconType,
       handleCityIconTypesLoaded,
       requestLanguage,
-      applyOptionDefaults,
-      lastUiDefaultsRef,
     } = {}
   ) {
     const uiOpts = await loadUiOptions(lang)
@@ -73,13 +73,14 @@ export default function useUiOptions() {
     setUiListsFromOptions(uiOpts)
 
     // compute initial books selection
+    // Prefer explicit manual overrides, then server-provided defaults
     const overrideBooks = Array.isArray(initialRandomOverrides.selectedBooks)
       ? initialRandomOverrides.selectedBooks
       : null
-    const validBooks = overrideBooks ? overrideBooks.filter((b) => uiOpts.books?.includes(b)) : null
+    const defsBooks = Array.isArray(uiOpts?.defaults?.books) ? uiOpts.defaults.books : null
     let initialBooks
-    if (validBooks?.length > 0) initialBooks = new Set(validBooks)
-    else if (Array.isArray(uiOpts?.books)) initialBooks = new Set(uiOpts.books)
+    if (overrideBooks && overrideBooks.length > 0) initialBooks = new Set(overrideBooks)
+    else if (defsBooks && defsBooks.length > 0) initialBooks = new Set(defsBooks)
     else initialBooks = new Set()
     if (booksLoadedRef && setSelectedBooks) {
       booksLoadedRef.current = true
@@ -89,19 +90,19 @@ export default function useUiOptions() {
     populateCityIconTypes(uiOpts.cityIconTypesByPack)
 
     // choose art pack and load city icon types
-    const firstArtPack =
-      Array.isArray(uiOpts.artPacks) && uiOpts.artPacks.length > 0 ? uiOpts.artPacks[0] : null
-    const chosenPack = artPack ?? firstArtPack ?? 'nortantis'
-    if (!artPack && firstArtPack && setArtPack) setArtPack(firstArtPack)
+    // Do not pick the first art pack from `options` as a client-side default.
+    // Prefer an explicitly provided `artPack`, then server `defaults.artPack`.
+    const defsArtPack = uiOpts?.defaults?.artPack ?? null
+    const chosenPack = artPack ?? defsArtPack ?? null
+    if (!artPack && defsArtPack && setArtPack) setArtPack(defsArtPack)
     const types = await loadCityIconTypes(chosenPack)
     if (handleCityIconTypesLoaded) handleCityIconTypesLoaded(types, cityIconType)
 
     await mergeAndSetUiI18n(uiOpts, requestLanguage)
 
-    // Apply server option defaults to caller-provided handler if present
-    if (applyOptionDefaults) applyOptionDefaults(uiOpts.options, uiOpts.defaults)
-
-    if (lastUiDefaultsRef) lastUiDefaultsRef.current = uiOpts.defaults ?? null
+    // Note: callers receive `uiOpts` from this function's return value
+    // and should apply any server-provided `defaults` themselves. Do
+    // not perform automatic default application here.
 
     setUiLoaded(true)
     return uiOpts
@@ -109,7 +110,9 @@ export default function useUiOptions() {
 
   return {
     uiI18n,
+    uiOptions,
     setUiI18n,
+    setUiOptions,
     uiLoaded,
     setUiLoaded,
     artPacks,

@@ -118,8 +118,8 @@ export function applyGridAndColoringHoisted(parsedSettings, ctx) {
   if (Number.isFinite(Number(gridOverlayLineWidth)))
     parsedSettings.gridOverlayLineWidth = Number(gridOverlayLineWidth)
   if (gridOverlayLayer) parsedSettings.gridOverlayLayer = gridOverlayLayer
-     parsedSettings.drawVoronoiGridOverlayOnlyOnLand = Boolean(drawVoronoiGridOverlayOnlyOnLand)
-    const resolvedLandMethod = landColoringMethod
+  parsedSettings.drawVoronoiGridOverlayOnlyOnLand = Boolean(drawVoronoiGridOverlayOnlyOnLand)
+  const resolvedLandMethod = landColoringMethod
   if (resolvedLandMethod)
     parsedSettings.drawRegionColors = resolvedLandMethod === 'ColorPoliticalRegions'
 }
