@@ -17,6 +17,10 @@ Behavior
      - `check`: name of a single sub-skill to run (examples: `formatters`, `linters`, `dependencies`, `secret-scan`, `large-files`, `eslint-provision`).
      - `scope`: when set to `changed` (for example when `/commit` orchestrator invokes `checks`), the skill will compute the repository `changed_set` (Added/Modified and untracked files) and run sub-skills only against those files.
      - `--fix`: optional flag which **enables** safe, non-destructive remediation attempts in sub-skills that support it (for example `dependencies --fix`). By default (when `--fix` is not provided) no check should perform automated remediation or modify files.
+    
+   - Non-interactive sub-skills
+
+   - Sub-skills invoked by the `checks` orchestrator SHOULD be non-interactive. When a sub-skill supports both interactive and non-interactive modes, `checks` will request the non-interactive behavior. The `docker-scout` sub-skill in particular is expected to run `quickview` followed by `cves` automatically and must not prompt for follow-up confirmation.
   3. If `check=all` or no `check` argument is provided, sequentially invoke the following skills (using the selected `scope`):
      - `formatters`
      - `linters`
