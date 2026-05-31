@@ -1,4 +1,5 @@
 import React from 'react'
+import { fontSpecToFamily } from '../utils'
 import PropTypes from 'prop-types'
 
 export default function FontsTab(props) {
@@ -27,6 +28,16 @@ export default function FontsTab(props) {
     setShowBoldBackgroundPicker,
   } = props
 
+  // Normalize `availableFontFamilies` which may be an array or a map
+  let families
+  if (Array.isArray(availableFontFamilies)) {
+    families = availableFontFamilies
+  } else if (availableFontFamilies && typeof availableFontFamilies === 'object') {
+    families = Object.keys(availableFontFamilies)
+  } else {
+    families = []
+  }
+
   return (
     <div className="fields-grid two-col-layout customize-fonts-panel">
       <div className="fields-column">
@@ -51,16 +62,19 @@ export default function FontsTab(props) {
                   type="button"
                   className="font-combo-trigger"
                   onClick={() => setOpenFontComboId(openFontComboId === field.id ? null : field.id)}
-                  style={{ fontFamily: field.value || 'serif' }}
+                  style={{
+                    fontFamily: fontSpecToFamily(field.value) || field.value || 'serif',
+                    fontStyle: (fontSpecToFamily(field.value) || field.value || '').toLowerCase().includes('chancery') ? 'italic' : 'normal'
+                  }}
                   aria-haspopup="listbox"
                   aria-expanded={openFontComboId === field.id}
                   disabled={!drawText}
                 >
-                  {field.value || translateLabel('common.choose')}
+                  {fontSpecToFamily(field.value) || field.value || translateLabel('common.choose')}
                 </button>
                 {openFontComboId === field.id && (
                   <div className="font-combo-menu">
-                    {availableFontFamilies.map((family) => (
+                    {families.map((family) => (
                       <button
                         key={family}
                         type="button"
@@ -68,10 +82,13 @@ export default function FontsTab(props) {
                         data-field-id={field.id}
                         data-family={family}
                         onClick={handleFontOptionClick}
-                        style={{ fontFamily: family }}
+                        style={{
+                          fontFamily: fontSpecToFamily(family) || family,
+                          fontStyle: (fontSpecToFamily(family) || family).toLowerCase().includes('chancery') ? 'italic' : 'normal'
+                        }}
                         disabled={!drawText}
                       >
-                        {family}
+                          {fontSpecToFamily(family) || family}
                       </button>
                     ))}
                   </div>
@@ -136,7 +153,7 @@ FontsTab.propTypes = {
   drawText: PropTypes.bool,
   setDrawText: PropTypes.func,
   fontFields: PropTypes.array,
-  availableFontFamilies: PropTypes.array,
+  availableFontFamilies: PropTypes.oneOfType([PropTypes.array, PropTypes.object]),
   openFontComboId: PropTypes.string,
   setOpenFontComboId: PropTypes.func,
   handleFontOptionClick: PropTypes.func,

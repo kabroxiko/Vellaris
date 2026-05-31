@@ -104,5 +104,11 @@ export default function mergeUiIntoParsed(parsedSettings, opts) {
     drawBoldBackground: opts.drawBoldBackground,
     boldBackgroundColor: opts.boldBackgroundColor,
     mergeColor: opts.mergeColor,
+    titleFontFamily: opts.titleFontFamily,
+    regionFontFamily: opts.regionFontFamily,
+    mountainRangeFontFamily: opts.mountainRangeFontFamily,
+    otherMountainsFontFamily: opts.otherMountainsFontFamily,
+    citiesFontFamily: opts.citiesFontFamily,
+    riverFontFamily: opts.riverFontFamily,
   })
 }

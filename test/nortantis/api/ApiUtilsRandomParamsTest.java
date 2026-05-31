@@ -37,12 +37,13 @@ class ApiUtilsRandomParamsTest
 		MapSettings settings = SettingsGenerator.generate(rand, Assets.installedArtPack, null);
 
 		ApiUtils.RandomMapParameters p = new ApiUtils.RandomMapParameters();
-		p.cityFrequency = Integer.valueOf(20);
+		// cityFrequency was removed; use cityProbability (fraction)
+		p.cityProbability = 0.20;
 		p.books = List.of("Alpha", "Beta");
 
 		ApiUtils.applyRandomMapParameterOverrides(p, settings);
 
-		double expected = p.cityFrequency / 100.0 * SettingsGenerator.maxCityProbability;
+		double expected = p.cityProbability;
 		assertEquals(expected, settings.cityProbability, 1e-9);
 		assertNotNull(settings.books);
 		assertTrue(settings.books.contains("Alpha"));

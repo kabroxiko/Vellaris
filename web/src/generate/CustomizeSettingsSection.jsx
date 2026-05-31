@@ -1,29 +1,17 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState, useCallback } from 'react'
 import { RgbaColorPicker } from 'react-colorful'
 import PropTypes from 'prop-types'
 import BackgroundTab from './tabs/BackgroundTab'
 import BorderTab from './tabs/BorderTab'
 import EffectsTab from './tabs/EffectsTab'
 import FontsTab from './tabs/FontsTab'
-import { parseColorChannels, colorToHexWithAlpha } from './utils'
 import useCustomizePreview from './hooks/useCustomizePreview'
-import backgroundBaseCache from './backgroundBaseCache'
 import useAutoPreview from './hooks/useAutoPreview'
-import ColorPickerModal from './ColorPickerModal'
-import { stripHtmlWrapper, removeTags, pick } from './customizeHelpers'
-import { computePreviewTriggerKey, PREVIEW_TRIGGER_KEYS } from './previewHelpers'
-const API_BASE = import.meta.env.VITE_API_BASE || '/api'
-
-// helpers and subcomponents extracted to modular files above
-
-ColorPickerModal.propTypes = {
-  open: PropTypes.bool,
-  onClose: PropTypes.func,
-  children: PropTypes.node,
-}
-
-// Export small module-scope helpers and modal styles
-export { ColorPickerModal }
+import backgroundBaseCache from './backgroundBaseCache'
+import { pick } from './customizeHelpers'
+import { parseColorChannels, colorToHexWithAlpha } from './utils'
+// Re-export `ColorPickerModal` from its own module so tests can import it
+export { default as ColorPickerModal } from './ColorPickerModal'
 
 // Re-export payload/preview helpers from the dedicated module for tests and compatibility
 export {
@@ -31,6 +19,750 @@ export {
   resolveRawTextureRef,
   buildPreviewPayload,
 } from './CustomizePreviewHelpers'
+
+// Helpers for runtime bundled font registration. Kept module-scoped
+// so the main component's cognitive complexity stays low.
+const _isDocumentAvailable = () => typeof document !== 'undefined' && document?.head
+
+const _extractBundled = (fontsMap) => {
+  if (!fontsMap || typeof fontsMap !== 'object') return null
+  return Object.fromEntries(
+    Object.entries(fontsMap).filter(([k, v]) => typeof v === 'string' && v.startsWith('/fonts/'))
+  )
+}
+
+
+
+
+const _inferFontMeta = (url, family) => {
+  try {
+    const raw = String(url || '')
+    const fnameEnc = raw.split('/').pop() || ''
+    const fname = decodeURIComponent(fnameEnc).split(/[_-]+/).join(' ')
+    let style = 'normal'
+    let weight = 'normal'
+    if (/italic|oblique/i.test(fname) || /italic|oblique/.test(family)) style = 'italic'
+    const m = /(\d{3})/.exec(fname)
+    if (m) weight = String(Number(m[1]))
+    else if (/bold/i.test(fname) || /black|heavy/i.test(fname)) weight = '700'
+    else if (/semibold|demibold|600/i.test(fname)) weight = '600'
+    else if (/medium|500/i.test(fname)) weight = '500'
+    return { style, weight }
+  } catch (e) {
+    // Log to aid debugging while still returning a safe default
+    if (typeof console !== 'undefined' && typeof console.debug === 'function') {
+      console.debug('inferFontMeta failed for', url, family, e)
+    }
+    return { style: 'normal', weight: 'normal' }
+  }
+}
+
+const _buildCssForBundled = (bundled) => {
+  let css = ''
+  Object.keys(bundled).forEach((family) => {
+    const url = bundled[family]
+    const meta = _inferFontMeta(url, family)
+    const fontStyle = meta.style || 'normal'
+    const fontWeight = meta.weight || 'normal'
+    css += `@font-face{font-family: "${family}";src: url('${url}') format('truetype');font-weight: ${fontWeight};font-style: ${fontStyle};font-display: swap;}` + '\n'
+  })
+  return css
+}
+
+const _applyBrandVars = (bundled) => {
+  if (!_isDocumentAvailable()) return
+  const docEl = document.documentElement
+  if (!docEl?.style) return
+  const setVar = (name, value) => docEl.style.setProperty(name, value)
+  if (bundled['Cinzel']) {
+    const meta = _inferFontMeta(bundled['Cinzel'], 'Cinzel')
+    setVar('--brand-font-family', '"Cinzel"')
+    setVar('--brand-font-weight', meta.weight || '700')
+    setVar('--brand-font-style', meta.style || 'normal')
+  }
+}
+
+// Extract preview fields from the full `values` object (module-scoped)
+const collectPreviewFieldsFromValues = (v = {}) => ({
+  backgroundType: v.backgroundType,
+  textureRef: v.textureRef,
+  backgroundSeed: v.backgroundSeed ? Number(v.backgroundSeed) : undefined,
+  randomSeed: v.finalSeed ? Number(v.finalSeed) : undefined,
+  finalWidth: v.finalWidth,
+  finalHeight: v.finalHeight,
+  colorizeLand: v.colorizeLand,
+  colorizeOcean: v.colorizeOcean,
+  landColor: v.landColor,
+  oceanColor: v.oceanColor,
+  drawBorder: v.drawBorder,
+  drawGridOverlay: v.drawGridOverlay,
+  gridOverlayShape: v.gridOverlayShape,
+  gridOverlayRowOrColCount: v.gridOverlayRowOrColCount,
+  gridOverlayColor: v.gridOverlayColor,
+  gridOverlayXOffset: v.gridOverlayXOffset,
+  gridOverlayYOffset: v.gridOverlayYOffset,
+  gridOverlayLineWidth: v.gridOverlayLineWidth,
+  drawRegionBoundaries: v.drawRegionBoundaries,
+  regionBoundaryStyle: v.regionBoundaryStyle,
+  regionBoundaryWidth: v.regionBoundaryWidth,
+  regionBoundaryColor: v.regionBoundaryColor,
+  borderRef: v.borderRef,
+  borderWidth: v.borderWidth,
+  borderPosition: v.borderPosition,
+  borderColorOption: v.borderColorOption,
+  borderColor: v.borderColor,
+  frayedBorder: v.frayedBorder,
+  frayedBorderBlurLevel: v.frayedBorderBlurLevel,
+  frayedBorderSize: v.frayedBorderSize,
+  frayedBorderSeed: v.frayedBorderSeed,
+  frayedBorderColor: v.frayedBorderColor,
+  drawGrunge: v.drawGrunge,
+  grungeWidth: v.grungeWidth,
+  lineStyle: v.lineStyle,
+  coastlineWidth: v.coastlineWidth,
+  coastlineColor: v.coastlineColor,
+  coastShadingLevel: v.coastShadingLevel,
+  coastShadingColor: v.coastShadingColor,
+  oceanShadingLevel: v.oceanShadingLevel,
+  oceanShadingColor: v.oceanShadingColor,
+  oceanWavesType: v.oceanWavesType,
+  oceanWavesLevel: v.oceanWavesLevel,
+  oceanWavesColor: v.oceanWavesColor,
+  concentricWaveCount: v.concentricWaveCount,
+  fadeConcentricWaves: v.fadeConcentricWaves,
+  jitterToConcentricWaves: v.jitterToConcentricWaves,
+  brokenLinesForConcentricWaves: v.brokenLinesForConcentricWaves,
+  drawOceanEffectsInLakes: v.drawOceanEffectsInLakes,
+  riverColor: v.riverColor,
+  drawRoads: v.drawRoads,
+  roadStyle: v.roadStyle,
+  roadWidth: v.roadWidth,
+  roadColor: v.roadColor,
+  mountainSize: v.mountainSize,
+  hillSize: v.hillSize,
+  duneSize: v.duneSize,
+  treeHeight: v.treeHeight,
+  citySize: v.citySize,
+  drawText: v.drawText,
+  titleFontFamily: v.titleFontFamily,
+  regionFontFamily: v.regionFontFamily,
+  mountainRangeFontFamily: v.mountainRangeFontFamily,
+  otherMountainsFontFamily: v.otherMountainsFontFamily,
+  citiesFontFamily: v.citiesFontFamily,
+  riverFontFamily: v.riverFontFamily,
+  textColor: v.textColor,
+  drawBoldBackground: v.drawBoldBackground,
+  boldBackgroundColor: v.boldBackgroundColor,
+})
+
+// Keys from `previewFields` that should trigger preview recompute when changed.
+const PREVIEW_TRIGGER_KEYS = [
+  'backgroundType',
+  'textureRef',
+  'backgroundSeed',
+  'randomSeed',
+  'finalWidth',
+  'finalHeight',
+  'colorizeLand',
+  'colorizeOcean',
+  'landColor',
+  'oceanColor',
+  'drawBorder',
+  'drawGridOverlay',
+  'gridOverlayShape',
+  'gridOverlayRowOrColCount',
+  'gridOverlayColor',
+  'gridOverlayXOffset',
+  'gridOverlayYOffset',
+  'gridOverlayLineWidth',
+  'drawRegionBoundaries',
+  'regionBoundaryStyle',
+  'regionBoundaryWidth',
+  'regionBoundaryColor',
+  'borderRef',
+  'borderWidth',
+  'borderPosition',
+  'borderColor',
+  'frayedBorder',
+  'frayedBorderBlurLevel',
+  'frayedBorderSize',
+  'drawBoldBackground',
+]
+
+// Compute a stable preview trigger key from `previewFields` so that
+// useMemo can depend on a small array rather than the whole object.
+function computePreviewTriggerKey(previewFields = {}) {
+  try {
+    // Build a compact tuple of values for the watched keys and stringify.
+    const vals = PREVIEW_TRIGGER_KEYS.map((k) => {
+      const v = previewFields?.[k]
+      if (v === undefined) return '__u__'
+      if (v === null) return '__n__'
+      if (typeof v === 'object') return JSON.stringify(v)
+      return String(v)
+    })
+    return vals.join('|')
+  } catch (e) {
+    if (typeof console !== 'undefined' && typeof console.debug === 'function') {
+      console.debug('computePreviewTriggerKey error', e)
+    }
+    return ''
+  }
+}
+
+// Static tab key lists (module-scoped to reduce component complexity)
+const BACKGROUND_KEYS = [
+  'translateLabel',
+  'gatedControlValue',
+  'emptyComboOption',
+  'renderColorControl',
+  'notifyManualChange',
+  'recomposeUsingLastBase',
+  'textures',
+  'backgroundTypes',
+  'strokeTypes',
+  'landColoringMethods',
+  'backgroundType',
+  'setBackgroundType',
+  'showTextureOptions',
+  'hasTextures',
+  'textureRef',
+  'setTextureRef',
+  'drawRegionBoundaries',
+  'setDrawRegionBoundaries',
+  'regionBoundaryStyle',
+  'setRegionBoundaryStyle',
+  'regionBoundaryWidth',
+  'setRegionBoundaryWidth',
+  'regionBoundaryColor',
+  'setRegionBoundaryColor',
+  'showRegionBoundaryPicker',
+  'setShowRegionBoundaryPicker',
+  'colorizeLand',
+  'setColorizeLand',
+  'landColoringMethod',
+  'setLandColoringMethod',
+  'landColor',
+  'setLandColor',
+  'showLandPicker',
+  'setShowLandPicker',
+  'colorizeOcean',
+  'setColorizeOcean',
+  'showOceanPicker',
+  'setShowOceanPicker',
+  'oceanColor',
+  'setOceanColor',
+  'backgroundSeed',
+  'sanitizeSeedValue',
+  'setBackgroundSeed',
+  'drawGridOverlay',
+  'setDrawGridOverlay',
+  'gridOverlayShape',
+  'setGridOverlayShape',
+  'gridOverlayRowOrColCount',
+  'setGridOverlayRowOrColCount',
+  'gridOverlayLineWidth',
+  'setGridOverlayLineWidth',
+  'gridOverlayColor',
+  'setGridOverlayColor',
+  'showGridPicker',
+  'setShowGridPicker',
+  'gridOverlayOffsets',
+  'gridOverlayXOffset',
+  'setGridOverlayXOffset',
+  'gridOverlayYOffset',
+  'setGridOverlayYOffset',
+  'gridOverlayLayers',
+  'gridOverlayLayer',
+  'setGridOverlayLayer',
+  'backgroundPreviewUrl',
+  'gridOverlayShapes',
+  'drawVoronoiGridOverlayOnlyOnLand',
+  'setDrawVoronoiGridOverlayOnlyOnLand',
+]
+
+const BORDER_KEYS = [
+  'translateLabel',
+  'gatedControlValue',
+  'emptyComboOption',
+  'renderColorControl',
+  'drawBorder',
+  'setDrawBorder',
+  'borderRef',
+  'setBorderRef',
+  'borderTypes',
+  'borderWidth',
+  'setBorderWidth',
+  'borderPosition',
+  'setBorderPosition',
+  'borderPositions',
+  'borderColorOption',
+  'setBorderColorOption',
+  'borderColorOptions',
+  'borderColor',
+  'setBorderColor',
+  'frayedBorder',
+  'setFrayedBorder',
+  'frayedBorderBlurLevel',
+  'setFrayedBorderBlurLevel',
+  'frayedBorderSize',
+  'setFrayedBorderSize',
+  'frayedBorderSeed',
+  'setFrayedBorderSeed',
+  'drawGrunge',
+  'setDrawGrunge',
+  'grungeWidth',
+  'setGrungeWidth',
+  'frayedBorderColor',
+  'setFrayedBorderColor',
+  'showBorderColorPicker',
+  'setShowBorderColorPicker',
+  'showFrayedBorderPicker',
+  'setShowFrayedBorderPicker',
+]
+
+const EFFECTS_KEYS = [
+  'translateLabel',
+  'gatedControlValue',
+  'emptyComboOption',
+  'renderColorControl',
+  'lineStyles',
+  'lineStyle',
+  'setLineStyle',
+  'coastlineWidth',
+  'setCoastlineWidth',
+  'coastlineColor',
+  'setCoastlineColor',
+  'showCoastlinePicker',
+  'setShowCoastlinePicker',
+  'coastShadingLevel',
+  'setCoastShadingLevel',
+  'coastShadingColor',
+  'setCoastShadingColor',
+  'landColoringMethod',
+  'oceanShadingLevel',
+  'setOceanShadingLevel',
+  'oceanShadingColor',
+  'setOceanShadingColor',
+  'showOceanPicker',
+  'setShowOceanPicker',
+  'oceanWaveTypes',
+  'oceanWavesType',
+  'setOceanWavesType',
+  'concentricWaveValue',
+  'noneWaveValue',
+  'oceanWavesLevel',
+  'setOceanWavesLevel',
+  'oceanWavesColor',
+  'setOceanWavesColor',
+  'showOceanWavesPicker',
+  'setShowOceanWavesPicker',
+  'concentricWaveCount',
+  'setConcentricWaveCount',
+  'fadeConcentricWaves',
+  'setFadeConcentricWaves',
+  'jitterToConcentricWaves',
+  'setJitterToConcentricWaves',
+  'brokenLinesForConcentricWaves',
+  'setBrokenLinesForConcentricWaves',
+  'drawOceanEffectsInLakes',
+  'setDrawOceanEffectsInLakes',
+  'riverColor',
+  'setRiverColor',
+  'showRiverPicker',
+  'setShowRiverPicker',
+  'drawRoads',
+  'setDrawRoads',
+  'roadStyle',
+  'setRoadStyle',
+  'strokeTypes',
+  'roadWidth',
+  'setRoadWidth',
+  'roadColor',
+  'setRoadColor',
+  'showRoadPicker',
+  'setShowRoadPicker',
+  'mountainSize',
+  'setMountainSize',
+  'hillSize',
+  'setHillSize',
+  'duneSize',
+  'setDuneSize',
+  'treeHeight',
+  'setTreeHeight',
+  'citySize',
+  'setCitySize',
+]
+
+const FONTS_KEYS = [
+  'translateLabel',
+  'renderColorControl',
+  'drawText',
+  'setDrawText',
+  'fontFields',
+  'availableFontFamilies',
+  'openFontComboId',
+  'setOpenFontComboId',
+  'handleFontOptionClick',
+  'textColor',
+  'setTextColor',
+  'showTextColorPicker',
+  'setShowTextColorPicker',
+  'drawBoldBackground',
+  'setDrawBoldBackground',
+  'boldBackgroundColor',
+  'setBoldBackgroundColor',
+  'showBoldBackgroundPicker',
+  'setShowBoldBackgroundPicker',
+]
+
+// Helper to render the active tab panel (module-scoped to reduce component complexity).
+const renderActivePanel = (activeTab, tabProps) => {
+  if (!activeTab) return null
+  switch (String(activeTab).trim().toLowerCase()) {
+    case 'background':
+      return <BackgroundTab {...pick(tabProps, BACKGROUND_KEYS)} />
+    case 'border':
+      return <BorderTab {...pick(tabProps, BORDER_KEYS)} />
+    case 'effects':
+      return <EffectsTab {...pick(tabProps, EFFECTS_KEYS)} />
+    case 'fonts':
+      return <FontsTab {...pick(tabProps, FONTS_KEYS)} />
+    default:
+      return null
+  }
+}
+
+// Module-scoped factory to build tab props (extracted from the component
+// to reduce its cognitive complexity).
+const buildTabProps = (p) => {
+  return {
+    values: p.values,
+    handlers: p.handlers,
+    options: p.options,
+    ui: p.ui,
+    translateLabel: p.translateLabel,
+    translateLabelWithArgs: p.translateLabelWithArgs,
+    sanitizeSeedValue: p.sanitizeSeedValue,
+    sanitizeTranslation: p.sanitizeTranslation,
+    renderColorControl: p.renderColorControl,
+    gatedControlValue: p.gatedControlValue,
+    emptyComboOption: p.emptyComboOption,
+    textures: p.textures,
+    backgroundTypes: p.backgroundTypes,
+    hasTextures: p.hasTextures,
+    strokeTypes: p.strokeTypes,
+    borderTypes: p.borderTypes,
+    borderPositions: p.borderPositions,
+    borderColorOptions: p.borderColorOptions,
+    landColoringMethods: p.landColoringMethods,
+    gridOverlayShapes: p.gridOverlayShapes,
+    gridOverlayOffsets: p.gridOverlayOffsets,
+    gridOverlayLayers: p.gridOverlayLayers,
+    lineStyles: p.lineStyles,
+    oceanWaveTypes: p.oceanWaveTypes,
+    concentricWaveValue: p.concentricWaveValue,
+    rippleWaveValue: p.rippleWaveValue,
+    noneWaveValue: p.noneWaveValue,
+    availableFontFamilies: p.availableFontFamilies,
+    fontFields: p.fontFields,
+    fontFieldSetters: p.fontFieldSetters,
+    openFontComboId: p.openFontComboId,
+    setOpenFontComboId: p.setOpenFontComboId,
+    recomposeUsingLastBase: p.recomposeUsingLastBase,
+    notifyManualChange: p.notifyManualChange,
+    previewFields: p.previewFields,
+    backgroundPreviewUrl: p.backgroundPreviewUrl,
+    preview: p.preview,
+    showTextureOptions: p.showTextureOptions,
+    drawVoronoiGridOverlayOnlyOnLand: p.drawVoronoiGridOverlayOnlyOnLand,
+    // setters and preview values (canonicalized)
+    ...p.previewFields,
+    // ensure BackgroundTab receives the active landColoringMethod value
+    landColoringMethod: p.values?.landColoringMethod,
+    // Explicit setters/handlers (not part of previewFields)
+    setTextureRef: p.handlers?.setTextureRef,
+    setBackgroundType: p.handlers?.setBackgroundType,
+    setDrawBorder: p.handlers?.setDrawBorder,
+    setDrawRegionBoundaries: p.handlers?.setDrawRegionBoundaries,
+    setRegionBoundaryStyle: p.handlers?.setRegionBoundaryStyle,
+    setRegionBoundaryWidth: p.handlers?.setRegionBoundaryWidth,
+    setRegionBoundaryColor: p.handlers?.setRegionBoundaryColor,
+    setColorizeLand: p.handlers?.setColorizeLand,
+    setLandColoringMethod: p.handlers?.setLandColoringMethod,
+    setLandColor: p.handlers?.setLandColor,
+    setColorizeOcean: p.handlers?.setColorizeOcean,
+    setOceanColor: p.handlers?.setOceanColor,
+    setBackgroundSeed: p.handlers?.setBackgroundSeed,
+    setDrawGridOverlay: p.handlers?.setDrawGridOverlay,
+    setGridOverlayShape: p.handlers?.setGridOverlayShape,
+    setGridOverlayRowOrColCount: p.handlers?.setGridOverlayRowOrColCount,
+    setGridOverlayLineWidth: p.handlers?.setGridOverlayLineWidth,
+    setGridOverlayColor: p.handlers?.setGridOverlayColor,
+    setGridOverlayXOffset: p.handlers?.setGridOverlayXOffset,
+    setGridOverlayYOffset: p.handlers?.setGridOverlayYOffset,
+    handleGenerateFromSettings: p.handlers?.handleGenerateFromSettings,
+    handleGenerateAndSaveNort: p.handlers?.handleGenerateAndSaveNort,
+    openPreviewModal: p.handlers?.openPreviewModal,
+    handleDownloadMap: p.handlers?.handleDownloadMap,
+    ...p.setterDeps,
+    handleFontOptionClick: p.handleFontOptionClick,
+    // picker visibility state
+    showCoastPicker: p.showCoastPicker,
+    setShowCoastPicker: p.setShowCoastPicker,
+    showGridPicker: p.showGridPicker,
+    setShowGridPicker: p.setShowGridPicker,
+    showOceanPicker: p.showOceanPicker,
+    setShowOceanPicker: p.setShowOceanPicker,
+    showRegionBoundaryPicker: p.showRegionBoundaryPicker,
+    setShowRegionBoundaryPicker: p.setShowRegionBoundaryPicker,
+    showLandPicker: p.showLandPicker,
+    setShowLandPicker: p.setShowLandPicker,
+    showBorderColorPicker: p.showBorderColorPicker,
+    setShowBorderColorPicker: p.setShowBorderColorPicker,
+    showFrayedBorderPicker: p.showFrayedBorderPicker,
+    setShowFrayedBorderPicker: p.setShowFrayedBorderPicker,
+    showCoastlinePicker: p.showCoastlinePicker,
+    setShowCoastlinePicker: p.setShowCoastlinePicker,
+    showOceanWavesPicker: p.showOceanWavesPicker,
+    setShowOceanWavesPicker: p.setShowOceanWavesPicker,
+    showRiverPicker: p.showRiverPicker,
+    setShowRiverPicker: p.setShowRiverPicker,
+    showRoadPicker: p.showRoadPicker,
+    setShowRoadPicker: p.setShowRoadPicker,
+    showTextColorPicker: p.showTextColorPicker,
+    setShowTextColorPicker: p.setShowTextColorPicker,
+    showBoldBackgroundPicker: p.showBoldBackgroundPicker,
+    setShowBoldBackgroundPicker: p.setShowBoldBackgroundPicker,
+  }
+}
+
+// Extracted helper: register bundled fonts into the document head and use
+// the Font Loading API to eagerly load them. This keeps the component body
+// smaller and easier to reason about.
+function registerBundledFonts(fontsMap) {
+  const bundled = _extractBundled(fontsMap)
+  const styleId = 'nortantis-bundled-fonts'
+
+  if (!_isDocumentAvailable()) return
+  const existing = document.getElementById(styleId)
+  if (!bundled) {
+    if (existing) existing.remove()
+    return
+  }
+
+  if (existing) existing.remove()
+  const styleEl = document.createElement('style')
+  styleEl.id = styleId
+  styleEl.appendChild(document.createTextNode(_buildCssForBundled(bundled)))
+  document.head.appendChild(styleEl)
+
+  _applyBrandVars(bundled)
+
+  if (document.fonts && typeof document.fonts.load === 'function') {
+    const loads = Object.keys(bundled).map((family) => {
+      const meta = _inferFontMeta(bundled[family], family)
+      const stylePart = meta.style && meta.style !== 'normal' ? `${meta.style} ` : ''
+      const weightPart = meta.weight && meta.weight !== 'normal' ? `${meta.weight} ` : ''
+      const desc = `${stylePart}${weightPart}16px "${family}"`
+      return document.fonts.load(desc)
+    })
+    Promise.allSettled(loads).catch((err) => {
+      if (typeof console !== 'undefined' && typeof console.debug === 'function') {
+        console.debug('bundled font load failed', err)
+      }
+    })
+  }
+}
+
+// Extracted helper: preload a small set of background bases to reduce first-open latency.
+function preloadBackgroundBases(textures, backgroundTypes) {
+  const candidates = []
+  if (Array.isArray(textures) && textures.length > 0) {
+    textures.slice(0, 5).forEach((t) => {
+      candidates.push({
+        width: 520,
+        height: 170,
+        type: 'GeneratedFromTexture',
+        artPack: t.artPack,
+        cityIconType: t.name,
+      })
+    })
+  }
+  const fractal = Array.isArray(backgroundTypes)
+    ? backgroundTypes.find((b) => b?.value && String(b.value).toLowerCase().includes('fractal'))
+    : null
+  if (fractal) candidates.push({ width: 520, height: 170, type: fractal.value })
+  else candidates.push({ width: 520, height: 170, type: 'Fractal' })
+
+  candidates.forEach((p) => {
+    backgroundBaseCache.preload(p)
+  })
+}
+
+// Helper to add a document-level mouse handler which closes an open font combo
+// if the click occurs outside of any `.font-combo` element. Returns a cleanup
+// function suitable for use as a useEffect cleanup.
+function setupCloseOnOutsideClick(setOpenFontComboId) {
+  const onDocumentMouseDown = (event) => {
+    const target = event.target
+    if (!(target instanceof Element)) return
+    if (!target.closest('.font-combo')) {
+      setOpenFontComboId(null)
+    }
+  }
+
+  document.addEventListener('mousedown', onDocumentMouseDown)
+  return () => {
+    document.removeEventListener('mousedown', onDocumentMouseDown)
+  }
+}
+
+// Return an array of available font family names from backend-provided fonts
+// (accepts either legacy array or new map form).
+function getAvailableFontFamilies(rawFonts) {
+  if (Array.isArray(rawFonts)) return rawFonts
+  if (rawFonts && typeof rawFonts === 'object') return Object.keys(rawFonts)
+  return []
+}
+
+// Extracted submit handler implementation so the component can use a
+// lightweight useCallback wrapper and keep its body small.
+async function onSubmitGenerateImpl(e, handlers, triggerPreviewRefresh) {
+  if (e && typeof e.preventDefault === 'function') e.preventDefault()
+  if (typeof handlers?.handleGenerateFromSettings === 'function') {
+    await handlers.handleGenerateFromSettings(e)
+  }
+  // Let errors propagate; caller will observe failures. Trigger preview refresh afterwards.
+  if (typeof triggerPreviewRefresh === 'function') triggerPreviewRefresh()
+}
+
+// Module-scoped sanitizer to reduce component complexity.
+const _sanitizeTranslation = (s) => {
+  if (!s) return s
+  if (typeof s !== 'string') return s
+  let t = String(s)
+  const MAX_SANITIZE_LENGTH = 2000
+  if (t.length > MAX_SANITIZE_LENGTH) t = t.slice(0, MAX_SANITIZE_LENGTH)
+  t = stripHtmlWrapper(t)
+  if (/<br\s*\/?>>/i.test(t)) {
+    const parts = t.split(/<br\s*\/?/i)
+    return parts.flatMap((p) => (p === parts.at(-1) ? [p] : [p, React.createElement('br', { key: `br-${String(p).slice(0, 20)}` })]))
+  }
+  t = removeTags(t)
+  t = t.replaceAll("''", "'")
+  t = t.replaceAll(/\s+/g, ' ').trim()
+  return t
+}
+
+// Module-scoped color control component to reduce cognitive complexity
+const RenderColorControl = ({
+  id,
+  label,
+  hexValue,
+  onHexChange,
+  alphaValue,
+  onAlphaChange,
+  disabled,
+  showState,
+  setShowState,
+  onClose,
+  swatchReplacement,
+}) => {
+  const openerClick = (e) => {
+    if (disabled) return
+    if (typeof setShowState === 'function') setShowState(true)
+  }
+  const openerKey = (e) => {
+    if ((e.key === 'Enter' || e.key === ' ') && !disabled) {
+      e.preventDefault()
+      if (typeof setShowState === 'function') setShowState(true)
+    }
+  }
+  RenderColorControl.propTypes = {
+    id: PropTypes.string,
+    label: PropTypes.oneOfType([PropTypes.string, PropTypes.node]),
+    hexValue: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    onHexChange: PropTypes.func,
+    alphaValue: PropTypes.number,
+    onAlphaChange: PropTypes.func,
+    disabled: PropTypes.bool,
+    showState: PropTypes.bool,
+    setShowState: PropTypes.func,
+    onClose: PropTypes.func,
+    swatchReplacement: PropTypes.node,
+  }
+  const closePicker = () => {
+    if (typeof setShowState === 'function') setShowState(false)
+    if (typeof onClose === 'function') onClose()
+  }
+
+  return (
+    <>
+      <label htmlFor={`${id}`} className={disabled ? 'is-disabled' : ''}>
+        {label}
+      </label>
+      <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+        {swatchReplacement ? (
+          <div className="disabled-color-replacement">{swatchReplacement}</div>
+        ) : (
+          <button
+            type="button"
+            aria-label={`Open ${label} color picker`}
+            disabled={disabled}
+            onClick={openerClick}
+            onKeyDown={openerKey}
+            style={{
+              display: 'inline-block',
+              flex: '1 1 auto',
+              minWidth: 48,
+              height: 28,
+              background: (function () {
+                if (!hexValue) return '#000000'
+                const ch = parseColorChannels(hexValue)
+                if (!ch) return '#000000'
+                const a = (ch.a ?? 255) / 255
+                return `rgba(${ch.r}, ${ch.g}, ${ch.b}, ${a})`
+              })(),
+              border: '1px solid #bbb',
+              cursor: disabled ? 'default' : 'pointer',
+              opacity: disabled ? 0.5 : 1,
+              pointerEvents: disabled ? 'none' : undefined,
+            }}
+          />
+        )}
+      </div>
+      {showState && (
+        <ColorPickerModal open={showState} onClose={closePicker}>
+          <>
+            <RgbaColorPicker
+              color={(() => {
+                const ch = parseColorChannels(hexValue) || { r: 0, g: 0, b: 0, a: 255 }
+                return { r: ch.r, g: ch.g, b: ch.b, a: (ch.a ?? 255) / 255 }
+              })()}
+              onChange={(col) => {
+                const r = Math.round(col.r || 0)
+                const g = Math.round(col.g || 0)
+                const b = Math.round(col.b || 0)
+                const a = Math.round((col.a ?? 1) * 255)
+                const combinedHex = colorToHexWithAlpha({ r, g, b, a })
+                if (typeof onHexChange === 'function') onHexChange(combinedHex)
+                if (typeof onAlphaChange === 'function') {
+                  onAlphaChange(Math.round((1 - (col.a ?? 1)) * 100))
+                }
+              }}
+            />
+            <div style={{ marginTop: 8, display: 'flex', justifyContent: 'flex-end' }}>
+              <button type="button" onClick={closePicker}>
+                Close
+              </button>
+            </div>
+          </>
+        </ColorPickerModal>
+      )}
+    </>
+  )
+}
 export {
   colorizeBitmap,
   makeCanvasForBitmap,
@@ -44,96 +776,23 @@ export {
 export default function CustomizeSettingsSection({ values, handlers, options, ui }) {
   const [activeTab, setActiveTab] = useState(null)
   const [openFontComboId, setOpenFontComboId] = useState(null)
+  // token for bundled-fonts load completion removed; we don't read it.
 
   const FORCE_ENABLE_CUSTOMIZE = true
 
   useEffect(() => {
-    const onDocumentMouseDown = (event) => {
-      const target = event.target
-      if (!(target instanceof Element)) return
-      if (!target.closest('.font-combo')) {
-        setOpenFontComboId(null)
-      }
-    }
-
-    document.addEventListener('mousedown', onDocumentMouseDown)
-    return () => {
-      document.removeEventListener('mousedown', onDocumentMouseDown)
-    }
+    return setupCloseOnOutsideClick(setOpenFontComboId)
   }, [])
 
   const {
     preview,
     backgroundType,
-    textureRef,
-    colorizeLand,
-    colorizeOcean,
-    landColor,
-    oceanColor,
-    backgroundSeed,
-    finalSeed,
-    finalWidth,
-    finalHeight,
-    drawBorder,
-    drawGrunge,
-    drawGridOverlay,
-    gridOverlayShape,
-    gridOverlayRowOrColCount,
-    gridOverlayColor,
-    gridOverlayXOffset,
-    gridOverlayYOffset,
-    gridOverlayLineWidth,
-    drawVoronoiGridOverlayOnlyOnLand,
-    borderRef,
-    borderWidth,
-    borderPosition,
-    borderColorOption,
-    borderColor,
-    frayedBorder,
-    frayedBorderBlurLevel,
-    frayedBorderSize,
-    frayedBorderSeed,
-    grungeWidth,
-    frayedBorderColor,
-    lineStyle,
-    coastlineWidth,
-    coastlineColor,
-    coastShadingLevel,
-    coastShadingColor,
-    drawRegionBoundaries,
-    regionBoundaryStyle,
-    regionBoundaryWidth,
-    regionBoundaryColor,
-    oceanShadingLevel,
-    oceanShadingColor,
-    oceanWavesType,
-    oceanWavesLevel,
-    oceanWavesColor,
-    concentricWaveCount,
-    fadeConcentricWaves,
-    jitterToConcentricWaves,
-    brokenLinesForConcentricWaves,
-    drawOceanEffectsInLakes,
-    riverColor,
-    drawRoads,
-    roadStyle,
-    roadWidth,
-    roadColor,
-    mountainSize,
-    hillSize,
-    duneSize,
-    treeHeight,
-    citySize,
-    drawText,
     titleFontFamily,
     regionFontFamily,
     mountainRangeFontFamily,
     otherMountainsFontFamily,
     citiesFontFamily,
     riverFontFamily,
-    textColor,
-    drawBoldBackground,
-    boldBackgroundColor,
     fileObj,
     currentSource,
   } = values
@@ -143,102 +802,14 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
 
   // Runtime debug: log received `drawGrunge` value from parent `values`
 
-  // Aggregate all customization fields we want to send to the preview.
-  // Extracted into a single helper to avoid duplicated lists and to keep
-  // the canonical list in one place (safer than repeating it in a
-  // literal and a dependencies array).
-  function collectPreviewFields() {
-    return {
-      backgroundType,
-      textureRef,
-      backgroundSeed: backgroundSeed ? Number(backgroundSeed) : undefined,
-      randomSeed: finalSeed ? Number(finalSeed) : undefined,
-      finalWidth,
-      finalHeight,
-      colorizeLand,
-      colorizeOcean,
-      landColor,
-      oceanColor,
-      drawBorder,
-      drawGridOverlay,
-      gridOverlayShape,
-      gridOverlayRowOrColCount,
-      gridOverlayColor,
-      gridOverlayXOffset,
-      gridOverlayYOffset,
-      gridOverlayLineWidth,
-      drawRegionBoundaries,
-      regionBoundaryStyle,
-      regionBoundaryWidth,
-      regionBoundaryColor,
-      borderRef,
-      borderWidth,
-      borderPosition,
-      borderColorOption,
-      borderColor,
-      frayedBorder,
-      frayedBorderBlurLevel,
-      frayedBorderSize,
-      frayedBorderSeed,
-      frayedBorderColor,
-      drawGrunge,
-      grungeWidth,
-      lineStyle,
-      coastlineWidth,
-      coastlineColor,
-      coastShadingLevel,
-      coastShadingColor,
-      oceanShadingLevel,
-      oceanShadingColor,
-      oceanWavesType,
-      oceanWavesLevel,
-      oceanWavesColor,
-      concentricWaveCount,
-      fadeConcentricWaves,
-      jitterToConcentricWaves,
-      brokenLinesForConcentricWaves,
-      drawOceanEffectsInLakes,
-      riverColor,
-      drawRoads,
-      roadStyle,
-      roadWidth,
-      roadColor,
-      mountainSize,
-      hillSize,
-      duneSize,
-      treeHeight,
-      citySize,
-      drawText,
-      titleFontFamily,
-      regionFontFamily,
-      mountainRangeFontFamily,
-      otherMountainsFontFamily,
-      citiesFontFamily,
-      riverFontFamily,
-      textColor,
-      drawBoldBackground,
-      boldBackgroundColor,
-    }
-  }
-
-  const previewFields = collectPreviewFields()
+  // Build preview fields from the received `values` object.
+  const previewFields = collectPreviewFieldsFromValues(values)
 
   // Use a filtered preview key so color toggles/values do not trigger the background preview.
   const previewTriggerKey = useMemo(
     () => computePreviewTriggerKey(previewFields),
     PREVIEW_TRIGGER_KEYS.map((k) => previewFields?.[k])
   )
-
-  async function onSubmitGenerate(e) {
-    if (e && typeof e.preventDefault === 'function') e.preventDefault()
-    if (typeof handlers.handleGenerateFromSettings === 'function') {
-      await handlers.handleGenerateFromSettings(e)
-    }
-    // Let errors propagate; caller will observe failures. Trigger preview refresh afterwards.
-    triggerPreviewRefresh()
-  }
-
-  // Use the `handlers` object directly; accessors below will reference `handlers.<name>`.
 
   // Consolidated map of setter functions so they can be spread into `tabProps`.
   const setterDeps = {
@@ -293,6 +864,12 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     setBoldBackgroundColor: handlers.setBoldBackgroundColor,
   }
 
+  // Boolean controlling whether the Voronoi grid overlay is drawn only on land.
+  // Prefer the explicit value from `values` (controlled by parent), then
+  // fall back to `previewFields` and finally default to `false`.
+  const drawVoronoiGridOverlayOnlyOnLand =
+    values?.drawVoronoiGridOverlayOnlyOnLand ?? previewFields?.drawVoronoiGridOverlayOnlyOnLand ?? false
+
   const { textures, borderTypes, i18n, backendOptions: passedBackendOptions } = options
   const { loading } = ui
   const labels = i18n?.labels
@@ -306,34 +883,23 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
   const gridOverlayLayers = backendOptions?.gridOverlayLayers
   const backgroundTypes = backendOptions?.backgroundTypes
 
-  // Fonts are provided by the backend via `i18n.options.fonts`.
-  const availableFontFamilies = backendOptions?.fonts
+  // Fonts are provided by the backend via `i18n.options.fonts`. Normalize
+  // into an array of family names using a helper to reduce inline branches.
+  const _rawFonts = backendOptions?.fonts
+  const availableFontFamilies = getAvailableFontFamilies(_rawFonts)
+
+  // Dynamically register any bundled fonts by inspecting `options.fonts`.
+  // The backend populates `options.fonts` with public /fonts/ paths for
+  // families that are shipped with the runtime image.
+  useEffect(() => registerBundledFonts(backendOptions?.fonts), [backendOptions?.fonts])
+
+  // Note: explicit preloads removed to avoid duplicate fetches; font
+  // loading is handled via injected @font-face rules and the
+  // Font Loading API above.
 
   // Preload the first few texture bases and a fractal base so the UI
   // doesn't hit the backend on first open. Uses `backgroundBaseCache.preload`.
-  useEffect(() => {
-    const candidates = []
-    if (Array.isArray(textures) && textures.length > 0) {
-      textures.slice(0, 5).forEach((t) => {
-        candidates.push({
-          width: 520,
-          height: 170,
-          type: 'GeneratedFromTexture',
-          artPack: t.artPack,
-          cityIconType: t.name,
-        })
-      })
-    }
-    const fractal = Array.isArray(backgroundTypes)
-      ? backgroundTypes.find((b) => b?.value && String(b.value).toLowerCase().includes('fractal'))
-      : null
-    if (fractal) candidates.push({ width: 520, height: 170, type: fractal.value })
-    else candidates.push({ width: 520, height: 170, type: 'Fractal' })
-
-    candidates.forEach((p) => {
-      backgroundBaseCache.preload(p)
-    })
-  }, [textures, backgroundTypes])
+  useEffect(() => preloadBackgroundBases(textures, backgroundTypes), [textures, backgroundTypes])
   const strokeTypes = backendOptions?.strokeTypes
   const {
     backgroundPreviewUrl,
@@ -342,6 +908,11 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     triggerPreviewRefresh,
     clearPreview,
   } = useCustomizePreview({ previewFields, textures, currentSource })
+
+  const onSubmitGenerate = useCallback(
+    (e) => onSubmitGenerateImpl(e, handlers, triggerPreviewRefresh),
+    [handlers, triggerPreviewRefresh]
+  )
   const borderPositions = backendOptions?.borderPositions
   const borderColorOptions = backendOptions?.borderColorOptions
   const lineStyles = backendOptions?.lineStyles
@@ -405,30 +976,7 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     if (typeof v === 'string' && v.trim() === '') return ''
     return v
   }
-  const sanitizeTranslation = (s) => {
-    if (!s) return s
-    if (typeof s !== 'string') return s
-    // Remove surrounding <html> wrappers and preserve <br> as line breaks
-    let t = String(s)
-    const MAX_SANITIZE_LENGTH = 2000
-    if (t.length > MAX_SANITIZE_LENGTH) t = t.slice(0, MAX_SANITIZE_LENGTH)
-    // Strip optional surrounding <html> wrapper using module-scope helper
-    t = stripHtmlWrapper(t)
-    // If there are <br> tags, convert to React nodes with breaks
-    if (/<br\s*\/?>/i.test(t)) {
-      const parts = t.split(/<br\s*\/?>/i)
-      return parts.flatMap((p) =>
-        p === parts.at(-1)
-          ? [p]
-          : [p, React.createElement('br', { key: `br-${String(p).slice(0, 20)}` })]
-      )
-    }
-    // Otherwise strip any other HTML tags using module-scope helper
-    t = removeTags(t)
-    t = t.replaceAll("''", "'")
-    t = t.replaceAll(/\s+/g, ' ').trim()
-    return t
-  }
+  const sanitizeTranslation = _sanitizeTranslation
 
   // Small helpers to convert between hex and rgba used by the picker.
   // (helpers available in module scope)
@@ -563,103 +1111,7 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     hasCustomizationSource
   )
 
-  function renderColorControl({
-    id,
-    label,
-    hexValue,
-    onHexChange,
-    alphaValue,
-    onAlphaChange,
-    disabled,
-    showState,
-    setShowState,
-    onClose,
-    swatchReplacement,
-  }) {
-    const openerClick = (e) => {
-      if (disabled) return
-      if (typeof setShowState === 'function') setShowState(true)
-    }
-    const openerKey = (e) => {
-      if ((e.key === 'Enter' || e.key === ' ') && !disabled) {
-        e.preventDefault()
-        if (typeof setShowState === 'function') setShowState(true)
-      }
-    }
-    const closePicker = () => {
-      if (typeof setShowState === 'function') setShowState(false)
-      if (typeof onClose === 'function') onClose()
-    }
-
-    return (
-      <>
-        <label htmlFor={`${id}`} className={disabled ? 'is-disabled' : ''}>
-          {label}
-        </label>
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-          {swatchReplacement ? (
-            <div className="disabled-color-replacement">{swatchReplacement}</div>
-          ) : (
-            <button
-              type="button"
-              aria-label={`Open ${label} color picker`}
-              disabled={disabled}
-              onClick={openerClick}
-              onKeyDown={openerKey}
-              style={{
-                display: 'inline-block',
-                flex: '1 1 auto',
-                minWidth: 48,
-                height: 28,
-                // Use CSS-friendly rgba() for consistent rendering even when
-                // the stored value is canonical 8-digit hex (#RRGGBBAA).
-                background: (function () {
-                  if (!hexValue) return '#000000'
-                  const ch = parseColorChannels(hexValue)
-                  if (!ch) return '#000000'
-                  const a = (ch.a ?? 255) / 255
-                  return `rgba(${ch.r}, ${ch.g}, ${ch.b}, ${a})`
-                })(),
-                border: '1px solid #bbb',
-                cursor: disabled ? 'default' : 'pointer',
-                opacity: disabled ? 0.5 : 1,
-                pointerEvents: disabled ? 'none' : undefined,
-              }}
-            />
-          )}
-        </div>
-        {showState && (
-          <ColorPickerModal open={showState} onClose={closePicker}>
-            <>
-              <RgbaColorPicker
-                color={(() => {
-                  const ch = parseColorChannels(hexValue) || { r: 0, g: 0, b: 0, a: 255 }
-                  return { r: ch.r, g: ch.g, b: ch.b, a: (ch.a ?? 255) / 255 }
-                })()}
-                onChange={(col) => {
-                  const r = Math.round(col.r || 0)
-                  const g = Math.round(col.g || 0)
-                  const b = Math.round(col.b || 0)
-                  const a = Math.round((col.a ?? 1) * 255)
-                  // Store canonical combined hex (#RRGGBBAA)
-                  const combinedHex = colorToHexWithAlpha({ r, g, b, a })
-                  if (typeof onHexChange === 'function') onHexChange(combinedHex)
-                  if (typeof onAlphaChange === 'function') {
-                    onAlphaChange(Math.round((1 - (col.a ?? 1)) * 100))
-                  }
-                }}
-              />
-              <div style={{ marginTop: 8, display: 'flex', justifyContent: 'flex-end' }}>
-                <button type="button" onClick={closePicker}>
-                  Close
-                </button>
-              </div>
-            </>
-          </ColorPickerModal>
-        )}
-      </>
-    )
-  }
+  const renderColorControl = RenderColorControl
 
   useEffect(() => {
     return () => {
@@ -677,333 +1129,84 @@ export default function CustomizeSettingsSection({ values, handlers, options, ui
     setOpenFontComboId(null)
   }
 
-  function buildTabProps() {
-    return {
-      values,
-      handlers,
-      options,
-      ui,
-      translateLabel,
-      translateLabelWithArgs,
-      sanitizeSeedValue,
-      sanitizeTranslation,
-      renderColorControl,
-      gatedControlValue,
-      emptyComboOption,
-      textures,
-      backgroundTypes,
-      hasTextures,
-      strokeTypes,
-      borderTypes,
-      borderPositions,
-      borderColorOptions,
-      landColoringMethods,
-      gridOverlayShapes,
-      gridOverlayOffsets,
-      gridOverlayLayers,
-      lineStyles,
-      oceanWaveTypes,
-      concentricWaveValue,
-      rippleWaveValue,
-      noneWaveValue,
-      availableFontFamilies,
-      fontFields,
-      fontFieldSetters,
-      openFontComboId,
-      setOpenFontComboId,
-      recomposeUsingLastBase,
-      notifyManualChange,
-      previewFields,
-      backgroundPreviewUrl,
-      preview,
-      showTextureOptions,
-      drawVoronoiGridOverlayOnlyOnLand,
-      // setters and preview values (canonicalized)
-      ...previewFields,
-      // ensure BackgroundTab receives the active landColoringMethod value
-      landColoringMethod: values.landColoringMethod,
-      // Explicit setters/handlers (not part of previewFields)
-      setTextureRef: handlers.setTextureRef,
-      setBackgroundType: handlers.setBackgroundType,
-      setDrawBorder: handlers.setDrawBorder,
-      setDrawRegionBoundaries: handlers.setDrawRegionBoundaries,
-      setRegionBoundaryStyle: handlers.setRegionBoundaryStyle,
-      setRegionBoundaryWidth: handlers.setRegionBoundaryWidth,
-      setRegionBoundaryColor: handlers.setRegionBoundaryColor,
-      setColorizeLand: handlers.setColorizeLand,
-      setLandColoringMethod: handlers.setLandColoringMethod,
-      setLandColor: handlers.setLandColor,
-      setColorizeOcean: handlers.setColorizeOcean,
-      setOceanColor: handlers.setOceanColor,
-      setBackgroundSeed: handlers.setBackgroundSeed,
-      setDrawGridOverlay: handlers.setDrawGridOverlay,
-      setGridOverlayShape: handlers.setGridOverlayShape,
-      setGridOverlayRowOrColCount: handlers.setGridOverlayRowOrColCount,
-      setGridOverlayLineWidth: handlers.setGridOverlayLineWidth,
-      setGridOverlayColor: handlers.setGridOverlayColor,
-      setGridOverlayXOffset: handlers.setGridOverlayXOffset,
-      setGridOverlayYOffset: handlers.setGridOverlayYOffset,
-      handleGenerateFromSettings: handlers.handleGenerateFromSettings,
-      handleGenerateAndSaveNort: handlers.handleGenerateAndSaveNort,
-      openPreviewModal: handlers.openPreviewModal,
-      handleDownloadMap: handlers.handleDownloadMap,
-      ...setterDeps,
-      handleFontOptionClick,
-      // picker visibility state
-      showCoastPicker,
-      setShowCoastPicker,
-      showGridPicker,
-      setShowGridPicker,
-      showOceanPicker,
-      setShowOceanPicker,
-      showRegionBoundaryPicker,
-      setShowRegionBoundaryPicker,
-      showLandPicker,
-      setShowLandPicker,
-      showBorderColorPicker,
-      setShowBorderColorPicker,
-      showFrayedBorderPicker,
-      setShowFrayedBorderPicker,
-      showCoastlinePicker,
-      setShowCoastlinePicker,
-      showOceanWavesPicker,
-      setShowOceanWavesPicker,
-      showRiverPicker,
-      setShowRiverPicker,
-      showRoadPicker,
-      setShowRoadPicker,
-      showTextColorPicker,
-      setShowTextColorPicker,
-      showBoldBackgroundPicker,
-      setShowBoldBackgroundPicker,
-    }
-  }
+  
 
-  const tabProps = buildTabProps()
+  const tabProps = buildTabProps({
+    values,
+    handlers,
+    options,
+    ui,
+    translateLabel,
+    translateLabelWithArgs,
+    sanitizeSeedValue,
+    sanitizeTranslation,
+    renderColorControl,
+    gatedControlValue,
+    emptyComboOption,
+    textures,
+    backgroundTypes,
+    hasTextures,
+    strokeTypes,
+    borderTypes,
+    borderPositions,
+    borderColorOptions,
+    landColoringMethods,
+    gridOverlayShapes,
+    gridOverlayOffsets,
+    gridOverlayLayers,
+    lineStyles,
+    oceanWaveTypes,
+    concentricWaveValue,
+    rippleWaveValue,
+    noneWaveValue,
+    availableFontFamilies,
+    fontFields,
+    fontFieldSetters,
+    openFontComboId,
+    setOpenFontComboId,
+    recomposeUsingLastBase,
+    notifyManualChange,
+    previewFields,
+    backgroundPreviewUrl,
+    preview,
+    showTextureOptions,
+    drawVoronoiGridOverlayOnlyOnLand,
+    setterDeps,
+    handleFontOptionClick,
+    showCoastPicker,
+    setShowCoastPicker,
+    showGridPicker,
+    setShowGridPicker,
+    showOceanPicker,
+    setShowOceanPicker,
+    showRegionBoundaryPicker,
+    setShowRegionBoundaryPicker,
+    showLandPicker,
+    setShowLandPicker,
+    showBorderColorPicker,
+    setShowBorderColorPicker,
+    showFrayedBorderPicker,
+    setShowFrayedBorderPicker,
+    showCoastlinePicker,
+    setShowCoastlinePicker,
+    showOceanWavesPicker,
+    setShowOceanWavesPicker,
+    showRiverPicker,
+    setShowRiverPicker,
+    showRoadPicker,
+    setShowRoadPicker,
+    showTextColorPicker,
+    setShowTextColorPicker,
+    showBoldBackgroundPicker,
+    setShowBoldBackgroundPicker,
+  })
 
   // Tab implementations have been moved into dedicated components.
 
-  const backgroundKeys = [
-    'translateLabel',
-    'gatedControlValue',
-    'emptyComboOption',
-    'renderColorControl',
-    'notifyManualChange',
-    'recomposeUsingLastBase',
-    'textures',
-    'backgroundTypes',
-    'strokeTypes',
-    'landColoringMethods',
-    'backgroundType',
-    'setBackgroundType',
-    'showTextureOptions',
-    'hasTextures',
-    'textureRef',
-    'setTextureRef',
-    'drawRegionBoundaries',
-    'setDrawRegionBoundaries',
-    'regionBoundaryStyle',
-    'setRegionBoundaryStyle',
-    'regionBoundaryWidth',
-    'setRegionBoundaryWidth',
-    'regionBoundaryColor',
-    'setRegionBoundaryColor',
-    'showRegionBoundaryPicker',
-    'setShowRegionBoundaryPicker',
-    'colorizeLand',
-    'setColorizeLand',
-    'landColoringMethod',
-    'setLandColoringMethod',
-    'landColor',
-    'setLandColor',
-    'showLandPicker',
-    'setShowLandPicker',
-    'colorizeOcean',
-    'setColorizeOcean',
-    'showOceanPicker',
-    'setShowOceanPicker',
-    'oceanColor',
-    'setOceanColor',
-    'backgroundSeed',
-    'sanitizeSeedValue',
-    'setBackgroundSeed',
-    'drawGridOverlay',
-    'setDrawGridOverlay',
-    'gridOverlayShape',
-    'setGridOverlayShape',
-    'gridOverlayRowOrColCount',
-    'setGridOverlayRowOrColCount',
-    'gridOverlayLineWidth',
-    'setGridOverlayLineWidth',
-    'gridOverlayColor',
-    'setGridOverlayColor',
-    'showGridPicker',
-    'setShowGridPicker',
-    'gridOverlayOffsets',
-    'gridOverlayXOffset',
-    'setGridOverlayXOffset',
-    'gridOverlayYOffset',
-    'setGridOverlayYOffset',
-    'gridOverlayLayers',
-    'gridOverlayLayer',
-    'setGridOverlayLayer',
-    'backgroundPreviewUrl',
-    'gridOverlayShapes',
-    'drawVoronoiGridOverlayOnlyOnLand',
-    'setDrawVoronoiGridOverlayOnlyOnLand',
-  ]
-
-  const borderKeys = [
-    'translateLabel',
-    'gatedControlValue',
-    'emptyComboOption',
-    'renderColorControl',
-    'drawBorder',
-    'setDrawBorder',
-    'borderRef',
-    'setBorderRef',
-    'borderTypes',
-    'borderWidth',
-    'setBorderWidth',
-    'borderPosition',
-    'setBorderPosition',
-    'borderPositions',
-    'borderColorOption',
-    'setBorderColorOption',
-    'borderColorOptions',
-    'borderColor',
-    'setBorderColor',
-    'frayedBorder',
-    'setFrayedBorder',
-    'frayedBorderBlurLevel',
-    'setFrayedBorderBlurLevel',
-    'frayedBorderSize',
-    'setFrayedBorderSize',
-    'frayedBorderSeed',
-    'setFrayedBorderSeed',
-    'drawGrunge',
-    'setDrawGrunge',
-    'grungeWidth',
-    'setGrungeWidth',
-    'frayedBorderColor',
-    'setFrayedBorderColor',
-    'showBorderColorPicker',
-    'setShowBorderColorPicker',
-    'showFrayedBorderPicker',
-    'setShowFrayedBorderPicker',
-  ]
-
-  const effectsKeys = [
-    'translateLabel',
-    'gatedControlValue',
-    'emptyComboOption',
-    'renderColorControl',
-    'lineStyles',
-    'lineStyle',
-    'setLineStyle',
-    'coastlineWidth',
-    'setCoastlineWidth',
-    'coastlineColor',
-    'setCoastlineColor',
-    'showCoastlinePicker',
-    'setShowCoastlinePicker',
-    'coastShadingLevel',
-    'setCoastShadingLevel',
-    'coastShadingColor',
-    'setCoastShadingColor',
-    'landColoringMethod',
-    'oceanShadingLevel',
-    'setOceanShadingLevel',
-    'oceanShadingColor',
-    'setOceanShadingColor',
-    'showOceanPicker',
-    'setShowOceanPicker',
-    'oceanWaveTypes',
-    'oceanWavesType',
-    'setOceanWavesType',
-    'concentricWaveValue',
-    'noneWaveValue',
-    'oceanWavesLevel',
-    'setOceanWavesLevel',
-    'oceanWavesColor',
-    'setOceanWavesColor',
-    'showOceanWavesPicker',
-    'setShowOceanWavesPicker',
-    'concentricWaveCount',
-    'setConcentricWaveCount',
-    'fadeConcentricWaves',
-    'setFadeConcentricWaves',
-    'jitterToConcentricWaves',
-    'setJitterToConcentricWaves',
-    'brokenLinesForConcentricWaves',
-    'setBrokenLinesForConcentricWaves',
-    'drawOceanEffectsInLakes',
-    'setDrawOceanEffectsInLakes',
-    'riverColor',
-    'setRiverColor',
-    'showRiverPicker',
-    'setShowRiverPicker',
-    'drawRoads',
-    'setDrawRoads',
-    'roadStyle',
-    'setRoadStyle',
-    'strokeTypes',
-    'roadWidth',
-    'setRoadWidth',
-    'roadColor',
-    'setRoadColor',
-    'showRoadPicker',
-    'setShowRoadPicker',
-    'mountainSize',
-    'setMountainSize',
-    'hillSize',
-    'setHillSize',
-    'duneSize',
-    'setDuneSize',
-    'treeHeight',
-    'setTreeHeight',
-    'citySize',
-    'setCitySize',
-  ]
-
-  const fontsKeys = [
-    'translateLabel',
-    'renderColorControl',
-    'drawText',
-    'setDrawText',
-    'fontFields',
-    'availableFontFamilies',
-    'openFontComboId',
-    'setOpenFontComboId',
-    'handleFontOptionClick',
-    'textColor',
-    'setTextColor',
-    'showTextColorPicker',
-    'setShowTextColorPicker',
-    'drawBoldBackground',
-    'setDrawBoldBackground',
-    'boldBackgroundColor',
-    'setBoldBackgroundColor',
-    'showBoldBackgroundPicker',
-    'setShowBoldBackgroundPicker',
-  ]
+  // Tab keys (module-level constants used directly)
 
   // Determine which tab index is active by matching normalized ids/labels.
-  const activePanel = (() => {
-    if (!activeTab) return null
-    switch (normalizeTabId(activeTab)) {
-      case 'background':
-        return <BackgroundTab {...pick(tabProps, backgroundKeys)} />
-      case 'border':
-        return <BorderTab {...pick(tabProps, borderKeys)} />
-      case 'effects':
-        return <EffectsTab {...pick(tabProps, effectsKeys)} />
-      case 'fonts':
-        return <FontsTab {...pick(tabProps, fontsKeys)} />
-      default:
-        return null
-    }
-  })()
+  const activePanel = renderActivePanel(activeTab, tabProps)
 
   return (
     <section

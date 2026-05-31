@@ -22,9 +22,9 @@ class MapApiServerEnumerateFontsTest
 		m.invoke(null, options);
 
 		assertTrue(options.containsKey("fonts"));
-		Object fonts = options.get("fonts");
-		assertNotNull(fonts);
-		assertTrue(fonts instanceof java.util.List);
+		Object fontsMap = options.get("fonts");
+		assertNotNull(fontsMap);
+		assertTrue(fontsMap instanceof java.util.Map);
 	}
 
 	@Test

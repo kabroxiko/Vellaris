@@ -40,10 +40,10 @@ class MapApiServerRandomSettingsTest
 		Field regionCountField = paramsClass.getDeclaredField("regionCount");
 		regionCountField.setAccessible(true);
 		regionCountField.set(params, Integer.valueOf(12));
-
-		Field cityFreqField = paramsClass.getDeclaredField("cityFrequency");
-		cityFreqField.setAccessible(true);
-		cityFreqField.set(params, Integer.valueOf(10));
+		// Use explicit probability (fraction) instead of legacy integer percent
+		java.lang.reflect.Field cityProbField = paramsClass.getDeclaredField("cityProbability");
+		cityProbField.setAccessible(true);
+		cityProbField.set(params, Double.valueOf(10.0 / 100.0 * SettingsGenerator.maxCityProbability));
 
 		Field booksField = paramsClass.getDeclaredField("books");
 		booksField.setAccessible(true);
@@ -72,6 +72,7 @@ class MapApiServerRandomSettingsTest
 		// region count applied
 		assertEquals(12, settings.regionCount);
 		// city probability computed from cityFrequency
+		// Expect the explicit probability applied above
 		double expectedCityProb = 10.0 / 100.0 * SettingsGenerator.maxCityProbability;
 		assertEquals(expectedCityProb, settings.cityProbability, 1e-12);
 		// books set applied

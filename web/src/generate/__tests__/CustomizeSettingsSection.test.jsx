@@ -1,6 +1,75 @@
 import React from 'react'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, cleanup, screen, fireEvent } from '@testing-library/react'
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest'
+import CustomizeSettingsSection from '../CustomizeSettingsSection.jsx'
+
+beforeEach(() => {
+  // ensure clean document for style element checks
+  document.head.innerHTML = ''
+  document.documentElement.style.cssText = ''
+})
+
+afterEach(() => {
+  cleanup()
+})
+
+function makeProps(overrides = {}) {
+  const baseValues = {
+    preview: null,
+    backgroundType: null,
+    titleFontFamily: null,
+    regionFontFamily: null,
+    mountainRangeFontFamily: null,
+    otherMountainsFontFamily: null,
+    citiesFontFamily: null,
+    riverFontFamily: null,
+    fileObj: null,
+    currentSource: null,
+  }
+  const handlers = {}
+  // Provide the full `options` shape expected by the component
+  const defaultOptions = {
+    textures: [],
+    borderTypes: [],
+    i18n: {},
+    backendOptions: {},
+  }
+  const options = { ...defaultOptions, ...(overrides.options) }
+  const ui = { loading: false }
+  return { values: { ...baseValues, ...(overrides.values) }, handlers, options, ui }
+}
+
+describe('CustomizeSettingsSection bundled fonts', () => {
+  it('injects a style element for bundled fonts', () => {
+    const fonts = { 'My Fancy': '/fonts/MyFancy.ttf' }
+    const props = makeProps({ options: { backendOptions: { fonts } } })
+    render(<CustomizeSettingsSection {...props} />)
+
+    const el = document.getElementById('nortantis-bundled-fonts')
+    expect(el).toBeTruthy()
+    const text = el.textContent
+    expect(text).toContain("font-family: \"My Fancy\"")
+    expect(text).toContain("url('/fonts/MyFancy.ttf')")
+  })
+
+  it('applies brand CSS vars when Cinzel is bundled', () => {
+    const fonts = { Cinzel: '/fonts/Cinzel-BoldItalic-700.ttf' }
+    const props = makeProps({ options: { backendOptions: { fonts } } })
+    render(<CustomizeSettingsSection {...props} />)
+
+    // style element should exist
+    const el = document.getElementById('nortantis-bundled-fonts')
+    expect(el).toBeTruthy()
+
+    // brand font variables applied
+    const family = document.documentElement.style.getPropertyValue('--brand-font-family')
+    const weight = document.documentElement.style.getPropertyValue('--brand-font-weight')
+    const style = document.documentElement.style.getPropertyValue('--brand-font-style')
+    expect(family).toBe('"Cinzel"')
+    expect(weight).toBeTruthy()
+    expect(style).toBeTruthy()
+  })
+})
 
 // Mock tab components to keep tests focused and lightweight
 vi.mock('../tabs/BackgroundTab', () => ({
@@ -16,8 +85,6 @@ vi.mock('../tabs/EffectsTab', () => ({
 vi.mock('../tabs/FontsTab', () => ({
   default: () => React.createElement('div', {}, 'FontsTab'),
 }))
-
-import CustomizeSettingsSection from '../CustomizeSettingsSection'
 
 describe('CustomizeSettingsSection', () => {
   let handlers

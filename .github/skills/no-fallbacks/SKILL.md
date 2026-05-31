@@ -4,7 +4,6 @@ description: Global rule for AI agents: do not introduce ad-hoc fallbacks, heuri
 user-invocable: true
 ---
 
-
 # No-Fallbacks — Global Agent Rule
 
 This skill defines a global, repository-wide rule for any AI agent (Copilot, CLI agents, cloud agents, etc.) making decisions, edits, or suggestions related to this codebase.

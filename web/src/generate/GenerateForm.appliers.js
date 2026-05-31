@@ -1,4 +1,4 @@
-import { formatColorString, colorToHexWithAlpha, colorToHex } from './utils'
+import { formatColorString, colorToHexWithAlpha, colorToHex, updateFontFamilyInSpec } from './utils'
 
 export function mergeColor(
   parsedSettings,
@@ -252,10 +252,35 @@ export function applyTextAndBackgroundHoisted(parsedSettings, ctx) {
     drawBoldBackground,
     boldBackgroundColor,
     mergeColor: mergeColorFromCtx,
+    titleFontFamily,
+    regionFontFamily,
+    mountainRangeFontFamily,
+    otherMountainsFontFamily,
+    citiesFontFamily,
+    riverFontFamily,
   } = ctx
   const merge = mergeColorFromCtx || mergeColor
   parsedSettings.drawText = Boolean(drawText)
   merge(parsedSettings, 'textColor', textColor)
   parsedSettings.drawBoldBackground = Boolean(drawBoldBackground)
   merge(parsedSettings, 'boldBackgroundColor', boldBackgroundColor)
+  // Convert UI font-family selections into backend font spec keys
+  if (titleFontFamily)
+    parsedSettings.titleFont = updateFontFamilyInSpec(parsedSettings.titleFont || '', titleFontFamily)
+  if (regionFontFamily)
+    parsedSettings.regionFont = updateFontFamilyInSpec(parsedSettings.regionFont || '', regionFontFamily)
+  if (mountainRangeFontFamily)
+    parsedSettings.mountainRangeFont = updateFontFamilyInSpec(
+      parsedSettings.mountainRangeFont || '',
+      mountainRangeFontFamily
+    )
+  if (otherMountainsFontFamily)
+    parsedSettings.otherMountainsFont = updateFontFamilyInSpec(
+      parsedSettings.otherMountainsFont || '',
+      otherMountainsFontFamily
+    )
+  if (citiesFontFamily)
+    parsedSettings.citiesFont = updateFontFamilyInSpec(parsedSettings.citiesFont || '', citiesFontFamily)
+  if (riverFontFamily)
+    parsedSettings.riverFont = updateFontFamilyInSpec(parsedSettings.riverFont || '', riverFontFamily)
 }

@@ -151,7 +151,7 @@ export async function processGenerateResponse(bytes, contentType, options) {
     globalThis.showToast?.('ui.toast.settingsDownloaded', { type: 'success', duration: 3000 })
   }
 
-  try {
+  const main = (async () => {
     if (!contentType.includes('application/json')) {
       if (outputMode === 'nort-only')
         throw new Error('Server returned image bytes; expected settings content.')
@@ -175,8 +175,11 @@ export async function processGenerateResponse(bytes, contentType, options) {
     }
 
     await handleJsonNortResponse(data)
-  } catch (e) {
+  })()
+
+  // avoid a broad try/catch by using Promise rejection handling here
+  return main.catch((e) => {
     showFailureToast(e)
     throw e
-  }
+  })
 }

@@ -17,7 +17,7 @@ class MapApiServerCoverageTest
 	@Test
 	void testTryParseAndGenerateRandomSettings() throws Exception
 	{
-		String json = "{\"dimension\":\"Square\",\"cityFrequency\":10,\"books\":[\"One\",\"Two\"]}";
+		String json = "{\"dimension\":\"Square\",\"cityProbability\":0.1,\"books\":[\"One\",\"Two\"]}";
 
 		Method tryParse = MapApiServer.class.getDeclaredMethod("tryParseParams", String.class);
 		tryParse.setAccessible(true);

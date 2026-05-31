@@ -1,5 +1,9 @@
 @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Merriweather:ital,wght@0,300;0,700;1,700&display=swap');
 
+/* Bundled fonts are injected at runtime by the app. */
+/* CustomizeSettingsSection.jsx creates a <style id="nortantis-bundled-fonts"> */
+/* element with @font-face rules only for fonts present in /fonts at runtime. */
+
 /* Base theme variables are defined later (parchment theme). */
 * {
   box-sizing: border-box;
@@ -136,9 +140,10 @@ header {
     inset 0 1px 0 rgba(255, 255, 255, 0.75),
     0 2px 4px rgba(58, 40, 24, 0.1);
   color: #533a23;
-  font-family: 'Cinzel', serif;
+  font-family: var(--brand-font-family, 'Cinzel'), serif;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: var(--brand-font-weight, 700);
+  font-style: var(--brand-font-style, normal);
   letter-spacing: 0.02em;
   text-transform: none;
   text-align: center;
@@ -922,6 +927,10 @@ header {
   --preview-controls-gap: 12px;
   --preview-controls-align: center;
   --preview-controls-button-padding: 6px 10px;
+  /* Dynamic branding/button font vars (can be set by JS when bundled fonts load) */
+  --brand-font-family: 'Cinzel';
+  --brand-font-weight: 700;
+  --brand-font-style: normal;
 }
 
 /* Ensure the page uses full viewport height */
@@ -954,10 +963,11 @@ body {
 
 /* Branding */
 .branding h1 {
-  font-family: Cinzel, Merriweather, serif;
+  font-family: var(--brand-font-family, Cinzel), Merriweather, serif;
   color: var(--pf-accent-2);
   font-size: var(--branding-h1-font-size, 36px);
-  font-weight: 700;
+  font-weight: var(--brand-font-weight, 700);
+  font-style: var(--brand-font-style, normal);
   text-shadow:
     0 2px 0 rgba(255, 255, 255, 0.25),
     0 6px 18px rgba(16, 10, 6, 0.45);
@@ -1043,7 +1053,9 @@ body {
 
 /* Buttons - gold / parchment look */
 .btn {
-  font-family: Cinzel, Merriweather, serif;
+  font-family: var(--brand-font-family, Cinzel), Merriweather, serif;
+  font-weight: var(--brand-font-weight, 700);
+  font-style: var(--brand-font-style, normal);
   border: 1px solid rgba(107, 86, 63, 0.12);
   box-shadow: 0 6px 18px rgba(11, 8, 6, 0.45);
 }

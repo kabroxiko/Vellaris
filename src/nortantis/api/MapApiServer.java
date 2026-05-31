@@ -489,9 +489,35 @@ public class MapApiServer
 
 	private static void enumerateFonts(Map<String, Object> options)
 	{
+		java.util.List<String> available = getSystemFamilies();
+		java.util.List<String> hardcoded = buildHardcodedList();
+
+		// Assemble the prioritized result list and expose it as a map
+		java.util.List<String> result = assembleResultList(available, hardcoded);
+
+		java.util.Map<String, Object> fontsMap = buildFontsMap(result);
+		options.put("fonts", fontsMap);
+
+		// Scan runtime bundled font files and update maps accordingly.
+		try
+		{
+			scanBundledFonts(fontsMap, result);
+		}
+		catch (RuntimeException re)
+		{
+			// Ignore file system errors; bundled fonts are optional.
+		}
+	}
+
+	private static java.util.List<String> getSystemFamilies()
+	{
 		java.awt.GraphicsEnvironment ge = java.awt.GraphicsEnvironment.getLocalGraphicsEnvironment();
 		String[] families = ge.getAvailableFontFamilyNames();
+		return new java.util.ArrayList<>(java.util.Arrays.asList(families));
+	}
 
+	private static java.util.List<String> buildHardcodedList()
+	{
 		java.util.List<String> hardcoded = new java.util.ArrayList<>();
 		String osName = System.getProperty("os.name", "").toLowerCase();
 		if (osName.contains("mac"))
@@ -504,23 +530,71 @@ public class MapApiServer
 		}
 		else
 		{
-			java.util.Collections.addAll(hardcoded, "EB Garamond", "Libre Baskerville", "Gentium", "DejaVu Serif", "Cardo", "Cinzel", "Cormorant Garamond", "FreeSerif");
+			java.util.Collections.addAll(hardcoded, "Allura", "EB Garamond", "Libre Baskerville", "Gentium", "DejaVu Serif", "Cardo", "Cinzel", "Cormorant Garamond", "FreeSerif");
+		}
+		return hardcoded;
+	}
+
+    
+
+	private static java.util.List<String> assembleResultList(java.util.List<String> available, java.util.List<String> hardcoded)
+	{
+		java.util.List<String> result = new java.util.ArrayList<>();
+		// If Cinzel is present, place it first (previous behavior preserved)
+		for (int i = 0; i < available.size(); i++)
+		{
+			if (available.get(i).equalsIgnoreCase("Cinzel"))
+			{
+				result.add(available.remove(i));
+				break;
+			}
 		}
 
-		java.util.List<String> filtered = new java.util.ArrayList<>();
-		for (String desired : hardcoded)
+		for (String fav : hardcoded)
 		{
-			for (String inst : families)
+			java.util.Iterator<String> it = available.iterator();
+			while (it.hasNext())
 			{
-				if (inst.equalsIgnoreCase(desired))
+				String inst = it.next();
+				if (inst.equalsIgnoreCase(fav))
 				{
-					filtered.add(inst);
+					result.add(inst);
+					it.remove();
 					break;
 				}
 			}
 		}
 
-		options.put("fonts", filtered);
+		java.util.Collections.sort(available, String.CASE_INSENSITIVE_ORDER);
+		result.addAll(available);
+		return result;
+	}
+
+	private static java.util.Map<String, Object> buildFontsMap(java.util.List<String> result)
+	{
+		java.util.Map<String, Object> fontsMap = new java.util.LinkedHashMap<>();
+		for (String fam : result) {
+			fontsMap.put(fam, "");
+		}
+		return fontsMap;
+	}
+
+	private static void scanBundledFonts(java.util.Map<String, Object> fontsMap, java.util.List<String> result)
+	{
+		java.util.Map<String, String> bundled = new java.util.LinkedHashMap<>();
+		java.nio.file.Path p = java.nio.file.Paths.get("/app", "static", "fonts");
+		if (!java.nio.file.Files.exists(p))
+		{
+			return;
+		}
+
+		try (java.util.stream.Stream<java.nio.file.Path> stream = java.nio.file.Files.list(p)) {
+			stream.filter(fp -> java.nio.file.Files.isRegularFile(fp) && fp.toString().toLowerCase().endsWith(".ttf"))
+				.forEach(fp -> processBundledFontFile(fp, fontsMap, result, bundled));
+		}
+		catch (java.io.IOException ioe) {
+			// ignore I/O errors listing bundled fonts
+		}
 	}
 
 	private static Map<String, String> loadLabels()
@@ -555,6 +629,111 @@ public class MapApiServer
 		@SuppressWarnings("unchecked")
 		Map<String, Object> normalized = (Map<String, Object>) ApiUtils.normalizeNumbersInObject(defMap);
 		result.put("defaults", normalized);
+	}
+
+	// Helper to process a bundled TTF file found under /app/static/fonts.
+	// Extracted from the inline lambda in enumerateFonts to avoid nested
+	// try blocks and improve testability. Matches original behavior
+	// (best-effort parsing, fall back to filename-derived family).
+	private static void processBundledFontFile(java.nio.file.Path fp, java.util.Map<String, Object> fontsMap, java.util.List<String> result, java.util.Map<String, String> bundled)
+	{
+		try {
+			String fileName = fp.getFileName().toString();
+			String decoded = safeUrlDecode(fileName);
+			String family = detectFontFamily(fp);
+
+			if (family == null || family.isBlank()) {
+				family = decoded.replaceAll("\\.ttf$", "");
+				family = family.replaceAll("[_-]+", " ").trim();
+			}
+
+			String publicPath = "/fonts/" + fileName;
+			// Add to bundled map
+			bundled.put(family, publicPath);
+
+			// Update fonts map and ensure this family appears near the front
+			// of the result list. Helpers keep the method flat and simpler
+			// to reason about.
+			updateFontsMapForBundled(fontsMap, family, publicPath);
+			ensureFamilyAtFront(result, family);
+		} catch (RuntimeException re) {
+			// Swallow errors to preserve original best-effort behavior
+		}
+	}
+
+	// Safely URL-decode a filename using UTF-8. Falls back to the
+	// original filename on any error. Extracted to avoid nested try/catch
+	// blocks in the caller (Sonar S1141).
+	private static String safeUrlDecode(String fileName)
+	{
+		if (fileName == null) return "";
+		try {
+			return java.net.URLDecoder.decode(fileName, "UTF-8");
+		} catch (Exception e) {
+			return fileName;
+		}
+	}
+
+	// Attempt to read the font's internal family name from the TTF file.
+	// Returns null when parsing fails; keeps exceptions local to avoid
+	// bubbling I/O or parse errors to the caller.
+	private static String detectFontFamily(java.nio.file.Path fp)
+	{
+		try (java.io.InputStream is = java.nio.file.Files.newInputStream(fp)) {
+			return readFamilyFromStream(is);
+		} catch (Exception ioe) {
+			return null;
+		}
+	}
+
+	// Read a Font from the supplied InputStream and return its family name.
+	// Kept as a separate helper to avoid nested try blocks in the caller
+	// (Sonar S1141). Returns null when parsing fails.
+	private static String readFamilyFromStream(java.io.InputStream is)
+	{
+		try {
+			java.awt.Font f = java.awt.Font.createFont(java.awt.Font.TRUETYPE_FONT, is);
+			String family = f.getFamily(Locale.ENGLISH);
+			if (family == null || family.isBlank())
+				family = f.getFontName(Locale.ENGLISH);
+			return family;
+		} catch (Exception ignoreFont) {
+			return null;
+		}
+	}
+
+	// Update the provided fonts map when a bundled font matches an existing
+	// family (by a relaxed normalization). Keeps behavior localized for
+	// easier reasoning and reduced cognitive complexity in the caller.
+	private static void updateFontsMapForBundled(java.util.Map<String, Object> fontsMap, String family, String publicPath)
+	{
+		java.util.function.UnaryOperator<String> normalize = s -> s == null ? "" : s.toLowerCase().replaceAll("\\b(regular|bold|italic|light|wght)\\b", "").replaceAll("[^a-z0-9]", "");
+		String famNorm = normalize.apply(family);
+		String matchedKey = null;
+		for (String existingKey : new java.util.ArrayList<>(fontsMap.keySet())) {
+			String kNorm = normalize.apply(existingKey);
+			if (kNorm.equals(famNorm)) {
+				matchedKey = existingKey;
+				break;
+			}
+		}
+		if (matchedKey != null) {
+			if (!matchedKey.equals(family)) {
+				fontsMap.remove(matchedKey);
+			}
+			fontsMap.put(family, publicPath);
+		}
+	}
+
+	// Ensure the supplied family is present near the front of the result list.
+	private static void ensureFamilyAtFront(java.util.List<String> result, String family)
+	{
+		for (String f : result) {
+			if (f.equalsIgnoreCase(family)) {
+				return;
+			}
+		}
+		result.add(0, family);
 	}
 
 	private static List<String> getCityIconTypesForPack(String pack)

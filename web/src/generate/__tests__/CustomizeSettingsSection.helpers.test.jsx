@@ -1,13 +1,117 @@
 import React from 'react'
-import { vi } from 'vitest'
-import { render } from '@testing-library/react'
-
+import { render, cleanup } from '@testing-library/react'
+import { vi, expect, it, beforeEach, afterEach, describe } from 'vitest'
+import backgroundBaseCache from '../backgroundBaseCache'
+import CustomizeSettingsSection from '../CustomizeSettingsSection.jsx'
 import {
   drawBackgroundAndInset,
   drawIslandShape,
   composeMiniIslandFromBlobModule,
-  ColorPickerModal,
-} from '../CustomizeSettingsSection.jsx'
+} from '../CustomizePreviewHelpers'
+import ColorPickerModal from '../ColorPickerModal'
+
+// Mock backgroundBaseCache to observe preload calls (exported as default)
+vi.mock('../backgroundBaseCache', () => ({
+  default: { preload: vi.fn() },
+}))
+
+// Mock tab components to keep tests focused and lightweight
+vi.mock('../tabs/BackgroundTab', () => ({
+  default: (props) => React.createElement('div', {}, 'BackgroundTab:' + (props.backgroundType || '')),
+}))
+vi.mock('../tabs/BorderTab', () => ({ default: () => React.createElement('div', {}, 'BorderTab') }))
+vi.mock('../tabs/EffectsTab', () => ({ default: () => React.createElement('div', {}, 'EffectsTab') }))
+vi.mock('../tabs/FontsTab', () => ({ default: () => React.createElement('div', {}, 'FontsTab') }))
+
+describe('CustomizeSettingsSection helpers', () => {
+  beforeEach(() => {
+    // Ensure a clean DOM and restore any styles
+    document.head.innerHTML = ''
+    document.documentElement.style.cssText = ''
+    // Provide a fonts.load mock
+    if (!document.fonts) document.fonts = {}
+    document.fonts.load = vi.fn(() => Promise.resolve())
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    cleanup()
+  })
+
+  it('registers bundled fonts and applies brand vars', async () => {
+    const options = {
+      textures: [],
+      borderTypes: [],
+      i18n: { labels: { 'ui.section.then': 'Then' }, options: { fonts: { Cinzel: '/fonts/Cinzel-BoldItalic-700.ttf', Other: '/assets/Other.ttf' } } },
+      backendOptions: { fonts: { Cinzel: '/fonts/Cinzel-BoldItalic-700.ttf', Other: '/assets/Other.ttf' } },
+    }
+    const values = { preview: null, fileObj: null, currentSource: null }
+    const handlers = {
+      setTextureRef: () => {},
+      setBackgroundType: () => {},
+      notifyManualChange: () => {},
+      handleGenerateAndSaveNort: () => {},
+      handleDownloadMap: () => {},
+      openPreviewModal: () => {},
+    }
+
+    render(<CustomizeSettingsSection values={values} handlers={handlers} options={options} ui={{ loading: false }} />)
+
+    // Style element should be created for bundled fonts
+    const style = document.getElementById('nortantis-bundled-fonts')
+    expect(style).toBeTruthy()
+    expect(style.textContent).toContain('@font-face')
+    expect(style.textContent).toContain('"Cinzel"')
+
+    // Brand CSS variables set
+    expect(document.documentElement.style.getPropertyValue('--brand-font-family')).toBe('"Cinzel"')
+
+    // document.fonts.load should have been called for the bundled family
+    expect(document.fonts.load).toHaveBeenCalled()
+  })
+
+  it('removes existing bundled style when fonts are cleared', async () => {
+    const optionsA = { textures: [], borderTypes: [], i18n: { labels: { 'ui.section.then': 'Then' }, options: { fonts: { Test: '/fonts/Test.ttf' } } }, backendOptions: { fonts: { Test: '/fonts/Test.ttf' } } }
+    const optionsB = { textures: [], borderTypes: [], i18n: { labels: { 'ui.section.then': 'Then' }, options: { fonts: null } }, backendOptions: { fonts: null } }
+    const values = { preview: null, fileObj: null, currentSource: null }
+    const handlers = { setTextureRef: () => {}, setBackgroundType: () => {}, notifyManualChange: () => {}, handleGenerateAndSaveNort: () => {}, handleDownloadMap: () => {}, openPreviewModal: () => {} }
+
+    const { rerender } = render(<CustomizeSettingsSection values={values} handlers={handlers} options={optionsA} ui={{ loading: false }} />)
+    expect(document.getElementById('nortantis-bundled-fonts')).toBeTruthy()
+
+    // Rerender with fonts cleared
+    rerender(<CustomizeSettingsSection values={values} handlers={handlers} options={optionsB} ui={{ loading: false }} />)
+    expect(document.getElementById('nortantis-bundled-fonts')).toBeNull()
+  })
+
+  it('splits translated labels containing <br> into nodes', async () => {
+    const options = { textures: [], borderTypes: [], i18n: { labels: { 'ui.title.customize': 'Line1<br/>Line2', 'ui.subtitle.customize': 'Sub' }, options: {} }, backendOptions: {} }
+    const values = { preview: null, fileObj: null, currentSource: null }
+    const handlers = { setTextureRef: () => {}, setBackgroundType: () => {}, notifyManualChange: () => {}, handleGenerateAndSaveNort: () => {}, handleDownloadMap: () => {}, openPreviewModal: () => {} }
+
+    const { container } = render(<CustomizeSettingsSection values={values} handlers={handlers} options={options} ui={{ loading: false }} />)
+    // The header should contain a <br> element between the lines
+    const header = container.querySelector('h3')
+    expect(header).toBeTruthy()
+    // should have two child nodes (text + br + text) -> length >= 2
+    expect(header.childNodes.length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('preloads background bases including fractal type', async () => {
+    backgroundBaseCache.preload.mockClear()
+    const textures = [{ artPack: 'ap', name: 't1' }, { artPack: 'ap', name: 't2' }]
+    const backgroundTypes = [{ value: 'SomeFractal' }, { value: 'Other' }]
+    const options = { textures, borderTypes: [], i18n: { labels: { 'ui.section.then': 'Then' }, options: { backgroundTypes } }, backendOptions: { backgroundTypes } }
+    const values = { preview: null, fileObj: null, currentSource: null }
+    const handlers = { setTextureRef: () => {}, setBackgroundType: () => {}, notifyManualChange: () => {}, handleGenerateAndSaveNort: () => {}, handleDownloadMap: () => {}, openPreviewModal: () => {} }
+
+    render(<CustomizeSettingsSection values={values} handlers={handlers} options={options} ui={{ loading: false }} />)
+    // backgroundBaseCache.preload should be called for candidates
+    expect(backgroundBaseCache.preload).toHaveBeenCalled()
+    const calls = backgroundBaseCache.preload.mock.calls.flat()
+    expect(calls.some((p) => p.type && /Fractal/i.test(p.type))).toBeTruthy()
+  })
+})
 
 test('drawBackgroundAndInset calls expected ctx methods', () => {
   const calls = {}

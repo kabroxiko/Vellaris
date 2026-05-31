@@ -48,10 +48,10 @@ class MapApiServerExtraCoverageTest
 		Boolean resEmpty = (Boolean) m.invoke(null, params);
 		assertFalse(resEmpty);
 
-		// set a field (cityFrequency) and verify it returns true
-		java.lang.reflect.Field f = paramsClass.getDeclaredField("cityFrequency");
+		// set a field (cityProbability) and verify it returns true
+		java.lang.reflect.Field f = paramsClass.getDeclaredField("cityProbability");
 		f.setAccessible(true);
-		f.set(params, Integer.valueOf(10));
+		f.set(params, Double.valueOf(0.10));
 		Boolean resWithCity = (Boolean) m.invoke(null, params);
 		assertTrue(resWithCity);
 

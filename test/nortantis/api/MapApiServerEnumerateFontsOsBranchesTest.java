@@ -26,6 +26,7 @@ class MapApiServerEnumerateFontsOsBranchesTest
 			Map<String, Object> options = new LinkedHashMap<>();
 			m.invoke(null, options);
 
+			// API exposes `fonts` as a mapping of family -> publicPath
 			assertTrue(options.containsKey("fonts"));
 		}
 		finally
