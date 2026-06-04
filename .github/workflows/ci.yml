@@ -5,6 +5,10 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+permissions:
+  contents: read
+  packages: write
+
 jobs:
   build:
     name: Build & Test
@@ -41,19 +45,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Log in to Docker Hub
+      - name: Log in to GitHub Container Registry
         uses: docker/login-action@v2
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Build and push Docker image
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push Docker image to GHCR
         uses: docker/build-push-action@v4
         with:
           context: .
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/nortantis:latest,${{ secrets.DOCKERHUB_USERNAME }}/nortantis:${{ github.sha }}
+          tags: ghcr.io/${{ github.repository_owner }}/nortantis:latest,ghcr.io/${{ github.repository_owner }}/nortantis:${{ github.sha }}
       - name: Upload image info
-        run: echo "image=${{ secrets.DOCKERHUB_USERNAME }}/nortantis:latest" > image.txt
+        run: echo "image=ghcr.io/${{ github.repository_owner }}/nortantis:latest" > image.txt
       - uses: actions/upload-artifact@v4
         with:
           name: image-info
