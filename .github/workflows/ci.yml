@@ -58,7 +58,7 @@ jobs:
           push: true
           tags: ghcr.io/${{ github.repository_owner }}/vellaris:latest,ghcr.io/${{ github.repository_owner }}/vellaris:${{ github.sha }}
       - name: Upload image info
-        run: echo "image=ghcr.io/${{ github.repository_owner }}/vellaris:latest" > image.txt
+        run: echo "ghcr.io/${{ github.repository_owner }}/vellaris:latest" > image.txt
       - uses: actions/upload-artifact@v4
         with:
           name: image-info
@@ -75,6 +75,18 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: vellaris-build
+      - name: Download image info
+        uses: actions/download-artifact@v4
+        with:
+          name: image-info
+      - name: Compose release body
+        run: |
+          IMAGE=$(cat image.txt 2>/dev/null || echo "ghcr.io/${{ github.repository_owner }}/vellaris:latest")
+          echo "Automated release from CI" > release_body.md
+          echo "" >> release_body.md
+          echo "Docker image: https://ghcr.io/${{ github.repository_owner }}/vellaris" >> release_body.md
+          echo "Image tag: $IMAGE" >> release_body.md
+        shell: bash
       - name: Compute release tag
         id: tag
         run: |
@@ -86,5 +98,6 @@ jobs:
           commit: ${{ github.sha }}
           name: Release ${{ steps.tag.outputs.tag }}
           artifacts: build/libs/*.jar
+          bodyFile: release_body.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
