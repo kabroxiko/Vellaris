@@ -39,12 +39,19 @@ RUN ./gradlew jar
 ########################
 # Runtime image (Alpine + nginx + Temurin JRE)
 ########################
-FROM eclipse-temurin:21-jre-alpine AS runtime
+FROM eclipse-temurin:26-jre-ubi10-minimal AS runtime
 WORKDIR /app
 
-# Install nginx and common utilities
+# Install nginx and common utilities; upgrade base packages first
 USER root
-RUN apk add --no-cache nginx curl fontconfig tzdata
+RUN set -eux; \
+	if command -v apk >/dev/null 2>&1; then \
+		apk update && apk upgrade --no-cache && apk add --no-cache nginx curl fontconfig tzdata; \
+	elif command -v microdnf >/dev/null 2>&1; then \
+		microdnf -y update && microdnf -y install nginx curl fontconfig tzdata && microdnf clean all; \
+	else \
+		echo "No supported package manager found" >&2; exit 1; \
+	fi
 
 # Fetch bundled fonts (retry on transient network failures)
 RUN set -eux; \
