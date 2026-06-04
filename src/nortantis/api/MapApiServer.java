@@ -32,7 +32,7 @@ import java.awt.image.BufferedImage;
 import java.util.Base64;
 import java.util.List;
 import java.util.Random;
- 
+
 import java.security.SecureRandom;
 import java.util.Map;
 import java.util.LinkedHashMap;
@@ -59,8 +59,7 @@ public class MapApiServer
 	// Thread-safe holder for the supplier used to create MapCreator instances.
 	// Use AtomicReference so updates are atomic and visible across threads
 	// (volatile alone does not provide atomicity for updates).
-	private static final java.util.concurrent.atomic.AtomicReference<java.util.function.Supplier<MapCreator>> mapCreatorFactory =
-		new java.util.concurrent.atomic.AtomicReference<>(MapCreator::new);
+	private static final java.util.concurrent.atomic.AtomicReference<java.util.function.Supplier<MapCreator>> mapCreatorFactory = new java.util.concurrent.atomic.AtomicReference<>(MapCreator::new);
 
 	public static void main(String[] args)
 	{
@@ -185,7 +184,7 @@ public class MapApiServer
 		{
 			@SuppressWarnings("unchecked")
 			Map<String, Object> raw = gson.fromJson(ctx.body(), Map.class);
-				if (raw != null)
+			if (raw != null)
 			{
 				Integer w = ApiUtils.parseInteger(raw.get("width"));
 				Integer h = ApiUtils.parseInteger(raw.get("height"));
@@ -316,7 +315,6 @@ public class MapApiServer
 
 		return gson.toJson(ui);
 	}
-
 
 
 	private static Object handleGenerate(Context ctx)
@@ -463,27 +461,29 @@ public class MapApiServer
 		// reads labels from the translation bundle (e.g. `theme.tab.background`).
 		// Avoid returning `options.tabs` to prevent UI fallbacks based on server-provided ids.
 		options.put("dimensions", List.of(ApiUtils.option("Square", tr("GeneratedDimension.Square")), ApiUtils.option("Sixteen_by_9", tr("GeneratedDimension.Sixteen_by_9")),
-			ApiUtils.option("Golden_Ratio", tr("GeneratedDimension.Golden_Ratio"))));
-		options.put("landShapes", List.of(ApiUtils.option("Continents", tr("LandShape.Continents")), ApiUtils.option("Inland_Sea", tr("LandShape.Inland_Sea")), ApiUtils.option("Scattered", tr("LandShape.Scattered"))));
-		options.put("landColoringMethods", List.of(ApiUtils.option("SingleColor", tr("LandColoringMethod.SingleColor")), ApiUtils.option("ColorPoliticalRegions", tr("LandColoringMethod.ColorPoliticalRegions"))));
-		options.put("backgroundTypes", List.of(ApiUtils.option("FractalNoise", tr("theme.background.fractalNoise")), ApiUtils.option("GeneratedFromTexture", tr("theme.background.generatedFromTexture")),
-			ApiUtils.option("SolidColor", tr("theme.background.solidColor"))));
-		options.put("strokeTypes", List.of(ApiUtils.option("Solid", tr("StrokeType.Solid")), ApiUtils.option("Dashes", tr("StrokeType.Dashes")), ApiUtils.option("Rounded_Dashes", tr("StrokeType.Rounded_Dashes")),
-			ApiUtils.option("Dots", tr("StrokeType.Dots"))));
+				ApiUtils.option("Golden_Ratio", tr("GeneratedDimension.Golden_Ratio"))));
+		options.put("landShapes",
+				List.of(ApiUtils.option("Continents", tr("LandShape.Continents")), ApiUtils.option("Inland_Sea", tr("LandShape.Inland_Sea")), ApiUtils.option("Scattered", tr("LandShape.Scattered"))));
+		options.put("landColoringMethods",
+				List.of(ApiUtils.option("SingleColor", tr("LandColoringMethod.SingleColor")), ApiUtils.option("ColorPoliticalRegions", tr("LandColoringMethod.ColorPoliticalRegions"))));
+		options.put("backgroundTypes", List.of(ApiUtils.option("FractalNoise", tr("theme.background.fractalNoise")),
+				ApiUtils.option("GeneratedFromTexture", tr("theme.background.generatedFromTexture")), ApiUtils.option("SolidColor", tr("theme.background.solidColor"))));
+		options.put("strokeTypes", List.of(ApiUtils.option("Solid", tr("StrokeType.Solid")), ApiUtils.option("Dashes", tr("StrokeType.Dashes")),
+				ApiUtils.option("Rounded_Dashes", tr("StrokeType.Rounded_Dashes")), ApiUtils.option("Dots", tr("StrokeType.Dots"))));
 		options.put("borderPositions", List.of(ApiUtils.option("Outside_map", tr("BorderPosition.Outside_map")), ApiUtils.option("Over_map", tr("BorderPosition.Over_map"))));
 		options.put("borderColorOptions", List.of(ApiUtils.option("Ocean_color", tr("BorderColorOption.Ocean_color")), ApiUtils.option("Choose_color", tr("BorderColorOption.Choose_color"))));
 		options.put("lineStyles", List.of(ApiUtils.option("Jagged", tr("theme.lineStyle.jagged")), ApiUtils.option("Splines", tr("theme.lineStyle.splines")),
-			ApiUtils.option("SplinesWithSmoothedCoastlines", tr("theme.lineStyle.splinesSmoothed"))));
-		options.put("oceanWaveTypes",
-			List.of(ApiUtils.option("ConcentricWaves", tr("theme.waveType.concentricWaves")), ApiUtils.option("Ripples", tr("theme.waveType.ripples")), ApiUtils.option("None", tr("theme.waveType.none"))));
+				ApiUtils.option("SplinesWithSmoothedCoastlines", tr("theme.lineStyle.splinesSmoothed"))));
+		options.put("oceanWaveTypes", List.of(ApiUtils.option("ConcentricWaves", tr("theme.waveType.concentricWaves")), ApiUtils.option("Ripples", tr("theme.waveType.ripples")),
+				ApiUtils.option("None", tr("theme.waveType.none"))));
 	}
 
 	private static void populateGridOptions(Map<String, Object> options)
 	{
 		options.put("gridOverlayShapes", List.of(ApiUtils.option("Horizontal_hexes", tr("GridOverlayShape.Horizontal_hexes")), ApiUtils.option("Vertical_hexes", tr("GridOverlayShape.Vertical_hexes")),
-			ApiUtils.option("Squares", tr("GridOverlayShape.Squares")), ApiUtils.option("Voronoi_polygons", tr("GridOverlayShape.Voronoi_polygons"))));
-		options.put("gridOverlayOffsets", List.of(ApiUtils.option("zero", tr("GridOverlayOffset.zero")), ApiUtils.option("quarter", tr("GridOverlayOffset.quarter")), ApiUtils.option("half", tr("GridOverlayOffset.half")),
-			ApiUtils.option("threeQuarters", tr("GridOverlayOffset.threeQuarters"))));
+				ApiUtils.option("Squares", tr("GridOverlayShape.Squares")), ApiUtils.option("Voronoi_polygons", tr("GridOverlayShape.Voronoi_polygons"))));
+		options.put("gridOverlayOffsets", List.of(ApiUtils.option("zero", tr("GridOverlayOffset.zero")), ApiUtils.option("quarter", tr("GridOverlayOffset.quarter")),
+				ApiUtils.option("half", tr("GridOverlayOffset.half")), ApiUtils.option("threeQuarters", tr("GridOverlayOffset.threeQuarters"))));
 		options.put("gridOverlayLayers", List.of(ApiUtils.option("Under_icons", tr("GridOverlayLayer.Under_icons")), ApiUtils.option("Over_icons", tr("GridOverlayLayer.Over_icons"))));
 	}
 
@@ -535,7 +535,6 @@ public class MapApiServer
 		return hardcoded;
 	}
 
-    
 
 	private static java.util.List<String> assembleResultList(java.util.List<String> available, java.util.List<String> hardcoded)
 	{
@@ -573,7 +572,8 @@ public class MapApiServer
 	private static java.util.Map<String, Object> buildFontsMap(java.util.List<String> result)
 	{
 		java.util.Map<String, Object> fontsMap = new java.util.LinkedHashMap<>();
-		for (String fam : result) {
+		for (String fam : result)
+		{
 			fontsMap.put(fam, "");
 		}
 		return fontsMap;
@@ -588,11 +588,12 @@ public class MapApiServer
 			return;
 		}
 
-		try (java.util.stream.Stream<java.nio.file.Path> stream = java.nio.file.Files.list(p)) {
-			stream.filter(fp -> java.nio.file.Files.isRegularFile(fp) && fp.toString().toLowerCase().endsWith(".ttf"))
-				.forEach(fp -> processBundledFontFile(fp, fontsMap, result, bundled));
+		try (java.util.stream.Stream<java.nio.file.Path> stream = java.nio.file.Files.list(p))
+		{
+			stream.filter(fp -> java.nio.file.Files.isRegularFile(fp) && fp.toString().toLowerCase().endsWith(".ttf")).forEach(fp -> processBundledFontFile(fp, fontsMap, result, bundled));
 		}
-		catch (java.io.IOException ioe) {
+		catch (java.io.IOException ioe)
+		{
 			// ignore I/O errors listing bundled fonts
 		}
 	}
@@ -637,12 +638,14 @@ public class MapApiServer
 	// (best-effort parsing, fall back to filename-derived family).
 	private static void processBundledFontFile(java.nio.file.Path fp, java.util.Map<String, Object> fontsMap, java.util.List<String> result, java.util.Map<String, String> bundled)
 	{
-		try {
+		try
+		{
 			String fileName = fp.getFileName().toString();
 			String decoded = safeUrlDecode(fileName);
 			String family = detectFontFamily(fp);
 
-			if (family == null || family.isBlank()) {
+			if (family == null || family.isBlank())
+			{
 				family = decoded.replaceAll("\\.ttf$", "");
 				family = family.replaceAll("[_-]+", " ").trim();
 			}
@@ -656,7 +659,9 @@ public class MapApiServer
 			// to reason about.
 			updateFontsMapForBundled(fontsMap, family, publicPath);
 			ensureFamilyAtFront(result, family);
-		} catch (RuntimeException re) {
+		}
+		catch (RuntimeException re)
+		{
 			// Swallow errors to preserve original best-effort behavior
 		}
 	}
@@ -666,10 +671,14 @@ public class MapApiServer
 	// blocks in the caller (Sonar S1141).
 	private static String safeUrlDecode(String fileName)
 	{
-		if (fileName == null) return "";
-		try {
+		if (fileName == null)
+			return "";
+		try
+		{
 			return java.net.URLDecoder.decode(fileName, "UTF-8");
-		} catch (Exception e) {
+		}
+		catch (Exception e)
+		{
 			return fileName;
 		}
 	}
@@ -679,9 +688,12 @@ public class MapApiServer
 	// bubbling I/O or parse errors to the caller.
 	private static String detectFontFamily(java.nio.file.Path fp)
 	{
-		try (java.io.InputStream is = java.nio.file.Files.newInputStream(fp)) {
+		try (java.io.InputStream is = java.nio.file.Files.newInputStream(fp))
+		{
 			return readFamilyFromStream(is);
-		} catch (Exception ioe) {
+		}
+		catch (Exception ioe)
+		{
 			return null;
 		}
 	}
@@ -691,13 +703,16 @@ public class MapApiServer
 	// (Sonar S1141). Returns null when parsing fails.
 	private static String readFamilyFromStream(java.io.InputStream is)
 	{
-		try {
+		try
+		{
 			java.awt.Font f = java.awt.Font.createFont(java.awt.Font.TRUETYPE_FONT, is);
 			String family = f.getFamily(Locale.ENGLISH);
 			if (family == null || family.isBlank())
 				family = f.getFontName(Locale.ENGLISH);
 			return family;
-		} catch (Exception ignoreFont) {
+		}
+		catch (Exception ignoreFont)
+		{
 			return null;
 		}
 	}
@@ -710,15 +725,19 @@ public class MapApiServer
 		java.util.function.UnaryOperator<String> normalize = s -> s == null ? "" : s.toLowerCase().replaceAll("\\b(regular|bold|italic|light|wght)\\b", "").replaceAll("[^a-z0-9]", "");
 		String famNorm = normalize.apply(family);
 		String matchedKey = null;
-		for (String existingKey : new java.util.ArrayList<>(fontsMap.keySet())) {
+		for (String existingKey : new java.util.ArrayList<>(fontsMap.keySet()))
+		{
 			String kNorm = normalize.apply(existingKey);
-			if (kNorm.equals(famNorm)) {
+			if (kNorm.equals(famNorm))
+			{
 				matchedKey = existingKey;
 				break;
 			}
 		}
-		if (matchedKey != null) {
-			if (!matchedKey.equals(family)) {
+		if (matchedKey != null)
+		{
+			if (!matchedKey.equals(family))
+			{
 				fontsMap.remove(matchedKey);
 			}
 			fontsMap.put(family, publicPath);
@@ -728,8 +747,10 @@ public class MapApiServer
 	// Ensure the supplied family is present near the front of the result list.
 	private static void ensureFamilyAtFront(java.util.List<String> result, String family)
 	{
-		for (String f : result) {
-			if (f.equalsIgnoreCase(family)) {
+		for (String f : result)
+		{
+			if (f.equalsIgnoreCase(family))
+			{
 				return;
 			}
 		}
@@ -786,10 +807,6 @@ public class MapApiServer
 	}
 
 
-    
-
-    
-
 	private static String tr(String key)
 	{
 		return Translation.get(key);
@@ -824,7 +841,6 @@ public class MapApiServer
 		}
 	}
 
-    
 
 	private static Image generateBackgroundBaseImage(int width, int height, String type, String cityIconType, String artPack)
 	{
@@ -917,7 +933,6 @@ public class MapApiServer
 		return settings;
 	}
 
-    
 
 	/**
 	 * Internal helper holding parsed request context for generation endpoints.
@@ -970,7 +985,8 @@ public class MapApiServer
 	// Helper: quick check whether parsed params contain any generation fields
 	private static boolean paramsContainGenerationFields(ApiUtils.RandomMapParameters p)
 	{
-		return p != null && (p.language != null || p.dimension != null || p.worldSize != null || p.landShape != null || p.regionCount != null || p.cityProbability != null || (p.books != null && !p.books.isEmpty()));
+		return p != null && (p.language != null || p.dimension != null || p.worldSize != null || p.landShape != null || p.regionCount != null || p.cityProbability != null
+				|| (p.books != null && !p.books.isEmpty()));
 	}
 
 	// Build GenerationRequestContext when params-driven generation is requested
@@ -1073,7 +1089,6 @@ public class MapApiServer
 		return fallback;
 	}
 
-    
 
 	private static Object returnJsonResponse(BufferedImage buf, MapSettings settings, Context ctx) throws IOException
 	{
@@ -1093,7 +1108,6 @@ public class MapApiServer
 		return gson.toJson(settingsMap);
 	}
 
-    
 
 	private static String resolveBestNortContent(MapSettings settings)
 	{
@@ -1142,8 +1156,6 @@ public class MapApiServer
 		}
 	}
 
-
-    
 
 	private static class GenerationContext
 	{

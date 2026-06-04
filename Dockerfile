@@ -30,45 +30,21 @@ USER root
 # Avoid copying the entire build context to reduce leaked secrets and
 # unnecessary files in the image (see Sonar rule S6470).
 # Adjust these paths if your build requires additional files.
-COPY gradlew ./
-COPY gradle/ ./gradle/
-COPY build.gradle.kts settings.gradle ./
-# Source and other inputs used by the build
-COPY src/ ./src/
-RUN mkdir assets && ./gradlew --no-daemon clean assemble -x test
-# Optional: switch back to the default user if necessary (not required for build stage)
-USER root
+COPY assets/ assets/
+COPY src/ src/
+COPY gradle/ gradle/
+COPY gradlew build.gradle.kts settings.gradle ./
+RUN ./gradlew jar
 
 ########################
-# Temurin runtime stage (source of JRE)
+# Runtime image (Alpine + nginx + Temurin JRE)
 ########################
-FROM eclipse-temurin:21-jre-jammy AS temurin
-
-########################
-# Runtime image (rootless nginx + Java)
-########################
-FROM nginxinc/nginx-unprivileged:1.25 AS runtime
+FROM eclipse-temurin:21-jre-alpine AS runtime
 WORKDIR /app
 
-# Install utilities and a Temurin Java 21 JRE, then add fonts
+# Install nginx and common utilities
 USER root
-RUN apt-get update \
-	&& apt-get install -y --no-install-recommends \
-		fontconfig \
-		curl \
-		ca-certificates \
-	&& rm -rf /var/lib/apt/lists/*
-
-# Copy JRE from the official Temurin image to avoid network tarball downloads
-COPY --from=temurin /opt /opt
-RUN set -eux; \
-		for d in /opt/*; do \
-			if [ -x "$d/bin/java" ]; then \
-				ln -s "$d" /opt/jdk || true; \
-				ln -sf "$d/bin/java" /usr/local/bin/java; \
-				break; \
-			fi; \
-		done
+RUN apk add --no-cache nginx curl fontconfig tzdata
 
 # Fetch bundled fonts (retry on transient network failures)
 RUN set -eux; \
@@ -89,20 +65,23 @@ RUN set -eux; \
 # Copy backend jar and frontend static build output
 COPY --from=backend-builder /src/build/libs/*.jar ./app.jar
 COPY --from=frontend-builder /src/web/dist ./static
-COPY assets/ ./assets/
 
-# Create non-root user and ensure nginx runtime dirs are writable
-RUN addgroup --system vellaris \
-	&& adduser --system --ingroup vellaris --home /home/vellaris --shell /usr/sbin/nologin vellaris \
-	&& mkdir -p /home/vellaris /var/log/nginx /var/run /var/cache/nginx /var/lib/nginx/body /app/static /app/static/fonts \
-	&& cp /usr/share/fonts/truetype/vellaris/*.ttf ./static/fonts/ || true \
-	&& chown -R vellaris:vellaris /home/vellaris /var/log/nginx /var/run /var/cache/nginx /var/lib/nginx /app /usr/share/fonts/truetype/vellaris
+# Copy custom nginx main config (overwrite default)
+RUN mkdir -p /var/cache/nginx /var/run /var/log/nginx /app/static/fonts
+COPY docker/nginx.conf /etc/nginx/nginx.conf
 
-# Switch to non-root user; nginx-unprivileged runs as non-root by default
-USER vellaris
+# Copy bundled fonts if any (best-effort)
+RUN cp -r /usr/share/fonts/* ./static/fonts/ || true
+
+# Ensure runtime dirs are writable
+RUN chmod -R a+rwX /app /var/cache/nginx /var/run /var/log/nginx || true
+
+# Expose standard HTTP port
+EXPOSE 80
+
+# Entrypoint starts Java in background then runs nginx in foreground
+COPY docker/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+USER root
 ENV JAVA_OPTS=""
-ENV JAVA_HOME=/opt/jdk
-ENV PATH=/opt/jdk/bin:$PATH
-EXPOSE 8080
-# Start Java in background and run nginx (already configured to run rootless)
-CMD ["sh", "-c", "java $JAVA_OPTS -cp app.jar nortantis.api.MapApiServer & nginx -g 'daemon off;' "]
+CMD ["/usr/local/bin/docker-entrypoint.sh"]

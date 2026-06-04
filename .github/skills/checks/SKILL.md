@@ -20,7 +20,16 @@ Behavior
     
    - Non-interactive sub-skills
 
-   - Sub-skills invoked by the `checks` orchestrator SHOULD be non-interactive. When a sub-skill supports both interactive and non-interactive modes, `checks` will request the non-interactive behavior. The `docker-scout` sub-skill in particular is expected to run `quickview` followed by `cves` automatically and must not prompt for follow-up confirmation.
+   - Sub-skills invoked by the `checks` orchestrator SHOULD be non-interactive. When a sub-skill supports both interactive and non-interactive modes, `checks` will request the non-interactive behavior.
+
+   - `docker-scout` specifics: When the `docker-scout` sub-skill runs, prefer scanning a built container image rather than the raw filesystem. Behavior should be:
+     1. If the caller provides an `--image <image-ref>` argument, use that image reference for scanning.
+     2. Otherwise, attempt to detect a suitable image name from the repository (for example a `name` in `package.json`, or `nortantis:scan`), and check for a local image with that name.
+     3. If no local image exists, build the image from the repository `Dockerfile` using `docker build -t <image-ref> .` (non-interactive). Use `--no-cache` only when explicitly requested.
+     4. Run `docker scout quickview <image-ref>` followed by `docker scout cves <image-ref>` (non-interactive). Use `--format`/`--output` options to save machine-readable reports when available.
+     5. If building the image or running the scan fails, return a non-zero error and include the raw CLI logs in the aggregated checks output.
+
+   - The `docker-scout` sub-skill MUST NOT modify repository files. When the user requested `--fix`, the skill may suggest commands to remediate (for example, Dockerfile base image updates or `apt-get` package pins) but must not apply them automatically.
   3. If `check=all` or no `check` argument is provided, sequentially invoke the following skills (using the selected `scope`):
      - `formatters`
      - `linters`

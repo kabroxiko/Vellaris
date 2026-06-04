@@ -10,17 +10,20 @@ import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
-class MapApiServerTest {
+class MapApiServerTest
+{
 
 	// Helper to invoke private static methods on MapApiServer
-	private Object invokeOnMapApi(String name, Class<?>[] paramTypes, Object... args) throws Exception {
+	private Object invokeOnMapApi(String name, Class<?>[] paramTypes, Object... args) throws Exception
+	{
 		Method m = MapApiServer.class.getDeclaredMethod(name, paramTypes);
 		m.setAccessible(true);
 		return m.invoke(null, args);
 	}
 
 	@Test
-	void testAssembleResultListPlacesCinzelFirstWhenPresent() throws Exception {
+	void testAssembleResultListPlacesCinzelFirstWhenPresent() throws Exception
+	{
 		List<String> available = new ArrayList<>();
 		available.add("Arial");
 		available.add("Cinzel");
@@ -33,7 +36,8 @@ class MapApiServerTest {
 	}
 
 	@Test
-	void testBuildFontsMapProducesEmptyPaths() throws Exception {
+	void testBuildFontsMapProducesEmptyPaths() throws Exception
+	{
 		List<String> result = List.of("A", "B", "Cinzel");
 		@SuppressWarnings("unchecked")
 		Map<String, Object> map = (Map<String, Object>) invokeOnMapApi("buildFontsMap", new Class[] { List.class }, result);
@@ -44,7 +48,8 @@ class MapApiServerTest {
 	}
 
 	@Test
-	void testUpdateFontsMapForBundledReplacesNormalizedKey() throws Exception {
+	void testUpdateFontsMapForBundledReplacesNormalizedKey() throws Exception
+	{
 		Map<String, Object> fontsMap = new LinkedHashMap<>();
 		fontsMap.put("Cinzel", "");
 
@@ -55,7 +60,8 @@ class MapApiServerTest {
 	}
 
 	@Test
-	void testEnsureFamilyAtFrontAddsIfMissing() throws Exception {
+	void testEnsureFamilyAtFrontAddsIfMissing() throws Exception
+	{
 		List<String> result = new ArrayList<>();
 		result.add("One");
 		result.add("Two");
@@ -69,13 +75,15 @@ class MapApiServerTest {
 	}
 
 	@Test
-	void testSafeUrlDecodeDecodes() throws Exception {
+	void testSafeUrlDecodeDecodes() throws Exception
+	{
 		String out = (String) invokeOnMapApi("safeUrlDecode", new Class[] { String.class }, "A%20B.ttf");
 		assertEquals("A B.ttf", out);
 	}
 
 	@Test
-	void testParamsContainGenerationFieldsDetectsCityProbability() throws Exception {
+	void testParamsContainGenerationFieldsDetectsCityProbability() throws Exception
+	{
 		ApiUtils.RandomMapParameters p = new ApiUtils.RandomMapParameters();
 		p.cityProbability = 0.5;
 
@@ -85,7 +93,8 @@ class MapApiServerTest {
 
 	// Additional ApiUtils behavior tests via reflection
 	@Test
-	void testTryParseParams_and_paramsContainGenerationFields() throws Exception {
+	void testTryParseParams_and_paramsContainGenerationFields() throws Exception
+	{
 		String json = "{\"language\":\"en\", \"worldSize\": 5}";
 		Method tryParse = MapApiServer.class.getDeclaredMethod("tryParseParams", String.class);
 		tryParse.setAccessible(true);

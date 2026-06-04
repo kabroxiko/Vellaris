@@ -16,10 +16,12 @@ import org.junit.jupiter.api.Test;
 import nortantis.platform.PlatformFactory;
 import nortantis.platform.awt.AwtFactory;
 
-class MapApiServerMoreCoverageTest {
+class MapApiServerMoreCoverageTest
+{
 
 	@Test
-	void testReadFamilyFromStreamReturnsNullForNonFont() throws Exception {
+	void testReadFamilyFromStreamReturnsNullForNonFont() throws Exception
+	{
 		byte[] data = "this is not a ttf".getBytes();
 		Method m = MapApiServer.class.getDeclaredMethod("readFamilyFromStream", java.io.InputStream.class);
 		m.setAccessible(true);
@@ -28,10 +30,12 @@ class MapApiServerMoreCoverageTest {
 	}
 
 	@Test
-	void testDetectFontFamilyReturnsNullForGarbageFile() throws Exception {
+	void testDetectFontFamilyReturnsNullForGarbageFile() throws Exception
+	{
 		File tmp = File.createTempFile("garbage", ".ttf");
 		tmp.deleteOnExit();
-		try (FileOutputStream fos = new FileOutputStream(tmp)) {
+		try (FileOutputStream fos = new FileOutputStream(tmp))
+		{
 			fos.write("not a font".getBytes());
 		}
 		Method m = MapApiServer.class.getDeclaredMethod("detectFontFamily", java.nio.file.Path.class);
@@ -41,7 +45,8 @@ class MapApiServerMoreCoverageTest {
 	}
 
 	@Test
-	void testSafeUrlDecodeHandlesNullAndEncoded() throws Exception {
+	void testSafeUrlDecodeHandlesNullAndEncoded() throws Exception
+	{
 		Method m = MapApiServer.class.getDeclaredMethod("safeUrlDecode", String.class);
 		m.setAccessible(true);
 		assertEquals("", m.invoke(null, (Object) null));
@@ -49,7 +54,8 @@ class MapApiServerMoreCoverageTest {
 	}
 
 	@Test
-	void testNamedResourcesToListHandlesNullAndProducesResourceInfo() throws Exception {
+	void testNamedResourcesToListHandlesNullAndProducesResourceInfo() throws Exception
+	{
 		Method m = MapApiServer.class.getDeclaredMethod("namedResourcesToList", java.util.List.class);
 		m.setAccessible(true);
 		List<?> empty = (List<?>) m.invoke(null, (Object) null);
@@ -68,7 +74,8 @@ class MapApiServerMoreCoverageTest {
 	}
 
 	@Test
-	void testBuildWebUiOptionsReturnsMapContainingOptions() throws Exception {
+	void testBuildWebUiOptionsReturnsMapContainingOptions() throws Exception
+	{
 		Method m = MapApiServer.class.getDeclaredMethod("buildWebUiOptions");
 		m.setAccessible(true);
 		@SuppressWarnings("unchecked")
@@ -78,7 +85,8 @@ class MapApiServerMoreCoverageTest {
 	}
 
 	@Test
-	void testReturnJsonResponseProducesImageBase64() throws Exception {
+	void testReturnJsonResponseProducesImageBase64() throws Exception
+	{
 		PlatformFactory.setInstance(new AwtFactory());
 
 		BufferedImage img = new BufferedImage(8, 8, BufferedImage.TYPE_INT_RGB);
@@ -88,12 +96,15 @@ class MapApiServerMoreCoverageTest {
 		// Create a lightweight proxy for io.javalin.http.Context that only
 		// supports contentType/status/result methods used by returnJsonResponse.
 		Class<?> ctxIface = Class.forName("io.javalin.http.Context");
-		java.lang.reflect.InvocationHandler ih = (proxy, method, args) -> {
+		java.lang.reflect.InvocationHandler ih = (proxy, method, args) ->
+		{
 			String name = method.getName();
-			if ("contentType".equals(name) || "result".equals(name)) {
+			if ("contentType".equals(name) || "result".equals(name))
+			{
 				return proxy; // fluent API
 			}
-			if ("status".equals(name)) {
+			if ("status".equals(name))
+			{
 				return null;
 			}
 			throw new UnsupportedOperationException("Method not implemented: " + name);
@@ -110,22 +121,27 @@ class MapApiServerMoreCoverageTest {
 	}
 
 	@Test
-	void testPrepareGenerationRequestParsesNortJson() throws Exception {
+	void testPrepareGenerationRequestParsesNortJson() throws Exception
+	{
 		PlatformFactory.setInstance(new AwtFactory());
 
 		// Create a minimal Context proxy that returns a MapSettings JSON body
 		Class<?> ctxIface = Class.forName("io.javalin.http.Context");
 		nortantis.MapSettings gen = nortantis.SettingsGenerator.generate(new java.util.Random(2), nortantis.util.Assets.installedArtPack, null);
 		final String bodyJson = gen.toJsonString();
-		java.lang.reflect.InvocationHandler ih = (proxy, method, args) -> {
+		java.lang.reflect.InvocationHandler ih = (proxy, method, args) ->
+		{
 			String name = method.getName();
-			if ("body".equals(name)) {
+			if ("body".equals(name))
+			{
 				return bodyJson;
 			}
-			if ("contentType".equals(name) || "result".equals(name)) {
+			if ("contentType".equals(name) || "result".equals(name))
+			{
 				return proxy;
 			}
-			if ("status".equals(name)) {
+			if ("status".equals(name))
+			{
 				return null;
 			}
 			throw new UnsupportedOperationException("Method not implemented: " + name);
