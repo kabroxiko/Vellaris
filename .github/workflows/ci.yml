@@ -36,7 +36,7 @@ jobs:
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: nortantis-build
+          name: vellaris-build
           path: build/libs/**/*.jar
 
   docker:
@@ -56,9 +56,9 @@ jobs:
         with:
           context: .
           push: true
-          tags: ghcr.io/${{ github.repository_owner }}/nortantis:latest,ghcr.io/${{ github.repository_owner }}/nortantis:${{ github.sha }}
+          tags: ghcr.io/${{ github.repository_owner }}/vellaris:latest,ghcr.io/${{ github.repository_owner }}/vellaris:${{ github.sha }}
       - name: Upload image info
-        run: echo "image=ghcr.io/${{ github.repository_owner }}/nortantis:latest" > image.txt
+        run: echo "image=ghcr.io/${{ github.repository_owner }}/vellaris:latest" > image.txt
       - uses: actions/upload-artifact@v4
         with:
           name: image-info
@@ -74,7 +74,7 @@ jobs:
       - name: Download build artifact
         uses: actions/download-artifact@v4
         with:
-          name: nortantis-build
+          name: vellaris-build
       - name: Compute release tag
         id: tag
         run: |
