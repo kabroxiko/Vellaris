@@ -1,9 +1,10 @@
 #!/bin/sh
 set -eu
 
-# Start the Java backend in background
+# Start the Java backend in background, but send stdout/stderr to container logs
 echo "Starting Java backend..."
-nohup java $JAVA_OPTS -Djava.awt.headless=true -cp /app/app.jar nortantis.api.MapApiServer > /var/log/java.out 2>&1 &
+# Redirect Java stdout/stderr to the main PID's fds so Docker captures them
+java $JAVA_OPTS -Djava.awt.headless=true -cp /app/app.jar nortantis.api.MapApiServer > /proc/1/fd/1 2>/proc/1/fd/2 &
 JAVA_PID=$!
 
 # Start nginx in foreground
