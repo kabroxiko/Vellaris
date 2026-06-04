@@ -11,11 +11,16 @@ WORKDIR /src/web
 ARG VITE_API_BASE=/api
 ENV VITE_API_BASE=${VITE_API_BASE}
 COPY web/package*.json ./
-RUN npm ci --silent
+ENV NPM_CONFIG_PRODUCTION=false
+# Ensure devDependencies needed for the build are installed (explicit in newer npm)
+RUN npm ci --silent --include=dev
 # ImageMagick and librsvg are required by scripts/make-favicon.sh
 # `rsvg-convert` (from librsvg) is used by ImageMagick to rasterize SVGs
 RUN apk add --no-cache imagemagick librsvg
 COPY web/ ./
+RUN chmod +x scripts/*.sh || true
+ENV NODE_ENV=production
+# Run Vite build in production mode
 RUN npm run build
 
 ########################
