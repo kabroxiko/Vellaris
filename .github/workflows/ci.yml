@@ -74,11 +74,11 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: Download build artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: vellaris-build
       - name: Download image info
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: image-info
       - name: Compose release body
