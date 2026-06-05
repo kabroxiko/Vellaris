@@ -96,7 +96,7 @@ jobs:
           cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/vellaris-cache:${{ steps.tag.outputs.tag }},mode=max
       - name: Upload image info
         run: echo "ghcr.io/${{ github.repository_owner }}/vellaris:${{ steps.tag.outputs.tag }}" > image.txt
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: image-info
           path: image.txt
