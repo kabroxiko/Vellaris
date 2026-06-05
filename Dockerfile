@@ -61,16 +61,16 @@ RUN set -eux; \
 RUN set -eux; \
 	mkdir -p /usr/share/fonts/truetype/vellaris; \
 	cd /usr/share/fonts/truetype/vellaris; \
-	curl --fail --show-error --location --retry 3 -o 'Cinzel[wght].ttf' https://raw.githubusercontent.com/google/fonts/main/ofl/cinzel/Cinzel%5Bwght%5D.ttf; \
-	curl --fail --show-error --location --retry 3 -o 'EBGaramond[wght].ttf' https://raw.githubusercontent.com/google/fonts/main/ofl/ebgaramond/EBGaramond%5Bwght%5D.ttf; \
-	curl --fail --show-error --location --retry 3 -o 'LibreBaskerville[wght].ttf' https://raw.githubusercontent.com/google/fonts/main/ofl/librebaskerville/LibreBaskerville%5Bwght%5D.ttf; \
-	curl --fail --show-error --location --retry 3 -o Cardo-Regular.ttf https://raw.githubusercontent.com/google/fonts/main/ofl/cardo/Cardo-Regular.ttf; \
-	curl --fail --show-error --location --retry 3 -o GentiumPlus-Regular.ttf https://raw.githubusercontent.com/google/fonts/main/ofl/gentiumplus/GentiumPlus-Regular.ttf; \
-	curl --fail --show-error --location --retry 3 -o 'CormorantGaramond[wght].ttf' https://raw.githubusercontent.com/google/fonts/main/ofl/cormorantgaramond/CormorantGaramond%5Bwght%5D.ttf; \
-	curl --fail --show-error --location --retry 3 -o Allura-Regular.ttf https://raw.githubusercontent.com/google/fonts/main/ofl/allura/Allura-Regular.ttf; \
-	curl --fail --show-error --location --retry 3 -o GreatVibes-Regular.ttf https://raw.githubusercontent.com/google/fonts/main/ofl/greatvibes/GreatVibes-Regular.ttf; \
-	curl --fail --show-error --location --retry 3 -o URWChanceryL.ttf https://raw.githubusercontent.com/hpi-swa-teaching/Scamper-SWT15/master/build-support/fonts/URW%20Chancery%20L%20Medium%20Italic%20U.ttf; \
-	curl --fail --show-error --location --retry 3 -o Z003.ttf https://raw.githubusercontent.com/ArtifexSoftware/urw-base35-fonts/master/fonts/Z003-MediumItalic.ttf; \
+	curl -s --fail --show-error --location --retry 3 -o 'Cinzel[wght].ttf' https://raw.githubusercontent.com/google/fonts/main/ofl/cinzel/Cinzel%5Bwght%5D.ttf; \
+	curl -s --fail --show-error --location --retry 3 -o 'EBGaramond[wght].ttf' https://raw.githubusercontent.com/google/fonts/main/ofl/ebgaramond/EBGaramond%5Bwght%5D.ttf; \
+	curl -s --fail --show-error --location --retry 3 -o 'LibreBaskerville[wght].ttf' https://raw.githubusercontent.com/google/fonts/main/ofl/librebaskerville/LibreBaskerville%5Bwght%5D.ttf; \
+	curl -s --fail --show-error --location --retry 3 -o Cardo-Regular.ttf https://raw.githubusercontent.com/google/fonts/main/ofl/cardo/Cardo-Regular.ttf; \
+	curl -s --fail --show-error --location --retry 3 -o GentiumPlus-Regular.ttf https://raw.githubusercontent.com/google/fonts/main/ofl/gentiumplus/GentiumPlus-Regular.ttf; \
+	curl -s --fail --show-error --location --retry 3 -o 'CormorantGaramond[wght].ttf' https://raw.githubusercontent.com/google/fonts/main/ofl/cormorantgaramond/CormorantGaramond%5Bwght%5D.ttf; \
+	curl -s --fail --show-error --location --retry 3 -o Allura-Regular.ttf https://raw.githubusercontent.com/google/fonts/main/ofl/allura/Allura-Regular.ttf; \
+	curl -s --fail --show-error --location --retry 3 -o GreatVibes-Regular.ttf https://raw.githubusercontent.com/google/fonts/main/ofl/greatvibes/GreatVibes-Regular.ttf; \
+	curl -s --fail --show-error --location --retry 3 -o URWChanceryL.ttf https://raw.githubusercontent.com/hpi-swa-teaching/Scamper-SWT15/master/build-support/fonts/URW%20Chancery%20L%20Medium%20Italic%20U.ttf; \
+	curl -s --fail --show-error --location --retry 3 -o Z003.ttf https://raw.githubusercontent.com/ArtifexSoftware/urw-base35-fonts/master/fonts/Z003-MediumItalic.ttf; \
 	fc-cache -f -v
 
 # Copy backend jar and frontend static build output
