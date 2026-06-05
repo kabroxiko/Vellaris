@@ -19,7 +19,7 @@ RUN --mount=type=cache,target=/root/.npm npm ci --silent --include=dev
 # `rsvg-convert` (from librsvg) is used by ImageMagick to rasterize SVGs
 RUN apk add --no-cache imagemagick librsvg
 COPY web/ ./
-RUN chmod +x scripts/*.sh || true
+RUN chmod +x scripts/*.sh
 ENV NODE_ENV=production
 # Run Vite build in production mode
 RUN npm run build
@@ -81,11 +81,11 @@ COPY --from=frontend-builder /src/web/dist ./static
 RUN mkdir -p /var/cache/nginx /var/run /var/log/nginx /app/static/fonts
 COPY docker/nginx.conf /etc/nginx/nginx.conf
 
-# Copy bundled fonts if any (best-effort)
-RUN cp -r /usr/share/fonts/* ./static/fonts/ || true
+# Copy bundled fonts (expect fonts to be present when build reaches this stage)
+RUN cp -r /usr/share/fonts/* ./static/fonts/
 
 # Ensure runtime dirs are writable
-RUN chmod -R a+rwX /app /var/cache/nginx /var/run /var/log/nginx || true
+RUN chmod -R a+rwX /app /var/cache/nginx /var/run /var/log/nginx
 
 # Expose standard HTTP port
 EXPOSE 80

@@ -12,5 +12,5 @@ echo "Starting nginx..."
 nginx -g 'daemon off;'
 
 # When nginx exits, stop the Java process as well
-kill "$JAVA_PID" || true
-wait "$JAVA_PID" || true
+kill "$JAVA_PID"
+wait "$JAVA_PID"

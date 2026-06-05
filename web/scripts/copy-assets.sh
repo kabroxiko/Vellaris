@@ -29,12 +29,12 @@ else
   # Fallback to cp; remove existing files from sources before copying so deletions propagate
   if [ -d "$SRC1" ]; then
     echo " - cp from $SRC1"
-    (cd "$OUT_DIR" && find . -maxdepth 1 -mindepth 1 -not -name '.gitkeep' -exec rm -rf {} +) || true
-    cp -R "$SRC1/"* "$OUT_DIR/" 2>/dev/null || true
+    (cd "$OUT_DIR" && find . -maxdepth 1 -mindepth 1 -not -name '.gitkeep' -exec rm -rf {} +)
+    cp -R "$SRC1/." "$OUT_DIR/"
   fi
   if [ -d "$SRC2" ]; then
     echo " - cp from $SRC2"
-    cp -R "$SRC2/"* "$OUT_DIR/" 2>/dev/null || true
+    cp -R "$SRC2/." "$OUT_DIR/"
   fi
 fi
 
