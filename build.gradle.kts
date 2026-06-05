@@ -25,7 +25,7 @@ dependencies {
     implementation("org.imgscalr:imgscalr-lib:4.2")
     implementation("org.slf4j:slf4j-simple:2.0.18")
     implementation("com.google.code.gson:gson:2.14.0")
-    testImplementation(platform("org.junit:junit-bom:5.10.2"))
+    testImplementation(platform("org.junit:junit-bom:6.1.0"))
     testImplementation("org.junit.jupiter:junit-jupiter")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     implementation("com.formdev:flatlaf:3.7.1")
