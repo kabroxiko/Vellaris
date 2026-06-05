@@ -45,6 +45,9 @@ jobs:
   docker:
     name: Build & Push Docker Image
     needs: build
+    concurrency:
+      group: "docker-${{ github.ref }}"
+      cancel-in-progress: false
     timeout-minutes: 30
     runs-on: ubuntu-latest
     env:
@@ -87,8 +90,10 @@ jobs:
           context: .
           push: true
           tags: ghcr.io/${{ github.repository_owner }}/vellaris:latest,ghcr.io/${{ github.repository_owner }}/vellaris:${{ steps.tag.outputs.tag }},ghcr.io/${{ github.repository_owner }}/vellaris:${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: |
+            type=registry,ref=ghcr.io/${{ github.repository_owner }}/vellaris-cache:latest
+            type=gha
+          cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/vellaris-cache:${{ steps.tag.outputs.tag }},mode=max
       - name: Upload image info
         run: echo "ghcr.io/${{ github.repository_owner }}/vellaris:${{ steps.tag.outputs.tag }}" > image.txt
       - uses: actions/upload-artifact@v4
