@@ -23,7 +23,7 @@ dependencies {
     implementation("org.apache.commons:commons-math3:3.6.1")
     implementation("com.googlecode.json-simple:json-simple:1.1.1")
     implementation("org.imgscalr:imgscalr-lib:4.2")
-    implementation("org.slf4j:slf4j-simple:2.0.7")
+    implementation("org.slf4j:slf4j-simple:2.0.18")
     implementation("com.google.code.gson:gson:2.14.0")
     testImplementation(platform("org.junit:junit-bom:5.10.2"))
     testImplementation("org.junit.jupiter:junit-jupiter")
