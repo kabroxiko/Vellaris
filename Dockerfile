@@ -95,5 +95,5 @@ EXPOSE 80
 COPY docker/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 USER root
-ENV JAVA_OPTS=""
+ENV JAVA_OPTS="-Xms2g -Xmx2g -XX:+UseG1GC"
 CMD ["/usr/local/bin/docker-entrypoint.sh"]
