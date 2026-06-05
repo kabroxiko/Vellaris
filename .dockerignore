@@ -1,0 +1,14 @@
+build/
+.gradle/
+node_modules/
+web/node_modules/
+**/dist/
+.git
+.gitignore
+Dockerfile
+.dockerignore
+**/*.log
+*/build/
+*.iml
+.vscode/
+.idea/

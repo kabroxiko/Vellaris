@@ -5,6 +5,10 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+concurrency:
+  group: "ci-${{ github.ref }}"
+  cancel-in-progress: true
+
 permissions:
   contents: write
   packages: write
@@ -14,6 +18,7 @@ env:
 jobs:
   build:
     name: Build & Test
+    timeout-minutes: 30
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -44,7 +49,10 @@ jobs:
   docker:
     name: Build & Push Docker Image
     needs: build
+    timeout-minutes: 30
     runs-on: ubuntu-latest
+    env:
+      DOCKER_BUILDKIT: 1
     steps:
       - uses: actions/checkout@v6
       - name: Log in to GitHub Container Registry
@@ -59,6 +67,8 @@ jobs:
           context: .
           push: true
           tags: ghcr.io/${{ github.repository_owner }}/vellaris:latest,ghcr.io/${{ github.repository_owner }}/vellaris:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
       - name: Upload image info
         run: echo "ghcr.io/${{ github.repository_owner }}/vellaris:latest" > image.txt
       - uses: actions/upload-artifact@v4
@@ -69,6 +79,7 @@ jobs:
   release:
     name: Create Release
     needs: [build, docker]
+    timeout-minutes: 30
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
     steps:

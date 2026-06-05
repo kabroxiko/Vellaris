@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.4
 # Multi-stage Dockerfile building frontend (Vite) and backend (Gradle/Java)
 # - Frontend: builds web/ using Node
 # - Backend: builds JVM JAR with Gradle
@@ -12,8 +13,8 @@ ARG VITE_API_BASE=/api
 ENV VITE_API_BASE=${VITE_API_BASE}
 COPY web/package*.json ./
 ENV NPM_CONFIG_PRODUCTION=false
-# Ensure devDependencies needed for the build are installed (explicit in newer npm)
-RUN npm ci --silent --include=dev
+# Use BuildKit cache for npm to speed repeated builds
+RUN --mount=type=cache,target=/root/.npm npm ci --silent --include=dev
 # ImageMagick and librsvg are required by scripts/make-favicon.sh
 # `rsvg-convert` (from librsvg) is used by ImageMagick to rasterize SVGs
 RUN apk add --no-cache imagemagick librsvg
@@ -32,14 +33,12 @@ WORKDIR /src
 # non-root users write ownership of copied files (addresses S6504).
 USER root
 # Copy only the files and directories required to run the Gradle build.
-# Avoid copying the entire build context to reduce leaked secrets and
-# unnecessary files in the image (see Sonar rule S6470).
-# Adjust these paths if your build requires additional files.
+# Use BuildKit cache for Gradle to speed builds between runs
 COPY assets/ assets/
 COPY src/ src/
 COPY gradle/ gradle/
 COPY gradlew build.gradle.kts settings.gradle ./
-RUN ./gradlew jar
+RUN --mount=type=cache,target=/root/.gradle ./gradlew jar
 
 ########################
 # Runtime image (Alpine + nginx + Temurin JRE)
