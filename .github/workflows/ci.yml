@@ -45,8 +45,6 @@ jobs:
   docker:
     name: Build & Push Docker Image
     needs: build
-    outputs:
-      image_tag: ${{ steps.tag.outputs.tag }}
     timeout-minutes: 30
     runs-on: ubuntu-latest
     env:
@@ -106,30 +104,36 @@ jobs:
     if: github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Compute image tag
+        id: tag
+        run: |
+          git fetch --tags --force
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "Latest tag: $LATEST_TAG"
+          V=${LATEST_TAG#v}
+          IFS='.' read -r MAJOR MINOR PATCH <<< "${V}"
+          MAJOR=${MAJOR:-0}
+          MINOR=${MINOR:-0}
+          PATCH=${PATCH:-0}
+          PATCH=$((PATCH + 1))
+          NEW_TAG="v${MAJOR}.${MINOR}.${PATCH}"
+          echo "tag=$NEW_TAG" >> $GITHUB_OUTPUT
       - name: Compose release body
         run: |
-          IMAGE="ghcr.io/${{ github.repository_owner }}/vellaris:${{ needs.docker.outputs.image_tag }}"
+          IMAGE="ghcr.io/${{ github.repository_owner }}/vellaris:${{ steps.tag.outputs.tag }}"
           echo "Automated release from CI" > release_body.md
           echo "" >> release_body.md
           echo "Docker image: https://ghcr.io/${{ github.repository_owner }}/vellaris" >> release_body.md
-          echo "Image tag: $IMAGE" >> release_body.md
+          echo "Image: $IMAGE" >> release_body.md
         shell: bash
       - name: Create GitHub release
         uses: ncipollo/release-action@v1
         with:
-          tag: ${{ needs.docker.outputs.image_tag }}
+          tag: ${{ steps.tag.outputs.tag }}
           commit: ${{ github.sha }}
-          name: Release ${{ needs.docker.outputs.image_tag }}
+          name: Release ${{ steps.tag.outputs.tag }}
           bodyFile: release_body.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Push tag to remote
-        if: always()
-        run: |
-          TAG=${{ needs.docker.outputs.image_tag }}
-          git config user.name "${{ github.actor }}"
-          git config user.email "${{ github.actor }}@users.noreply.github.com"
-          git tag -a "$TAG" -m "Release $TAG"
-          git push https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }} "$TAG"
-        shell: bash
