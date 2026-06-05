@@ -6,7 +6,7 @@ import java.io.IOException;
 
 public interface BackgroundTask<T>
 {
-	public T doInBackground() throws IOException, CancelledException;
+	T doInBackground() throws IOException, CancelledException;
 
-	public void done(T result);
+	void done(T result);
 }

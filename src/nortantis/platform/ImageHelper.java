@@ -429,13 +429,13 @@ public abstract class ImageHelper
 		if (originalWidth > maxDimensions.width)
 		{
 			width = maxDimensions.width;
-			height = height * (width / originalWidth);
+			height *= (width / originalWidth);
 		}
 		if (height > maxDimensions.height)
 		{
 			double prevHeight = height;
 			height = maxDimensions.height;
-			width = width * (height / prevHeight);
+			width *= (height / prevHeight);
 		}
 		return new Dimension(width, height);
 	}

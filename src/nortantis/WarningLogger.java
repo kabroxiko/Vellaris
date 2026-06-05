@@ -4,7 +4,7 @@ import java.util.List;
 
 public interface WarningLogger
 {
-	public void addWarningMessage(String message);
+	void addWarningMessage(String message);
 
-	public List<String> getWarningMessages();
+	List<String> getWarningMessages();
 }

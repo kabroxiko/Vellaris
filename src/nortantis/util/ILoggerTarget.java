@@ -2,9 +2,9 @@ package nortantis.util;
 
 public interface ILoggerTarget
 {
-	public void appendLoggerMessage(String message);
+	void appendLoggerMessage(String message);
 
-	public void clearLoggerMessages();
+	void clearLoggerMessages();
 
-	public boolean isReadyForLogging();
+	boolean isReadyForLogging();
 }

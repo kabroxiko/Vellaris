@@ -50,7 +50,7 @@ public class AwtGrayscalePixelReaderWriter extends AwtGrayscalePixelReader imple
 		int gray = color.getRed();
 		if (imageSubType == BufferedImage.TYPE_USHORT_GRAY)
 		{
-			gray = gray * 257;
+			gray *= 257;
 		}
 		setGrayLevel(x, y, gray);
 	}
@@ -61,7 +61,7 @@ public class AwtGrayscalePixelReaderWriter extends AwtGrayscalePixelReader imple
 		int gray = (rgb >> 16) & 0xFF;
 		if (imageSubType == BufferedImage.TYPE_USHORT_GRAY)
 		{
-			gray = gray * 257;
+			gray *= 257;
 		}
 		setGrayLevel(x, y, gray);
 	}
@@ -72,7 +72,7 @@ public class AwtGrayscalePixelReaderWriter extends AwtGrayscalePixelReader imple
 		int gray = red;
 		if (imageSubType == BufferedImage.TYPE_USHORT_GRAY)
 		{
-			gray = gray * 257;
+			gray *= 257;
 		}
 		setGrayLevel(x, y, gray);
 	}
@@ -83,7 +83,7 @@ public class AwtGrayscalePixelReaderWriter extends AwtGrayscalePixelReader imple
 		int gray = red;
 		if (imageSubType == BufferedImage.TYPE_USHORT_GRAY)
 		{
-			gray = gray * 257;
+			gray *= 257;
 		}
 		setGrayLevel(x, y, gray);
 	}
