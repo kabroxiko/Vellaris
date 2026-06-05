@@ -19,10 +19,9 @@ RUN --mount=type=cache,target=/root/.npm npm ci --silent --include=dev
 # `rsvg-convert` (from librsvg) is used by ImageMagick to rasterize SVGs
 RUN apk add --no-cache imagemagick librsvg
 COPY web/ ./
-RUN chmod +x scripts/*.sh
 ENV NODE_ENV=production
-# Run Vite build in production mode
-RUN npm run build
+# Run Vite build in production mode (combine chmod + build to reduce layers)
+RUN chmod +x scripts/*.sh && npm run build
 
 ########################
 # Backend build stage
@@ -55,10 +54,8 @@ RUN set -eux; \
 		microdnf -y update && microdnf -y install nginx curl fontconfig tzdata && microdnf clean all; \
 	else \
 		echo "No supported package manager found" >&2; exit 1; \
-	fi
-
-# Fetch bundled fonts (retry on transient network failures)
-RUN set -eux; \
+	fi; \
+	# Fetch bundled fonts (retry on transient network failures)
 	mkdir -p /usr/share/fonts/truetype/vellaris; \
 	cd /usr/share/fonts/truetype/vellaris; \
 	curl -s --fail --show-error --location --retry 3 -o 'Cinzel[wght].ttf' https://raw.githubusercontent.com/google/fonts/main/ofl/cinzel/Cinzel%5Bwght%5D.ttf; \
@@ -76,23 +73,28 @@ RUN set -eux; \
 # Copy backend jar and frontend static build output
 COPY --from=backend-builder /src/build/libs/*.jar ./app.jar
 COPY --from=frontend-builder /src/web/dist ./static
-
-# Copy custom nginx main config (overwrite default)
-RUN mkdir -p /var/cache/nginx /var/run /var/log/nginx /app/static/fonts
 COPY docker/nginx.conf /etc/nginx/nginx.conf
+COPY docker/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
 # Copy bundled fonts (expect fonts to be present when build reaches this stage)
-RUN cp -r /usr/share/fonts/* ./static/fonts/
+RUN mkdir -p /var/cache/nginx /var/run /var/log/nginx /app/static/fonts /var/lib/nginx/tmp/client_body && \
+	cp -r /usr/share/fonts/* ./static/fonts/ && \
+	chmod -R a+rwX /app /var/cache/nginx /var/run /var/log/nginx /var/lib/nginx && \
+	chmod +x /usr/local/bin/docker-entrypoint.sh && \
+	# Create non-root app user (if missing) and take ownership of runtime dirs
+	if ! id app >/dev/null 2>&1; then \
+		if command -v addgroup >/dev/null 2>&1 && command -v adduser >/dev/null 2>&1; then \
+			addgroup -S app && adduser -S -G app -u 1000 app || true; \
+		else \
+			groupadd -r app || true; useradd -r -u 1000 -g app -s /sbin/nologin -M app || true; \
+		fi; \
+	fi && \
+	chown -R app:app /app /var/cache/nginx /var/run /var/log/nginx /app/static /usr/share/fonts /var/lib/nginx || true
 
-# Ensure runtime dirs are writable
-RUN chmod -R a+rwX /app /var/cache/nginx /var/run /var/log/nginx
-
-# Expose standard HTTP port
-EXPOSE 80
+# Expose non-privileged HTTP port for rootless container
+EXPOSE 8081
 
 # Entrypoint starts Java in background then runs nginx in foreground
-COPY docker/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
-USER root
+USER app
 ENV JAVA_OPTS="-Xms2g -Xmx2g -XX:+UseG1GC"
 CMD ["/usr/local/bin/docker-entrypoint.sh"]
