@@ -28,7 +28,7 @@ dependencies {
     testImplementation(platform("org.junit:junit-bom:6.1.0"))
     testImplementation("org.junit.jupiter:junit-jupiter")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
-    implementation("com.formdev:flatlaf:3.7.1")
+    implementation("com.formdev:flatlaf:3.7.2")
 }
 
 // Attaches javadocs to libraries in Eclipse.
