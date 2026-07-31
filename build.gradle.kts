@@ -6,7 +6,7 @@ plugins {
     application
     `java-test-fixtures`
     id("com.diffplug.spotless") version "8.6.0"
-    id("com.github.ben-manes.versions") version "0.54.0"
+    id("com.github.ben-manes.versions") version "0.56.0"
     eclipse
     jacoco
 }
