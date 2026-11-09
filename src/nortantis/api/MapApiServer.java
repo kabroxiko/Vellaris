@@ -9,6 +9,7 @@ import nortantis.MapCreator;
 import nortantis.MapSettings;
 import nortantis.NamedResource;
 import nortantis.SettingsGenerator;
+import nortantis.editor.MapParts;
 import nortantis.i18n.Translation;
 import nortantis.util.Assets;
 import nortantis.geom.Dimension;
@@ -123,6 +124,7 @@ public class MapApiServer
 
 			config.routes.post("/api/generate-settings", ctx -> ctx.result(String.valueOf(handleGenerateSettings(ctx))));
 			config.routes.post("/api/generate", ctx -> ctx.result(String.valueOf(handleGenerate(ctx))));
+			config.routes.post("/api/world", ctx -> ctx.result(String.valueOf(handleWorld(ctx))));
 			config.routes.post("/api/background-base", MapApiServer::handleBackgroundBase);
 
 			config.routes.exception(Exception.class, (e, ctx) ->
@@ -340,11 +342,77 @@ public class MapApiServer
 		}
 	}
 
+	/**
+	 * Generates a map and returns a compact description of the world instead of an image.
+	 *
+	 * This exists so a client that needs structured locations - named places, regions and roads - does not have to encode and ship a multi
+	 * megabyte PNG, and does not have to dig that information out of the editor-format settings. The canonical settings are still returned
+	 * alongside it so a client can persist the world and re-render it later with /api/generate.
+	 */
+	private static Object handleWorld(Context ctx)
+	{
+		GenerationRequestContext grc = prepareGenerationRequest(ctx, false);
+		if (grc == null)
+		{
+			return gson.toJson(new ApiResponse(false, MSG_FAILED_TO_PARSE_CONFIG, null, null));
+		}
+
+		MapSettings requestSettings = grc.settings;
+		Integer generatedWidth = (requestSettings != null && requestSettings.generatedWidth > 0) ? Integer.valueOf(requestSettings.generatedWidth) : null;
+		Integer generatedHeight = (requestSettings != null && requestSettings.generatedHeight > 0) ? Integer.valueOf(requestSettings.generatedHeight) : null;
+
+		boolean appliedLanguage = requestSettings != null && requestSettings.language != null && !requestSettings.language.isEmpty();
+
+		GenerationResult generation;
+		try
+		{
+			if (appliedLanguage)
+			{
+				grc.ctx.settings.language = requestSettings.language;
+				Translation.initializeWithLanguage(requestSettings.language);
+			}
+			generation = generateMap(grc.ctx.settings, generatedWidth, generatedHeight, true);
+		}
+		finally
+		{
+			if (appliedLanguage)
+			{
+				Translation.initialize();
+			}
+		}
+
+		if (generation.image == null)
+		{
+			ctx.status(500);
+			return gson.toJson(new ApiResponse(false, generation.errorMessage, null, null));
+		}
+
+		try
+		{
+			Map<String, Object> response = new LinkedHashMap<>();
+			response.put("success", true);
+
+			// Resolve the canonical settings first, because that is what fills in the region edits that carry each region's color.
+			@SuppressWarnings("unchecked")
+			Map<String, Object> canonicalSettings = gson.fromJson(resolveBestNortContent(grc.ctx.settings), Map.class);
+
+			response.put("world", WorldModel.build(grc.ctx.settings, generation.mapParts == null ? null : generation.mapParts.graph));
+			response.put("settings", canonicalSettings);
+
+			ctx.contentType(CONTENT_TYPE_JSON);
+			ctx.status(200);
+			return gson.toJson(response);
+		}
+		finally
+		{
+			generation.image.close();
+		}
+	}
+
 	private static Object executeGenerationAndReturn(GenerationRequestContext grc, Context ctx)
 	{
 		GenerationContext genCtx = grc.ctx;
 		MapSettings requestSettings = grc.settings;
-
 		if (requestSettings != null && requestSettings.language != null && !requestSettings.language.isEmpty())
 		{
 			genCtx.settings.language = requestSettings.language;
@@ -1028,6 +1096,16 @@ public class MapApiServer
 
 	private static GenerationResult generateMap(MapSettings settings, Integer generatedWidth, Integer generatedHeight)
 	{
+		return generateMap(settings, generatedWidth, generatedHeight, false);
+	}
+
+	/**
+	 * @param captureMapParts
+	 *            When true, the generated graph is kept in the result so the caller can describe the world. Callers that only need the
+	 *            image pass false to let the graph be collected with everything else.
+	 */
+	private static GenerationResult generateMap(MapSettings settings, Integer generatedWidth, Integer generatedHeight, boolean captureMapParts)
+	{
 		// Only pass explicit render dimensions to the map creator when the
 		// caller provided `generatedWidth` or `generatedHeight`. The desktop
 		// generator (CLI/UI) passes `null` when no explicit output size is
@@ -1038,32 +1116,36 @@ public class MapApiServer
 
 		try
 		{
-			return attemptPrimaryRender(settings, dims);
+			return attemptPrimaryRender(settings, dims, captureMapParts);
 		}
 		catch (RuntimeException firstError)
 		{
 			Logger.println("generateMap primary render failed: " + firstError);
-			return attemptFallbackRender(settings, dims, firstError);
+			return attemptFallbackRender(settings, dims, captureMapParts, firstError);
 		}
 	}
 
-	private static GenerationResult attemptPrimaryRender(MapSettings settings, Dimension dims)
+	private static GenerationResult attemptPrimaryRender(MapSettings settings, Dimension dims, boolean captureMapParts)
 	{
 		java.util.function.Supplier<MapCreator> supplier = mapCreatorFactory.get();
 		MapCreator creator = supplier.get();
-		Image image = creator.createMap(settings, dims, null);
-		return GenerationResult.success(image);
+		MapParts mapParts = captureMapParts ? new MapParts() : null;
+		Image image = creator.createMap(settings, dims, mapParts);
+		return GenerationResult.success(image, mapParts);
 	}
 
-	private static GenerationResult attemptFallbackRender(MapSettings settings, Dimension dims, Exception firstError)
+	private static GenerationResult attemptFallbackRender(MapSettings settings, Dimension dims, boolean captureMapParts, Exception firstError)
 	{
 		try
 		{
 			MapSettings fallback = prepareFallbackSettings(settings);
 			java.util.function.Supplier<MapCreator> supplier = mapCreatorFactory.get();
 			MapCreator creator = supplier.get();
-			Image fallbackImage = creator.createMap(fallback, dims, null);
-			return GenerationResult.success(fallbackImage);
+			// The primary attempt may have already filled its MapParts with a graph built from the settings that failed, so the fallback
+			// gets a fresh container rather than reusing that graph.
+			MapParts mapParts = captureMapParts ? new MapParts() : null;
+			Image fallbackImage = creator.createMap(fallback, dims, mapParts);
+			return GenerationResult.success(fallbackImage, mapParts);
 		}
 		catch (RuntimeException fallbackError)
 		{
@@ -1171,12 +1253,14 @@ public class MapApiServer
 	private static class GenerationResult
 	{
 		Image image;
+		MapParts mapParts;
 		String errorMessage;
 
-		static GenerationResult success(Image image)
+		static GenerationResult success(Image image, MapParts mapParts)
 		{
 			GenerationResult result = new GenerationResult();
 			result.image = image;
+			result.mapParts = mapParts;
 			return result;
 		}
 

@@ -63,6 +63,9 @@ HTTP API
 - `GET /api/ui-options` — translation strings, icon sets, art packs, fonts, dimensions.
 - `POST /api/generate-settings` — returns a fresh random `MapSettings` JSON document.
 - `POST /api/generate` — renders a map from a `MapSettings` body and returns JSON with a base64 PNG.
+- `POST /api/world` — generates a map from a `MapSettings` body and returns a compact description of the world
+  (named places, regions with their names and colors, roads) plus the canonical settings, without encoding an image.
+  Coordinates are resolution-invariant, so the same world describes the same locations at any render resolution.
 - `POST /api/background-base` — returns a background texture PNG.
 
 Docker
