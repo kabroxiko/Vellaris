@@ -447,8 +447,7 @@ public class IconDrawer
 			Rectangle conversionBoundsOfIconsChanged = convertToFreeIconsIfNeeded(centersToUpdateIconsFor, edits, warningLogger);
 			// Expand the filter bounds to include the converted icons' bounds so that nearby icons are included
 			// in the draw tasks. Without this, when a converted icon (e.g. a tall mountain) extends beyond
-			// replaceBounds, icons in the expanded region would be missing from the draw tasks and get erased
-			// when the snippet is pasted over the expanded replaceBounds in incrementalUpdateForCentersAndEdges.
+			// replaceBounds, icons in the expanded region would be missing from the draw tasks.
 			Rectangle filterBounds = Rectangle.add(replaceBounds, conversionBoundsOfIconsChanged);
 			Rectangle removedOrReplacedChangeBounds = createDrawTasksForFreeIconsAndRemovedFailedIcons(warningLogger, filterBounds);
 			Rectangle combined = Rectangle.add(conversionBoundsOfIconsChanged, removedOrReplacedChangeBounds);

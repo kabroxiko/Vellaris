@@ -1132,39 +1132,6 @@ public class WorldGraph extends VoronoiGraph
 	}
 
 	/**
-	 * Clears the slice polygon cache for the specified centers and their neighbors. Call this when centers' noisy edges have been rebuilt.
-	 */
-	private void clearSlicePolygonCache(Collection<Center> centers)
-	{
-		if (slicePolygonsByCenter == null)
-		{
-			return;
-		}
-
-		Set<Center> centersWithNeighbors = new HashSet<>();
-		for (Center c : centers)
-		{
-			centersWithNeighbors.add(c);
-			for (Center neighbor : c.neighbors)
-			{
-				centersWithNeighbors.add(neighbor);
-			}
-		}
-
-		for (Center c : centersWithNeighbors)
-		{
-			// Clear the array for this center so it will be rebuilt
-			if (c.index < slicePolygonsByCenter.length && slicePolygonsByCenter[c.index] != null)
-			{
-				for (int i = 0; i < slicePolygonsByCenter[c.index].length; i++)
-				{
-					slicePolygonsByCenter[c.index][i] = null;
-				}
-			}
-		}
-	}
-
-	/**
 	 * Fast point-in-polygon test using ray casting with array coordinates.
 	 */
 	private boolean isPointInPolygonArray(double px, double py, double[] xCoords, double[] yCoords)
@@ -1232,45 +1199,6 @@ public class WorldGraph extends VoronoiGraph
 		}
 	}
 
-	/**
-	 * Rebuilds slice polygons for the specified centers and their neighbors.
-	 */
-	private void precomputeSlicePolygonsForCenters(Collection<Center> centersToUpdate)
-	{
-		if (slicePolygonsByCenter == null)
-		{
-			// Initialize full array if not yet done
-			precomputeSlicePolygons();
-			return;
-		}
-
-		Set<Center> centersWithNeighbors = new HashSet<>();
-		for (Center c : centersToUpdate)
-		{
-			centersWithNeighbors.add(c);
-			for (Center neighbor : c.neighbors)
-			{
-				centersWithNeighbors.add(neighbor);
-			}
-		}
-
-		for (Center center : centersWithNeighbors)
-		{
-			// Rebuild the slice polygons array for this center
-			if (slicePolygonsByCenter[center.index] == null)
-			{
-				slicePolygonsByCenter[center.index] = new CachedSlicePolygon[center.borders.size()];
-			}
-			for (int i = 0; i < center.borders.size(); i++)
-			{
-				Edge edge = center.borders.get(i);
-				if (edge.v0 != null && edge.v1 != null)
-				{
-					slicePolygonsByCenter[center.index][i] = buildSlicePolygon(center, edge);
-				}
-			}
-		}
-	}
 
 	/**
 	 * Spatial grid for efficient center lookup. Each cell stores a representative center that is close to that cell's center point.
@@ -1386,66 +1314,6 @@ public class WorldGraph extends VoronoiGraph
 				}
 				// Create cached reader for the entire map
 				cachedCenterLookupReader = centerLookupTable.createPixelReader();
-			}
-		}
-	}
-
-	/**
-	 * Updates the center lookup table, which is used to lookup which center draws at a given point. This needs to be done when a center
-	 * potentially changed its noisy edges, such as when it switched from inland to coast.
-	 *
-	 * @param centersToUpdate
-	 *            Centers to update
-	 */
-	public void updateCenterLookupTable(Collection<Center> centersToUpdate)
-	{
-		// Clear and rebuild slice polygon cache for affected centers (used by grid-based lookup)
-		clearSlicePolygonCache(centersToUpdate);
-		precomputeSlicePolygonsForCenters(centersToUpdate);
-
-		if (centerLookupMode == CenterLookupMode.PIXEL_CACHED || centerLookupMode == CenterLookupMode.PIXEL_UNCACHED)
-		{
-			synchronized (centerLookupLock)
-			{
-				if (centerLookupTable == null)
-				{
-					buildCenterLookupTableIfNeeded();
-				}
-				else
-				{
-					// Include neighbors of each center because if a center changed,
-					// that will affect its neighbors as well.
-					Set<Center> centersWithNeighbors = new HashSet<>();
-					for (Center c : centersToUpdate)
-					{
-						centersWithNeighbors.add(c);
-						for (Center neighbor : c.neighbors)
-						{
-							centersWithNeighbors.add(neighbor);
-						}
-					}
-
-					try (Painter p = centerLookupTable.createPainter())
-					{
-						drawPolygons(p, centersWithNeighbors, new Function<Center, Color>()
-						{
-							public Color apply(Center c)
-							{
-								return convertCenterIdToColor(c);
-							}
-						});
-					}
-
-					if (centerLookupMode == CenterLookupMode.PIXEL_CACHED)
-					{
-						// Refresh the cached reader with the changed region
-						Rectangle changedBounds = getBoundingBox(centersWithNeighbors);
-						if (changedBounds != null)
-						{
-							cachedCenterLookupReader.refreshRegion(changedBounds.toEnclosingIntRectangle());
-						}
-					}
-				}
 			}
 		}
 	}

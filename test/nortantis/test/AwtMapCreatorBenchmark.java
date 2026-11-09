@@ -31,10 +31,4 @@ public class AwtMapCreatorBenchmark
 	{
 		MapTestUtil.runMapCreationBenchmarkSingleIteration("AWT CPU", 1.5);
 	}
-
-	@Test
-	public void benchmarkIncrementalDrawing() throws Exception
-	{
-		MapTestUtil.runIncrementalDrawingBenchmark("AWT CPU", 0, 1);
-	}
 }

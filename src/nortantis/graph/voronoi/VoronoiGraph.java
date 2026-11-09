@@ -685,26 +685,6 @@ public abstract class VoronoiGraph
 		return centers;
 	}
 
-	public Set<Center> getCentersFromEdgeIds(Collection<Integer> edgeIds)
-	{
-		Set<Center> centers = new HashSet<Center>();
-		for (Integer id : edgeIds)
-		{
-			Edge edge = edges.get(id);
-			if (edge.d0 != null)
-			{
-				centers.add(edge.d0);
-			}
-
-			if (edge.d1 != null)
-			{
-				centers.add(edge.d1);
-			}
-		}
-
-		return centers;
-	}
-
 	public Set<Edge> getEdgesFromCenters(Collection<Center> centers)
 	{
 		Set<Edge> edges = new HashSet<>();

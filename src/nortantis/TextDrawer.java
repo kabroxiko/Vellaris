@@ -308,45 +308,6 @@ public class TextDrawer
 		}
 	}
 
-	public Rectangle getTextBoundingBoxFor1Or2LineSplit(MapText text)
-	{
-		if (text.value == null || text.value.trim().length() == 0)
-		{
-			// This text was deleted.
-			return null;
-		}
-		try (Painter p = Image.create(1, 1, ImageType.ARGB).createPainter())
-		{
-			setFontForText(p, text);
-			Point textLocation = new Point(text.location.x * settings.resolution, text.location.y * settings.resolution);
-
-			// Get bounds for when the text is on one line.
-			Rectangle bounds = getLine1BoundsWithoutCurvatureOrSpacing(text.value, textLocation, p, false);
-			bounds = expandBoundsToIncludeCurvatureAndSpacing(bounds, text, text.value, p);
-			bounds = addBackgroundBlendingPadding(bounds, getFontHeight(p), text);
-			Rectangle boundingBox = new RotatedRectangle(bounds, text.angle, textLocation).getBounds();
-
-			// Since it wouldn't be easy from here to figure out whether the text will draw onto one line or two, also add
-			// the bounds when it splits under two lines.
-			if ((text.lineBreak == LineBreak.Auto || text.lineBreak == LineBreak.Two_lines) && text.value.trim().contains(" "))
-			{
-				Pair<String> lines = addLineBreakNearMiddle(text.value);
-
-				Rectangle line1Bounds = getLine1BoundsWithoutCurvatureOrSpacing(lines.getFirst(), textLocation, p, true);
-				line1Bounds = expandBoundsToIncludeCurvatureAndSpacing(line1Bounds, text, lines.getFirst(), p);
-				line1Bounds = addBackgroundBlendingPadding(line1Bounds, getFontHeight(p), text);
-
-				boundingBox = boundingBox.add(new RotatedRectangle(line1Bounds, text.angle, textLocation).getBounds());
-
-				Rectangle line2Bounds = getLine2BoundsWithoutCurvatureOrSpacing(lines.getSecond(), textLocation, p);
-				line2Bounds = expandBoundsToIncludeCurvatureAndSpacing(line2Bounds, text, lines.getSecond(), p);
-				boundingBox = boundingBox.add(new RotatedRectangle(line2Bounds, text.angle, textLocation).getBounds());
-			}
-
-			return boundingBox;
-		}
-	}
-
 	private Rectangle addBackgroundBlendingPadding(Rectangle textBounds, int fontHeight, MapText text)
 	{
 		int padding = getBackgroundBlendingPadding(fontHeight, text);
@@ -361,25 +322,6 @@ public class TextDrawer
 		{
 			action.accept(text, lineArea);
 		}
-	}
-
-	public Rectangle expandBoundsToIncludeText(List<MapText> mapTexts, Rectangle bounds, MapSettings settings)
-	{
-		if (!settings.drawText)
-		{
-			return bounds;
-		}
-
-		Tuple1<Rectangle> wrapperToMakeCompilerHappy = new Tuple1<>(bounds);
-
-		doForEachTextInBounds(mapTexts, bounds, (text, area) ->
-		{
-			if (text.lineBreak == LineBreak.Auto)
-			{
-				wrapperToMakeCompilerHappy.set(wrapperToMakeCompilerHappy.get().add(area.getBounds()));
-			}
-		});
-		return wrapperToMakeCompilerHappy.get();
 	}
 
 	private void drawText(Image map, WorldGraph graph, List<MapText> textToDraw, Rectangle drawBounds)

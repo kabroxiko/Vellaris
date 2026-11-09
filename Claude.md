@@ -154,7 +154,9 @@ MapCreator.createMap()
 Image (final rendered map)
 ```
 
-"Incremental" draws update only part of the map, going through one of the MapCreator.incrementalUpdate\* methods. They let the service patch a region of an existing rendered map instead of redrawing everything.
+Every request renders the whole map. The incremental drawing methods (`incrementalUpdateText`,
+`incrementalUpdateIcons`, `incrementalUpdateForCentersAndEdges`) were removed along with the desktop editor that
+was their only caller, so `createMap` is the single rendering entry point.
 
 
 ## Key Algorithms
