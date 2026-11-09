@@ -9,7 +9,6 @@ import nortantis.MapCreator;
 import nortantis.MapSettings;
 import nortantis.NamedResource;
 import nortantis.SettingsGenerator;
-import nortantis.editor.UserPreferences;
 import nortantis.i18n.Translation;
 import nortantis.util.Assets;
 import nortantis.geom.Dimension;
@@ -337,7 +336,7 @@ public class MapApiServer
 		finally
 		{
 			// Do not modify or restore global UI language here; map generation
-			// must not depend on or mutate UserPreferences.language.
+			// must not depend on global UI state.
 		}
 	}
 
@@ -352,7 +351,7 @@ public class MapApiServer
 		}
 
 		// Use the MapSettings language for translations during generation
-		// without mutating global UserPreferences (safe for concurrent API use).
+		// without mutating global state (safe for concurrent API use).
 		boolean appliedLanguage = false;
 		if (requestSettings != null && requestSettings.language != null && !requestSettings.language.isEmpty())
 		{
@@ -365,7 +364,7 @@ public class MapApiServer
 		GenerationResult generation = generateMap(genCtx.settings, gw, gh);
 		if (generation.image == null)
 		{
-			// restore translation state (re-initialize from UserPreferences)
+			// restore translation state
 			if (appliedLanguage)
 			{
 				Translation.initialize();
@@ -422,8 +421,7 @@ public class MapApiServer
 		{
 			if (locale.getLanguage().equals(uiLanguage))
 			{
-				UserPreferences.getInstance().language = uiLanguage;
-				Translation.initialize();
+				Translation.initializeWithLanguage(uiLanguage);
 				return;
 			}
 		}

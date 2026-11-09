@@ -3,8 +3,6 @@ package nortantis.i18n;
 import java.text.MessageFormat;
 import java.util.*;
 
-import nortantis.editor.UserPreferences;
-
 public class Translation
 {
 	private static ResourceBundle bundle;
@@ -14,24 +12,18 @@ public class Translation
 
 	public static void initialize()
 	{
-		effectiveLocale = determineLocale();
+		effectiveLocale = determineLocaleForLanguage(null);
 		bundle = ResourceBundle.getBundle("nortantis.i18n.messages", effectiveLocale);
 	}
 
 	/**
-	 * Initialize translations using an explicit language code (e.g. "en", "fr"). This does not modify UserPreferences and is safe for
+	 * Initialize translations using an explicit language code (e.g. "en", "fr"). This does not touch any global state and is safe for
 	 * per-request use in the API.
 	 */
 	public static void initializeWithLanguage(String language)
 	{
 		effectiveLocale = determineLocaleForLanguage(language);
 		bundle = ResourceBundle.getBundle("nortantis.i18n.messages", effectiveLocale);
-	}
-
-	private static Locale determineLocale()
-	{
-		String language = UserPreferences.getInstance().language;
-		return determineLocaleForLanguage(language);
 	}
 
 	private static Locale determineLocaleForLanguage(String language)
