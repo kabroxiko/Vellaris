@@ -76,8 +76,6 @@ public abstract class ImageHelper
 		}
 		Image result = Image.create(image1.getWidth(), image1.getHeight(), resultType);
 
-		IntRectangle image1Bounds = new IntRectangle(0, 0, image1.getWidth(), image1.getHeight());
-
 		int numTasks = ThreadHelper.getInstance().getThreadCount();
 		List<Runnable> tasks = new ArrayList<>(numTasks);
 		int rowsPerJob = mask.getHeight() / numTasks;
@@ -99,31 +97,30 @@ public abstract class ImageHelper
 					int[] maskRow = new int[maskWidth];
 					int[] image1Row = new int[readWidth];
 					int[] image2Row = new int[readWidth];
+					int[] resultRow = new int[maskWidth];
 					for (int y = (taskNumber * rowsPerJob); y < endY; y++)
 					{
 						maskPixels.getGrayLevels(0, y, maskWidth, maskRow);
+						// Pixels outside image1 are left at the value a freshly created image has, which is zero.
+						Arrays.fill(resultRow, 0);
 						if (y < imageHeight && readWidth > 0)
 						{
 							image1Pixels.getRGBs(0, y, readWidth, image1Row);
 							image2Pixels.getRGBs(0, y, readWidth, image2Row);
-						}
-						for (int x = 0; x < maskWidth; x++)
-						{
-							if (!image1Bounds.contains(x, y))
+							for (int x = 0; x < readWidth; x++)
 							{
-								continue;
+								int rgb1 = image1Row[x];
+								int rgb2 = image2Row[x];
+								double maskLevel = maskRow[x] / maskMaxLevel;
+
+								int r = (int) (maskLevel * ((rgb1 >> 16) & 0xFF) + (1.0 - maskLevel) * ((rgb2 >> 16) & 0xFF));
+								int g = (int) (maskLevel * ((rgb1 >> 8) & 0xFF) + (1.0 - maskLevel) * ((rgb2 >> 8) & 0xFF));
+								int b = (int) (maskLevel * (rgb1 & 0xFF) + (1.0 - maskLevel) * (rgb2 & 0xFF));
+								int a = (int) (maskLevel * ((rgb1 >>> 24) & 0xFF) + (1.0 - maskLevel) * ((rgb2 >>> 24) & 0xFF));
+								resultRow[x] = (a << 24) | (r << 16) | (g << 8) | b;
 							}
-
-							int rgb1 = image1Row[x];
-							int rgb2 = image2Row[x];
-							double maskLevel = maskRow[x] / maskMaxLevel;
-
-							int r = (int) (maskLevel * ((rgb1 >> 16) & 0xFF) + (1.0 - maskLevel) * ((rgb2 >> 16) & 0xFF));
-							int g = (int) (maskLevel * ((rgb1 >> 8) & 0xFF) + (1.0 - maskLevel) * ((rgb2 >> 8) & 0xFF));
-							int b = (int) (maskLevel * (rgb1 & 0xFF) + (1.0 - maskLevel) * (rgb2 & 0xFF));
-							int a = (int) (maskLevel * ((rgb1 >>> 24) & 0xFF) + (1.0 - maskLevel) * ((rgb2 >>> 24) & 0xFF));
-							resultPixels.setRGB(x, y, r, g, b, a);
 						}
+						resultPixels.setRGBs(0, y, maskWidth, resultRow);
 					}
 				});
 			}
@@ -188,8 +185,12 @@ public abstract class ImageHelper
 					int[] maskRow = new int[imageWidth];
 					int[] sourceRow = new int[imageWidth];
 					int[] indexRow = new int[imageWidth];
+					int[] resultRow = new int[imageWidth];
 					int lastColorKey = Integer.MIN_VALUE;
-					Color lastColor = null;
+					int colorRed = 0;
+					int colorGreen = 0;
+					int colorBlue = 0;
+					boolean hasColor = false;
 					for (int y = taskNumber * rowsPerJob; y < endY; y++)
 					{
 						maskPixels.getGrayLevels(0, y, imageWidth, maskRow);
@@ -197,49 +198,62 @@ public abstract class ImageHelper
 						colorIndexesPixels.getRGBs(0, y, imageWidth, indexRow);
 						for (int x = 0; x < imageWidth; x++)
 						{
-							int sourceRgb = sourceRow[x];
-							int sourceRed = (sourceRgb >> 16) & 0xFF;
-							int sourceGreen = (sourceRgb >> 8) & 0xFF;
-							int sourceBlue = sourceRgb & 0xFF;
-
 							int colorKey = indexRow[x] & 0xFFFFFF;
 							if (colorKey != lastColorKey)
 							{
 								lastColorKey = colorKey;
-								lastColor = colors.get(colorKey);
+								Color color = colors.get(colorKey);
+								hasColor = color != null;
+								if (hasColor)
+								{
+									colorRed = color.getRed();
+									colorGreen = color.getGreen();
+									colorBlue = color.getBlue();
+								}
 							}
-							Color color = lastColor;
-							if (color != null)
+
+							// Pixels with no color are left at the value a freshly created image has, which is zero. resultRow is
+							// zero-initialized, so those pixels keep that value without any extra work.
+							if (hasColor)
 							{
 								int maskLevel = maskRow[x];
+								if (invertMask)
+								{
+									maskLevel = 255 - maskLevel;
+								}
+								int sourceRgb = sourceRow[x];
+								int sourceRed = (sourceRgb >> 16) & 0xFF;
+								int sourceGreen = (sourceRgb >> 8) & 0xFF;
+								int sourceBlue = sourceRgb & 0xFF;
 								if (isGrayscaleMask)
 								{
-									if (invertMask)
-										maskLevel = 255 - maskLevel;
-
-									int r = ((maskLevel * sourceRed) + (255 - maskLevel) * color.getRed()) / 255;
-									int g = ((maskLevel * sourceGreen) + (255 - maskLevel) * color.getGreen()) / 255;
-									int b = ((maskLevel * sourceBlue) + (255 - maskLevel) * color.getBlue()) / 255;
-									resultPixels.setRGB(x, y, r, g, b);
+									int red = ((maskLevel * sourceRed) + (255 - maskLevel) * colorRed) / 255;
+									int green = ((maskLevel * sourceGreen) + (255 - maskLevel) * colorGreen) / 255;
+									int blue = ((maskLevel * sourceBlue) + (255 - maskLevel) * colorBlue) / 255;
+									resultRow[x] = (0xFF << 24) | (red << 16) | (green << 8) | blue;
 								}
 								else
 								{
 									// TYPE_BYTE_BINARY
-
-									if (invertMask)
-										maskLevel = 255 - maskLevel;
-
-									int r = ((maskLevel * sourceRed) + (1 - maskLevel) * color.getRed());
-									int g = ((maskLevel * sourceGreen) + (1 - maskLevel) * color.getGreen());
-									int b = ((maskLevel * sourceBlue) + (1 - maskLevel) * color.getBlue());
-									resultPixels.setRGB(x, y, r, g, b);
+									int red = ((maskLevel * sourceRed) + (1 - maskLevel) * colorRed);
+									int green = ((maskLevel * sourceGreen) + (1 - maskLevel) * colorGreen);
+									int blue = ((maskLevel * sourceBlue) + (1 - maskLevel) * colorBlue);
+									resultRow[x] = (0xFF << 24) | (red << 16) | (green << 8) | blue;
 								}
 							}
 						}
+						resultPixels.setRGBs(0, y, imageWidth, resultRow);
 					}
 				});
 			}
-			ThreadHelper.getInstance().processInParallel(tasks, true);
+			if (mask.getPixelCount() < minParallelSize)
+			{
+				ThreadHelper.getInstance().processSerial(tasks);
+			}
+			else
+			{
+				ThreadHelper.getInstance().processInParallel(tasks, true);
+			}
 		}
 
 		return result;
@@ -306,36 +320,42 @@ public abstract class ImageHelper
 		Image result = Image.create(image.getWidth(), image.getHeight(), resultType);
 
 		float[] hsb = color.getHSB();
+		int width = image.getWidth();
+		float maxLevel = image.getMaxPixelLevel();
+
+		// Colorizing maps a grayscale level to an output color, and an 8-bit level only has 256 possible values, so computing the whole
+		// mapping once per image removes the HSB math from the pixel loop.
+		int[] lut = new int[256];
+		if (resultType == ImageType.ARGB)
+		{
+			int alpha = color.getAlpha();
+			for (int level = 0; level < lut.length; level++)
+			{
+				Color resultColor = Color.create(colorizePixel(level / maxLevel, hsb, how), false);
+				lut[level] = (alpha << 24) | (resultColor.getRed() << 16) | (resultColor.getGreen() << 8) | resultColor.getBlue();
+			}
+		}
+		else
+		{
+			for (int level = 0; level < lut.length; level++)
+			{
+				lut[level] = colorizePixel(level / maxLevel, hsb, how);
+			}
+		}
+
 		try (PixelReader imagePixels = image.createPixelReader(); PixelWriter resultPixels = result.createPixelWriter())
 		{
-			if (resultType == ImageType.ARGB)
+			ThreadHelper.getInstance().processRowsInParallel(0, image.getHeight(), (y) ->
 			{
-				int alpha = color.getAlpha();
-				ThreadHelper.getInstance().processRowsInParallel(0, image.getHeight(), (y) ->
+				int[] levelRow = new int[width];
+				int[] resultRow = new int[width];
+				imagePixels.getGrayLevels(0, y, width, levelRow);
+				for (int x = 0; x < width; x++)
 				{
-					for (int x = 0; x < image.getWidth(); x++)
-					{
-						float level = imagePixels.getNormalizedPixelLevel(x, y);
-						int rgb = colorizePixel(level, hsb, how);
-						Color resultColor = Color.create(rgb, false);
-						int r = resultColor.getRed();
-						int g = resultColor.getGreen();
-						int b = resultColor.getBlue();
-						resultPixels.setRGB(x, y, r, g, b, alpha);
-					}
-				});
-			}
-			else
-			{
-				ThreadHelper.getInstance().processRowsInParallel(0, image.getHeight(), (y) ->
-				{
-					for (int x = 0; x < image.getWidth(); x++)
-					{
-						float level = imagePixels.getNormalizedPixelLevel(x, y);
-						resultPixels.setRGB(x, y, colorizePixel(level, hsb, how));
-					}
-				});
-			}
+					resultRow[x] = lut[levelRow[x]];
+				}
+				resultPixels.setRGBs(0, y, width, resultRow);
+			});
 		}
 
 		return result;
@@ -362,43 +382,49 @@ public abstract class ImageHelper
 	{
 		Image result = Image.create(colorIndexes.getWidth(), colorIndexes.getHeight(), ImageType.RGB);
 
-		Map<Integer, float[]> hsbMap = new HashMap<>();
+		int width = colorIndexes.getWidth();
+		float maxLevel = imageToUse.getMaxPixelLevel();
 
-		for (int regionId : colorMap.keySet())
+		// A colorize algorithm maps a color plus a grayscale level to an output color, and an 8-bit level only has 256 possible values, so
+		// precomputing the 256 results for each color removes all of the HSB math from the pixel loop.
+		Map<Integer, int[]> lutMap = new HashMap<>();
+		for (Map.Entry<Integer, Color> entry : colorMap.entrySet())
 		{
-			Color color = colorMap.get(regionId);
-			float[] hsb = color.getHSB();
-			hsbMap.put(regionId, hsb);
+			float[] hsb = entry.getValue().getHSB();
+			int[] lut = new int[256];
+			for (int level = 0; level < lut.length; level++)
+			{
+				lut[level] = colorizePixel(level / maxLevel, hsb, how);
+			}
+			lutMap.put(entry.getKey(), lut);
 		}
 
-		Image imageToUseFinal = imageToUse;
-		float maxLevel = imageToUseFinal.getMaxPixelLevel();
-		int width = colorIndexes.getWidth();
-		try (PixelReader imagePixels = imageToUseFinal.createPixelReader(); PixelReader colorIndexesPixels = colorIndexes.createPixelReader(); PixelWriter resultPixels = result.createPixelWriter())
+		try (PixelReader imagePixels = imageToUse.createPixelReader(); PixelReader colorIndexesPixels = colorIndexes.createPixelReader(); PixelWriter resultPixels = result.createPixelWriter())
 		{
 			ThreadHelper.getInstance().processRowsInParallel(0, colorIndexes.getHeight(), (y) ->
 			{
 				int[] levelRow = new int[width];
 				int[] indexRow = new int[width];
+				int[] resultRow = new int[width];
 				imagePixels.getGrayLevels(0, y, width, levelRow);
 				colorIndexesPixels.getRGBs(0, y, width, indexRow);
 				int lastKey = Integer.MIN_VALUE;
-				float[] lastHsb = null;
+				int[] lastLut = null;
 				for (int x = 0; x < width; x++)
 				{
-					float level = levelRow[x] / maxLevel;
 					int colorKey = indexRow[x] & 0xFFFFFF;
 					if (colorKey != lastKey)
 					{
 						lastKey = colorKey;
-						lastHsb = hsbMap.get(colorKey);
+						lastLut = lutMap.get(colorKey);
 					}
-					float[] hsb = lastHsb;
-					if (hsb != null)
+					// Pixels with no color are left at the value a freshly created image has, which is zero. resultRow starts at zero.
+					if (lastLut != null)
 					{
-						resultPixels.setRGB(x, y, colorizePixel(level, hsb, how));
+						resultRow[x] = lastLut[levelRow[x]];
 					}
 				}
+				resultPixels.setRGBs(0, y, width, resultRow);
 			});
 		}
 

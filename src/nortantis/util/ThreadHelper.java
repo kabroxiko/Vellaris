@@ -11,7 +11,14 @@ public class ThreadHelper
 {
 	private static ThreadHelper instance;
 	private ExecutorService cachedThreadPool;
+	private ExecutorService fixedThreadPool;
 	private final int threadCount;
+
+	/**
+	 * Marks threads that belong to {@link #fixedThreadPool}. A job running on that pool must never block waiting for the same pool, so
+	 * nested calls run their jobs serially on the current thread instead.
+	 */
+	private static final ThreadLocal<Boolean> insideFixedThreadPoolWorker = ThreadLocal.withInitial(() -> false);
 
 	private ThreadHelper()
 	{
@@ -19,7 +26,7 @@ public class ThreadHelper
 		cachedThreadPool = Executors.newCachedThreadPool();
 	}
 
-	public static ThreadHelper getInstance()
+	public static synchronized ThreadHelper getInstance()
 	{
 		if (instance == null)
 		{
@@ -29,54 +36,65 @@ public class ThreadHelper
 	}
 
 	/**
+	 * The pool is created once and reused for every call. Creating a fixed pool per call meant starting and stopping a thread per core for
+	 * every image operation, which cost far more than the work being parallelized.
+	 */
+	private synchronized ExecutorService getFixedThreadPool()
+	{
+		if (fixedThreadPool == null)
+		{
+			fixedThreadPool = Executors.newFixedThreadPool(threadCount, runnable ->
+			{
+				Thread thread = new Thread(() ->
+				{
+					insideFixedThreadPoolWorker.set(true);
+					runnable.run();
+				});
+				thread.setDaemon(true);
+				return thread;
+			});
+		}
+		return fixedThreadPool;
+	}
+
+	/**
 	 * Processes a list of jobs in parallel using a shared thread pool.
 	 * 
 	 * @param jobs
 	 * @param useFixedThreadPool
-	 *            Whether to use the thread pool with a limited number of threads vs the one that grows as needed. Warning: Never submit a
-	 *            job that will submit more jobs to the fixed thread pool, as that can lead to a deadlock.
+	 *            Whether to use the thread pool with a limited number of threads vs the one that grows as needed. Calls made from inside a
+	 *            job that is already running on the fixed pool run serially, because waiting on that pool from one of its own workers would
+	 *            deadlock.
 	 */
 	public void processInParallel(List<Runnable> jobs, boolean useFixedThreadPool)
 	{
-		List<Future<?>> futures = new ArrayList<Future<?>>();
-		ExecutorService threadPool;
-		if (useFixedThreadPool)
+		if (jobs.size() <= 1 || (useFixedThreadPool && insideFixedThreadPoolWorker.get()))
 		{
-			threadPool = Executors.newFixedThreadPool(threadCount);
-		}
-		else
-		{
-			threadPool = cachedThreadPool;
+			processSerial(jobs);
+			return;
 		}
 
-		try
-		{
-			for (Runnable job : jobs)
-			{
-				futures.add(threadPool.submit(job));
-			}
+		ExecutorService threadPool = useFixedThreadPool ? getFixedThreadPool() : cachedThreadPool;
+		List<Future<?>> futures = new ArrayList<Future<?>>(jobs.size());
 
-			for (int i : new Range(jobs.size()))
-			{
-				try
-				{
-					futures.get(i).get();
-				}
-				catch (ExecutionException e)
-				{
-					throw new RuntimeException(e);
-				}
-				catch (InterruptedException e)
-				{
-					throw new RuntimeException(e);
-				}
-			}
-		}
-		finally
+		for (Runnable job : jobs)
 		{
-			if (useFixedThreadPool)
+			futures.add(threadPool.submit(job));
+		}
+
+		for (Future<?> future : futures)
+		{
+			try
 			{
-				threadPool.shutdown();
+				future.get();
+			}
+			catch (ExecutionException e)
+			{
+				throw new RuntimeException(e);
+			}
+			catch (InterruptedException e)
+			{
+				throw new RuntimeException(e);
 			}
 		}
 	}
@@ -93,60 +111,57 @@ public class ThreadHelper
 	}
 
 	/**
-	 * Processes a list of jobs in parallel that return results. Warning: Never submit a job that will submit more jobs using the methods in
-	 * this class, as that can lead to a deadlock.
+	 * Processes a list of jobs in parallel that return results. Calls made from inside a job that is already running on the fixed pool run
+	 * serially for the same reason as in processInParallel.
 	 * 
 	 * @param <T>
 	 *            Result type
 	 * @param jobs
 	 * @param useFixedThreadPool
-	 *            Whether to use the thread pool with a limited number of threads vs the one that grows as needed. Warning: Never submit a
-	 *            job that will submit more jobs to the fixed thread pool, as that can lead to a deadlock.
+	 *            Whether to use the thread pool with a limited number of threads vs the one that grows as needed.
 	 * @return
 	 */
 	public <T> List<T> processInParallelAndGetResult(List<Callable<T>> jobs, boolean useFixedThreadPool)
 	{
-		List<Future<T>> futures = new ArrayList<>();
 		List<T> results = new ArrayList<>();
-		ExecutorService threadPool;
-		if (useFixedThreadPool)
-		{
-			threadPool = Executors.newFixedThreadPool(threadCount);
-		}
-		else
-		{
-			threadPool = cachedThreadPool;
-		}
 
-		try
+		if (jobs.size() <= 1 || (useFixedThreadPool && insideFixedThreadPoolWorker.get()))
 		{
 			for (Callable<T> job : jobs)
 			{
-				futures.add(threadPool.submit(job));
-			}
-
-			for (int i : new Range(jobs.size()))
-			{
 				try
 				{
-					T result = futures.get(i).get();
-					results.add(result);
+					results.add(job.call());
 				}
-				catch (ExecutionException e)
-				{
-					throw new RuntimeException(e);
-				}
-				catch (InterruptedException e)
+				catch (Exception e)
 				{
 					throw new RuntimeException(e);
 				}
 			}
+			return results;
 		}
-		finally
+
+		ExecutorService threadPool = useFixedThreadPool ? getFixedThreadPool() : cachedThreadPool;
+		List<Future<T>> futures = new ArrayList<>(jobs.size());
+
+		for (Callable<T> job : jobs)
 		{
-			if (useFixedThreadPool)
+			futures.add(threadPool.submit(job));
+		}
+
+		for (Future<T> future : futures)
+		{
+			try
 			{
-				threadPool.shutdown();
+				results.add(future.get());
+			}
+			catch (ExecutionException e)
+			{
+				throw new RuntimeException(e);
+			}
+			catch (InterruptedException e)
+			{
+				throw new RuntimeException(e);
 			}
 		}
 

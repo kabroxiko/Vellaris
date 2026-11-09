@@ -87,4 +87,37 @@ public class AwtGrayscalePixelReaderWriter extends AwtGrayscalePixelReader imple
 		}
 		setGrayLevel(x, y, gray);
 	}
+
+	@Override
+	public void setRGBs(int x, int y, int count, int[] rgb)
+	{
+		for (int i = 0; i < count; i++)
+		{
+			setRGB(x + i, y, rgb[i]);
+		}
+	}
+
+	@Override
+	public void setGrayLevels(int x, int y, int count, int[] levels)
+	{
+		if (cachedByteArray != null)
+		{
+			int offset = (y * image.getWidth()) + x;
+			for (int i = 0; i < count; i++)
+			{
+				cachedByteArray[offset + i] = (byte) levels[i];
+			}
+			return;
+		}
+		if (imageSubType == BufferedImage.TYPE_BYTE_BINARY)
+		{
+			// Binary rasters clamp every level above 1 to on, so the run has to go through the per-pixel path to keep that behavior.
+			for (int i = 0; i < count; i++)
+			{
+				setGrayLevel(x + i, y, levels[i]);
+			}
+			return;
+		}
+		raster.setSamples(x, y, count, 1, 0, levels);
+	}
 }

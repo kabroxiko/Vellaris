@@ -51,4 +51,19 @@ public class AwtIntPixelReaderWriter extends AwtIntPixelReader implements PixelR
 	{
 		raster.setSample(x, y, band, level);
 	}
+
+	@Override
+	public void setRGBs(int x, int y, int count, int[] rgb)
+	{
+		System.arraycopy(rgb, 0, cachedPixelArray, (y * image.getWidth()) + x, count);
+	}
+
+	@Override
+	public void setGrayLevels(int x, int y, int count, int[] levels)
+	{
+		for (int i = 0; i < count; i++)
+		{
+			setGrayLevel(x + i, y, levels[i]);
+		}
+	}
 }

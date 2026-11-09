@@ -46,4 +46,16 @@ public class AwtPixelReaderWriter extends AwtPixelReader implements PixelReaderW
 	{
 		raster.setSample(x, y, band, level);
 	}
+
+	@Override
+	public void setRGBs(int x, int y, int count, int[] rgb)
+	{
+		bufferedImage.setRGB(x, y, count, 1, rgb, 0, count);
+	}
+
+	@Override
+	public void setGrayLevels(int x, int y, int count, int[] levels)
+	{
+		raster.setSamples(x, y, count, 1, 0, levels);
+	}
 }
