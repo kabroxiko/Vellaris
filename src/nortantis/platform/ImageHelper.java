@@ -93,11 +93,20 @@ public abstract class ImageHelper
 				{
 					int endY = taskNumber == numTasks - 1 ? mask.getHeight() : ((taskNumber + 1) * rowsPerJob);
 					int maskWidth = mask.getWidth();
+					int imageHeight = image1.getHeight();
+					int readWidth = Math.min(maskWidth, image1.getWidth());
 					float maskMaxLevel = mask.getMaxPixelLevel();
 					int[] maskRow = new int[maskWidth];
+					int[] image1Row = new int[readWidth];
+					int[] image2Row = new int[readWidth];
 					for (int y = (taskNumber * rowsPerJob); y < endY; y++)
 					{
 						maskPixels.getGrayLevels(0, y, maskWidth, maskRow);
+						if (y < imageHeight && readWidth > 0)
+						{
+							image1Pixels.getRGBs(0, y, readWidth, image1Row);
+							image2Pixels.getRGBs(0, y, readWidth, image2Row);
+						}
 						for (int x = 0; x < maskWidth; x++)
 						{
 							if (!image1Bounds.contains(x, y))
@@ -105,14 +114,14 @@ public abstract class ImageHelper
 								continue;
 							}
 
-							Color color1 = Color.create(image1Pixels.getRGB(x, y), image1.hasAlpha());
-							Color color2 = Color.create(image2Pixels.getRGB(x, y), image2.hasAlpha());
+							int rgb1 = image1Row[x];
+							int rgb2 = image2Row[x];
 							double maskLevel = maskRow[x] / maskMaxLevel;
 
-							int r = (int) (maskLevel * color1.getRed() + (1.0 - maskLevel) * color2.getRed());
-							int g = (int) (maskLevel * color1.getGreen() + (1.0 - maskLevel) * color2.getGreen());
-							int b = (int) (maskLevel * color1.getBlue() + (1.0 - maskLevel) * color2.getBlue());
-							int a = (int) (maskLevel * color1.getAlpha() + (1.0 - maskLevel) * color2.getAlpha());
+							int r = (int) (maskLevel * ((rgb1 >> 16) & 0xFF) + (1.0 - maskLevel) * ((rgb2 >> 16) & 0xFF));
+							int g = (int) (maskLevel * ((rgb1 >> 8) & 0xFF) + (1.0 - maskLevel) * ((rgb2 >> 8) & 0xFF));
+							int b = (int) (maskLevel * (rgb1 & 0xFF) + (1.0 - maskLevel) * (rgb2 & 0xFF));
+							int a = (int) (maskLevel * ((rgb1 >>> 24) & 0xFF) + (1.0 - maskLevel) * ((rgb2 >>> 24) & 0xFF));
 							resultPixels.setRGB(x, y, r, g, b, a);
 						}
 					}
