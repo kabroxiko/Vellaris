@@ -14,7 +14,6 @@ import org.apache.commons.math3.distribution.NormalDistribution;
 import org.imgscalr.Scalr.Method;
 import org.jtransforms.fft.FloatFFT_2D;
 
-import java.awt.Desktop;
 import java.io.File;
 import java.io.IOException;
 import java.util.*;
@@ -1300,39 +1299,6 @@ public abstract class ImageHelper
 	public void write(Image image, String fileName)
 	{
 		image.write(fileName);
-	}
-
-	public String openImageInSystemDefaultEditor(Image map, String filenameWithoutExtension) throws IOException
-	{
-		String format = "png";
-		File tempFile = File.createTempFile(filenameWithoutExtension, "." + format);
-		map.write(tempFile.getAbsolutePath());
-
-		openImageInSystemDefaultEditor(tempFile.getAbsolutePath());
-		return tempFile.getAbsolutePath();
-	}
-
-	public void openImageInSystemDefaultEditor(String imageFilePath)
-	{
-		if (Desktop.isDesktopSupported())
-		{
-			Desktop desktop = Desktop.getDesktop();
-			if (desktop.isSupported(Desktop.Action.OPEN))
-			{
-				try
-				{
-					desktop.open(new File(imageFilePath));
-				}
-				catch (IOException e)
-				{
-					throw new RuntimeException(e);
-				}
-			}
-		}
-		else
-		{
-			throw new RuntimeException("Unable to open the map because Java's Desktop is not supported");
-		}
 	}
 
 	public int bound(int value)

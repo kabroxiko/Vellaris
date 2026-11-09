@@ -29,11 +29,11 @@ public enum IconType
 
 	public String getSingularNameForGUILowerCase()
 	{
-		return nortantis.swing.translation.Translation.get("IconType." + name() + ".singular");
+		return nortantis.i18n.Translation.get("IconType." + name() + ".singular");
 	}
 
 	public String getNameForGUI()
 	{
-		return nortantis.swing.translation.Translation.get("IconType." + name());
+		return nortantis.i18n.Translation.get("IconType." + name());
 	}
 }

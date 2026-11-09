@@ -1,6 +1,6 @@
 package nortantis;
 
-import nortantis.swing.translation.Translation;
+import nortantis.i18n.Translation;
 
 /**
  * The allowed map dimensions for generated backgrounds.

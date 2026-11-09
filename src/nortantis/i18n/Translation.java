@@ -1,4 +1,4 @@
-package nortantis.swing.translation;
+package nortantis.i18n;
 
 import java.text.MessageFormat;
 import java.util.*;
@@ -15,7 +15,7 @@ public class Translation
 	public static void initialize()
 	{
 		effectiveLocale = determineLocale();
-		bundle = ResourceBundle.getBundle("nortantis.swing.translation.messages", effectiveLocale);
+		bundle = ResourceBundle.getBundle("nortantis.i18n.messages", effectiveLocale);
 	}
 
 	/**
@@ -25,7 +25,7 @@ public class Translation
 	public static void initializeWithLanguage(String language)
 	{
 		effectiveLocale = determineLocaleForLanguage(language);
-		bundle = ResourceBundle.getBundle("nortantis.swing.translation.messages", effectiveLocale);
+		bundle = ResourceBundle.getBundle("nortantis.i18n.messages", effectiveLocale);
 	}
 
 	private static Locale determineLocale()

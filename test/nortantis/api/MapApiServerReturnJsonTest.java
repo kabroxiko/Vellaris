@@ -6,7 +6,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import nortantis.MapSettings;
 import nortantis.SettingsGenerator;
 import nortantis.util.Assets;
-import nortantis.swing.MapEdits;
+import nortantis.editor.MapEdits;
 
 import java.awt.image.BufferedImage;
 import java.lang.reflect.Method;

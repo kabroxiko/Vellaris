@@ -37,7 +37,7 @@ class MapApiServerCoverageTest
 		PlatformFactory.setInstance(new AwtFactory());
 		try
 		{
-			Class<?> trClass = Class.forName("nortantis.swing.translation.Translation");
+			Class<?> trClass = Class.forName("nortantis.i18n.Translation");
 			java.lang.reflect.Field bundleField = trClass.getDeclaredField("bundle");
 			bundleField.setAccessible(true);
 			java.util.ResourceBundle fake = new java.util.ResourceBundle()
@@ -78,7 +78,7 @@ class MapApiServerCoverageTest
 			// Ensure translations are available for populateStandardOptions
 			try
 			{
-				Class<?> trClass = Class.forName("nortantis.swing.translation.Translation");
+				Class<?> trClass = Class.forName("nortantis.i18n.Translation");
 				java.lang.reflect.Field bundleField = trClass.getDeclaredField("bundle");
 				bundleField.setAccessible(true);
 				java.util.ResourceBundle fake = new java.util.ResourceBundle()

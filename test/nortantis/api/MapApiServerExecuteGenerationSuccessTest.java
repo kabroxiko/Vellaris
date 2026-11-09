@@ -41,7 +41,7 @@ class MapApiServerExecuteGenerationSuccessTest
 		ref.set(sup);
 
 		MapSettings settings = SettingsGenerator.generate(new Random(3), Assets.installedArtPack, null);
-		settings.edits = new nortantis.swing.MapEdits();
+		settings.edits = new nortantis.editor.MapEdits();
 		settings.edits.centerEdits.put(0, new nortantis.editor.CenterEdit(0, false, false, null, null, null));
 
 		ApiUtils.RandomMapParameters params = new ApiUtils.RandomMapParameters();

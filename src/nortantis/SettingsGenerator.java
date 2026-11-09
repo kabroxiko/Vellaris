@@ -3,7 +3,7 @@ package nortantis;
 import nortantis.MapSettings.LineStyle;
 import nortantis.MapSettings.OceanWaves;
 import nortantis.platform.Color;
-import nortantis.swing.MapEdits;
+import nortantis.editor.MapEdits;
 import nortantis.util.*;
 import org.apache.commons.lang3.StringUtils;
 

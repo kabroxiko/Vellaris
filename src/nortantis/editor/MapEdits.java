@@ -1,12 +1,8 @@
-package nortantis.swing;
+package nortantis.editor;
 
 import nortantis.FreeIconCollection;
 import nortantis.MapText;
 import nortantis.Region;
-import nortantis.editor.CenterEdit;
-import nortantis.editor.EdgeEdit;
-import nortantis.editor.RegionEdit;
-import nortantis.editor.Road;
 import nortantis.geom.Point;
 import nortantis.graph.voronoi.Center;
 import nortantis.graph.voronoi.Edge;

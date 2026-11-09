@@ -2,10 +2,7 @@ package nortantis;
 
 import nortantis.platform.Image;
 import nortantis.platform.ImageType;
-import nortantis.platform.PlatformFactory;
-import nortantis.platform.awt.AwtFactory;
 import nortantis.platform.ImageHelper;
-import nortantis.util.Stopwatch;
 import nortantis.util.ThreadHelper;
 import org.jtransforms.fft.FloatFFT_2D;
 
@@ -93,21 +90,6 @@ public class FractalBGGenerator
 		Image result = data.toImage(0, height, 0, width, ImageType.Grayscale8Bit);
 		return result;
 
-	}
-
-	public static void main(String[] args) throws IOException
-	{
-		Stopwatch sw = new Stopwatch("generate fractal image");
-
-		// Tell drawing code to use AWT.
-		PlatformFactory.setInstance(new AwtFactory());
-
-		Image background = generate(new Random(16), 1.3f, 256 * 1, 256 * 1, 0.75f);
-
-		sw.printElapsedTime();
-
-		ImageHelper.getInstance().openImageInSystemDefaultEditor(background, "cloud");
-		System.out.println("Done.");
 	}
 
 }

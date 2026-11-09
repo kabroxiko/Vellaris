@@ -15,7 +15,7 @@ public class MapGenerationTest
 	{
 		PlatformFactory.setInstance(new AwtFactory());
 		// Initialize translations and preferences used by name generation
-		nortantis.swing.translation.Translation.initialize();
+		nortantis.i18n.Translation.initialize();
 		String path = Paths.get("unit test files/map settings/minimal.nort").toAbsolutePath().toString();
 		assertDoesNotThrow(() ->
 		{

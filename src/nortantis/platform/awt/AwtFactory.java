@@ -8,7 +8,6 @@ import nortantis.platform.Color;
 import nortantis.platform.Font;
 import nortantis.platform.Image;
 import nortantis.platform.Painter;
-import nortantis.swing.SwingHelper;
 import org.apache.commons.io.FilenameUtils;
 
 import javax.imageio.IIOImage;
@@ -16,7 +15,6 @@ import javax.imageio.ImageIO;
 import javax.imageio.ImageWriteParam;
 import javax.imageio.ImageWriter;
 import javax.imageio.stream.ImageOutputStream;
-import javax.swing.*;
 import java.awt.*;
 import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
@@ -323,53 +321,4 @@ public class AwtFactory extends PlatformFactory
 		}
 		return false;
 	}
-
-	@Override
-	public <T> void doInBackgroundThread(BackgroundTask<T> task)
-	{
-		SwingWorker<T, Void> worker = new SwingWorker<>()
-		{
-			@Override
-			protected T doInBackground() throws Exception
-			{
-				return task.doInBackground();
-			}
-
-			@Override
-			protected void done()
-			{
-				T result = null;
-				try
-				{
-					result = get();
-				}
-				catch (InterruptedException ex)
-				{
-					throw new RuntimeException(ex);
-				}
-				catch (Exception ex)
-				{
-					SwingHelper.handleException(ex, null, false);
-				}
-
-				task.done(result);
-			}
-		};
-
-		worker.execute();
-	}
-
-	@Override
-	public void doInMainUIThreadAsynchronous(Runnable toRun)
-	{
-		if (SwingUtilities.isEventDispatchThread())
-		{
-			toRun.run();
-		}
-		else
-		{
-			SwingUtilities.invokeLater(toRun);
-		}
-	}
-
 }

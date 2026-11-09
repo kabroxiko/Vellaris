@@ -102,7 +102,7 @@ How to start dev mode with HMR working through NPM
 1. Start your Vellaris API (port 8080):
 
 ```bash
-./gradlew run
+java -jar build/libs/VellarisServer.jar
 ```
 
 2. Start Vite dev server with HMR configured for your external domain (replace `maps.example.com` with your host):

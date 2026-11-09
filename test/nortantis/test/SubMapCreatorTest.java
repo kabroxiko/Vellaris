@@ -5,7 +5,6 @@ import nortantis.MapSettings;
 import nortantis.River;
 import nortantis.SubMapCreator;
 import nortantis.geom.Rectangle;
-import nortantis.swing.SubMapDialog;
 import nortantis.graph.voronoi.Corner;
 import nortantis.graph.voronoi.Edge;
 import nortantis.platform.Image;
@@ -43,7 +42,7 @@ public class SubMapCreatorTest
 	public static void setUpBeforeClass() throws IOException
 	{
 		PlatformFactory.setInstance(new AwtFactory());
-		nortantis.swing.translation.Translation.initialize();
+		nortantis.i18n.Translation.initialize();
 		FileUtils.deleteDirectory(new File(Paths.get("unit test files", failedMapsFolderName).toString()));
 	}
 
@@ -64,7 +63,7 @@ public class SubMapCreatorTest
 		// Sub-map selection bounds in RI (resolution-invariant) coordinates.
 		Rectangle selectionBoundsRI = new Rectangle(1324, 999, 1307, 1307);
 
-		int worldSize = SubMapDialog.computeDefaultWorldSize(originalSettings, selectionBoundsRI);
+		int worldSize = SubMapCreator.computeDefaultWorldSize(originalSettings, selectionBoundsRI);
 
 		long seed = 1962328436L;
 		MapSettings subMapSettings = SubMapCreator.createSubMapSettings(originalSettings, originalGraph, selectionBoundsRI, worldSize, originalSettings.resolution, seed, true);
@@ -103,7 +102,7 @@ public class SubMapCreatorTest
 		// Sub-map selection bounds in RI (resolution-invariant) coordinates.
 		Rectangle selectionBoundsRI = new Rectangle(0, 0, 1348, 4096);
 
-		int worldSize = SubMapDialog.computeDefaultWorldSize(originalSettings, selectionBoundsRI);
+		int worldSize = SubMapCreator.computeDefaultWorldSize(originalSettings, selectionBoundsRI);
 
 		long seed = 983909832L;
 		MapSettings subMapSettings = SubMapCreator.createSubMapSettings(originalSettings, originalGraph, selectionBoundsRI, worldSize, originalSettings.resolution, seed, true);
@@ -134,7 +133,7 @@ public class SubMapCreatorTest
 		// Sub-map selection bounds in RI (resolution-invariant) coordinates.
 		Rectangle selectionBoundsRI = new Rectangle(2515, 1471, 1581, 2625);
 
-		int worldSize = SubMapDialog.computeDefaultWorldSize(originalSettings, selectionBoundsRI);
+		int worldSize = SubMapCreator.computeDefaultWorldSize(originalSettings, selectionBoundsRI);
 
 		long seed = 1735631519L;
 		MapSettings subMapSettings = SubMapCreator.createSubMapSettings(originalSettings, originalGraph, selectionBoundsRI, worldSize, originalSettings.resolution, seed, true);
@@ -167,7 +166,7 @@ public class SubMapCreatorTest
 		// Sub-map selection bounds in RI (resolution-invariant) coordinates.
 		Rectangle selectionBoundsRI = new Rectangle(0, 0, 1348, 4096);
 
-		int worldSize = SubMapDialog.computeDefaultWorldSize(originalSettings, selectionBoundsRI);
+		int worldSize = SubMapCreator.computeDefaultWorldSize(originalSettings, selectionBoundsRI);
 
 		long seed = 1142346135L;
 		MapSettings subMapSettings = SubMapCreator.createSubMapSettings(originalSettings, originalGraph, selectionBoundsRI, worldSize, originalSettings.resolution, seed, true);

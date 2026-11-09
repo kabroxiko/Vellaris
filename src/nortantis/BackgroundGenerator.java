@@ -2,16 +2,11 @@ package nortantis;
 
 import nortantis.geom.IntRectangle;
 import nortantis.platform.*;
-import nortantis.platform.awt.AwtFactory;
 import nortantis.platform.ImageHelper;
 import nortantis.util.Range;
-import nortantis.util.Stopwatch;
 import org.imgscalr.Scalr.Method;
 
-import java.io.IOException;
 import java.util.Random;
-
-import static java.lang.System.out;
 
 public class BackgroundGenerator
 {
@@ -215,26 +210,6 @@ public class BackgroundGenerator
 			}
 		}
 		return texture;
-	}
-
-	public static void main(String[] args) throws IOException
-	{
-		// Tell drawing code to use AWT.
-		PlatformFactory.setInstance(new AwtFactory());
-
-		Stopwatch sw = new Stopwatch();
-
-		Image image = Image.read("C:\\Program Files\\Nortantis\\app\\assets\\background textures\\wavy paper.png");
-		if (image == null)
-		{
-			out.print("Unable to load image.");
-		}
-		Image result = generateUsingWhiteNoiseConvolution(new Random(), image, 3072, 3072, false);
-		ImageHelper.getInstance().openImageInSystemDefaultEditor(result, "result");
-
-		sw.printElapsedTime();
-		System.out.println("Done.");
-		System.exit(0);
 	}
 
 }

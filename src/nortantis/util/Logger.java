@@ -1,31 +1,11 @@
 package nortantis.util;
 
-import nortantis.platform.PlatformFactory;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 
 public class Logger
 {
-	private ILoggerTarget target;
-
 	private Logger()
 	{
-	}
-
-	private static Logger instance;
-
-	private static Logger getInstance()
-	{
-		if (instance == null)
-		{
-			instance = new Logger();
-		}
-
-		return instance;
-	}
-
-	public static void setLoggerTarget(ILoggerTarget target)
-	{
-		getInstance().target = target;
 	}
 
 	public static void println()
@@ -60,45 +40,13 @@ public class Logger
 
 	private static void println(final Object message, boolean isError)
 	{
-		if (getInstance().target != null && getInstance().target.isReadyForLogging())
+		if (isError)
 		{
-			PlatformFactory.getInstance().doInMainUIThreadAsynchronous(() ->
-			{
-				getInstance().appendToTarget(message + "\n");
-			});
+			System.err.println(message);
 		}
 		else
 		{
-			if (isError)
-			{
-				System.err.println(message);
-			}
-			else
-			{
-				System.out.println(message);
-			}
+			System.out.println(message);
 		}
 	}
-
-	private synchronized void appendToTarget(String message)
-	{
-		getInstance().target.appendLoggerMessage(message);
-	}
-
-	public static void clear()
-	{
-		if (getInstance().target != null && getInstance().target.isReadyForLogging())
-		{
-			PlatformFactory.getInstance().doInMainUIThreadAsynchronous(() ->
-			{
-				getInstance().clearTarget();
-			});
-		}
-	}
-
-	private synchronized void clearTarget()
-	{
-		getInstance().target.clearLoggerMessages();
-	}
-
 }

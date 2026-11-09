@@ -1,6 +1,5 @@
 package nortantis.editor;
 
-import nortantis.swing.LookAndFeel;
 import nortantis.util.FileHelper;
 import nortantis.util.Logger;
 import nortantis.util.OSHelper;
@@ -31,7 +30,7 @@ public class UserPreferences
 	public Set<String> collapsedPanels = new TreeSet<>();
 	public String lastVersionFromCheck;
 	public LocalDateTime lastVersionCheckTime;
-	public LookAndFeel lookAndFeel = LookAndFeel.Dark;
+	public UiTheme lookAndFeel = UiTheme.Dark;
 	public int toolsPanelWidth;
 	public int themePanelWidth;
 	public String language;
@@ -109,7 +108,7 @@ public class UserPreferences
 
 				if (props.containsKey("lookAndFeel") && !StringUtils.isEmpty(props.getProperty("lookAndFeel")))
 				{
-					lookAndFeel = LookAndFeel.valueOf(props.getProperty("lookAndFeel"));
+					lookAndFeel = UiTheme.valueOf(props.getProperty("lookAndFeel"));
 				}
 
 				if (props.containsKey("toolsPanelWidth"))

@@ -16,7 +16,7 @@ class MapApiServerHandleUiOptionsTest
 		try (AutoCloseable installer = nortantis.TestTranslationBundleInstaller.installFakeBundle())
 		{
 			// Ensure Translation.effectiveLocale is set so ResourceBundle.getBundle isn't called with null
-			Class<?> trClass = Class.forName("nortantis.swing.translation.Translation");
+			Class<?> trClass = Class.forName("nortantis.i18n.Translation");
 			java.lang.reflect.Field eff = trClass.getDeclaredField("effectiveLocale");
 			eff.setAccessible(true);
 			eff.set(null, java.util.Locale.ENGLISH);

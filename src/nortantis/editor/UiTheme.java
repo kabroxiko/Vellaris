@@ -1,8 +1,8 @@
-package nortantis.swing;
+package nortantis.editor;
 
-import nortantis.swing.translation.Translation;
+import nortantis.i18n.Translation;
 
-public enum LookAndFeel
+public enum UiTheme
 {
 	Dark, Light, System;
 

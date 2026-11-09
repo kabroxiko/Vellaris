@@ -1,7 +1,7 @@
 package nortantis;
 
 import nortantis.geom.Point;
-import nortantis.swing.translation.Translation;
+import nortantis.i18n.Translation;
 import nortantis.util.*;
 
 import java.util.*;

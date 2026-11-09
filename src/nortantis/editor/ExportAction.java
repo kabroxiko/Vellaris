@@ -1,6 +1,6 @@
 package nortantis.editor;
 
-import nortantis.swing.translation.Translation;
+import nortantis.i18n.Translation;
 
 public enum ExportAction
 {

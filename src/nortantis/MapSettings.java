@@ -5,8 +5,8 @@ import nortantis.geom.Point;
 import nortantis.platform.Color;
 import nortantis.platform.Font;
 import nortantis.platform.FontStyle;
-import nortantis.swing.MapEdits;
-import nortantis.swing.translation.Translation;
+import nortantis.editor.MapEdits;
+import nortantis.i18n.Translation;
 import nortantis.util.*;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.FilenameUtils;
@@ -2246,7 +2246,7 @@ public class MapSettings implements Serializable
 		if (backgroundTextureSource == TextureSource.File && StringUtils.isEmpty(backgroundTextureImage))
 		{
 			return new Tuple2<>(Assets.getBackgroundTextureResourcePath(backgroundTextureResource, customImagesPath),
-					nortantis.swing.translation.Translation.get("warning.backgroundTextureFallback", backgroundTextureSource));
+					nortantis.i18n.Translation.get("warning.backgroundTextureFallback", backgroundTextureSource));
 		}
 		if (backgroundTextureSource == TextureSource.Assets)
 		{

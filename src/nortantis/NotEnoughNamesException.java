@@ -1,6 +1,6 @@
 package nortantis;
 
-import nortantis.swing.translation.Translation;
+import nortantis.i18n.Translation;
 
 @SuppressWarnings("serial")
 public class NotEnoughNamesException extends RuntimeException

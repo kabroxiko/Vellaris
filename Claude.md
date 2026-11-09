@@ -1,14 +1,17 @@
-# Nortantis
+# Vellaris
 
-Fantasy map generator and editor that uses tectonic plate simulation to create islands and continents with terrain features (trees, rivers, mountains) rendered with an old-fashioned, hand-drawn appearance.
+Fantasy map generator that uses tectonic plate simulation to create islands and continents with terrain features (trees, rivers, mountains) rendered with an old-fashioned, hand-drawn appearance. This build runs as a web service: a Java HTTP API generates maps and a React frontend consumes it.
 
 ## Tech Stack
 
 - **Language:** Java 21+
 - **Build System:** Gradle (use `gradlew` wrapper)
-- **UI Framework:** Swing with FlatLaf look-and-feel
-- **Graphics:** AWT (CPU-based rendering)
+- **Server:** Javalin/Jetty HTTP API (headless)
+- **Graphics:** AWT (CPU-based rendering, `-Djava.awt.headless=true`)
+- **Frontend:** React + Vite in `web/`
 - **Testing:** JUnit 5
+
+There is no desktop UI. Do not add `javax.swing` or `com.formdev` dependencies, and do not reintroduce a GUI main class.
 
 ## Shell and Paths
 
@@ -17,11 +20,11 @@ The shell is Windows bash (Git Bash / MSYS2). Use Windows-style paths like `C:/U
 ## Build and Run
 
 ```bash
-# Run the GUI application
-./gradlew run
-
-# Build JAR
+# Build the server jar (API + map generation)
 ./gradlew jar
+
+# Run the API server headlessly
+java -jar build/libs/VellarisServer.jar
 
 # Run tests
 ./gradlew test
@@ -29,6 +32,10 @@ The shell is Windows bash (Git Bash / MSYS2). Use Windows-style paths like `C:/U
 # Run benchmark with JFR profiling
 ./gradlew benchmark
 ```
+
+The server listens on port 8080. The React frontend in `web/` is built separately with Vite and talks to
+`/api/*`. In production, nginx serves the static build and proxies to the Java process (see `Dockerfile`
+and `docker/nginx.conf`).
 
 ## Project Structure
 
@@ -38,17 +45,14 @@ src/nortantis/
 ├── MapSettings.java         # Serializable map configuration
 ├── WorldGraph.java          # Voronoi graph with elevation/biome data
 ├── GraphCreator.java        # Constructs WorldGraph from Voronoi diagrams
+├── api/                     # Javalin HTTP API (MapApiServer)
+├── i18n/                    # Translation class and messages*.properties bundles
 ├── platform/                # Graphics abstraction layer
 │   ├── PlatformFactory.java # Factory for graphics backends
 │   ├── Image.java           # Abstract image
 │   ├── Painter.java         # Abstract drawing interface
 │   └── awt/                 # AWT rendering implementation
-├── swing/                   # UI components
-│   ├── MainWindow.java      # Application entry point
-│   ├── MapEditingPanel.java # Map canvas/viewport
-│   ├── ThemePanel.java      # Theme customization
-│   └── ToolsPanel.java      # Editing tools
-├── editor/                  # Map editing data structures
+├── editor/                  # Map editing data structures (MapEdits, UserPreferences, UpdateType)
 ├── graph/voronoi/           # Voronoi diagram structures
 ├── geom/                    # Geometry utilities
 └── util/                    # General utilities
@@ -56,15 +60,15 @@ src/nortantis/
 
 ## Key Entry Points
 
-- **GUI Entry:** `nortantis.swing.MainWindow`
-- **Map Generation:** `nortantis.MapCreator.createMap()`
+- **Server Entry:** `nortantis.api.MapApiServer`
+- **Map Generation:** `nortantis.MapCreator.createMap()
 - **Settings:** `nortantis.MapSettings` - serialized as `.nort` files
 
 ## Architecture Patterns
 
 ### Platform Abstraction (Strategy Pattern)
 ```java
-// The desktop app uses AWT rendering:
+// The server uses AWT rendering in headless mode:
 PlatformFactory.setInstance(new AwtFactory());
 ```
 
@@ -129,7 +133,7 @@ Whenever possible, use the Read, Edit, and Write tools to read and modify files.
 - **Tuple Classes:** `Tuple2`, `Tuple3`, `Tuple4`, `Pair`, `OrderlessPair`
 - **Helper class for timing:** nortantis.util.Stopwatch
 - **Rectangle and dimension classes:** Use `nortantis.geom.Rectangle`, `IntRectangle`, `RotatedRectangle`, `Dimension`, and `IntDimension` for anything bounding-box or size related. These classes have methods for intersection, union, containment checks, `fromCorners`, etc. Prefer these over recreating bounding-box logic inline.
-- **Translations:** Whenever you add or modify a string key accessed via `Translation.get(...)`, update the English file (`messages.properties`) and all language files (`messages_de.properties`, `messages_es.properties`, `messages_fr.properties`, `messages_pt.properties`, `messages_ru.properties`, `messages_zh.properties`) in `src/nortantis/swing/translation/`.
+- **Translations:** Whenever you add or modify a string key accessed via `Translation.get(...)`, update the English file (`messages.properties`) and all language files (`messages_de.properties`, `messages_es.properties`, `messages_fr.properties`, `messages_pt.properties`, `messages_ru.properties`, `messages_zh.properties`) in `src/nortantis/i18n/`.
 
 ## Map Generation Pipeline
 
@@ -150,7 +154,7 @@ MapCreator.createMap()
 Image (final rendered map)
 ```
 
-"Incremental" draws update only part of the map, going through one of the MapCreator.incrementalUpdate\* methods. Incremental draws or what allows the editor to quickly update the map in near real time while the user is drawing or changing text.
+"Incremental" draws update only part of the map, going through one of the MapCreator.incrementalUpdate\* methods. They let the service patch a region of an existing rendered map instead of redrawing everything.
 
 
 ## Key Algorithms
@@ -162,6 +166,7 @@ Image (final rendered map)
 
 ## Android / Skia
 
-The Skia rendering backend has been moved to the Android project (`NortantisTest`). This project produces a JAR (`./gradlew jar`) that the Android project depends on. See the Android project's CLAUDE.md for details.
+The Skia rendering backend lives in the separate Android project (`NortantisTest`), which depends on this
+repository's JAR. See the Android project's CLAUDE.md for details.
 
 If you discover anything to be incorrect in these instructions, please update them in CLAUDE.md.

@@ -20,7 +20,7 @@ class MapApiServerInitializeEditsTest
 
 		// Create settings with empty edits so MapCreator.createGraphForUnitTests can use it
 		MapSettings settings = SettingsGenerator.generate(new Random(5), Assets.installedArtPack, null);
-		settings.edits = new nortantis.swing.MapEdits();
+		settings.edits = new nortantis.editor.MapEdits();
 
 		Class<?> c = Class.forName("nortantis.api.MapApiServer");
 		Method m = c.getDeclaredMethod("initializeEditsFromGraph", MapSettings.class);

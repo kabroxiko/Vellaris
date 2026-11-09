@@ -1,6 +1,6 @@
 package nortantis;
 
-import nortantis.swing.translation.Translation;
+import nortantis.i18n.Translation;
 import nortantis.util.ComparableList;
 import nortantis.util.Range;
 import nortantis.util.StringCounterMap;

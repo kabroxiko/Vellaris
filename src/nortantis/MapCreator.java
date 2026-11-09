@@ -8,8 +8,8 @@ import nortantis.graph.voronoi.Corner;
 import nortantis.graph.voronoi.Edge;
 import nortantis.graph.voronoi.EdgeDrawType;
 import nortantis.platform.*;
-import nortantis.swing.MapEdits;
-import nortantis.swing.translation.Translation;
+import nortantis.editor.MapEdits;
+import nortantis.i18n.Translation;
 import nortantis.util.*;
 import org.apache.commons.lang3.StringUtils;
 

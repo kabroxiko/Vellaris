@@ -27,7 +27,7 @@ class MapApiServerProduceResponseRuntimeTest
 
 		// Create settings and ensure edits initialized to avoid heavy graph work
 		MapSettings settings = SettingsGenerator.generate(new Random(4), Assets.installedArtPack, null);
-		settings.edits = new nortantis.swing.MapEdits();
+		settings.edits = new nortantis.editor.MapEdits();
 		settings.edits.centerEdits.put(0, new nortantis.editor.CenterEdit(0, false, false, null, null, null));
 
 		// Build GenerationContext via reflection

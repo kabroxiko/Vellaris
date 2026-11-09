@@ -1,13 +1,9 @@
-import org.gradle.plugins.ide.eclipse.model.Library
-import org.gradle.plugins.ide.eclipse.model.internal.FileReferenceFactory
-
 plugins {
     java
     application
     `java-test-fixtures`
     id("com.diffplug.spotless") version "8.6.0"
     id("com.github.ben-manes.versions") version "0.54.0"
-    eclipse
     jacoco
 }
 
@@ -28,26 +24,12 @@ dependencies {
     testImplementation(platform("org.junit:junit-bom:6.1.0"))
     testImplementation("org.junit.jupiter:junit-jupiter")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
-    implementation("com.formdev:flatlaf:3.7.1")
-}
-
-// Attaches javadocs to libraries in Eclipse.
-eclipse {
-    classpath {
-        file {
-            whenMerged {
-                val cp = this as org.gradle.plugins.ide.eclipse.model.Classpath
-                val fileReferenceFactory = FileReferenceFactory()
-                val entry = cp.entries.filterIsInstance<Library>().first { it.path.contains("JTransforms") }
-                entry.javadocPath = fileReferenceFactory.fromPath(file("libraries-doc/JTransforms-3.1-javadoc.jar").toString())
-            }
-        }
-    }
 }
 
 application {
-    mainClass.set("nortantis.swing.MainWindow")
+    mainClass.set("nortantis.api.MapApiServer")
     applicationDefaultJvmArgs = listOf(
+        "-Djava.awt.headless=true",
         "--enable-native-access=ALL-UNNAMED",
     )
 }
@@ -65,7 +47,7 @@ tasks.withType<JavaCompile> {
 tasks.jar {
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     manifest {
-        attributes("Main-Class" to "nortantis.swing.MainWindow")
+        attributes("Main-Class" to "nortantis.api.MapApiServer")
     }
     from(configurations.runtimeClasspath.get().map { if (it.isDirectory) it else zipTree(it) }) {
         exclude("META-INF/*.SF", "META-INF/*.DSA", "META-INF/*.RSA")
@@ -75,7 +57,7 @@ tasks.jar {
             into("assets")
         }
     }
-    archiveFileName.set("Nortantis.jar")
+    archiveFileName.set("VellarisServer.jar")
 }
 
 tasks.test {

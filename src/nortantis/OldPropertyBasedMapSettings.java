@@ -7,7 +7,7 @@ import nortantis.geom.Point;
 import nortantis.platform.Color;
 import nortantis.platform.Font;
 import nortantis.platform.FontStyle;
-import nortantis.swing.MapEdits;
+import nortantis.editor.MapEdits;
 import nortantis.util.Assets;
 import java.util.function.Supplier;
 import org.json.simple.JSONArray;

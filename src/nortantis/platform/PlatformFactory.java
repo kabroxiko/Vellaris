@@ -102,8 +102,4 @@ public abstract class PlatformFactory
 	 * @return a Color
 	 */
 	public abstract Color createColorFromHSB(float hue, float saturation, float brightness);
-
-	public abstract <T> void doInBackgroundThread(BackgroundTask<T> task);
-
-	public abstract void doInMainUIThreadAsynchronous(Runnable toRun);
 }

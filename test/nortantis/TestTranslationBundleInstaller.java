@@ -21,7 +21,7 @@ public final class TestTranslationBundleInstaller
 	{
 		try
 		{
-			Class<?> trClass = Class.forName("nortantis.swing.translation.Translation");
+			Class<?> trClass = Class.forName("nortantis.i18n.Translation");
 			Field bundleField = trClass.getDeclaredField("bundle");
 			bundleField.setAccessible(true);
 			Object previous = bundleField.get(null);

@@ -10,7 +10,7 @@ import nortantis.MapSettings;
 import nortantis.NamedResource;
 import nortantis.SettingsGenerator;
 import nortantis.editor.UserPreferences;
-import nortantis.swing.translation.Translation;
+import nortantis.i18n.Translation;
 import nortantis.util.Assets;
 import nortantis.geom.Dimension;
 import nortantis.platform.Image;
@@ -63,6 +63,9 @@ public class MapApiServer
 
 	public static void main(String[] args)
 	{
+		// This process only renders off-screen images, so AWT must never try to open a display.
+		System.setProperty("java.awt.headless", "true");
+
 		CountDownLatch latch = new CountDownLatch(1);
 
 		// Increase Jetty's max form/request content size globally to 10 MB.
@@ -80,7 +83,7 @@ public class MapApiServer
 		// Initialize translations early so API endpoints using Translation.get()
 		// have a valid ResourceBundle available even before any request-level
 		// language handling occurs.
-		nortantis.swing.translation.Translation.initialize();
+		nortantis.i18n.Translation.initialize();
 
 		// Create and configure the Javalin app (routes declared inside config.routes)
 		Javalin app = Javalin.create(config ->
@@ -603,7 +606,7 @@ public class MapApiServer
 		Map<String, String> labels = new LinkedHashMap<>();
 		try
 		{
-			ResourceBundle bundle = ResourceBundle.getBundle("nortantis.swing.translation.messages", Translation.getEffectiveLocale());
+			ResourceBundle bundle = ResourceBundle.getBundle("nortantis.i18n.messages", Translation.getEffectiveLocale());
 			for (String k : bundle.keySet())
 			{
 				String v = bundle.getString(k);
@@ -1139,7 +1142,7 @@ public class MapApiServer
 			try
 			{
 				if (settings.edits == null)
-					settings.edits = new nortantis.swing.MapEdits();
+					settings.edits = new nortantis.editor.MapEdits();
 				settings.edits.initializeCenterEdits(graph.centers);
 				settings.edits.initializeEdgeEdits(graph.edges);
 				settings.edits.initializeRegionEdits(graph.regions.values());

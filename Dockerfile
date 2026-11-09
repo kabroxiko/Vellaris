@@ -71,7 +71,7 @@ RUN set -eux; \
 	fc-cache -f -v
 
 # Copy backend jar and frontend static build output
-COPY --from=backend-builder /src/build/libs/*.jar ./app.jar
+COPY --from=backend-builder /src/build/libs/VellarisServer.jar ./app.jar
 COPY --from=frontend-builder /src/web/dist ./static
 COPY docker/nginx.conf /etc/nginx/nginx.conf
 COPY docker/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh

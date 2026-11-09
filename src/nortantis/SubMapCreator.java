@@ -14,7 +14,7 @@ import nortantis.graph.voronoi.Center;
 import nortantis.graph.voronoi.Corner;
 import nortantis.graph.voronoi.Edge;
 import nortantis.platform.Font;
-import nortantis.swing.MapEdits;
+import nortantis.editor.MapEdits;
 
 import nortantis.util.Tuple2;
 
@@ -28,6 +28,28 @@ import java.util.function.Predicate;
  */
 public class SubMapCreator
 {
+	/**
+	 * Minimum number of graph polygons a sub-map is allowed to have.
+	 */
+	public static final int minPolygonsInSubMap = 1000;
+
+	/**
+	 * Computes the world size that gives a sub-map the same level of detail as the source map for the given selection bounds.
+	 *
+	 * @param origSettings
+	 *            The source map settings.
+	 * @param selectionBoundsRI
+	 *            The selection bounds in resolution-invariant (RI) coordinates.
+	 * @return The number of Voronoi polygons the sub-map should use.
+	 */
+	public static int computeDefaultWorldSize(MapSettings origSettings, Rectangle selectionBoundsRI)
+	{
+		double origMapArea = origSettings.generatedWidth * (double) origSettings.generatedHeight;
+		double selArea = selectionBoundsRI.width * selectionBoundsRI.height;
+		double oneXWorldSize = origSettings.worldSize * selArea / origMapArea;
+		return (int) Math.round(Math.clamp(oneXWorldSize, minPolygonsInSubMap, SettingsGenerator.maxWorldSize));
+	}
+
 	/**
 	 * Creates a new MapSettings for a sub-map of the given original map.
 	 *
