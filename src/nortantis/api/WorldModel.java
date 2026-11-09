@@ -149,7 +149,7 @@ public class WorldModel
 		return regions;
 	}
 
-	private static Map<Integer, String> attributeRegionNames(MapSettings settings, WorldGraph graph)
+	public static Map<Integer, String> attributeRegionNames(MapSettings settings, WorldGraph graph)
 	{
 		Map<Integer, String> namesByRegionId = new HashMap<>();
 		if (settings.edits == null || settings.edits.text == null)
@@ -250,7 +250,7 @@ public class WorldModel
 		return new Point(resolutionInvariant.x * resolution, resolutionInvariant.y * resolution);
 	}
 
-	private static double toInvariant(double imageSpaceValue, double resolution)
+	static double toInvariant(double imageSpaceValue, double resolution)
 	{
 		return imageSpaceValue / resolution;
 	}

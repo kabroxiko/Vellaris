@@ -9,6 +9,7 @@ import nortantis.MapCreator;
 import nortantis.MapSettings;
 import nortantis.NamedResource;
 import nortantis.SettingsGenerator;
+import nortantis.WorldGraph;
 import nortantis.editor.MapParts;
 import nortantis.i18n.Translation;
 import nortantis.util.Assets;
@@ -126,6 +127,8 @@ public class MapApiServer
 			config.routes.post("/api/generate", ctx -> ctx.result(String.valueOf(handleGenerate(ctx))));
 			config.routes.post("/api/world", ctx -> ctx.result(String.valueOf(handleWorld(ctx))));
 			config.routes.post("/api/world/map", MapApiServer::handleWorldMap);
+			config.routes.post("/api/route", MapApiServer::handleRoute);
+			config.routes.post("/api/nearest", MapApiServer::handleNearest);
 			config.routes.post("/api/background-base", MapApiServer::handleBackgroundBase);
 
 			config.routes.exception(Exception.class, (e, ctx) ->
@@ -522,6 +525,113 @@ public class MapApiServer
 		{
 			generation.image.close();
 		}
+	}
+
+	/**
+	 * Routes between two named places or coordinates, reporting the terrain travelled through, the distance, how long it takes, and what
+	 * lies along the way. Answers a question a dungeon master would otherwise have to guess at.
+	 */
+	private static void handleRoute(Context ctx)
+	{
+		RouteModel.RouteRequest request = parseBodyAs(ctx, RouteModel.RouteRequest.class);
+		handleWorldQuery(ctx, (settings, graph) -> RouteModel.route(settings, graph, request));
+	}
+
+	/**
+	 * Describes what is at a point: the nearest named place, the region containing it, and a stable anchor a caller can key its own notes
+	 * on.
+	 */
+	private static void handleNearest(Context ctx)
+	{
+		RouteModel.PointRequest request = parseBodyAs(ctx, RouteModel.PointRequest.class);
+		handleWorldQuery(ctx, (settings, graph) -> RouteModel.nearest(settings, graph, request));
+	}
+
+	/**
+	 * Shared plumbing for the query endpoints: generate the requested world, hand its settings and graph to the builder, and write the
+	 * result.
+	 *
+	 * These endpoints need the generated graph, and they also need the place names, which are only produced while drawing text - so the map
+	 * has to be rendered even though the image itself is then discarded.
+	 */
+	private static void handleWorldQuery(Context ctx, java.util.function.BiFunction<MapSettings, WorldGraph, Map<String, Object>> buildResponse)
+	{
+		GenerationRequestContext grc = prepareGenerationRequest(ctx, false);
+		if (grc == null)
+		{
+			writeJsonError(ctx, 400, MSG_FAILED_TO_PARSE_CONFIG);
+			return;
+		}
+
+		GenerationResult generation = generateForQuery(grc);
+		Map<String, Object> response;
+		try
+		{
+			if (generation.image == null)
+			{
+				writeJsonError(ctx, 500, generation.errorMessage);
+				return;
+			}
+			response = buildResponse.apply(grc.ctx.settings, generation.mapParts == null ? null : generation.mapParts.graph);
+		}
+		finally
+		{
+			if (generation.image != null)
+			{
+				generation.image.close();
+			}
+		}
+
+		ctx.contentType(CONTENT_TYPE_JSON);
+		ctx.status(Boolean.TRUE.equals(response.get("success")) ? 200 : 400);
+		ctx.result(gson.toJson(response));
+	}
+
+	/**
+	 * Generates the requested world and keeps its graph, applying the request's language for the duration of the generation.
+	 */
+	private static GenerationResult generateForQuery(GenerationRequestContext grc)
+	{
+		MapSettings requestSettings = grc.settings;
+		Integer generatedWidth = (requestSettings != null && requestSettings.generatedWidth > 0) ? Integer.valueOf(requestSettings.generatedWidth) : null;
+		Integer generatedHeight = (requestSettings != null && requestSettings.generatedHeight > 0) ? Integer.valueOf(requestSettings.generatedHeight) : null;
+
+		boolean appliedLanguage = requestSettings != null && requestSettings.language != null && !requestSettings.language.isEmpty();
+		try
+		{
+			if (appliedLanguage)
+			{
+				grc.ctx.settings.language = requestSettings.language;
+				Translation.initializeWithLanguage(requestSettings.language);
+			}
+			return generateMap(grc.ctx.settings, generatedWidth, generatedHeight, true);
+		}
+		finally
+		{
+			if (appliedLanguage)
+			{
+				Translation.initialize();
+			}
+		}
+	}
+
+	private static <T> T parseBodyAs(Context ctx, Class<T> type)
+	{
+		try
+		{
+			return gson.fromJson(ctx.body(), type);
+		}
+		catch (com.google.gson.JsonSyntaxException e)
+		{
+			return null;
+		}
+	}
+
+	private static void writeJsonError(Context ctx, int status, String message)
+	{
+		ctx.contentType(CONTENT_TYPE_JSON);
+		ctx.status(status);
+		ctx.result(gson.toJson(new ApiResponse(false, message, null, null)));
 	}
 
 	private static Object executeGenerationAndReturn(GenerationRequestContext grc, Context ctx)

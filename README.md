@@ -71,6 +71,16 @@ HTTP API
 - `POST /api/world/map` — generates a map from a `MapSettings` body and returns the raw PNG as `image/png`. The bytes
   are identical to the ones carried by `/api/generate` and `/api/world?includeImage=true`, but without the base64
   overhead.
+- `POST /api/route` — takes a `MapSettings` body plus `from` and `to` (each either `{"name":"..."}` or `{"x":..,"y":..}`)
+  and returns the route between them: distance, terrain travelled through, travel time, the regions crossed, the
+  named places near the route in the order they are reached, and waypoints. `mode` may be `walk` (default) or
+  `horse`. Water is impassable unless `allowWater` is true, so a destination on another landmass reports
+  `reachable: false` rather than inventing a route. Because the map has no inherent physical scale, `travel.days`
+  assumes `mapUnitsPerDay` of open ground per day; override it to match your world, and read `travel.assumptions`
+  to see what was used.
+- `POST /api/nearest` — takes a `MapSettings` body plus `x` and `y`, and returns the nearest named place, the region
+  containing that point, and a stable `anchor` string for the surrounding area. Anchors are coarse cells, intended as
+  the key under which a client stores its own per-location notes; this server stores nothing.
 - `POST /api/background-base` — returns a background texture PNG.
 
 Docker
