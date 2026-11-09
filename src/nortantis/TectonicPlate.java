@@ -16,19 +16,15 @@ public class TectonicPlate
 
 	// This is needed to give the object a deterministic hash code. If I use the object's address as the hash
 	// code, it may change from one run to the next, and so HashSet iterates over the objects in a different
-	// order sometimes.
-	private int id;
-	static int nextID = 0;
+	// order sometimes. The id is assigned by the WorldGraph that owns the plate rather than by a static counter,
+	// because a static counter is shared between concurrently generated graphs, which makes ids interleave and
+	// therefore makes the plate HashSets iterate in a different order from one concurrent run to the next.
+	private final int id;
 
-	public static void resetIds()
-	{
-		nextID = 0;
-	}
-
-	public TectonicPlate(double growthProbability)
+	public TectonicPlate(double growthProbability, int id)
 	{
 		this.growthProbability = growthProbability;
-		this.id = nextID++;
+		this.id = id;
 		centers = new HashSet<>();
 	}
 

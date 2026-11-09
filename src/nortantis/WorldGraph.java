@@ -81,6 +81,10 @@ public class WorldGraph extends VoronoiGraph
 
 	// Maps plate ids to plates.
 	Set<TectonicPlate> plates;
+
+	// Deterministic, per-graph plate ids. These feed TectonicPlate.hashCode, which determines how the plate
+	// HashSets iterate, so they must be scoped to this graph rather than shared with concurrently generated graphs.
+	private int nextTectonicPlateId;
 	public Map<Integer, Region> regions;
 	LandShape landShape;
 	int regionCount;
@@ -93,7 +97,6 @@ public class WorldGraph extends VoronoiGraph
 		this.borderPlateContinentalProbability = borderPlateContinentalProbability;
 		this.landShape = landShape;
 		this.regionCount = regionCount;
-		TectonicPlate.resetIds();
 		initVoronoiGraph(v, numLloydRelaxations, lloydRelaxationsScale, createElevationBiomesLakesAndRegions);
 		regions = new TreeMap<>();
 
@@ -2035,10 +2038,18 @@ public class WorldGraph extends VoronoiGraph
 		return Math.min(Math.min(distLeft, distRight), Math.min(distTop, distBottom));
 	}
 
+	/**
+	 * Creates a tectonic plate with an id that is deterministic for this graph. The id backs TectonicPlate.hashCode, which decides how the
+	 * plate HashSets iterate, so it has to be allocated per graph instead of from a process-wide counter.
+	 */
+	private TectonicPlate createTectonicPlate(double growthProbability)
+	{
+		return new TectonicPlate(growthProbability, nextTectonicPlateId++);
+	}
+
 	private void createTectonicPlatesForRegionCount()
 	{
 		int oceanicPlateCount = Math.max(regionCount, 4);
-
 		// For Continents/Scattered with high world size or region count, add extra oceanic
 		// plates to break up maze-like land patterns. The continental plate count stays the same.
 		int extraOceanicPlates = 0;
@@ -2144,7 +2155,7 @@ public class WorldGraph extends VoronoiGraph
 		for (int i = 0; i < totalPlates; i++)
 		{
 			double growthWeight = 0.3 + rand.nextDouble() * 0.6;
-			TectonicPlate plate = new TectonicPlate(growthWeight);
+			TectonicPlate plate = createTectonicPlate(growthWeight);
 			plate.type = isContinental[i] ? PlateType.Continental : PlateType.Oceanic;
 			plateList.add(plate);
 		}
@@ -2284,7 +2295,7 @@ public class WorldGraph extends VoronoiGraph
 		BetaDistribution betaDist = new BetaDistribution(randomData, 1, 3, BetaDistribution.DEFAULT_INVERSE_ABSOLUTE_ACCURACY);
 		for (Center c : centers)
 		{
-			c.tectonicPlate = new TectonicPlate(betaDist.sample());
+			c.tectonicPlate = createTectonicPlate(betaDist.sample());
 			plateCounts.put(c.tectonicPlate, 1);
 		}
 
