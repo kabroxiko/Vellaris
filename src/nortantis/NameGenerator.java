@@ -59,6 +59,23 @@ public class NameGenerator
 		romanNumerals = new HashSet<String>(Arrays.asList(romanNumeralString.split(",")));
 	}
 
+	/**
+	 * Creates a generator that reuses an already trained n-gram model instead of training a new one from the corpora. The model is only
+	 * read after training, so sharing it between generators is safe.
+	 */
+	public NameGenerator(Random r, CharacterNGram trainedNGram, double averageWordLength, double maxWordLengthComparedToAverage, double probabilityOfKeepingNameLength1,
+			double probabilityOfKeepingNameLength2, double probabilityOfKeepingNameLength3)
+	{
+		this.maxWordLengthComparedToAverage = maxWordLengthComparedToAverage;
+		this.probabilityOfKeepingNameLength1 = probabilityOfKeepingNameLength1;
+		this.probabilityOfKeepingNameLength2 = probabilityOfKeepingNameLength2;
+		this.probabilityOfKeepingNameLength3 = probabilityOfKeepingNameLength3;
+		this.nGram = new CharacterNGram(r, trainedNGram);
+		this.rand = r;
+		this.averageWordLength = averageWordLength;
+		romanNumerals = new HashSet<String>(Arrays.asList(romanNumeralString.split(",")));
+	}
+
 	public String generateName(String requiredPrefix) throws NotEnoughNamesException
 	{
 		String name = null;

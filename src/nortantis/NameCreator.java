@@ -19,6 +19,46 @@ public class NameCreator
 	private final double probabilityOfKeepingNameLength3 = 0.3;
 	private Set<String> namesGenerated;
 
+	/**
+	 * Number of distinct book selections to keep trained name models for.
+	 */
+	private static final int maxCachedCorpora = 16;
+
+	private static final Map<Set<String>, Corpora> corporaCache = Collections.synchronizedMap(new LinkedHashMap<Set<String>, Corpora>(16, 0.75f, true)
+	{
+		private static final long serialVersionUID = 1L;
+
+		@Override
+		protected boolean removeEldestEntry(Map.Entry<Set<String>, Corpora> eldest)
+		{
+			return size() > maxCachedCorpora;
+		}
+	});
+
+	/**
+	 * Trained name models and loaded word pairs for one selection of books. Everything here is read-only after construction.
+	 */
+	private static class Corpora
+	{
+		final CharacterNGram placeNameModel;
+		final double placeNamesAverageWordLength;
+		final CharacterNGram personNameModel;
+		final double personNamesAverageWordLength;
+		final List<Pair<String>> nounAdjectivePairs;
+		final List<Pair<String>> nounVerbPairs;
+
+		Corpora(CharacterNGram placeNameModel, double placeNamesAverageWordLength, CharacterNGram personNameModel, double personNamesAverageWordLength, List<Pair<String>> nounAdjectivePairs,
+				List<Pair<String>> nounVerbPairs)
+		{
+			this.placeNameModel = placeNameModel;
+			this.placeNamesAverageWordLength = placeNamesAverageWordLength;
+			this.personNameModel = personNameModel;
+			this.personNamesAverageWordLength = personNamesAverageWordLength;
+			this.nounAdjectivePairs = nounAdjectivePairs;
+			this.nounVerbPairs = nounVerbPairs;
+		}
+	}
+
 	public NameCreator(MapSettings settings)
 	{
 		this.r = new Random(settings.textRandomSeed);
@@ -27,6 +67,38 @@ public class NameCreator
 	}
 
 	private void processBooks(Set<String> books)
+	{
+		Corpora corpora = getCorpora(books);
+		placeNameGenerator = new NameGenerator(r, corpora.placeNameModel, corpora.placeNamesAverageWordLength, maxWordLengthComparedToAverage, probabilityOfKeepingNameLength1,
+				probabilityOfKeepingNameLength2, probabilityOfKeepingNameLength3);
+		personNameGenerator = new NameGenerator(r, corpora.personNameModel, corpora.personNamesAverageWordLength, maxWordLengthComparedToAverage, probabilityOfKeepingNameLength1,
+				probabilityOfKeepingNameLength2, probabilityOfKeepingNameLength3);
+
+		nameCompiler = new NameCompiler(r, corpora.nounAdjectivePairs, corpora.nounVerbPairs);
+	}
+
+	/**
+	 * The selected books are the only input to corpora loading, so the trained name models are cached and reused across map generations.
+	 * Maps generated concurrently share them; the models are only read after training, and each map still supplies its own random source.
+	 */
+	private static Corpora getCorpora(Set<String> books)
+	{
+		Set<String> key = new HashSet<>(books);
+		synchronized (corporaCache)
+		{
+			Corpora cached = corporaCache.get(key);
+			if (cached != null)
+			{
+				return cached;
+			}
+
+			Corpora loaded = loadCorpora(books);
+			corporaCache.put(key, loaded);
+			return loaded;
+		}
+	}
+
+	private static Corpora loadCorpora(Set<String> books)
 	{
 		List<String> placeNames = new ArrayList<>();
 		List<String> personNames = new ArrayList<>();
@@ -40,10 +112,29 @@ public class NameCreator
 			nounVerbPairs.addAll(Assets.readStringPairs(Assets.getAssetsPath() + "/books/" + book + "_noun_verb_pairs.txt"));
 		}
 
-		placeNameGenerator = new NameGenerator(r, placeNames, maxWordLengthComparedToAverage, probabilityOfKeepingNameLength1, probabilityOfKeepingNameLength2, probabilityOfKeepingNameLength3);
-		personNameGenerator = new NameGenerator(r, personNames, maxWordLengthComparedToAverage, probabilityOfKeepingNameLength1, probabilityOfKeepingNameLength2, probabilityOfKeepingNameLength3);
+		// The average is taken before lower-casing, which does not change lengths.
+		double placeNamesAverageWordLength = averageWordLength(placeNames);
+		double personNamesAverageWordLength = averageWordLength(personNames);
 
-		nameCompiler = new NameCompiler(r, nounAdjectivePairs, nounVerbPairs);
+		placeNames.replaceAll(String::toLowerCase);
+		personNames.replaceAll(String::toLowerCase);
+
+		CharacterNGram placeNameModel = new CharacterNGram(new Random(0), 3);
+		placeNameModel.addData(placeNames);
+		CharacterNGram personNameModel = new CharacterNGram(new Random(0), 3);
+		personNameModel.addData(personNames);
+
+		return new Corpora(placeNameModel, placeNamesAverageWordLength, personNameModel, personNamesAverageWordLength, nounAdjectivePairs, nounVerbPairs);
+	}
+
+	private static double averageWordLength(List<String> names)
+	{
+		int sum = 0;
+		for (String name : names)
+		{
+			sum += name.length();
+		}
+		return ((double) sum) / names.size();
 	}
 
 	public String generatePlaceName(String format, boolean requireUnique)

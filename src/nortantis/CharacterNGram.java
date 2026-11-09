@@ -36,6 +36,19 @@ public class CharacterNGram
 		this.scMap = new StringCounterMap();
 	}
 
+	/**
+	 * Creates a generator that reuses the trained data of another generator. The trained state is not modified after
+	 * {@link #addData(Collection)}, so instances created this way can share it, including across threads. Each instance supplies its own
+	 * random source, so generation stays deterministic for a given seed.
+	 */
+	public CharacterNGram(Random r, CharacterNGram trained)
+	{
+		this.n = trained.n;
+		this.r = r;
+		this.scMap = trained.scMap;
+		this.namesFromCorpora = trained.namesFromCorpora;
+	}
+
 	public void addData(Collection<String> phrases)
 	{
 		for (String phrase : phrases)
