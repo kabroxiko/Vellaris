@@ -168,23 +168,36 @@ public abstract class ImageHelper
 				tasks.add(() ->
 				{
 					int endY = taskNumber == numTasks - 1 ? image.getHeight() : (taskNumber + 1) * rowsPerJob;
+					boolean isGrayscaleMask = mask.getType() == ImageType.Grayscale8Bit;
+					int lastColorKey = Integer.MIN_VALUE;
+					Color lastColor = null;
 					for (int y = taskNumber * rowsPerJob; y < endY; y++)
 					{
 						for (int x = 0; x < image.getWidth(); x++)
 						{
-							Color col = Color.create(imagePixels.getRGB(x, y));
-							Color color = colors.get(WorldGraph.getValueFromColor(colorIndexesPixels.getPixelColor(x, y)));
+							int sourceRgb = imagePixels.getRGB(x, y);
+							int sourceRed = (sourceRgb >> 16) & 0xFF;
+							int sourceGreen = (sourceRgb >> 8) & 0xFF;
+							int sourceBlue = sourceRgb & 0xFF;
+
+							int colorKey = WorldGraph.getValueFromColor(colorIndexesPixels.getPixelColor(x, y));
+							if (colorKey != lastColorKey)
+							{
+								lastColorKey = colorKey;
+								lastColor = colors.get(colorKey);
+							}
+							Color color = lastColor;
 							if (color != null)
 							{
 								int maskLevel = maskPixels.getGrayLevel(x, y);
-								if (mask.getType() == ImageType.Grayscale8Bit)
+								if (isGrayscaleMask)
 								{
 									if (invertMask)
 										maskLevel = 255 - maskLevel;
 
-									int r = ((maskLevel * col.getRed()) + (255 - maskLevel) * color.getRed()) / 255;
-									int g = ((maskLevel * col.getGreen()) + (255 - maskLevel) * color.getGreen()) / 255;
-									int b = ((maskLevel * col.getBlue()) + (255 - maskLevel) * color.getBlue()) / 255;
+									int r = ((maskLevel * sourceRed) + (255 - maskLevel) * color.getRed()) / 255;
+									int g = ((maskLevel * sourceGreen) + (255 - maskLevel) * color.getGreen()) / 255;
+									int b = ((maskLevel * sourceBlue) + (255 - maskLevel) * color.getBlue()) / 255;
 									resultPixels.setRGB(x, y, r, g, b);
 								}
 								else
@@ -194,9 +207,9 @@ public abstract class ImageHelper
 									if (invertMask)
 										maskLevel = 255 - maskLevel;
 
-									int r = ((maskLevel * col.getRed()) + (1 - maskLevel) * color.getRed());
-									int g = ((maskLevel * col.getGreen()) + (1 - maskLevel) * color.getGreen());
-									int b = ((maskLevel * col.getBlue()) + (1 - maskLevel) * color.getBlue());
+									int r = ((maskLevel * sourceRed) + (1 - maskLevel) * color.getRed());
+									int g = ((maskLevel * sourceGreen) + (1 - maskLevel) * color.getGreen());
+									int b = ((maskLevel * sourceBlue) + (1 - maskLevel) * color.getBlue());
 									resultPixels.setRGB(x, y, r, g, b);
 								}
 							}
@@ -341,11 +354,18 @@ public abstract class ImageHelper
 		{
 			ThreadHelper.getInstance().processRowsInParallel(0, colorIndexes.getHeight(), (y) ->
 			{
+				int lastKey = Integer.MIN_VALUE;
+				float[] lastHsb = null;
 				for (int x = 0; x < colorIndexes.getWidth(); x++)
 				{
 					float level = imagePixels.getNormalizedPixelLevel(x, y);
 					int colorKey = WorldGraph.getValueFromColor(colorIndexesPixels.getPixelColor(x, y));
-					float[] hsb = hsbMap.get(colorKey);
+					if (colorKey != lastKey)
+					{
+						lastKey = colorKey;
+						lastHsb = hsbMap.get(colorKey);
+					}
+					float[] hsb = lastHsb;
 					if (hsb != null)
 					{
 						resultPixels.setRGB(x, y, colorizePixel(level, hsb, how));
@@ -762,28 +782,33 @@ public abstract class ImageHelper
 
 		try (Image overlay = Image.create(image.getWidth(), image.getHeight(), ImageType.ARGB))
 		{
+			final int colorRed = color.getRed();
+			final int colorGreen = color.getGreen();
+			final int colorBlue = color.getBlue();
+			final float colorAlpha = color.getAlpha();
+			final int maskWidth = mask.getWidth();
+			final int maskHeight = mask.getHeight();
+			final int overlayWidth = overlay.getWidth();
+
 			try (PixelReader maskPixels = mask.createPixelReader(new IntRectangle(imageOffsetInMask, overlay.getWidth(), overlay.getHeight())); PixelWriter overlayPixels = overlay.createPixelWriter())
 			{
 				ThreadHelper.getInstance().processRowsInParallel(0, overlay.getHeight(), (y) ->
 				{
-					for (int x = 0; x < overlay.getWidth(); x++)
+					int yInMask = y + imageOffsetInMask.y;
+					boolean yInRange = yInMask >= 0 && yInMask < maskHeight;
+					for (int x = 0; x < overlayWidth; x++)
 					{
 						int xInMask = x + imageOffsetInMask.x;
-						int yInMask = y + imageOffsetInMask.y;
-						if (xInMask < 0 || yInMask < 0 || xInMask >= mask.getWidth() || yInMask >= mask.getHeight())
+						if (!yInRange || xInMask < 0 || xInMask >= maskWidth)
 						{
 							continue;
 						}
 
-						int maskLevel = (int) (maskPixels.getNormalizedPixelLevel(xInMask, yInMask) * color.getAlpha());
+						int maskLevel = (int) (maskPixels.getNormalizedPixelLevel(xInMask, yInMask) * colorAlpha);
 						if (invertMask)
 							maskLevel = 255 - maskLevel;
 
-						int r = color.getRed();
-						int g = color.getGreen();
-						int b = color.getBlue();
-						int a = 255 - maskLevel;
-						overlayPixels.setRGB(x, y, r, g, b, a);
+						overlayPixels.setRGB(x, y, colorRed, colorGreen, colorBlue, 255 - maskLevel);
 					}
 				});
 			}
