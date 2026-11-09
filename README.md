@@ -97,32 +97,37 @@ With a 4096x2304 box the service returns a 4015x2302 image, which is about 2.4 M
 transparency is flattened onto white before encoding, which only matters if a map is rendered with a see-through edge.
 A `maxDimension` of around 1920-2560 is a reasonable target for a player-facing map.
 
-## Query caching
+## Answering queries without keeping the world
 
 `/api/route` and `/api/nearest` need the generated graph and the place names, and the names are only
-produced while drawing text — so a cache miss costs a full render even when the request is only asking
-about one pair of places. That is why a query on a large map used to take several seconds, and why a
-request naming a place that does not exist was just as slow as a valid one.
+produced while drawing text. The service therefore answers them from the settings the caller sends,
+not from anything it remembers:
 
-Generated worlds are now cached, keyed by a hash of the settings they were built from. Because a world
-is a pure function of its settings, a cached entry can never disagree with the settings that produced
-it. `/api/world` and `/api/world/map` prime the cache with the world they generated, so the first query
-after generating a map is already fast.
+1. Call `/api/world` once. It renders the map, invents the names, and returns them under `settings`.
+2. Keep that `settings` object and send it back with every `/api/route` and `/api/nearest` request,
+   alongside `from` and `to` (or `x` and `y`).
+
+Because those settings already carry the generated names, the service rebuilds only the graph and
+skips the render entirely. Nothing is cached server-side, so there is no cache to size, no eviction,
+and no per-world memory held between requests — the caller owns the world.
+
+A request whose settings carry no names yet (a raw world from `/api/generate-settings`) still gets a
+full render first, because there are no names to resolve against.
 
 Measured on a 4096x2304 world:
 
 | request | time |
 |---|---|
-| `/api/world/map` (renders and primes the cache) | 9.2 s |
-| `/api/route`, cache hit | 0.14 s |
-| `/api/route`, another pair, same world | 0.02 s |
-| `/api/nearest`, cache hit | 0.02 s |
-| `/api/route`, unknown place name, cache hit | 0.01 s (400, with the valid names listed) |
+| `/api/world` (renders, invents names) | 7-9 s |
+| `/api/route` with the returned `settings`, first call | 1.8 s |
+| `/api/route` with the returned `settings`, warm | 0.55 s |
+| `/api/route` without names (falls back to a render) | 3.3-7.4 s |
 
-Each cached world costs roughly 100 MB on a map that size, so the cache is bounded. It holds three
-worlds by default; set `-Dvellaris.worldCacheSize=N` to change that, or `0` to disable caching
-entirely (every query then pays for a render). Keep the heap large enough for the cache plus one
-in-flight render.
+The rebuild marks mountains and hills itself, because the renderer marks them while placing icons and
+a graph that was never drawn has none. Terrain cost depends on those marks, so without them a route
+came out 1.8% longer than the same route in the rendered world. It marks slightly more than the
+renderer keeps — the renderer also clears the flag where a mountain icon could not be drawn — so a
+rebuilt graph can treat a handful of extra centres as mountainous.
 
 ## Docker
 
