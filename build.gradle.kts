@@ -63,6 +63,7 @@ tasks.jar {
 tasks.test {
     jvmArgs = listOf(
         "-ea", "--enable-native-access=ALL-UNNAMED", "-Dfile.encoding=UTF-8", "-Dsun.java2d.d3d=false", "-Xmx3g",
+        "-Djava.awt.headless=true",
         "--add-opens", "java.base/java.nio=ALL-UNNAMED",
     )
     useJUnitPlatform()
