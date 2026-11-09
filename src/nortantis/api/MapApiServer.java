@@ -385,6 +385,9 @@ public class MapApiServer
 
 		boolean appliedLanguage = requestSettings != null && requestSettings.language != null && !requestSettings.language.isEmpty();
 
+		// Keyed before generation, because generating fills in edits and would change the settings' content.
+		String cacheKey = WorldCache.keyFor(grc.ctx.settings);
+
 		GenerationResult generation;
 		try
 		{
@@ -413,6 +416,9 @@ public class MapApiServer
 		{
 			Map<String, Object> response = new LinkedHashMap<>();
 			response.put("success", true);
+
+			// Remember the world before serializing the settings, which adds the bulky center edits that queries do not need.
+			seedWorldCache(cacheKey, grc.ctx.settings, generation.mapParts);
 
 			// Resolve the canonical settings first, because that is what fills in the region edits that carry each region's color.
 			@SuppressWarnings("unchecked")
@@ -552,6 +558,9 @@ public class MapApiServer
 
 		boolean appliedLanguage = requestSettings != null && requestSettings.language != null && !requestSettings.language.isEmpty();
 
+		// Keyed before generation, because generating fills in edits and would change the settings' content.
+		String cacheKey = WorldCache.keyFor(grc.ctx.settings);
+
 		GenerationResult generation;
 		try
 		{
@@ -560,8 +569,8 @@ public class MapApiServer
 				grc.ctx.settings.language = requestSettings.language;
 				Translation.initializeWithLanguage(requestSettings.language);
 			}
-			// The graph is not needed here, so don't ask the renderer to keep hold of it.
-			generation = generateMap(grc.ctx.settings, generatedWidth, generatedHeight, false);
+			// Keep the graph so this world can be cached for subsequent queries, instead of making them render it again.
+			generation = generateMap(grc.ctx.settings, generatedWidth, generatedHeight, true);
 		}
 		finally
 		{
@@ -578,6 +587,8 @@ public class MapApiServer
 			ctx.result(gson.toJson(new ApiResponse(false, generation.errorMessage, null, null)));
 			return;
 		}
+
+		seedWorldCache(cacheKey, grc.ctx.settings, generation.mapParts);
 
 		try
 		{
@@ -620,11 +631,12 @@ public class MapApiServer
 	}
 
 	/**
-	 * Shared plumbing for the query endpoints: generate the requested world, hand its settings and graph to the builder, and write the
+	 * Shared plumbing for the query endpoints: obtain the requested world, hand its settings and graph to the builder, and write the
 	 * result.
 	 *
-	 * These endpoints need the generated graph, and they also need the place names, which are only produced while drawing text - so the map
-	 * has to be rendered even though the image itself is then discarded.
+	 * These endpoints need the generated graph and the place names, and the names are only produced while drawing text - so on a miss the
+	 * map has to be rendered even though the image itself is then discarded. Rendered worlds are cached by their settings, so the second
+	 * and later queries against the same world cost almost nothing.
 	 */
 	private static void handleWorldQuery(Context ctx, java.util.function.BiFunction<MapSettings, WorldGraph, Map<String, Object>> buildResponse)
 	{
@@ -635,22 +647,37 @@ public class MapApiServer
 			return;
 		}
 
-		GenerationResult generation = generateForQuery(grc);
+		MapSettings settings = grc.ctx.settings;
+		WorldCache cache = WorldCache.getInstance();
+		String cacheKey = WorldCache.keyFor(settings);
+
 		Map<String, Object> response;
-		try
+		WorldCache.Entry cached = cache.get(cacheKey);
+		if (cached != null)
 		{
-			if (generation.image == null)
-			{
-				writeJsonError(ctx, 500, generation.errorMessage);
-				return;
-			}
-			response = buildResponse.apply(grc.ctx.settings, generation.mapParts == null ? null : generation.mapParts.graph);
+			response = buildResponse.apply(cached.settings, cached.graph);
 		}
-		finally
+		else
 		{
-			if (generation.image != null)
+			GenerationResult generation = generateForQuery(grc);
+			try
 			{
-				generation.image.close();
+				if (generation.image == null)
+				{
+					writeJsonError(ctx, 500, generation.errorMessage);
+					return;
+				}
+
+				WorldGraph graph = generation.mapParts == null ? null : generation.mapParts.graph;
+				cache.put(cacheKey, settings, graph);
+				response = buildResponse.apply(settings, graph);
+			}
+			finally
+			{
+				if (generation.image != null)
+				{
+					generation.image.close();
+				}
 			}
 		}
 
@@ -685,6 +712,22 @@ public class MapApiServer
 				Translation.initialize();
 			}
 		}
+	}
+
+	/**
+	 * Remembers a freshly generated world so that later queries against the same settings skip the render entirely.
+	 *
+	 * The settings are copied because the response path adds bulk to them afterwards - every polygon's center edit - which queries do not
+	 * use and which would otherwise be retained for each cached world.
+	 */
+	private static void seedWorldCache(String cacheKey, MapSettings settings, MapParts mapParts)
+	{
+		if (mapParts == null || mapParts.graph == null)
+		{
+			return;
+		}
+
+		WorldCache.getInstance().put(cacheKey, settings.deepCopy(), mapParts.graph);
 	}
 
 	private static <T> T parseBodyAs(Context ctx, Class<T> type)

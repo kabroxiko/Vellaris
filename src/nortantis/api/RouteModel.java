@@ -2,6 +2,7 @@ package nortantis.api;
 
 import nortantis.MapSettings;
 import nortantis.MapText;
+import nortantis.TextType;
 import nortantis.WorldGraph;
 import nortantis.graph.voronoi.Center;
 import nortantis.graph.voronoi.Edge;
@@ -34,6 +35,9 @@ public class RouteModel
 	public static final double DEFAULT_ANCHOR_CELL_SIZE = 50.0;
 
 	private static final int MAX_WAYPOINTS = 40;
+
+	/** How many place names to offer when an endpoint cannot be resolved, so a typo is obvious. */
+	private static final int MAX_SUGGESTED_PLACES = 25;
 
 	private RouteModel()
 	{
@@ -111,8 +115,10 @@ public class RouteModel
 		Map<String, Object> result = new LinkedHashMap<>();
 		if (from == null || to == null)
 		{
+			String unresolved = from == null ? request == null || request.from == null ? "from" : describeEndpoint(request.from) : describeEndpoint(request.to);
 			result.put("success", false);
-			result.put("message", from == null ? "Could not resolve the 'from' endpoint." : "Could not resolve the 'to' endpoint.");
+			result.put("message", "Could not resolve the '" + (from == null ? "from" : "to") + "' endpoint: " + unresolved + " is not a place in this world.");
+			result.put("availablePlaces", placeNames(settings, MAX_SUGGESTED_PLACES));
 			return result;
 		}
 
@@ -553,6 +559,44 @@ public class RouteModel
 		description.put("id", region.id);
 		description.put("name", WorldModel.attributeRegionNames(settings, graph).get(region.id));
 		return description;
+	}
+
+	/** Describes an endpoint as the caller wrote it, for error messages. */
+	private static String describeEndpoint(Endpoint endpoint)
+	{
+		if (endpoint == null)
+		{
+			return "the endpoint";
+		}
+		if (endpoint.name != null && !endpoint.name.trim().isEmpty())
+		{
+			return "'" + endpoint.name.trim() + "'";
+		}
+		return "(" + endpoint.x + ", " + endpoint.y + ")";
+	}
+
+	/** The place names a caller could have meant, so a failed lookup is self-explanatory. */
+	private static List<String> placeNames(MapSettings settings, int limit)
+	{
+		List<String> names = new ArrayList<>();
+		if (settings.edits == null || settings.edits.text == null)
+		{
+			return names;
+		}
+
+		for (MapText text : settings.edits.text)
+		{
+			if (names.size() >= limit)
+			{
+				break;
+			}
+			if (text == null || text.location == null || text.value == null || text.value.trim().isEmpty() || text.type == TextType.Title)
+			{
+				continue;
+			}
+			names.add(text.value.trim());
+		}
+		return names;
 	}
 
 	private static MapText findPlace(MapSettings settings, String name)
