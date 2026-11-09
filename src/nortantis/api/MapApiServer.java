@@ -125,6 +125,7 @@ public class MapApiServer
 			config.routes.post("/api/generate-settings", ctx -> ctx.result(String.valueOf(handleGenerateSettings(ctx))));
 			config.routes.post("/api/generate", ctx -> ctx.result(String.valueOf(handleGenerate(ctx))));
 			config.routes.post("/api/world", ctx -> ctx.result(String.valueOf(handleWorld(ctx))));
+			config.routes.post("/api/world/map", MapApiServer::handleWorldMap);
 			config.routes.post("/api/background-base", MapApiServer::handleBackgroundBase);
 
 			config.routes.exception(Exception.class, (e, ctx) ->
@@ -427,13 +428,18 @@ public class MapApiServer
 	}
 
 	/**
-	 * Encodes an image exactly the way /api/generate does, so that asking for both representations returns the same PNG.
+	 * Encodes an image exactly the way /api/generate does, so that every representation of the map holds the same PNG bytes.
 	 */
-	private static String encodeImageAsBase64(Image image) throws IOException
+	private static byte[] encodeImageAsPng(Image image) throws IOException
 	{
 		BufferedImage buf = AwtFactory.unwrap(image);
 		buf = ApiUtils.scaleImageIfNeeded(buf);
-		return Base64.getEncoder().encodeToString(ApiUtils.serializeImageToBytes(buf));
+		return ApiUtils.serializeImageToBytes(buf);
+	}
+
+	private static String encodeImageAsBase64(Image image) throws IOException
+	{
+		return Base64.getEncoder().encodeToString(encodeImageAsPng(image));
 	}
 
 	private static boolean parseBooleanFlag(String value)
@@ -445,6 +451,77 @@ public class MapApiServer
 
 		String trimmed = value.trim();
 		return trimmed.equalsIgnoreCase("true") || trimmed.equals("1") || trimmed.equalsIgnoreCase("yes");
+	}
+
+	/**
+	 * Generates the map and returns it as raw PNG bytes.
+	 *
+	 * /api/world?includeImage=true returns the same PNG base64-encoded, which costs a third again in transfer size and leaves the client to
+	 * decode it. This hands back the bytes directly so a client can store them, or stream them straight to a browser. The bytes are
+	 * identical to the ones the other map endpoints carry.
+	 */
+	private static void handleWorldMap(Context ctx)
+	{
+		GenerationRequestContext grc = prepareGenerationRequest(ctx, false);
+		if (grc == null)
+		{
+			ctx.contentType(CONTENT_TYPE_JSON);
+			ctx.status(400);
+			ctx.result(gson.toJson(new ApiResponse(false, MSG_FAILED_TO_PARSE_CONFIG, null, null)));
+			return;
+		}
+
+		MapSettings requestSettings = grc.settings;
+		Integer generatedWidth = (requestSettings != null && requestSettings.generatedWidth > 0) ? Integer.valueOf(requestSettings.generatedWidth) : null;
+		Integer generatedHeight = (requestSettings != null && requestSettings.generatedHeight > 0) ? Integer.valueOf(requestSettings.generatedHeight) : null;
+
+		boolean appliedLanguage = requestSettings != null && requestSettings.language != null && !requestSettings.language.isEmpty();
+
+		GenerationResult generation;
+		try
+		{
+			if (appliedLanguage)
+			{
+				grc.ctx.settings.language = requestSettings.language;
+				Translation.initializeWithLanguage(requestSettings.language);
+			}
+			// The graph is not needed here, so don't ask the renderer to keep hold of it.
+			generation = generateMap(grc.ctx.settings, generatedWidth, generatedHeight, false);
+		}
+		finally
+		{
+			if (appliedLanguage)
+			{
+				Translation.initialize();
+			}
+		}
+
+		if (generation.image == null)
+		{
+			ctx.contentType(CONTENT_TYPE_JSON);
+			ctx.status(500);
+			ctx.result(gson.toJson(new ApiResponse(false, generation.errorMessage, null, null)));
+			return;
+		}
+
+		try
+		{
+			byte[] png = encodeImageAsPng(generation.image);
+			ctx.contentType(CONTENT_TYPE_PNG);
+			ctx.status(200);
+			ctx.result(png);
+		}
+		catch (IOException ioe)
+		{
+			Logger.println("Failed to encode the map PNG: " + ioe);
+			ctx.contentType(CONTENT_TYPE_JSON);
+			ctx.status(500);
+			ctx.result(gson.toJson(new ApiResponse(false, "Failed to encode the map image: " + ioe.getClass().getSimpleName(), null, null)));
+		}
+		finally
+		{
+			generation.image.close();
+		}
 	}
 
 	private static Object executeGenerationAndReturn(GenerationRequestContext grc, Context ctx)

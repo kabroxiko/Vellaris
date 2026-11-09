@@ -68,6 +68,9 @@ HTTP API
   Coordinates are resolution-invariant, so the same world describes the same locations at any render resolution.
   Pass `?includeImage=true` to also get the rendered map as `imageBase64`; that PNG is identical to the one
   `/api/generate` returns for the same settings, and generating both in one call avoids rendering the world twice.
+- `POST /api/world/map` — generates a map from a `MapSettings` body and returns the raw PNG as `image/png`. The bytes
+  are identical to the ones carried by `/api/generate` and `/api/world?includeImage=true`, but without the base64
+  overhead.
 - `POST /api/background-base` — returns a background texture PNG.
 
 Docker
