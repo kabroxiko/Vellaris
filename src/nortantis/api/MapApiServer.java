@@ -366,6 +366,16 @@ public class MapApiServer
 		}
 
 		boolean includeImage = parseBooleanFlag(ctx.queryParam("includeImage"));
+		Integer imageMaxDimension;
+		try
+		{
+			imageMaxDimension = parseOptionalMaxDimension(ctx);
+		}
+		catch (IllegalArgumentException e)
+		{
+			ctx.status(400);
+			return gson.toJson(new ApiResponse(false, e.getMessage(), null, null));
+		}
 
 		MapSettings requestSettings = grc.settings;
 		Integer generatedWidth = (requestSettings != null && requestSettings.generatedWidth > 0) ? Integer.valueOf(requestSettings.generatedWidth) : null;
@@ -411,7 +421,8 @@ public class MapApiServer
 
 			if (includeImage)
 			{
-				response.put("imageBase64", encodeImageAsBase64(generation.image));
+				// Base64 costs a third again in transfer size, so default to a preview-sized image unless the caller asks for more.
+				response.put("imageBase64", encodeImageAsBase64(generation.image, imageMaxDimension == null ? 1920 : imageMaxDimension));
 			}
 
 			ctx.contentType(CONTENT_TYPE_JSON);
@@ -432,17 +443,41 @@ public class MapApiServer
 
 	/**
 	 * Encodes an image exactly the way /api/generate does, so that every representation of the map holds the same PNG bytes.
+	 *
+	 * @param maxDimension
+	 *            Longest side to allow, or null to keep the render's full size. The base64 representations cap this to keep their payloads
+	 *            small; the raw PNG route passes null because it is the one a client delivers to players.
 	 */
-	private static byte[] encodeImageAsPng(Image image) throws IOException
+	private static byte[] encodeImageAsPng(Image image, Integer maxDimension) throws IOException
 	{
 		BufferedImage buf = AwtFactory.unwrap(image);
-		buf = ApiUtils.scaleImageIfNeeded(buf);
+		buf = ApiUtils.scaleImageToMaxDimension(buf, maxDimension);
 		return ApiUtils.serializeImageToBytes(buf);
 	}
 
-	private static String encodeImageAsBase64(Image image) throws IOException
+	private static String encodeImageAsBase64(Image image, Integer maxDimension) throws IOException
 	{
-		return Base64.getEncoder().encodeToString(encodeImageAsPng(image));
+		return Base64.getEncoder().encodeToString(encodeImageAsPng(image, maxDimension));
+	}
+
+	/**
+	 * Reads the optional maxDimension query parameter. Absent means "no limit", which is what the raw PNG route wants; a value that is not
+	 * a positive integer is a client error rather than something to silently ignore.
+	 */
+	private static Integer parseOptionalMaxDimension(Context ctx)
+	{
+		String value = ctx.queryParam("maxDimension");
+		if (value == null || value.isBlank())
+		{
+			return null;
+		}
+
+		int parsed = Integer.parseInt(value.trim());
+		if (parsed <= 0)
+		{
+			throw new IllegalArgumentException("maxDimension must be a positive integer");
+		}
+		return Integer.valueOf(parsed);
 	}
 
 	private static boolean parseBooleanFlag(String value)
@@ -460,8 +495,10 @@ public class MapApiServer
 	 * Generates the map and returns it as raw PNG bytes.
 	 *
 	 * /api/world?includeImage=true returns the same PNG base64-encoded, which costs a third again in transfer size and leaves the client to
-	 * decode it. This hands back the bytes directly so a client can store them, or stream them straight to a browser. The bytes are
-	 * identical to the ones the other map endpoints carry.
+	 * decode it. This hands back the bytes directly so a client can store them, or stream them straight to a browser.
+	 *
+	 * Unlike the base64 representations this does not cap the image size, because this is the map a client shows to players. Pass
+	 * {@code maxDimension} to request a downscaled copy.
 	 */
 	private static void handleWorldMap(Context ctx)
 	{
@@ -471,6 +508,17 @@ public class MapApiServer
 			ctx.contentType(CONTENT_TYPE_JSON);
 			ctx.status(400);
 			ctx.result(gson.toJson(new ApiResponse(false, MSG_FAILED_TO_PARSE_CONFIG, null, null)));
+			return;
+		}
+
+		Integer maxDimension;
+		try
+		{
+			maxDimension = parseOptionalMaxDimension(ctx);
+		}
+		catch (IllegalArgumentException e)
+		{
+			writeJsonError(ctx, 400, e.getMessage());
 			return;
 		}
 
@@ -509,7 +557,7 @@ public class MapApiServer
 
 		try
 		{
-			byte[] png = encodeImageAsPng(generation.image);
+			byte[] png = encodeImageAsPng(generation.image, maxDimension);
 			ctx.contentType(CONTENT_TYPE_PNG);
 			ctx.status(200);
 			ctx.result(png);

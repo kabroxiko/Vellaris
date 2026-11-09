@@ -68,9 +68,10 @@ HTTP API
   Coordinates are resolution-invariant, so the same world describes the same locations at any render resolution.
   Pass `?includeImage=true` to also get the rendered map as `imageBase64`; that PNG is identical to the one
   `/api/generate` returns for the same settings, and generating both in one call avoids rendering the world twice.
-- `POST /api/world/map` — generates a map from a `MapSettings` body and returns the raw PNG as `image/png`. The bytes
-  are identical to the ones carried by `/api/generate` and `/api/world?includeImage=true`, but without the base64
-  overhead.
+- `POST /api/world/map` — generates a map from a `MapSettings` body and returns the raw PNG as `image/png`. This is the
+  map you show to players, so it is **not** downscaled: you get the size the render produced. Pass `?maxDimension=N` to
+  request a smaller copy. `/api/world?includeImage=true` and `/api/generate` return base64, which does not compress, so
+  those default to a 1920px preview; raise it with `?maxDimension=N` or use this route for the full map.
 - `POST /api/route` — takes a `MapSettings` body plus `from` and `to` (each either `{"name":"..."}` or `{"x":..,"y":..}`)
   and returns the route between them: distance, terrain travelled through, travel time, the regions crossed, the
   named places near the route in the order they are reached, and waypoints. `mode` may be `walk` (default) or
@@ -83,7 +84,18 @@ HTTP API
   the key under which a client stores its own per-location notes; this server stores nothing.
 - `POST /api/background-base` — returns a background texture PNG.
 
-Docker
+## Map raster size
+
+The pixel size of a rendered map is set by `generatedWidth` / `generatedHeight` in the settings, which act as a bounding
+box: the map is rendered to fit inside it while preserving its aspect ratio, so a 1600x900 box produces roughly
+1525x899 of actual map. `resolution` scales the same result, but when a box is supplied the renderer lowers the
+resolution to fit the box, so raising `resolution` alone will not make the image larger — raise the box instead.
+
+With a 4096x2304 box the service returns a 4015x2302 PNG. That is ~28 MB, because the paper texture and grunge
+compress poorly as PNG, so for a player-facing map a `maxDimension` of around 1920-2560 is usually the better
+trade-off (6-11 MB).
+
+## Docker
 
 The `Dockerfile` builds the frontend with Vite, builds the server jar with Gradle, and assembles a runtime
 image with nginx in front of the Java process:

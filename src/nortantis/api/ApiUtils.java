@@ -337,9 +337,25 @@ public final class ApiUtils
 
 	public static BufferedImage scaleImageIfNeeded(BufferedImage buf)
 	{
-		if (buf.getWidth() > MAX_BASE64_PREVIEW_DIMENSION || buf.getHeight() > MAX_BASE64_PREVIEW_DIMENSION)
+		return scaleImageToMaxDimension(buf, MAX_BASE64_PREVIEW_DIMENSION);
+	}
+
+	/**
+	 * Scales the image down so neither side exceeds maxDimension.
+	 *
+	 * This exists so the base64 representations can stay small, but it destroys detail, so callers that genuinely deliver the map - the raw
+	 * PNG route - pass null to keep the full-resolution render instead of silently handing back a 1920px preview of a much larger map.
+	 */
+	public static BufferedImage scaleImageToMaxDimension(BufferedImage buf, Integer maxDimension)
+	{
+		if (maxDimension == null || maxDimension <= 0)
 		{
-			double scale = Math.min((double) MAX_BASE64_PREVIEW_DIMENSION / buf.getWidth(), (double) MAX_BASE64_PREVIEW_DIMENSION / buf.getHeight());
+			return buf;
+		}
+
+		if (buf.getWidth() > maxDimension || buf.getHeight() > maxDimension)
+		{
+			double scale = Math.min((double) maxDimension / buf.getWidth(), (double) maxDimension / buf.getHeight());
 			int previewWidth = (int) (buf.getWidth() * scale);
 			int previewHeight = (int) (buf.getHeight() * scale);
 			BufferedImage scaled = new BufferedImage(previewWidth, previewHeight, buf.getType());
