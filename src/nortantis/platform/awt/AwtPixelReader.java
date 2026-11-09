@@ -42,6 +42,15 @@ public class AwtPixelReader implements PixelReader
 	}
 
 	@Override
+	public void getGrayLevels(int x, int y, int count, int[] dest)
+	{
+		if (count > 0)
+		{
+			raster.getSamples(x, y, count, 1, 0, dest);
+		}
+	}
+
+	@Override
 	public int getBandLevel(int x, int y, int band)
 	{
 		return raster.getSample(x, y, band);

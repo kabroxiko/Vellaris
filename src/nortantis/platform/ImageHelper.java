@@ -92,8 +92,13 @@ public abstract class ImageHelper
 				tasks.add(() ->
 				{
 					int endY = taskNumber == numTasks - 1 ? mask.getHeight() : ((taskNumber + 1) * rowsPerJob);
+					int maskWidth = mask.getWidth();
+					float maskMaxLevel = mask.getMaxPixelLevel();
+					int[] maskRow = new int[maskWidth];
 					for (int y = (taskNumber * rowsPerJob); y < endY; y++)
-						for (int x = 0; x < mask.getWidth(); x++)
+					{
+						maskPixels.getGrayLevels(0, y, maskWidth, maskRow);
+						for (int x = 0; x < maskWidth; x++)
 						{
 							if (!image1Bounds.contains(x, y))
 							{
@@ -102,7 +107,7 @@ public abstract class ImageHelper
 
 							Color color1 = Color.create(image1Pixels.getRGB(x, y), image1.hasAlpha());
 							Color color2 = Color.create(image2Pixels.getRGB(x, y), image2.hasAlpha());
-							double maskLevel = maskPixels.getNormalizedPixelLevel(x, y);
+							double maskLevel = maskRow[x] / maskMaxLevel;
 
 							int r = (int) (maskLevel * color1.getRed() + (1.0 - maskLevel) * color2.getRed());
 							int g = (int) (maskLevel * color1.getGreen() + (1.0 - maskLevel) * color2.getGreen());
@@ -110,6 +115,7 @@ public abstract class ImageHelper
 							int a = (int) (maskLevel * color1.getAlpha() + (1.0 - maskLevel) * color2.getAlpha());
 							resultPixels.setRGB(x, y, r, g, b, a);
 						}
+					}
 				});
 			}
 
@@ -169,11 +175,14 @@ public abstract class ImageHelper
 				{
 					int endY = taskNumber == numTasks - 1 ? image.getHeight() : (taskNumber + 1) * rowsPerJob;
 					boolean isGrayscaleMask = mask.getType() == ImageType.Grayscale8Bit;
+					int imageWidth = image.getWidth();
+					int[] maskRow = new int[imageWidth];
 					int lastColorKey = Integer.MIN_VALUE;
 					Color lastColor = null;
 					for (int y = taskNumber * rowsPerJob; y < endY; y++)
 					{
-						for (int x = 0; x < image.getWidth(); x++)
+						maskPixels.getGrayLevels(0, y, imageWidth, maskRow);
+						for (int x = 0; x < imageWidth; x++)
 						{
 							int sourceRgb = imagePixels.getRGB(x, y);
 							int sourceRed = (sourceRgb >> 16) & 0xFF;
@@ -189,7 +198,7 @@ public abstract class ImageHelper
 							Color color = lastColor;
 							if (color != null)
 							{
-								int maskLevel = maskPixels.getGrayLevel(x, y);
+								int maskLevel = maskRow[x];
 								if (isGrayscaleMask)
 								{
 									if (invertMask)
@@ -789,6 +798,7 @@ public abstract class ImageHelper
 			final int maskWidth = mask.getWidth();
 			final int maskHeight = mask.getHeight();
 			final int overlayWidth = overlay.getWidth();
+			final float maskMaxLevel = mask.getMaxPixelLevel();
 
 			try (PixelReader maskPixels = mask.createPixelReader(new IntRectangle(imageOffsetInMask, overlay.getWidth(), overlay.getHeight())); PixelWriter overlayPixels = overlay.createPixelWriter())
 			{
@@ -796,6 +806,14 @@ public abstract class ImageHelper
 				{
 					int yInMask = y + imageOffsetInMask.y;
 					boolean yInRange = yInMask >= 0 && yInMask < maskHeight;
+					int startX = Math.max(0, imageOffsetInMask.x);
+					int endX = Math.min(maskWidth, imageOffsetInMask.x + overlayWidth);
+					int[] maskRow = new int[Math.max(0, endX - startX)];
+					if (yInRange && maskRow.length > 0)
+					{
+						maskPixels.getGrayLevels(startX, yInMask, maskRow.length, maskRow);
+					}
+
 					for (int x = 0; x < overlayWidth; x++)
 					{
 						int xInMask = x + imageOffsetInMask.x;
@@ -804,7 +822,7 @@ public abstract class ImageHelper
 							continue;
 						}
 
-						int maskLevel = (int) (maskPixels.getNormalizedPixelLevel(xInMask, yInMask) * colorAlpha);
+						int maskLevel = (int) ((maskRow[xInMask - startX] / maskMaxLevel) * colorAlpha);
 						if (invertMask)
 							maskLevel = 255 - maskLevel;
 

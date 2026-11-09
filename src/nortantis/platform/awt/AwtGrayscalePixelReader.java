@@ -41,6 +41,21 @@ public class AwtGrayscalePixelReader extends AwtPixelReader
 	}
 
 	@Override
+	public void getGrayLevels(int x, int y, int count, int[] dest)
+	{
+		if (cachedByteArray != null)
+		{
+			int offset = (y * image.getWidth()) + x;
+			for (int i = 0; i < count; i++)
+			{
+				dest[i] = cachedByteArray[offset + i] & 0xFF;
+			}
+			return;
+		}
+		super.getGrayLevels(x, y, count, dest);
+	}
+
+	@Override
 	public int getBandLevel(int x, int y, int band)
 	{
 		if (band == 3)
