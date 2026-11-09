@@ -66,6 +66,8 @@ HTTP API
 - `POST /api/world` — generates a map from a `MapSettings` body and returns a compact description of the world
   (named places, regions with their names and colors, roads) plus the canonical settings, without encoding an image.
   Coordinates are resolution-invariant, so the same world describes the same locations at any render resolution.
+  Pass `?includeImage=true` to also get the rendered map as `imageBase64`; that PNG is identical to the one
+  `/api/generate` returns for the same settings, and generating both in one call avoids rendering the world twice.
 - `POST /api/background-base` — returns a background texture PNG.
 
 Docker

@@ -343,11 +343,15 @@ public class MapApiServer
 	}
 
 	/**
-	 * Generates a map and returns a compact description of the world instead of an image.
+	 * Generates a map and returns a compact description of the world.
 	 *
-	 * This exists so a client that needs structured locations - named places, regions and roads - does not have to encode and ship a multi
-	 * megabyte PNG, and does not have to dig that information out of the editor-format settings. The canonical settings are still returned
-	 * alongside it so a client can persist the world and re-render it later with /api/generate.
+	 * This exists so a client that needs structured locations - named places, regions and roads - does not have to dig that information out
+	 * of the editor-format settings. The canonical settings are still returned alongside it so a client can persist the world and re-render
+	 * it later with /api/generate.
+	 *
+	 * Pass {@code includeImage=true} to also receive the rendered map, which is what a client that shows the map to players wants. Asking
+	 * for it here rather than calling /api/generate separately keeps the map and the world description from being generated twice, so they
+	 * are guaranteed to be the same world.
 	 */
 	private static Object handleWorld(Context ctx)
 	{
@@ -356,6 +360,8 @@ public class MapApiServer
 		{
 			return gson.toJson(new ApiResponse(false, MSG_FAILED_TO_PARSE_CONFIG, null, null));
 		}
+
+		boolean includeImage = parseBooleanFlag(ctx.queryParam("includeImage"));
 
 		MapSettings requestSettings = grc.settings;
 		Integer generatedWidth = (requestSettings != null && requestSettings.generatedWidth > 0) ? Integer.valueOf(requestSettings.generatedWidth) : null;
@@ -399,14 +405,46 @@ public class MapApiServer
 			response.put("world", WorldModel.build(grc.ctx.settings, generation.mapParts == null ? null : generation.mapParts.graph));
 			response.put("settings", canonicalSettings);
 
+			if (includeImage)
+			{
+				response.put("imageBase64", encodeImageAsBase64(generation.image));
+			}
+
 			ctx.contentType(CONTENT_TYPE_JSON);
 			ctx.status(200);
 			return gson.toJson(response);
+		}
+		catch (IOException ioe)
+		{
+			Logger.println("Failed to encode the world's map image: " + ioe);
+			ctx.status(500);
+			return gson.toJson(new ApiResponse(false, "Failed to encode the map image: " + ioe.getClass().getSimpleName(), null, null));
 		}
 		finally
 		{
 			generation.image.close();
 		}
+	}
+
+	/**
+	 * Encodes an image exactly the way /api/generate does, so that asking for both representations returns the same PNG.
+	 */
+	private static String encodeImageAsBase64(Image image) throws IOException
+	{
+		BufferedImage buf = AwtFactory.unwrap(image);
+		buf = ApiUtils.scaleImageIfNeeded(buf);
+		return Base64.getEncoder().encodeToString(ApiUtils.serializeImageToBytes(buf));
+	}
+
+	private static boolean parseBooleanFlag(String value)
+	{
+		if (value == null)
+		{
+			return false;
+		}
+
+		String trimmed = value.trim();
+		return trimmed.equalsIgnoreCase("true") || trimmed.equals("1") || trimmed.equalsIgnoreCase("yes");
 	}
 
 	private static Object executeGenerationAndReturn(GenerationRequestContext grc, Context ctx)
