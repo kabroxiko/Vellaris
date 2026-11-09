@@ -67,7 +67,7 @@ describe('usePreview hook', () => {
 
     await waitFor(() => expect(globalThis.__usePreview.preview).toBeTruthy())
     expect(globalThis.__usePreview.preview.url).toBe('blob://u1')
-    expect(globalThis.__usePreview.preview.filename).toBe('derived-name.png')
+    expect(globalThis.__usePreview.preview.filename).toBe('derived-name.jpg')
 
     // mergedSettingsRef should be parsed from nortContent
     expect(mergedSettingsRef.current).toEqual({ hello: 'world' })

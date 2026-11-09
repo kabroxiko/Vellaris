@@ -22,7 +22,7 @@ export default function useGenerate({
         if (outputMode === 'nort-only')
           throw new Error('Server returned image bytes; expected settings content.')
         handleSuccessRef.current?.(
-          new Blob([bytes], { type: contentType || 'image/png' }),
+          new Blob([bytes], { type: contentType || 'image/jpeg' }),
           baseName,
           source
         )
@@ -37,7 +37,7 @@ export default function useGenerate({
         delete copy.imageBase64
         const nortContent = serializeNortObject(copy)
         handleSuccessRef.current?.(
-          base64ToBlob(imageBase64, 'image/png'),
+          base64ToBlob(imageBase64, 'image/jpeg'),
           baseName,
           source,
           nortContent

@@ -62,16 +62,17 @@ HTTP API
 - `GET /api/health` — liveness probe.
 - `GET /api/ui-options` — translation strings, icon sets, art packs, fonts, dimensions.
 - `POST /api/generate-settings` — returns a fresh random `MapSettings` JSON document.
-- `POST /api/generate` — renders a map from a `MapSettings` body and returns JSON with a base64 PNG.
+- `POST /api/generate` — renders a map from a `MapSettings` body and returns JSON with a base64 JPEG.
 - `POST /api/world` — generates a map from a `MapSettings` body and returns a compact description of the world
   (named places, regions with their names and colors, roads) plus the canonical settings, without encoding an image.
   Coordinates are resolution-invariant, so the same world describes the same locations at any render resolution.
-  Pass `?includeImage=true` to also get the rendered map as `imageBase64`; that PNG is identical to the one
+  Pass `?includeImage=true` to also get the rendered map as `imageBase64`; that image is identical to the one
   `/api/generate` returns for the same settings, and generating both in one call avoids rendering the world twice.
-- `POST /api/world/map` — generates a map from a `MapSettings` body and returns the raw PNG as `image/png`. This is the
+- `POST /api/world/map` — generates a map from a `MapSettings` body and returns the raw JPEG as `image/jpeg`. This is the
   map you show to players, so it is **not** downscaled: you get the size the render produced. Pass `?maxDimension=N` to
-  request a smaller copy. `/api/world?includeImage=true` and `/api/generate` return base64, which does not compress, so
-  those default to a 1920px preview; raise it with `?maxDimension=N` or use this route for the full map.
+  request a smaller copy, and `?quality=1..100` (default 92) to trade fidelity for size. `/api/world?includeImage=true`
+  and `/api/generate` return base64, which does not compress, so those default to a 1920px preview; raise it with
+  `?maxDimension=N` or use this route for the full map.
 - `POST /api/route` — takes a `MapSettings` body plus `from` and `to` (each either `{"name":"..."}` or `{"x":..,"y":..}`)
   and returns the route between them: distance, terrain travelled through, travel time, the regions crossed, the
   named places near the route in the order they are reached, and waypoints. `mode` may be `walk` (default) or
@@ -82,7 +83,7 @@ HTTP API
 - `POST /api/nearest` — takes a `MapSettings` body plus `x` and `y`, and returns the nearest named place, the region
   containing that point, and a stable `anchor` string for the surrounding area. Anchors are coarse cells, intended as
   the key under which a client stores its own per-location notes; this server stores nothing.
-- `POST /api/background-base` — returns a background texture PNG.
+- `POST /api/background-base` — returns a background texture JPEG.
 
 ## Map raster size
 
@@ -91,9 +92,10 @@ box: the map is rendered to fit inside it while preserving its aspect ratio, so 
 1525x899 of actual map. `resolution` scales the same result, but when a box is supplied the renderer lowers the
 resolution to fit the box, so raising `resolution` alone will not make the image larger — raise the box instead.
 
-With a 4096x2304 box the service returns a 4015x2302 PNG. That is ~28 MB, because the paper texture and grunge
-compress poorly as PNG, so for a player-facing map a `maxDimension` of around 1920-2560 is usually the better
-trade-off (6-11 MB).
+With a 4096x2304 box the service returns a 4015x2302 image, which is about 2.4 MB as JPEG at the default quality of 92
+(3.2 MB at 95, 1.7 MB at 85). Images are encoded as JPEG: there is no PNG output. JPEG has no alpha channel, so any
+transparency is flattened onto white before encoding, which only matters if a map is rendered with a see-through edge.
+A `maxDimension` of around 1920-2560 is a reasonable target for a player-facing map.
 
 ## Docker
 

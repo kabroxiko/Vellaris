@@ -73,11 +73,10 @@ class ApiUtilsTest
 		byte[] bytes = ApiUtils.serializeImageToBytes(small);
 		assertNotNull(bytes);
 		assertTrue(bytes.length > 8);
-		// PNG signature
-		assertEquals((byte) 137, bytes[0]);
-		assertEquals((byte) 80, bytes[1]);
-		assertEquals((byte) 78, bytes[2]);
-		assertEquals((byte) 71, bytes[3]);
+		// JPEG signature
+		assertEquals((byte) 0xFF, bytes[0]);
+		assertEquals((byte) 0xD8, bytes[1]);
+		assertEquals((byte) 0xFF, bytes[2]);
 	}
 
 	@Test

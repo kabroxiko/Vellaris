@@ -53,14 +53,13 @@ class MapApiServerGenerateBaseImageTest
 		Object img = m.invoke(null, ctx);
 		assertNotNull(img, "Expected Image returned");
 
-		// ensure bytes were captured and look like PNG (89 50 4E 47)
-		assertNotNull(captured[0], "PNG bytes should have been written to ctx.result(byte[])");
+		// ensure bytes were captured and look like JPEG (FF D8 FF)
+		assertNotNull(captured[0], "JPEG bytes should have been written to ctx.result(byte[])");
 		byte[] bytes = captured[0];
-		assertTrue(bytes.length > 8, "PNG bytes length reasonable");
-		assertEquals((byte) 0x89, bytes[0]);
-		assertEquals((byte) 0x50, bytes[1]);
-		assertEquals((byte) 0x4E, bytes[2]);
-		assertEquals((byte) 0x47, bytes[3]);
+		assertTrue(bytes.length > 8, "JPEG bytes length reasonable");
+		assertEquals((byte) 0xFF, bytes[0]);
+		assertEquals((byte) 0xD8, bytes[1]);
+		assertEquals((byte) 0xFF, bytes[2]);
 
 		// don't attempt to close implementation-specific Image here
 	}

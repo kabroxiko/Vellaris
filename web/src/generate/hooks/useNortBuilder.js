@@ -80,7 +80,7 @@ export default function useNortBuilder(opts) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(normalized),
         },
-        baseName: (preview?.filename ?? 'generated-map.png').replace(/\.png$/, ''),
+        baseName: (preview?.filename ?? 'generated-map.jpg').replace(/\.(png|jpe?g)$/i, ''),
         source: {
           type: currentSource.type,
           name: currentSource.name,

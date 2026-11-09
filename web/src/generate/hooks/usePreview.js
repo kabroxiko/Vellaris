@@ -22,7 +22,7 @@ export default function usePreview({
           const derived = deriveNortFilenameFromContent(nortContent)
           if (derived) filenameBase = derived
         }
-        const filename = `${sanitizeFilenameBase(filenameBase, 'vellaris-map')}.png`
+        const filename = `${sanitizeFilenameBase(filenameBase, 'vellaris-map')}.jpg`
         return {
           url,
           filename,
@@ -65,7 +65,7 @@ export default function usePreview({
     if (!preview?.url) return
     const anchor = document.createElement('a')
     anchor.href = preview.url
-    anchor.download = preview.filename ?? 'vellaris-map.png'
+    anchor.download = preview.filename ?? 'vellaris-map.jpg'
     document.body.appendChild(anchor)
     anchor.click()
     // Notify user that download completed using i18n key

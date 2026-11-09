@@ -344,7 +344,7 @@ public final class ApiUtils
 	 * Scales the image down so neither side exceeds maxDimension.
 	 *
 	 * This exists so the base64 representations can stay small, but it destroys detail, so callers that genuinely deliver the map - the raw
-	 * PNG route - pass null to keep the full-resolution render instead of silently handing back a 1920px preview of a much larger map.
+	 * image route - pass null to keep the full-resolution render instead of silently handing back a 1920px preview of a much larger map.
 	 */
 	public static BufferedImage scaleImageToMaxDimension(BufferedImage buf, Integer maxDimension)
 	{
@@ -368,22 +368,41 @@ public final class ApiUtils
 		return buf;
 	}
 
+	/** Quality used when a caller does not ask for a specific one. High enough that the fine coastline strokes survive. */
+	public static final float DEFAULT_JPEG_QUALITY = 0.92f;
+
 	public static byte[] serializeImageToBytes(BufferedImage buf) throws IOException
+	{
+		return serializeImageToBytes(buf, DEFAULT_JPEG_QUALITY);
+	}
+
+	public static byte[] serializeImageToBytes(BufferedImage buf, float quality) throws IOException
 	{
 		try (ByteArrayOutputStream baos = new ByteArrayOutputStream())
 		{
-			writeCompressedPng(buf, baos);
+			writeCompressedJpeg(buf, baos, quality);
 			baos.flush();
 			return baos.toByteArray();
 		}
 	}
 
-	public static void writeCompressedPng(BufferedImage image, OutputStream outputStream) throws IOException
+	/**
+	 * Writes the image as JPEG.
+	 *
+	 * JPEG has no alpha channel, so transparency is flattened onto white first. Maps are normally painted edge to edge and lose nothing,
+	 * but a transparent map (a frayed border, for instance) would otherwise come out with black where it used to be see-through.
+	 *
+	 * @param quality
+	 *            0.0 to 1.0. Lower values produce visibly worse text and coastline strokes, which is most of what a map is made of.
+	 */
+	public static void writeCompressedJpeg(BufferedImage image, OutputStream outputStream, float quality) throws IOException
 	{
-		java.util.Iterator<ImageWriter> writers = ImageIO.getImageWritersByFormatName("png");
+		BufferedImage opaque = toOpaqueRgb(image);
+
+		java.util.Iterator<ImageWriter> writers = ImageIO.getImageWritersByFormatName("jpeg");
 		if (!writers.hasNext())
 		{
-			ImageIO.write(image, "png", outputStream);
+			ImageIO.write(opaque, "jpeg", outputStream);
 			return;
 		}
 
@@ -395,14 +414,39 @@ public final class ApiUtils
 			if (param.canWriteCompressed())
 			{
 				param.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
-				param.setCompressionQuality(0.95f);
+				param.setCompressionQuality(Math.max(0.0f, Math.min(1.0f, quality)));
 			}
-			writer.write(null, new IIOImage(image, null, null), param);
+			writer.write(null, new IIOImage(opaque, null, null), param);
 		}
 		finally
 		{
 			writer.dispose();
 		}
+	}
+
+	/**
+	 * Flattens any transparency onto white and returns a JPEG-compatible image.
+	 */
+	public static BufferedImage toOpaqueRgb(BufferedImage image)
+	{
+		if (image.getType() == BufferedImage.TYPE_INT_RGB)
+		{
+			return image;
+		}
+
+		BufferedImage rgb = new BufferedImage(image.getWidth(), image.getHeight(), BufferedImage.TYPE_INT_RGB);
+		java.awt.Graphics2D g = rgb.createGraphics();
+		try
+		{
+			g.setColor(java.awt.Color.WHITE);
+			g.fillRect(0, 0, image.getWidth(), image.getHeight());
+			g.drawImage(image, 0, 0, null);
+		}
+		finally
+		{
+			g.dispose();
+		}
+		return rgb;
 	}
 
 	private ApiUtils()

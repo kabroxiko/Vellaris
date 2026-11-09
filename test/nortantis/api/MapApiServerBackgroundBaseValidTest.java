@@ -39,14 +39,14 @@ class MapApiServerBackgroundBaseValidTest
 				if (a0 instanceof byte[])
 				{
 					byte[] b = (byte[]) a0;
-					// check PNG signature
-					if (b.length >= 8 && (b[0] & 0xFF) == 0x89 && b[1] == 'P' && b[2] == 'N' && b[3] == 'G')
+					// check JPEG signature
+					if (b.length >= 8 && (b[0] & 0xFF) == 0xFF && (b[1] & 0xFF) == 0xD8 && (b[2] & 0xFF) == 0xFF)
 					{
-						recorded[2] = "png";
+						recorded[2] = "jpeg";
 					}
 					else
 					{
-						recorded[2] = "notpng";
+						recorded[2] = "notjpeg";
 					}
 				}
 				return null;
@@ -63,8 +63,8 @@ class MapApiServerBackgroundBaseValidTest
 		// method returns Image; it may be non-null and must be closed by caller, generateBaseImageAndWriteResponse returns the Image when
 		// successful
 		assertNotNull(res);
-		assertEquals("image/png", recorded[0]);
+		assertEquals("image/jpeg", recorded[0]);
 		assertEquals("200", recorded[1]);
-		assertEquals("png", recorded[2]);
+		assertEquals("jpeg", recorded[2]);
 	}
 }

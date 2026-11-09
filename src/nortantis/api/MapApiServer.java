@@ -45,7 +45,7 @@ import java.nio.file.Path;
 
 /**
  * Small HTTP API to generate random or .nort maps. POST /generate - body JSON: { "nortFile": "path.nort", "width":2000, "height":1200,
- * "seed":123, "out":"out.png" }
+ * "seed":123, "out":"out.jpg" }
  */
 public class MapApiServer
 {
@@ -54,7 +54,7 @@ public class MapApiServer
 
 	private static final Random SHARED_RANDOM = new SecureRandom();
 	private static final String CONTENT_TYPE_JSON = "application/json";
-	private static final String CONTENT_TYPE_PNG = "image/png";
+	private static final String CONTENT_TYPE_JPEG = "image/jpeg";
 	private static final String MSG_FAILED_TO_PARSE_CONFIG = "Failed to parse config";
 
 	// Thread-safe holder for the supplier used to create MapCreator instances.
@@ -177,7 +177,7 @@ public class MapApiServer
 	}
 
 	// Extracted helper to reduce cognitive complexity in handleBackgroundBase.
-	// Builds params, generates the background image and writes the PNG to the
+	// Builds params, generates the background image and writes the JPEG to the
 	// response output stream. Returns the generated Image for the caller to
 	// close/cleanup when appropriate.
 	private static Image generateBaseImageAndWriteResponse(Context ctx) throws java.io.IOException
@@ -228,13 +228,13 @@ public class MapApiServer
 		// will use defaults or fall back to a solid background.
 		Image baseImage = generateBackgroundBaseImage(width, height, type, cityIconType, artPack);
 		BufferedImage buffered = nortantis.platform.awt.AwtFactory.unwrap(baseImage);
-		// Write compressed PNG into memory then set as result to avoid
+		// Write a compressed JPEG into memory then set as result to avoid
 		// directly depending on servlet response APIs.
 		try (ByteArrayOutputStream baos = new ByteArrayOutputStream())
 		{
-			ApiUtils.writeCompressedPng(buffered, baos);
+			ApiUtils.writeCompressedJpeg(buffered, baos, ApiUtils.DEFAULT_JPEG_QUALITY);
 			baos.flush();
-			ctx.contentType(CONTENT_TYPE_PNG);
+			ctx.contentType(CONTENT_TYPE_JPEG);
 			ctx.status(200);
 			ctx.result(baos.toByteArray());
 		}
@@ -367,9 +367,11 @@ public class MapApiServer
 
 		boolean includeImage = parseBooleanFlag(ctx.queryParam("includeImage"));
 		Integer imageMaxDimension;
+		float imageQuality;
 		try
 		{
 			imageMaxDimension = parseOptionalMaxDimension(ctx);
+			imageQuality = parseOptionalQuality(ctx);
 		}
 		catch (IllegalArgumentException e)
 		{
@@ -422,7 +424,7 @@ public class MapApiServer
 			if (includeImage)
 			{
 				// Base64 costs a third again in transfer size, so default to a preview-sized image unless the caller asks for more.
-				response.put("imageBase64", encodeImageAsBase64(generation.image, imageMaxDimension == null ? 1920 : imageMaxDimension));
+				response.put("imageBase64", encodeImageAsBase64(generation.image, imageMaxDimension == null ? 1920 : imageMaxDimension, imageQuality));
 			}
 
 			ctx.contentType(CONTENT_TYPE_JSON);
@@ -442,27 +444,47 @@ public class MapApiServer
 	}
 
 	/**
-	 * Encodes an image exactly the way /api/generate does, so that every representation of the map holds the same PNG bytes.
+	 * Encodes an image as JPEG, so that every representation of the map holds the same bytes.
 	 *
 	 * @param maxDimension
 	 *            Longest side to allow, or null to keep the render's full size. The base64 representations cap this to keep their payloads
-	 *            small; the raw PNG route passes null because it is the one a client delivers to players.
+	 *            small; the raw image route passes null because it is the one a client delivers to players.
 	 */
-	private static byte[] encodeImageAsPng(Image image, Integer maxDimension) throws IOException
+	private static byte[] encodeImageAsJpeg(Image image, Integer maxDimension, float quality) throws IOException
 	{
 		BufferedImage buf = AwtFactory.unwrap(image);
 		buf = ApiUtils.scaleImageToMaxDimension(buf, maxDimension);
-		return ApiUtils.serializeImageToBytes(buf);
+		return ApiUtils.serializeImageToBytes(buf, quality);
 	}
 
-	private static String encodeImageAsBase64(Image image, Integer maxDimension) throws IOException
+	private static String encodeImageAsBase64(Image image, Integer maxDimension, float quality) throws IOException
 	{
-		return Base64.getEncoder().encodeToString(encodeImageAsPng(image, maxDimension));
+		return Base64.getEncoder().encodeToString(encodeImageAsJpeg(image, maxDimension, quality));
 	}
 
 	/**
-	 * Reads the optional maxDimension query parameter. Absent means "no limit", which is what the raw PNG route wants; a value that is not
-	 * a positive integer is a client error rather than something to silently ignore.
+	 * Reads the optional quality query parameter as a percentage. Absent means the default; anything that is not 1-100 is a client error
+	 * rather than something to silently ignore.
+	 */
+	private static float parseOptionalQuality(Context ctx)
+	{
+		String value = ctx.queryParam("quality");
+		if (value == null || value.isBlank())
+		{
+			return ApiUtils.DEFAULT_JPEG_QUALITY;
+		}
+
+		int parsed = Integer.parseInt(value.trim());
+		if (parsed < 1 || parsed > 100)
+		{
+			throw new IllegalArgumentException("quality must be an integer between 1 and 100");
+		}
+		return parsed / 100f;
+	}
+
+	/**
+	 * Reads the optional maxDimension query parameter. Absent means "no limit", which is what the raw image route wants; a value that is
+	 * not a positive integer is a client error rather than something to silently ignore.
 	 */
 	private static Integer parseOptionalMaxDimension(Context ctx)
 	{
@@ -492,13 +514,13 @@ public class MapApiServer
 	}
 
 	/**
-	 * Generates the map and returns it as raw PNG bytes.
+	 * Generates the map and returns it as raw JPEG bytes.
 	 *
-	 * /api/world?includeImage=true returns the same PNG base64-encoded, which costs a third again in transfer size and leaves the client to
-	 * decode it. This hands back the bytes directly so a client can store them, or stream them straight to a browser.
+	 * /api/world?includeImage=true returns the same image base64-encoded, which costs a third again in transfer size and leaves the client
+	 * to decode it. This hands back the bytes directly so a client can store them, or stream them straight to a browser.
 	 *
 	 * Unlike the base64 representations this does not cap the image size, because this is the map a client shows to players. Pass
-	 * {@code maxDimension} to request a downscaled copy.
+	 * {@code maxDimension} to request a downscaled copy, and {@code quality} (1-100) to trade fidelity for size.
 	 */
 	private static void handleWorldMap(Context ctx)
 	{
@@ -512,9 +534,11 @@ public class MapApiServer
 		}
 
 		Integer maxDimension;
+		float quality;
 		try
 		{
 			maxDimension = parseOptionalMaxDimension(ctx);
+			quality = parseOptionalQuality(ctx);
 		}
 		catch (IllegalArgumentException e)
 		{
@@ -557,14 +581,14 @@ public class MapApiServer
 
 		try
 		{
-			byte[] png = encodeImageAsPng(generation.image, maxDimension);
-			ctx.contentType(CONTENT_TYPE_PNG);
+			byte[] imageBytes = encodeImageAsJpeg(generation.image, maxDimension, quality);
+			ctx.contentType(CONTENT_TYPE_JPEG);
 			ctx.status(200);
-			ctx.result(png);
+			ctx.result(imageBytes);
 		}
 		catch (IOException ioe)
 		{
-			Logger.println("Failed to encode the map PNG: " + ioe);
+			Logger.println("Failed to encode the map image: " + ioe);
 			ctx.contentType(CONTENT_TYPE_JSON);
 			ctx.status(500);
 			ctx.result(gson.toJson(new ApiResponse(false, "Failed to encode the map image: " + ioe.getClass().getSimpleName(), null, null)));

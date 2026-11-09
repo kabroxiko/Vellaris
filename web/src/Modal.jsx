@@ -405,7 +405,7 @@ export default function Modal({ open, onClose, children }) {
                 if (!img?.src) return
                 const link = document.createElement('a')
                 link.href = img.src
-                const filename = img.dataset?.filename || 'nortantis-map.png'
+                const filename = img.dataset?.filename || 'nortantis-map.jpg'
                 link.download = filename
                 document.body.appendChild(link)
                 link.click()

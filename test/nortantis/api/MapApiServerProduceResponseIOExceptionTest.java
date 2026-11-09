@@ -50,9 +50,9 @@ class MapApiServerProduceResponseIOExceptionTest
 			MapSettings settings = new MapSettings();
 			Object genCtx = ctor.newInstance(settings);
 
-			// Register a throwing ImageWriterSpi for "png"
+			// Register a throwing ImageWriterSpi for "jpeg", which is the format the response path encodes.
 			IIORegistry registry = IIORegistry.getDefaultInstance();
-			ImageWriterSpi spi = new ImageWriterSpi("testVendor", "1.0", new String[] { "png" }, new String[] { "png" }, new String[] { "image/png" }, "ThrowingWriter",
+			ImageWriterSpi spi = new ImageWriterSpi("testVendor", "1.0", new String[] { "jpeg" }, new String[] { "jpeg" }, new String[] { "image/jpeg" }, "ThrowingWriter",
 					new Class[] { javax.imageio.stream.ImageOutputStream.class }, new String[] {}, false, null, null, null, null, false, null, null, null, null)
 			{
 				@Override

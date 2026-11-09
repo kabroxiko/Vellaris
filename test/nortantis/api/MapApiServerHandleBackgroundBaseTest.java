@@ -192,7 +192,7 @@ class MapApiServerHandleBackgroundBaseTest
 		m.invoke(null, proxy);
 
 		assertEquals("200", recordedStatus[0]);
-		assertEquals("image/png", recordedContentType[0]);
+		assertEquals("image/jpeg", recordedContentType[0]);
 		assertNotNull(recordedResult[0]);
 		assertTrue(recordedResult[0] instanceof byte[]);
 		byte[] bytes = (byte[]) recordedResult[0];

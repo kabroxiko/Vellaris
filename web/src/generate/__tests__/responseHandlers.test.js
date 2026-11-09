@@ -60,7 +60,7 @@ describe('responseHandlers', () => {
 
     expect(setPreview).toHaveBeenCalled()
     expect(state.preview.url).toBe('blob:1')
-    expect(state.preview.filename).toBe('base.png')
+    expect(state.preview.filename).toBe('base.jpg')
     expect(setCurrentSource).toHaveBeenCalled()
   })
 

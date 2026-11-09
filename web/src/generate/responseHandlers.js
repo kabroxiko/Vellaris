@@ -51,7 +51,7 @@ export function handleSuccess(blob, options) {
     if (previous?.url) {
       URL.revokeObjectURL(previous.url)
     }
-    const filename = baseName ? `${baseName}.png` : 'vellaris-map.png'
+    const filename = baseName ? `${baseName}.jpg` : 'vellaris-map.jpg'
     return {
       url,
       filename,
@@ -114,7 +114,7 @@ export async function processGenerateResponse(bytes, contentType, options) {
   async function handleJsonImageResponse(data) {
     if (!data.imageBase64 || typeof data.imageBase64 !== 'string')
       throw new Error('Server did not return image data')
-    handleSuccess(base64ToBlob(data.imageBase64, 'image/png'), {
+    handleSuccess(base64ToBlob(data.imageBase64, 'image/jpeg'), {
       baseName,
       source,
       fileName,
@@ -155,7 +155,7 @@ export async function processGenerateResponse(bytes, contentType, options) {
     if (!contentType.includes('application/json')) {
       if (outputMode === 'nort-only')
         throw new Error('Server returned image bytes; expected settings content.')
-      handleSuccess(new Blob([bytes], { type: contentType || 'image/png' }), {
+      handleSuccess(new Blob([bytes], { type: contentType || 'image/jpeg' }), {
         baseName,
         source,
         fileName,

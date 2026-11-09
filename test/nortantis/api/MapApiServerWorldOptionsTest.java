@@ -9,11 +9,13 @@ import nortantis.platform.ImageType;
 import nortantis.platform.PlatformFactory;
 import nortantis.platform.awt.AwtFactory;
 
+import java.io.ByteArrayInputStream;
 import java.lang.reflect.Method;
 import java.util.Base64;
+import javax.imageio.ImageIO;
 
 /**
- * Covers the query flag that decides whether /api/world also returns the rendered map, and the encoding that keeps the raw PNG route and
+ * Covers the query flag that decides whether /api/world also returns the rendered map, and the encoding that keeps the raw image route and
  * the base64 representations carrying identical bytes.
  */
 class MapApiServerWorldOptionsTest
@@ -31,21 +33,16 @@ class MapApiServerWorldOptionsTest
 		return method.invoke(null, argument);
 	}
 
-	private static Object invokeImageEncoder(String methodName, Image image, Integer maxDimension) throws Exception
+	private static Object invokeImageEncoder(String methodName, Image image, Integer maxDimension, float quality) throws Exception
 	{
-		Method method = Class.forName("nortantis.api.MapApiServer").getDeclaredMethod(methodName, Image.class, Integer.class);
+		Method method = Class.forName("nortantis.api.MapApiServer").getDeclaredMethod(methodName, Image.class, Integer.class, float.class);
 		method.setAccessible(true);
-		return method.invoke(null, image, maxDimension);
+		return method.invoke(null, image, maxDimension, Float.valueOf(quality));
 	}
 
-	private static int pngWidth(byte[] png)
+	private static java.awt.image.BufferedImage decode(byte[] bytes) throws Exception
 	{
-		return ((png[16] & 0xFF) << 24) | ((png[17] & 0xFF) << 16) | ((png[18] & 0xFF) << 8) | (png[19] & 0xFF);
-	}
-
-	private static int pngHeight(byte[] png)
-	{
-		return ((png[20] & 0xFF) << 24) | ((png[21] & 0xFF) << 16) | ((png[22] & 0xFF) << 8) | (png[23] & 0xFF);
+		return ImageIO.read(new ByteArrayInputStream(bytes));
 	}
 
 	private static boolean parseBooleanFlag(String value) throws Exception
@@ -76,24 +73,23 @@ class MapApiServerWorldOptionsTest
 	}
 
 	/**
-	 * The raw PNG route and the base64 representations must carry the same bytes for the same size limit, otherwise a client could get a
+	 * The raw image route and the base64 representations must carry the same bytes for the same settings, otherwise a client could get a
 	 * different map depending on which endpoint it used.
 	 */
 	@Test
-	void testPngEncodingMatchesBase64Encoding() throws Exception
+	void testJpegEncodingMatchesBase64Encoding() throws Exception
 	{
 		Image image = Image.create(16, 12, ImageType.ARGB);
 		try
 		{
-			byte[] png = (byte[]) invokeImageEncoder("encodeImageAsPng", image, null);
-			String base64 = (String) invokeImageEncoder("encodeImageAsBase64", image, null);
+			byte[] jpeg = (byte[]) invokeImageEncoder("encodeImageAsJpeg", image, null, ApiUtils.DEFAULT_JPEG_QUALITY);
+			String base64 = (String) invokeImageEncoder("encodeImageAsBase64", image, null, ApiUtils.DEFAULT_JPEG_QUALITY);
 
-			assertArrayEquals(png, Base64.getDecoder().decode(base64), "Both encodings must produce the same PNG bytes");
-			assertTrue(png.length > 8, "Encoded PNG should have content");
-			assertEquals((byte) 0x89, png[0], "Encoded bytes should start with the PNG signature");
-			assertEquals('P', png[1]);
-			assertEquals('N', png[2]);
-			assertEquals('G', png[3]);
+			assertArrayEquals(jpeg, Base64.getDecoder().decode(base64), "Both encodings must produce the same JPEG bytes");
+			assertTrue(jpeg.length > 8, "Encoded image should have content");
+			assertEquals((byte) 0xFF, jpeg[0], "Encoded bytes should start with the JPEG signature");
+			assertEquals((byte) 0xD8, jpeg[1]);
+			assertEquals((byte) 0xFF, jpeg[2]);
 		}
 		finally
 		{
@@ -102,7 +98,7 @@ class MapApiServerWorldOptionsTest
 	}
 
 	/**
-	 * Leaving the limit unset must return the render at its full size, because the raw PNG route is how a client gets the map it shows to
+	 * Leaving the limit unset must return the render at its full size, because the raw image route is how a client gets the map it shows to
 	 * players. Capping it silently is what made large maps come back looking pixelated when the browser scaled them back up.
 	 */
 	@Test
@@ -111,13 +107,13 @@ class MapApiServerWorldOptionsTest
 		Image image = Image.create(200, 100, ImageType.ARGB);
 		try
 		{
-			byte[] fullSize = (byte[]) invokeImageEncoder("encodeImageAsPng", image, null);
-			assertEquals(200, pngWidth(fullSize), "An unset limit must not downscale the image");
-			assertEquals(100, pngHeight(fullSize));
+			byte[] fullSize = (byte[]) invokeImageEncoder("encodeImageAsJpeg", image, null, ApiUtils.DEFAULT_JPEG_QUALITY);
+			assertEquals(200, decode(fullSize).getWidth(), "An unset limit must not downscale the image");
+			assertEquals(100, decode(fullSize).getHeight());
 
-			byte[] capped = (byte[]) invokeImageEncoder("encodeImageAsPng", image, Integer.valueOf(100));
-			assertEquals(100, pngWidth(capped), "A limit should scale the longest side down to it");
-			assertEquals(50, pngHeight(capped));
+			byte[] capped = (byte[]) invokeImageEncoder("encodeImageAsJpeg", image, Integer.valueOf(100), ApiUtils.DEFAULT_JPEG_QUALITY);
+			assertEquals(100, decode(capped).getWidth(), "A limit should scale the longest side down to it");
+			assertEquals(50, decode(capped).getHeight());
 		}
 		finally
 		{
