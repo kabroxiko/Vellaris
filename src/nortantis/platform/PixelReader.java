@@ -23,6 +23,12 @@ public interface PixelReader extends AutoCloseable
 
 	int getRGB(int x, int y);
 
+	/**
+	 * Reads {@code count} pixels starting at column {@code x} of row {@code y} into {@code dest} as packed ARGB values, beginning at index
+	 * 0. This is equivalent to calling {@link #getRGB(int, int)} for each column in the run.
+	 */
+	void getRGBs(int x, int y, int count, int[] dest);
+
 	Color getPixelColor(int x, int y);
 
 	float getNormalizedPixelLevel(int x, int y);

@@ -210,6 +210,12 @@ public class AwtFactory extends PlatformFactory
 		return Color.create(java.awt.Color.HSBtoRGB(hue, saturation, brightness));
 	}
 
+	@Override
+	public int createRGBFromHSB(float hue, float saturation, float brightness)
+	{
+		return java.awt.Color.HSBtoRGB(hue, saturation, brightness);
+	}
+
 	public static BufferedImage unwrap(Image image)
 	{
 		if (image == null)

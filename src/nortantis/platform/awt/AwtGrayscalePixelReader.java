@@ -100,6 +100,22 @@ public class AwtGrayscalePixelReader extends AwtPixelReader
 	}
 
 	@Override
+	public void getRGBs(int x, int y, int count, int[] dest)
+	{
+		if (cachedByteArray != null)
+		{
+			int offset = (y * image.getWidth()) + x;
+			for (int i = 0; i < count; i++)
+			{
+				int gray = cachedByteArray[offset + i] & 0xFF;
+				dest[i] = 0xFF000000 | (gray << 16) | (gray << 8) | gray;
+			}
+			return;
+		}
+		super.getRGBs(x, y, count, dest);
+	}
+
+	@Override
 	public int getAlpha(int x, int y)
 	{
 		return 255;

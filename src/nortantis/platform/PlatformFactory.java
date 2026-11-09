@@ -102,4 +102,10 @@ public abstract class PlatformFactory
 	 * @return a Color
 	 */
 	public abstract Color createColorFromHSB(float hue, float saturation, float brightness);
+
+	/**
+	 * Converts hue, saturation, and brightness to a packed ARGB value, without allocating a Color. Equivalent to
+	 * {@code createColorFromHSB(hue, saturation, brightness).getRGB()}.
+	 */
+	public abstract int createRGBFromHSB(float hue, float saturation, float brightness);
 }

@@ -82,6 +82,14 @@ public abstract class Color implements Serializable
 		return PlatformFactory.getInstance().createColorFromHSB(hue, saturation, brightness);
 	}
 
+	/**
+	 * Converts hue, saturation, and brightness to a packed ARGB value without allocating a Color object.
+	 */
+	public static int hsbToRGB(float hue, float saturation, float brightness)
+	{
+		return PlatformFactory.getInstance().createRGBFromHSB(hue, saturation, brightness);
+	}
+
 	public HSBColor toHSB()
 	{
 		float[] hsb = getHSB();

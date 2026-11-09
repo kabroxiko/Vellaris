@@ -177,19 +177,23 @@ public abstract class ImageHelper
 					boolean isGrayscaleMask = mask.getType() == ImageType.Grayscale8Bit;
 					int imageWidth = image.getWidth();
 					int[] maskRow = new int[imageWidth];
+					int[] sourceRow = new int[imageWidth];
+					int[] indexRow = new int[imageWidth];
 					int lastColorKey = Integer.MIN_VALUE;
 					Color lastColor = null;
 					for (int y = taskNumber * rowsPerJob; y < endY; y++)
 					{
 						maskPixels.getGrayLevels(0, y, imageWidth, maskRow);
+						imagePixels.getRGBs(0, y, imageWidth, sourceRow);
+						colorIndexesPixels.getRGBs(0, y, imageWidth, indexRow);
 						for (int x = 0; x < imageWidth; x++)
 						{
-							int sourceRgb = imagePixels.getRGB(x, y);
+							int sourceRgb = sourceRow[x];
 							int sourceRed = (sourceRgb >> 16) & 0xFF;
 							int sourceGreen = (sourceRgb >> 8) & 0xFF;
 							int sourceBlue = sourceRgb & 0xFF;
 
-							int colorKey = WorldGraph.getValueFromColor(colorIndexesPixels.getPixelColor(x, y));
+							int colorKey = indexRow[x] & 0xFFFFFF;
 							if (colorKey != lastColorKey)
 							{
 								lastColorKey = colorKey;
@@ -359,16 +363,22 @@ public abstract class ImageHelper
 		}
 
 		Image imageToUseFinal = imageToUse;
+		float maxLevel = imageToUseFinal.getMaxPixelLevel();
+		int width = colorIndexes.getWidth();
 		try (PixelReader imagePixels = imageToUseFinal.createPixelReader(); PixelReader colorIndexesPixels = colorIndexes.createPixelReader(); PixelWriter resultPixels = result.createPixelWriter())
 		{
 			ThreadHelper.getInstance().processRowsInParallel(0, colorIndexes.getHeight(), (y) ->
 			{
+				int[] levelRow = new int[width];
+				int[] indexRow = new int[width];
+				imagePixels.getGrayLevels(0, y, width, levelRow);
+				colorIndexesPixels.getRGBs(0, y, width, indexRow);
 				int lastKey = Integer.MIN_VALUE;
 				float[] lastHsb = null;
-				for (int x = 0; x < colorIndexes.getWidth(); x++)
+				for (int x = 0; x < width; x++)
 				{
-					float level = imagePixels.getNormalizedPixelLevel(x, y);
-					int colorKey = WorldGraph.getValueFromColor(colorIndexesPixels.getPixelColor(x, y));
+					float level = levelRow[x] / maxLevel;
+					int colorKey = indexRow[x] & 0xFFFFFF;
 					if (colorKey != lastKey)
 					{
 						lastKey = colorKey;
@@ -412,7 +422,7 @@ public abstract class ImageHelper
 		{
 			float I = hsb[2] * 255f;
 			float overlay = ((I / 255f) * (I + (2 * pixelLevelNormalized) * (255f - I))) / 255f;
-			return Color.createFromHSB(hsb[0], hsb[1], overlay).getRGB();
+			return Color.hsbToRGB(hsb[0], hsb[1], overlay);
 		}
 		else if (how == ColorizeAlgorithm.algorithm3)
 		{
@@ -426,15 +436,15 @@ public abstract class ImageHelper
 				float range = (1f - hsb[2]) * 2;
 				resultLevel = range * pixelLevelNormalized + (1f - range);
 			}
-			return Color.createFromHSB(hsb[0], hsb[1], resultLevel).getRGB();
+			return Color.hsbToRGB(hsb[0], hsb[1], resultLevel);
 		}
 		else if (how == ColorizeAlgorithm.solidColor)
 		{
-			return Color.createFromHSB(hsb[0], hsb[1], hsb[2]).getRGB();
+			return Color.hsbToRGB(hsb[0], hsb[1], hsb[2]);
 		}
 		else if (how == ColorizeAlgorithm.none)
 		{
-			return Color.createFromHSB(hsb[0], hsb[1], hsb[2]).getRGB();
+			return Color.hsbToRGB(hsb[0], hsb[1], hsb[2]);
 		}
 		else
 		{

@@ -31,4 +31,19 @@ public class AwtIntPixelReader extends AwtPixelReader
 		}
 		return rgb;
 	}
+
+	@Override
+	public void getRGBs(int x, int y, int count, int[] dest)
+	{
+		int offset = (y * image.getWidth()) + x;
+		if (image.hasAlpha())
+		{
+			System.arraycopy(cachedPixelArray, offset, dest, 0, count);
+			return;
+		}
+		for (int i = 0; i < count; i++)
+		{
+			dest[i] = cachedPixelArray[offset + i] | 0xFF000000;
+		}
+	}
 }

@@ -63,6 +63,15 @@ public class AwtPixelReader implements PixelReader
 	}
 
 	@Override
+	public void getRGBs(int x, int y, int count, int[] dest)
+	{
+		if (count > 0)
+		{
+			bufferedImage.getRGB(x, y, count, 1, dest, 0, count);
+		}
+	}
+
+	@Override
 	public Color getPixelColor(int x, int y)
 	{
 		return new AwtColor(getRGB(x, y), image.hasAlpha());
