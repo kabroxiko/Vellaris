@@ -86,8 +86,10 @@ Use try-with-resources for Image whenever feasible.
 ## Testing
 
 Important tests:
-- `MapCreatorTest` - AWT rendering tests. These tests are very slow, so only run them as needed.
 - `ImageHelperTest` - Test ImageHelper operations
+- `ConcurrentGraphCreationTest` - Builds graphs from one seed on several threads and requires identical results. Fast, and it catches process-wide mutable state leaking between generations.
+
+`MapCreatorTest` is disabled (it is checked in as `MapCreatorTest.java.bak`). Its expected-output data is still in `unit test files/expected maps/`.
 
 My unit tests can be overly strict sometimes because they compare pixel-by-pixel. If the output images look close enough that a person wouldn't be able to easily tell the difference, then that's probably good enough, as long as the test is consistent in the results it gives.
 
@@ -119,6 +121,12 @@ This runs `AwtMapCreatorBenchmark` with JFR (Java Flight Recorder) profiling ena
 4. Use JFR profile to identify remaining hotspots
 
 The benchmark creates maps using settings from `unit test files/map settings/simpleSmallWorld.nort`.
+
+**Measuring honestly:** run-to-run variance on this benchmark is 15-20%, and it is much worse when
+other JVMs are running (SonarLint, the Java language server) - a load average above ~5 makes
+single-run before/after comparisons meaningless. Compare interleaved runs (A, B, A, B, A, B) rather
+than running all of A then all of B, and prefer load-independent metrics where they exist (thread
+counts, JFR sample counts) over wall-clock deltas.
 
 ## Editing Files
 

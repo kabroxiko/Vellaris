@@ -97,6 +97,7 @@ tasks.register<Test>("benchmark") {
         "--enable-native-access=ALL-UNNAMED",
         "-Dfile.encoding=UTF-8",
         "-Dsun.java2d.d3d=false",
+        "-Djava.awt.headless=true",
         "-Xmx4g",
         "--add-opens", "java.base/java.nio=ALL-UNNAMED",
         // JFR profiling - records to build/profile.jfr
