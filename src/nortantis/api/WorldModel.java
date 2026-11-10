@@ -113,8 +113,8 @@ public class WorldModel
 	 * The political regions, with the name that was generated for each one.
 	 *
 	 * Region names are generated as ordinary map text rather than being stored on the region itself, so each non-blank region label is
-	 * attributed to the region containing the point where it was placed. A region with no label of its own reports a null name. Each
-	 * entry reports {@code "type": "Region"} so a client knows the name is a territory rather than a settlement.
+	 * attributed to the region containing the point where it was placed. A region with no label of its own reports a null name. Each entry
+	 * reports {@code "type": "Region"} so a client knows the name is a territory rather than a settlement.
 	 */
 	private static List<Map<String, Object>> buildRegions(MapSettings settings, WorldGraph graph)
 	{
