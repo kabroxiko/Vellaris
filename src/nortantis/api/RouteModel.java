@@ -73,28 +73,6 @@ public class RouteModel
 	}
 
 	/**
-	 * Terrain categories that affect travel, with a cost multiplier relative to open ground. Water is marked so a route can refuse to cross
-	 * it unless the caller allows it.
-	 */
-	private enum Terrain
-	{
-		OCEAN("ocean", 0.0, true), LAKE("lake", 0.0, true), MOUNTAIN("mountain", 3.0, false), HILLS("hills", 1.7, false), MARSH("marsh", 2.2, false), FOREST("forest", 1.4, false), DESERT(
-				"desert", 1.3, false
-		), ARCTIC("arctic", 1.8, false), PLAINS("plains", 1.0, false);
-
-		final String label;
-		final double cost;
-		final boolean water;
-
-		Terrain(String label, double cost, boolean water)
-		{
-			this.label = label;
-			this.cost = cost;
-			this.water = water;
-		}
-	}
-
-	/**
 	 * Builds a route between two endpoints.
 	 *
 	 * Returns a map with {@code success=false} and a message when either endpoint cannot be resolved, and {@code reachable=false} when the
@@ -148,13 +126,13 @@ public class RouteModel
 
 		double distance = 0;
 		double weightedDistance = 0;
-		Map<Terrain, Double> distanceByTerrain = new LinkedHashMap<>();
+		Map<TerrainType, Double> distanceByTerrain = new LinkedHashMap<>();
 		boolean crossesWater = false;
 		for (int i = 1; i < path.size(); i++)
 		{
 			Center previous = path.get(i - 1);
 			Center currentCenter = path.get(i);
-			Terrain terrain = classify(currentCenter);
+			TerrainType terrain = TerrainType.classify(currentCenter);
 			crossesWater |= terrain.water;
 
 			double segment = Center.distanceBetween(previous, currentCenter);
@@ -242,7 +220,7 @@ public class RouteModel
 	{
 		return graph.findShortestPath(start, end, (edge, neighbor, distanceToEnd) ->
 		{
-			Terrain terrain = classify(neighbor);
+			TerrainType terrain = TerrainType.classify(neighbor);
 			double cost = effectiveCost(terrain, allowWater);
 			if (Double.isInfinite(cost))
 			{
@@ -253,7 +231,7 @@ public class RouteModel
 		});
 	}
 
-	private static double effectiveCost(Terrain terrain, boolean allowWater)
+	private static double effectiveCost(TerrainType terrain, boolean allowWater)
 	{
 		if (!terrain.water)
 		{
@@ -314,52 +292,7 @@ public class RouteModel
 		return path;
 	}
 
-	private static Terrain classify(Center center)
-	{
-		if (center.isWater)
-		{
-			return center.isLake ? Terrain.LAKE : Terrain.OCEAN;
-		}
-		if (center.isMountain)
-		{
-			return Terrain.MOUNTAIN;
-		}
-		if (center.isHill)
-		{
-			return Terrain.HILLS;
-		}
-		if (center.biome == null)
-		{
-			return Terrain.PLAINS;
-		}
-
-		switch (center.biome)
-		{
-			case MARSH:
-				return Terrain.MARSH;
-			case TAIGA:
-			case TEMPERATE_RAIN_FOREST:
-			case TEMPERATE_DECIDUOUS_FOREST:
-			case HIGH_TEMPERATE_DECIDUOUS_FOREST:
-			case TROPICAL_RAIN_FOREST:
-			case TROPICAL_SEASONAL_FOREST:
-				return Terrain.FOREST;
-			case TEMPERATE_DESERT:
-			case HIGH_TEMPERATE_DESERT:
-			case SUBTROPICAL_DESERT:
-			case SCORCHED:
-			case BARE:
-				return Terrain.DESERT;
-			case SNOW:
-			case ICE:
-			case TUNDRA:
-				return Terrain.ARCTIC;
-			default:
-				return Terrain.PLAINS;
-		}
-	}
-
-	private static Map<String, Object> buildTravel(double weightedDistance, double flatDistance, Map<Terrain, Double> distanceByTerrain, double mapUnitsPerDay, double speedFactor, String mode,
+	private static Map<String, Object> buildTravel(double weightedDistance, double flatDistance, Map<TerrainType, Double> distanceByTerrain, double mapUnitsPerDay, double speedFactor, String mode,
 			boolean allowWater)
 	{
 		Map<String, Object> travel = new LinkedHashMap<>();
@@ -380,13 +313,13 @@ public class RouteModel
 		return travel;
 	}
 
-	private static List<Map<String, Object>> terrainSegments(Map<Terrain, Double> distanceByTerrain, double totalDistance)
+	private static List<Map<String, Object>> terrainSegments(Map<TerrainType, Double> distanceByTerrain, double totalDistance)
 	{
 		List<Map<String, Object>> segments = new ArrayList<>();
-		List<Terrain> ordered = new ArrayList<>(distanceByTerrain.keySet());
+		List<TerrainType> ordered = new ArrayList<>(distanceByTerrain.keySet());
 		ordered.sort((a, b) -> Double.compare(distanceByTerrain.get(b), distanceByTerrain.get(a)));
 
-		for (Terrain terrain : ordered)
+		for (TerrainType terrain : ordered)
 		{
 			double segmentDistance = distanceByTerrain.get(terrain);
 			Map<String, Object> segment = new LinkedHashMap<>();
@@ -485,7 +418,7 @@ public class RouteModel
 		Point invariant = new Point(center.loc.x / resolution, center.loc.y / resolution);
 		waypoint.put("x", round(invariant.x));
 		waypoint.put("y", round(invariant.y));
-		waypoint.put("terrain", classify(center).label);
+		waypoint.put("terrain", TerrainType.classify(center).label);
 		waypoint.put("anchor", anchorFor(invariant, anchorCellSize));
 		return waypoint;
 	}

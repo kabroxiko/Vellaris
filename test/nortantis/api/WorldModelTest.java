@@ -13,6 +13,7 @@ import nortantis.WorldGraph;
 import nortantis.editor.MapEdits;
 import nortantis.editor.Road;
 import nortantis.geom.Point;
+import nortantis.graph.voronoi.Center;
 import nortantis.platform.PlatformFactory;
 import nortantis.platform.awt.AwtFactory;
 
@@ -132,6 +133,51 @@ public class WorldModelTest
 	}
 
 	@Test
+	public void placesReportWhatSurroundsThem()
+	{
+		double resolution = 0.75;
+		MapSettings settings = loadSettings(resolution);
+		WorldGraph graph = MapCreator.createGraphForUnitTests(settings);
+
+		Center land = graph.centers.stream().filter(center -> !center.isWater).findFirst().orElseThrow();
+		settings.edits.text.add(new MapText("Brookhollow", new Point(land.loc.x / resolution, land.loc.y / resolution), 0.0, TextType.City, null, null, null, 0.0, 0, null, 0.0));
+
+		@SuppressWarnings("unchecked")
+		List<Map<String, Object>> places = (List<Map<String, Object>>) WorldModel.build(settings, graph).get("places");
+
+		@SuppressWarnings("unchecked")
+		Map<String, Object> surroundings = (Map<String, Object>) places.get(0).get("surroundings");
+		assertNotNull(surroundings, "a place on a generated graph reports the ground around it");
+		assertTrue(surroundings.get("terrain") instanceof String, "the terrain a place stands on is reported");
+		assertFalse(((String) surroundings.get("terrain")).isEmpty(), "the terrain label is never blank");
+		for (String flag : Arrays.asList("coastal", "lake", "river", "mountains", "island"))
+		{
+			assertTrue(surroundings.get(flag) instanceof Boolean, flag + " is reported as a boolean");
+		}
+	}
+
+	@Test
+	public void aPlaceStandingOnWaterReportsThatWater()
+	{
+		double resolution = 0.75;
+		MapSettings settings = loadSettings(resolution);
+		WorldGraph graph = MapCreator.createGraphForUnitTests(settings);
+
+		Center water = graph.centers.stream().filter(center -> center.isWater && center.isLake).findFirst()
+				.orElseGet(() -> graph.centers.stream().filter(center -> center.isWater).findFirst().orElseThrow());
+		settings.edits.text.add(new MapText("Lake Thenn", new Point(water.loc.x / resolution, water.loc.y / resolution), 0.0, TextType.Lake, null, null, null, 0.0, 0, null, 0.0));
+
+		@SuppressWarnings("unchecked")
+		List<Map<String, Object>> places = (List<Map<String, Object>>) WorldModel.build(settings, graph).get("places");
+
+		@SuppressWarnings("unchecked")
+		Map<String, Object> surroundings = (Map<String, Object>) places.get(0).get("surroundings");
+		assertEquals(water.isLake ? "lake" : "ocean", surroundings.get("terrain"), "a label standing on water reads as that water");
+		assertEquals(water.isLake, surroundings.get("lake"));
+		assertEquals(Boolean.FALSE, surroundings.get("island"), "water is not an island");
+	}
+
+	@Test
 	public void buildToleratesAMissingGraph()
 	{
 		MapSettings settings = loadSettings(1.0);
@@ -146,6 +192,7 @@ public class WorldModelTest
 
 		assertEquals(1, places.size());
 		assertTrue(regions.isEmpty(), "Without a graph there is no region geometry to report");
+		assertFalse(places.get(0).containsKey("surroundings"), "Without a graph there is no ground to describe, so nothing is invented");
 		assertEquals(WorldModel.COORDINATE_SPACE, world.get("coordinateSpace"));
 	}
 }
