@@ -13,6 +13,7 @@ import nortantis.platform.Color;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -127,7 +128,8 @@ public class WorldModel
 	 *
 	 * Region names are generated as ordinary map text rather than being stored on the region itself, so each non-blank region label is
 	 * attributed to the region containing the point where it was placed. A region with no label of its own reports a null name. Each entry
-	 * reports {@code "type": "Region"} so a client knows the name is a territory rather than a settlement.
+	 * reports {@code "type": "Region"} so a client knows the name is a territory rather than a settlement, and the terrain most of the
+	 * territory is, so a campaign built on regions knows what each one can grow, mine or trade.
 	 */
 	private static List<Map<String, Object>> buildRegions(MapSettings settings, WorldGraph graph)
 	{
@@ -150,6 +152,7 @@ public class WorldModel
 			// Say what the name is: a region is a territory, and a client that only receives the name can otherwise
 			// mistake it for a settlement and write about its streets.
 			entry.put("type", "Region");
+			entry.put("terrain", dominantRegionTerrain(region));
 			entry.put("color", regionColorHex(settings, region.id));
 
 			Point centroid = region.getCenters().isEmpty() ? null : WorldGraph.findCentroid(region.getCenters());
@@ -164,6 +167,28 @@ public class WorldModel
 		}
 
 		return regions;
+	}
+
+	/**
+	 * The terrain most of a region's land is, so a campaign can say what a territory is like without reading the graph itself.
+	 *
+	 * Water cells are left out because a region is land, and a client reading "lake" as a territory's terrain would put a lake where a
+	 * province is. Null means the region holds no land at all, which is reported as an absence rather than a guessed terrain.
+	 */
+	private static String dominantRegionTerrain(Region region)
+	{
+		Map<TerrainType, Integer> counts = new EnumMap<>(TerrainType.class);
+		for (Center center : region.getCenters())
+		{
+			TerrainType terrain = TerrainType.classify(center);
+			if (!terrain.water)
+			{
+				counts.merge(terrain, 1, Integer::sum);
+			}
+		}
+
+		TerrainType dominant = TerrainType.dominant(counts);
+		return dominant == null ? null : dominant.label;
 	}
 
 	public static Map<Integer, String> attributeRegionNames(MapSettings settings, WorldGraph graph)

@@ -82,6 +82,8 @@ public class WorldModelTest
 		Map<String, Object> entry = findRegion(regions, region.id);
 		assertEquals("Testland", entry.get("name"), "The region label should be attributed to the region containing it");
 		assertEquals(((Number) entry.get("centerCount")).intValue(), region.getCenters().size());
+		assertTrue(entry.get("terrain") instanceof String, "A region reports the terrain most of its land is");
+		assertFalse(((String) entry.get("terrain")).isEmpty(), "The region terrain label is never blank");
 
 		// Everything is reported in resolution-invariant units, so the region's reported centre should coincide with the label that was
 		// placed at that same point.

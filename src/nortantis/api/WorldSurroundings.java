@@ -123,7 +123,7 @@ public final class WorldSurroundings
 			lake |= terrain == TerrainType.LAKE;
 		}
 
-		TerrainType nearbyTerrain = dominantTerrain(landNearby);
+		TerrainType nearbyTerrain = TerrainType.dominant(landNearby);
 
 		Map<String, Object> surroundings = new LinkedHashMap<>();
 		surroundings.put("terrain", terrainAtPlace.label);
@@ -170,26 +170,6 @@ public final class WorldSurroundings
 			frontier = next;
 		}
 		return area;
-	}
-
-	/**
-	 * The most common land terrain in a sample, or null when the sample held no land at all (a place labelled in open water).
-	 *
-	 * Ties keep the lower-valued enum constant, so the same world always reports the same answer.
-	 */
-	private static TerrainType dominantTerrain(Map<TerrainType, Integer> counts)
-	{
-		TerrainType best = null;
-		int bestCount = 0;
-		for (Map.Entry<TerrainType, Integer> entry : counts.entrySet())
-		{
-			if (entry.getValue() > bestCount)
-			{
-				best = entry.getKey();
-				bestCount = entry.getValue();
-			}
-		}
-		return best;
 	}
 
 	/**

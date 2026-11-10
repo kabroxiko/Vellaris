@@ -2,6 +2,8 @@ package nortantis.api;
 
 import nortantis.graph.voronoi.Center;
 
+import java.util.Map;
+
 /**
  * The terrain categories a generated world's Voronoi cells fall into, shared by every API answer that has to say what the ground is like.
  *
@@ -74,5 +76,25 @@ public enum TerrainType
 			default:
 				return TerrainType.PLAINS;
 		}
+	}
+
+	/**
+	 * The most common terrain among counted cells, or null when nothing was counted.
+	 *
+	 * Ties keep the lower-valued constant, so the same world always reports the same answer.
+	 */
+	public static TerrainType dominant(Map<TerrainType, Integer> counts)
+	{
+		TerrainType best = null;
+		int bestCount = 0;
+		for (Map.Entry<TerrainType, Integer> entry : counts.entrySet())
+		{
+			if (entry.getValue() > bestCount)
+			{
+				best = entry.getKey();
+				bestCount = entry.getValue();
+			}
+		}
+		return best;
 	}
 }
