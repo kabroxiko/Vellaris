@@ -26,7 +26,10 @@ RUN chmod +x scripts/*.sh && npm run build
 ########################
 # Backend build stage
 ########################
-FROM gradle:8.4-jdk21 AS backend-builder
+# The base image only supplies the JDK: Gradle itself is pinned by gradle/wrapper
+# (9.9.1), so this build uses exactly the same version as CI and local builds
+# instead of whatever Gradle the base image happens to ship.
+FROM eclipse-temurin:21-jdk-noble AS backend-builder
 WORKDIR /src
 # Run the build as root inside the build stage to avoid granting
 # non-root users write ownership of copied files (addresses S6504).

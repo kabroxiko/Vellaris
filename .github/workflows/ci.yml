@@ -27,15 +27,12 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
-      - name: Cache Gradle
-        uses: actions/cache@v5
+      # Gradle is pinned by gradle/wrapper (9.9.1): setup-gradle uses that version
+      # and replaces the hand-rolled actions/cache step for the wrapper and caches.
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
         with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/gradle-wrapper.properties','**/*.gradle*','**/*.kts') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-
+          gradle-version: wrapper
       - name: Grant execute for gradlew
         run: chmod +x ./gradlew
       - name: Build and run tests
