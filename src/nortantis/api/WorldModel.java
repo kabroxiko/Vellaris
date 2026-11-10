@@ -113,7 +113,8 @@ public class WorldModel
 	 * The political regions, with the name that was generated for each one.
 	 *
 	 * Region names are generated as ordinary map text rather than being stored on the region itself, so each non-blank region label is
-	 * attributed to the region containing the point where it was placed. A region with no label of its own reports a null name.
+	 * attributed to the region containing the point where it was placed. A region with no label of its own reports a null name. Each
+	 * entry reports {@code "type": "Region"} so a client knows the name is a territory rather than a settlement.
 	 */
 	private static List<Map<String, Object>> buildRegions(MapSettings settings, WorldGraph graph)
 	{
@@ -133,6 +134,9 @@ public class WorldModel
 			Map<String, Object> entry = new LinkedHashMap<>();
 			entry.put("id", region.id);
 			entry.put("name", namesByRegionId.get(region.id));
+			// Say what the name is: a region is a territory, and a client that only receives the name can otherwise
+			// mistake it for a settlement and write about its streets.
+			entry.put("type", "Region");
 			entry.put("color", regionColorHex(settings, region.id));
 
 			Point centroid = region.getCenters().isEmpty() ? null : WorldGraph.findCentroid(region.getCenters());
