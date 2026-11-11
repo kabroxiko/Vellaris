@@ -98,8 +98,8 @@ public class WorldModel
 	 * Each place also carries the ground around it and the region it belongs to, when the graph is available to read them from, so a client
 	 * can tell a fishing village from a mountain fortress and can say which territory the place is in instead of guessing.
 	 *
-	 * A place whose drawing is known reports it as {@code iconX}/{@code iconY}: the label is placed beside the pictogram rather than on it,
-	 * and a mark meant to say "the party is here" belongs on the town, not on its name.
+	 * Coordinates are where the place is drawn. A settlement's label sits beside its pictogram rather than on it, so the drawing's centre
+	 * is what a mark saying "the party is here" belongs on; a label with no drawing of its own reports the label.
 	 */
 	private static List<Map<String, Object>> buildPlaces(MapSettings settings, WorldGraph graph, WorldSurroundings surroundings)
 	{
@@ -121,18 +121,14 @@ public class WorldModel
 			Map<String, Object> place = new LinkedHashMap<>();
 			place.put("name", text.value.trim());
 			place.put("type", text.type == null ? null : text.type.name());
-			place.put("x", round(text.location.x));
-			place.put("y", round(text.location.y));
 			FreeIcon drawing = drawingFor(text, drawings, settings.resolution);
-			if (drawing != null)
-			{
-				place.put("iconX", round(drawing.locationResolutionInvariant.x));
-				place.put("iconY", round(drawing.locationResolutionInvariant.y));
-			}
+			Point at = drawing != null ? drawing.locationResolutionInvariant : text.location;
+			place.put("x", round(at.x));
+			place.put("y", round(at.y));
 
-			// One lookup answers both questions about the map underneath this label: which region it is in, and what
+			// One lookup answers both questions about the map underneath this place: which region it is in, and what
 			// the ground around it is like.
-			Center containing = graph == null ? null : graph.findClosestCenter(toGraph(text.location, settings.resolution), false);
+			Center containing = graph == null ? null : graph.findClosestCenter(toGraph(at, settings.resolution), false);
 			if (containing != null && containing.region != null)
 			{
 				place.put("regionId", containing.region.id);

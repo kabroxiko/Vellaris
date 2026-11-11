@@ -66,9 +66,9 @@ HTTP API
 - `POST /api/world` — generates a map from a `MapSettings` body and returns a compact description of the world
   (named places, regions with their names and colors, roads) plus the canonical settings, without encoding an image.
   Coordinates are resolution-invariant, so the same world describes the same locations at any render resolution.
-  A place's `x`/`y` is where its label is drawn; when the map drew a pictogram for the place, `iconX`/`iconY` reports
-  the centre of that drawing, which is where a marker saying "the party is here" belongs. Scenery icons (trees,
-  hills, mountains, dunes) are never reported as a place's drawing.
+  A place's `x`/`y` is where the map draws it: the centre of its pictogram when it has one, and its label when it has
+  none. A marker saying "the party is here" therefore lands on the town rather than on the word beside it, and scenery
+  icons (trees, hills, mountains, dunes) are never mistaken for a place's drawing.
   Pass `?includeImage=true` to also get the rendered map as `imageBase64`; that image is identical to the one
   `/api/generate` returns for the same settings, and generating both in one call avoids rendering the world twice.
 - `POST /api/world/map` — generates a map from a `MapSettings` body and returns the raw JPEG as `image/jpeg`. This is the

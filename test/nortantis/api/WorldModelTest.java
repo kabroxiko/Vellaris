@@ -134,28 +134,26 @@ public class WorldModelTest
 	}
 
 	@Test
-	public void aSettlementReportsThePointOfItsDrawingNotJustItsLabel()
+	public void aSettlementReportsThePointOfItsDrawing()
 	{
 		double resolution = 0.75;
 		MapSettings settings = loadSettings(resolution);
 		WorldGraph graph = MapCreator.createGraphForUnitTests(settings);
 
-		// A town's name is drawn above its pictogram, so the place reports both: the label it was stored at and the
-		// centre of the drawing a pin belongs on.
+		// A town's name is drawn above its pictogram, so the place's coordinates are the drawing: a marker placed at
+		// them lands on the town instead of on the word.
 		settings.edits.text.add(new MapText("Brookhollow", new Point(120.0, 240.0), 0.0, TextType.City, null, null, null, 0.0, 0, null, 0.0));
 		settings.edits.freeIcons.addOrReplace(cityIcon(new Point(120.0, 210.0), "town"));
 
 		@SuppressWarnings("unchecked")
 		List<Map<String, Object>> places = (List<Map<String, Object>>) WorldModel.build(settings, graph).get("places");
 
-		assertEquals(120.0, ((Number) places.get(0).get("x")).doubleValue(), 0.001, "the label keeps its own point");
-		assertEquals(240.0, ((Number) places.get(0).get("y")).doubleValue(), 0.001);
-		assertEquals(120.0, ((Number) places.get(0).get("iconX")).doubleValue(), 0.001, "the drawing's centre is reported");
-		assertEquals(210.0, ((Number) places.get(0).get("iconY")).doubleValue(), 0.001);
+		assertEquals(120.0, ((Number) places.get(0).get("x")).doubleValue(), 0.001);
+		assertEquals(210.0, ((Number) places.get(0).get("y")).doubleValue(), 0.001, "the drawing's centre is the place's point");
 	}
 
 	@Test
-	public void aPlaceWithNoDrawingNearbyReportsNone()
+	public void aPlaceWithNoDrawingOfItsOwnReportsItsLabel()
 	{
 		double resolution = 0.75;
 		MapSettings settings = loadSettings(resolution);
@@ -168,8 +166,8 @@ public class WorldModelTest
 		@SuppressWarnings("unchecked")
 		List<Map<String, Object>> places = (List<Map<String, Object>>) WorldModel.build(settings, graph).get("places");
 
-		assertFalse(places.get(0).containsKey("iconX"), "a distant pictogram belongs to another place");
-		assertFalse(places.get(0).containsKey("iconY"));
+		assertEquals(120.0, ((Number) places.get(0).get("x")).doubleValue(), 0.001, "a distant pictogram belongs to another place");
+		assertEquals(240.0, ((Number) places.get(0).get("y")).doubleValue(), 0.001);
 	}
 
 	@Test
@@ -187,7 +185,7 @@ public class WorldModelTest
 		@SuppressWarnings("unchecked")
 		List<Map<String, Object>> places = (List<Map<String, Object>>) WorldModel.build(settings, graph).get("places");
 
-		assertFalse(places.get(0).containsKey("iconX"));
+		assertEquals(240.0, ((Number) places.get(0).get("y")).doubleValue(), 0.001);
 	}
 
 	private static FreeIcon cityIcon(Point location, String iconName)
