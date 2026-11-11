@@ -4,12 +4,14 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
+import nortantis.IconType;
 import nortantis.MapCreator;
 import nortantis.MapSettings;
 import nortantis.MapText;
 import nortantis.Region;
 import nortantis.TextType;
 import nortantis.WorldGraph;
+import nortantis.editor.FreeIcon;
 import nortantis.editor.MapEdits;
 import nortantis.editor.Road;
 import nortantis.geom.Point;
@@ -129,6 +131,68 @@ public class WorldModelTest
 
 		assertTrue(places.get(0).get("regionId") instanceof Number, "a place reports the region it belongs to");
 		assertEquals(region.id, ((Number) places.get(0).get("regionId")).intValue(), "the region is the one containing the place");
+	}
+
+	@Test
+	public void aSettlementReportsThePointOfItsDrawingNotJustItsLabel()
+	{
+		double resolution = 0.75;
+		MapSettings settings = loadSettings(resolution);
+		WorldGraph graph = MapCreator.createGraphForUnitTests(settings);
+
+		// A town's name is drawn above its pictogram, so the place reports both: the label it was stored at and the
+		// centre of the drawing a pin belongs on.
+		settings.edits.text.add(new MapText("Brookhollow", new Point(120.0, 240.0), 0.0, TextType.City, null, null, null, 0.0, 0, null, 0.0));
+		settings.edits.freeIcons.addOrReplace(cityIcon(new Point(120.0, 210.0), "town"));
+
+		@SuppressWarnings("unchecked")
+		List<Map<String, Object>> places = (List<Map<String, Object>>) WorldModel.build(settings, graph).get("places");
+
+		assertEquals(120.0, ((Number) places.get(0).get("x")).doubleValue(), 0.001, "the label keeps its own point");
+		assertEquals(240.0, ((Number) places.get(0).get("y")).doubleValue(), 0.001);
+		assertEquals(120.0, ((Number) places.get(0).get("iconX")).doubleValue(), 0.001, "the drawing's centre is reported");
+		assertEquals(210.0, ((Number) places.get(0).get("iconY")).doubleValue(), 0.001);
+	}
+
+	@Test
+	public void aPlaceWithNoDrawingNearbyReportsNone()
+	{
+		double resolution = 0.75;
+		MapSettings settings = loadSettings(resolution);
+		WorldGraph graph = MapCreator.createGraphForUnitTests(settings);
+
+		// A hand-added label far from every pictogram is not the name of the town on the other side of the map.
+		settings.edits.text.add(new MapText("Brookhollow", new Point(120.0, 240.0), 0.0, TextType.City, null, null, null, 0.0, 0, null, 0.0));
+		settings.edits.freeIcons.addOrReplace(cityIcon(new Point(2000.0, 2000.0), "walled city"));
+
+		@SuppressWarnings("unchecked")
+		List<Map<String, Object>> places = (List<Map<String, Object>>) WorldModel.build(settings, graph).get("places");
+
+		assertFalse(places.get(0).containsKey("iconX"), "a distant pictogram belongs to another place");
+		assertFalse(places.get(0).containsKey("iconY"));
+	}
+
+	@Test
+	public void aSceneryIconIsNeverAPlacesDrawing()
+	{
+		double resolution = 0.75;
+		MapSettings settings = loadSettings(resolution);
+		WorldGraph graph = MapCreator.createGraphForUnitTests(settings);
+
+		// A forest drawn right under the label is not where the town is drawn.
+		settings.edits.text.add(new MapText("Brookhollow", new Point(120.0, 240.0), 0.0, TextType.City, null, null, null, 0.0, 0, null, 0.0));
+		settings.edits.freeIcons.addOrReplace(new FreeIcon(new Point(122.0, 242.0), 1.0, IconType.trees, "nortantis", "trees", -1, "oak", null, 0.0, MapSettings.defaultIconFillColor,
+				MapSettings.defaultIconFilterColor, false, false, 1.0));
+
+		@SuppressWarnings("unchecked")
+		List<Map<String, Object>> places = (List<Map<String, Object>>) WorldModel.build(settings, graph).get("places");
+
+		assertFalse(places.get(0).containsKey("iconX"));
+	}
+
+	private static FreeIcon cityIcon(Point location, String iconName)
+	{
+		return new FreeIcon(location, 1.0, IconType.cities, "nortantis", "towns", -1, iconName, null, 0.0, MapSettings.defaultIconFillColor, MapSettings.defaultIconFilterColor, false, false, 1.0);
 	}
 
 	@Test

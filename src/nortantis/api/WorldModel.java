@@ -1,10 +1,12 @@
 package nortantis.api;
 
+import nortantis.IconType;
 import nortantis.MapSettings;
 import nortantis.MapText;
 import nortantis.Region;
 import nortantis.TextType;
 import nortantis.WorldGraph;
+import nortantis.editor.FreeIcon;
 import nortantis.editor.RegionEdit;
 import nortantis.editor.Road;
 import nortantis.geom.Point;
@@ -38,6 +40,15 @@ public class WorldModel
 	 * resolution, so the same world describes the same locations at every resolution.
 	 */
 	public static final String COORDINATE_SPACE = "resolutionInvariant";
+
+	/**
+	 * The furthest, in image pixels, that a place's label may sit from the icon drawn for it.
+	 *
+	 * The renderer never draws a name on its pictogram: a settlement's name goes above the icon, or below it when the space above is taken,
+	 * by roughly half the icon plus a line of text. Anything past this bound is not that label's drawing but another place's, so a label
+	 * added by hand with no pictogram of its own does not claim the town next to it.
+	 */
+	private static final double MAX_LABEL_ICON_GAP = 300.0;
 
 	private WorldModel()
 	{
@@ -86,6 +97,9 @@ public class WorldModel
 	 *
 	 * Each place also carries the ground around it and the region it belongs to, when the graph is available to read them from, so a client
 	 * can tell a fishing village from a mountain fortress and can say which territory the place is in instead of guessing.
+	 *
+	 * A place whose drawing is known reports it as {@code iconX}/{@code iconY}: the label is placed beside the pictogram rather than on it,
+	 * and a mark meant to say "the party is here" belongs on the town, not on its name.
 	 */
 	private static List<Map<String, Object>> buildPlaces(MapSettings settings, WorldGraph graph, WorldSurroundings surroundings)
 	{
@@ -94,6 +108,8 @@ public class WorldModel
 		{
 			return places;
 		}
+
+		List<FreeIcon> drawings = placeIcons(settings);
 
 		for (MapText text : settings.edits.text)
 		{
@@ -107,6 +123,12 @@ public class WorldModel
 			place.put("type", text.type == null ? null : text.type.name());
 			place.put("x", round(text.location.x));
 			place.put("y", round(text.location.y));
+			FreeIcon drawing = drawingFor(text, drawings, settings.resolution);
+			if (drawing != null)
+			{
+				place.put("iconX", round(drawing.locationResolutionInvariant.x));
+				place.put("iconY", round(drawing.locationResolutionInvariant.y));
+			}
 
 			// One lookup answers both questions about the map underneath this label: which region it is in, and what
 			// the ground around it is like.
@@ -130,6 +152,83 @@ public class WorldModel
 		}
 
 		return places;
+	}
+
+	/**
+	 * The icons that are a place's drawing rather than scenery: a settlement's pictogram, and the marker that flags a site the story added.
+	 *
+	 * Trees, hills, mountains and dunes are deliberately left out, so no label can claim a forest as where it stands.
+	 */
+	private static List<FreeIcon> placeIcons(MapSettings settings)
+	{
+		List<FreeIcon> icons = new ArrayList<>();
+		if (settings.edits == null || settings.edits.freeIcons == null)
+		{
+			return icons;
+		}
+		for (FreeIcon icon : settings.edits.freeIcons)
+		{
+			if (icon == null || icon.locationResolutionInvariant == null)
+			{
+				continue;
+			}
+			if (icon.type == IconType.cities || isSiteMarker(icon))
+			{
+				icons.add(icon);
+			}
+		}
+		return icons;
+	}
+
+	/** Whether an icon is the marker {@link PlaceMarker} draws above a site the story added. */
+	private static boolean isSiteMarker(FreeIcon icon)
+	{
+		return icon.type == IconType.decorations && PlaceMarker.MARKER_ICON.equals(icon.iconName);
+	}
+
+	/**
+	 * The icon drawn for a place, or null when the place has none this world can point at.
+	 *
+	 * Only kinds that belong to the place are considered — a settlement's pictogram for a city, the site marker for a landmark — and the
+	 * nearest one wins, because a label is drawn beside its own pictogram and nowhere near another place's.
+	 */
+	private static FreeIcon drawingFor(MapText text, List<FreeIcon> icons, double resolution)
+	{
+		FreeIcon nearest = null;
+		double nearestDistance = Double.MAX_VALUE;
+		for (FreeIcon icon : icons)
+		{
+			if (!iconMatchesTextKind(icon, text.type))
+			{
+				continue;
+			}
+			double dx = icon.locationResolutionInvariant.x - text.location.x;
+			double dy = icon.locationResolutionInvariant.y - text.location.y;
+			double distance = Math.sqrt(dx * dx + dy * dy);
+			if (distance < nearestDistance)
+			{
+				nearest = icon;
+				nearestDistance = distance;
+			}
+		}
+		if (nearest == null || nearestDistance * resolution > MAX_LABEL_ICON_GAP)
+		{
+			return null;
+		}
+		return nearest;
+	}
+
+	private static boolean iconMatchesTextKind(FreeIcon icon, TextType type)
+	{
+		if (type == TextType.City)
+		{
+			return icon.type == IconType.cities;
+		}
+		if (type == TextType.Landmark)
+		{
+			return isSiteMarker(icon);
+		}
+		return false;
 	}
 
 	/**
