@@ -64,7 +64,7 @@ public class WorldModel
 		world.put("imageWidth", settings.generatedWidth);
 		world.put("imageHeight", settings.generatedHeight);
 
-		List<Map<String, Object>> places = buildPlaces(settings, WorldSurroundings.forWorld(graph));
+		List<Map<String, Object>> places = buildPlaces(settings, graph, WorldSurroundings.forWorld(graph));
 		List<Map<String, Object>> regions = buildRegions(settings, graph);
 		List<Map<String, Object>> roads = buildRoads(settings);
 
@@ -84,10 +84,10 @@ public class WorldModel
 	/**
 	 * Every named location on the map. Text types are what distinguish a city from a lake, a river, a mountain range or a region label.
 	 *
-	 * Each place also carries the ground around it, when the graph is available to read it from, so a client can tell a fishing village
-	 * from a mountain fortress instead of only knowing the name.
+	 * Each place also carries the ground around it and the region it belongs to, when the graph is available to read them from, so a client
+	 * can tell a fishing village from a mountain fortress and can say which territory the place is in instead of guessing.
 	 */
-	private static List<Map<String, Object>> buildPlaces(MapSettings settings, WorldSurroundings surroundings)
+	private static List<Map<String, Object>> buildPlaces(MapSettings settings, WorldGraph graph, WorldSurroundings surroundings)
 	{
 		List<Map<String, Object>> places = new ArrayList<>();
 		if (settings.edits == null || settings.edits.text == null)
@@ -107,11 +107,20 @@ public class WorldModel
 			place.put("type", text.type == null ? null : text.type.name());
 			place.put("x", round(text.location.x));
 			place.put("y", round(text.location.y));
+
+			// One lookup answers both questions about the map underneath this label: which region it is in, and what
+			// the ground around it is like.
+			Center containing = graph == null ? null : graph.findClosestCenter(toGraph(text.location, settings.resolution), false);
+			if (containing != null && containing.region != null)
+			{
+				place.put("regionId", containing.region.id);
+			}
+
 			// A title and a region label are not places a party stands in, so describing the ground under them would
 			// only invite a reader to treat them as somewhere a scene happens.
 			if (surroundings != null && text.type != TextType.Title && text.type != TextType.Region)
 			{
-				Map<String, Object> described = surroundings.describe(settings, text);
+				Map<String, Object> described = surroundings.describe(containing);
 				if (described != null)
 				{
 					place.put("surroundings", described);

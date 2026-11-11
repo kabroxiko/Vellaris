@@ -1,9 +1,6 @@
 package nortantis.api;
 
-import nortantis.MapSettings;
-import nortantis.MapText;
 import nortantis.WorldGraph;
-import nortantis.geom.Point;
 import nortantis.graph.voronoi.Center;
 
 import java.util.ArrayDeque;
@@ -44,12 +41,10 @@ public final class WorldSurroundings
 	/** A landmass below this share of the world's land is reported as an island, provided it does not reach the map edge. */
 	public static final double ISLAND_LAND_SHARE = 0.1;
 
-	private final WorldGraph graph;
 	private final int islandCellLimit;
 
-	private WorldSurroundings(WorldGraph graph, int islandCellLimit)
+	private WorldSurroundings(int islandCellLimit)
 	{
-		this.graph = graph;
 		this.islandCellLimit = islandCellLimit;
 	}
 
@@ -75,26 +70,21 @@ public final class WorldSurroundings
 			}
 		}
 		int islandCellLimit = Math.max(1, (int) Math.round(landCells * ISLAND_LAND_SHARE));
-		return new WorldSurroundings(graph, islandCellLimit);
+		return new WorldSurroundings(islandCellLimit);
 	}
 
 	/**
-	 * Describes the surroundings of one named place, in resolution-invariant terms, or returns null when the place cannot be located on the
-	 * graph.
+	 * Describes the surroundings of one named place, in resolution-invariant terms, or returns null when the place has no centre.
+	 *
+	 * The caller resolves the centre because it is the same centre that says which region the place is in, and asking twice would risk two
+	 * answers for one point.
 	 *
 	 * The returned map carries {@code terrain} and, only when it differs, {@code nearbyTerrain}; the booleans {@code coastal},
 	 * {@code lake}, {@code river}, {@code mountains} and {@code island}. A caller renders those fields into prose; it never has to
 	 * interpret the graph itself.
 	 */
-	public Map<String, Object> describe(MapSettings settings, MapText text)
+	public Map<String, Object> describe(Center place)
 	{
-		if (settings == null || text == null || text.location == null)
-		{
-			return null;
-		}
-
-		Point graphPoint = new Point(text.location.x * settings.resolution, text.location.y * settings.resolution);
-		Center place = graph.findClosestCenter(graphPoint, false);
 		if (place == null)
 		{
 			return null;

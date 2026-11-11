@@ -113,6 +113,25 @@ public class WorldModelTest
 	}
 
 	@Test
+	public void placesReportTheRegionTheyAreIn()
+	{
+		double resolution = 0.75;
+		MapSettings settings = loadSettings(resolution);
+		WorldGraph graph = MapCreator.createGraphForUnitTests(settings);
+
+		// A region's own centre is inside the region, so the label placed there must resolve back to that region.
+		Region region = largestRegion(graph);
+		Center inside = region.getCenters().iterator().next();
+		settings.edits.text.add(new MapText("Brookhollow", new Point(inside.loc.x / resolution, inside.loc.y / resolution), 0.0, TextType.City, null, null, null, 0.0, 0, null, 0.0));
+
+		@SuppressWarnings("unchecked")
+		List<Map<String, Object>> places = (List<Map<String, Object>>) WorldModel.build(settings, graph).get("places");
+
+		assertTrue(places.get(0).get("regionId") instanceof Number, "a place reports the region it belongs to");
+		assertEquals(region.id, ((Number) places.get(0).get("regionId")).intValue(), "the region is the one containing the place");
+	}
+
+	@Test
 	public void roadsReportEndpointsAndLengthInResolutionInvariantUnits()
 	{
 		double resolution = 0.5;
