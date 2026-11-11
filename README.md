@@ -114,6 +114,8 @@ image can never push the description past MongoDB's document limit.
 Every persisted generation logs the id it was given:
 
 ```bash
+docker compose pull vellaris     # compose reuses a local `latest`; pull to get the log line
+docker compose up -d
 docker compose logs vellaris | grep "Stored map"
 # Stored map 6af3c182c19885d0202e524b (seed 1827671559, 2393168 image bytes)
 ```
