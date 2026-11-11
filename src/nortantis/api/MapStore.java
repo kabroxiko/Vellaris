@@ -133,6 +133,7 @@ public final class MapStore implements AutoCloseable
 		{
 			images.insertOne(new Document("_id", id).append("contentType", contentType).append("data", image).append("createdAt", now));
 		}
+		Logger.println("Stored map " + id.toHexString() + " (seed " + seed + ", " + (image == null ? 0 : image.length) + " image bytes)");
 		return id.toHexString();
 	}
 

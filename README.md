@@ -109,6 +109,42 @@ Stored routes:
 The stored records are two collections: `maps` (settings, world, timestamps) and `map_images` (the JPEG), so a large
 image can never push the description past MongoDB's document limit.
 
+### Checking that a map was stored
+
+Every persisted generation logs the id it was given:
+
+```bash
+docker compose logs vellaris | grep "Stored map"
+# Stored map 6af3c182c19885d0202e524b (seed 1827671559, 2393168 image bytes)
+```
+
+Read the map back through the API (send `X-Vellaris-Token` when `VELLARIS_API_TOKEN` is set):
+
+```bash
+curl -s "http://localhost:8080/api/maps/<id>" -H "X-Vellaris-Token: $VELLARIS_API_TOKEN" | head -c 200
+curl -s -o /tmp/map.jpg -w '%{http_code} %{content_type} %{size_download}\n' \
+  "http://localhost:8080/api/maps/<id>/map" -H "X-Vellaris-Token: $VELLARIS_API_TOKEN"
+```
+
+Or ask the database directly:
+
+```bash
+docker compose exec mongo mongosh -u vellaris -p "<password>" --authenticationDatabase admin vellaris --quiet \
+  --eval 'print("maps:", db.maps.countDocuments()); print("images:", db.map_images.countDocuments())'
+```
+
+`db.maps.find({}, {settings: 0, world: 0}).sort({createdAt: -1}).limit(5)` lists recent ids without the megabyte of
+settings. The game points at its map with `campaignSpec.vellarisMapId`; when that field is absent the campaign was
+generated statelessly because the service refused persistence, and the game server's log names the reason:
+
+```bash
+docker compose exec mongo mongosh -u vellaris -p "<password>" --authenticationDatabase admin vellaris --quiet \
+  --eval 'db.gamestates.find({}, {gameId: 1, "campaignSpec.vellarisMapId": 1}).limit(5)'
+```
+
+That last query needs the game server to use the same database (`DM_MONGODB_URI`); it logs `campaign world: stored map
+<id> for game <id>` at the moment it records the link.
+
 ## Docker Compose (service + database)
 
 `docker-compose.yml` runs the map service and the MongoDB it stores maps in, on one network.
