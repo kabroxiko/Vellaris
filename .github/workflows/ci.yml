@@ -22,11 +22,11 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
-      - name: Set up JDK 21
+      - name: Set up JDK 25
         uses: actions/setup-java@v6
         with:
           distribution: temurin
-          java-version: 21
+          java-version: 25
       # Gradle is pinned by gradle/wrapper (9.9.1): setup-gradle uses that version
       # and replaces the hand-rolled actions/cache step for the wrapper and caches.
       - name: Set up Gradle

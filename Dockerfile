@@ -29,7 +29,7 @@ RUN chmod +x scripts/*.sh && npm run build
 # The base image only supplies the JDK: Gradle itself is pinned by gradle/wrapper
 # (9.9.1), so this build uses exactly the same version as CI and local builds
 # instead of whatever Gradle the base image happens to ship.
-FROM eclipse-temurin:21-jdk-noble AS backend-builder
+FROM eclipse-temurin:25-jdk-noble AS backend-builder
 WORKDIR /src
 # Run the build as root inside the build stage to avoid granting
 # non-root users write ownership of copied files (addresses S6504).
@@ -45,7 +45,7 @@ RUN --mount=type=cache,target=/root/.gradle ./gradlew jar
 ########################
 # Runtime image (Alpine + nginx + Temurin JRE)
 ########################
-FROM eclipse-temurin:26-jre-ubi10-minimal AS runtime
+FROM eclipse-temurin:25-jre-ubi10-minimal AS runtime
 WORKDIR /app
 
 # Install nginx and common utilities; upgrade base packages first

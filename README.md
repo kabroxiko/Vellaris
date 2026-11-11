@@ -7,7 +7,7 @@ hand-drawn style. A React frontend consumes the API.
 There is no desktop application in this repository.
 
 **Tech Stack**
-- **Language:** Java 21 or newer
+- **Language:** Java 25 or newer
 - **Build:** Gradle (use the included Gradle wrapper)
 - **Server:** Javalin/Jetty HTTP API, headless AWT rendering
 - **Tests:** JUnit 5
@@ -24,7 +24,7 @@ Developer Quickstart
 --------------------
 
 Prerequisites
-- Install a Java 21+ JDK and make sure `java`/`javac` are on your PATH.
+- Install a Java 25+ JDK and make sure `java`/`javac` are on your PATH.
 - Install Node.js (recommended: Node 18 LTS or newer) and `npm` or `pnpm`.
 - Use the bundled Gradle wrapper (`./gradlew`)—no system Gradle required.
 

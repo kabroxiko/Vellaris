@@ -4,7 +4,7 @@ Fantasy map generator that uses tectonic plate simulation to create islands and 
 
 ## Tech Stack
 
-- **Language:** Java 21+
+- **Language:** Java 25+
 - **Build System:** Gradle (use `gradlew` wrapper)
 - **Server:** Javalin/Jetty HTTP API (headless)
 - **Graphics:** AWT (CPU-based rendering, `-Djava.awt.headless=true`)

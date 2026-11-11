@@ -36,8 +36,8 @@ application {
 }
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_21
-    targetCompatibility = JavaVersion.VERSION_21
+    sourceCompatibility = JavaVersion.VERSION_25
+    targetCompatibility = JavaVersion.VERSION_25
 }
 
 tasks.withType<JavaCompile> {
@@ -179,7 +179,9 @@ spotless {
 }
 
 jacoco {
-    toolVersion = "0.8.10"
+    // 0.8.10 is the release Gradle bundles, and it cannot read Java 25 class files: the agent throws "Unsupported
+    // class file major version 69" for every class the JVM loads, so coverage comes out empty.
+    toolVersion = "0.8.16"
 }
 
 tasks.jacocoTestReport {
