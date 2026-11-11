@@ -4,7 +4,7 @@ import nortantis.i18n.Translation;
 
 public enum TextType
 {
-	Title, Region, Mountain_range, Other_mountains, City, Lake, River;
+	Title, Region, Mountain_range, Other_mountains, City, Landmark, Lake, River;
 
 	public String toString()
 	{

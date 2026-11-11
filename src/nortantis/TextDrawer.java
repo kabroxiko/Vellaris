@@ -340,6 +340,12 @@ public class TextDrawer
 				{
 					drawNameRotated(map, p, graph, 0, false, null, text, false, drawOffset);
 				}
+				else if (text.type == TextType.Landmark)
+				{
+					// A landmark is a single named site (a cave, a ruin, a shrine) rather than a built-up place. It is drawn like a city
+					// label so it stays readable at map scale, but it keeps its own type so a reader of the world knows what it is.
+					drawNameRotated(map, p, graph, 0, false, null, text, false, drawOffset);
+				}
 				else if (text.type == TextType.Region)
 				{
 					drawNameSplitIfNeeded(map, p, graph, 0.0, false, null, text, settings.drawBoldBackground, true, drawOffset);
@@ -391,6 +397,10 @@ public class TextDrawer
 			p.setFont(titleFontScaled);
 		}
 		else if (type == TextType.City)
+		{
+			p.setFont(citiesFontScaled);
+		}
+		else if (type == TextType.Landmark)
 		{
 			p.setFont(citiesFontScaled);
 		}
@@ -1095,7 +1105,8 @@ public class TextDrawer
 						|| (line2 != null && overlapsExistingTextOrCityOrIsOffMap(area2, areaToIgnoreInBoundsChecks));
 				boolean overlapsRegionLakeOrCoastline = overlapsBoundaryThatShouldCauseLineSplit(bounds1, pivot, text.angle, text.type, graph)
 						|| overlapsBoundaryThatShouldCauseLineSplit(bounds2, pivot, text.angle, text.type, graph);
-				boolean isTypeAllowedToCrossBoundaries = text.type == TextType.Title || text.type == TextType.Region || text.type == TextType.City || text.type == TextType.Mountain_range;
+				boolean isTypeAllowedToCrossBoundaries = text.type == TextType.Title || text.type == TextType.Region || text.type == TextType.City || text.type == TextType.Landmark
+						|| text.type == TextType.Mountain_range;
 
 				if (overlapsExistingTextOrCityOrIsOffMap || overlapsRegionLakeOrCoastline)
 				{

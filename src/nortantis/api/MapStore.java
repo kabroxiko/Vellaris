@@ -137,6 +137,36 @@ public final class MapStore implements AutoCloseable
 		return id.toHexString();
 	}
 
+	/**
+	 * Rewrites a stored world in place, keeping its id and seed so every caller that already names this map keeps working.
+	 *
+	 * This exists for the one change a world can legitimately receive after generation: a place the story needed marked. The settings are
+	 * replaced with the edited ones, the world description with what those settings now produce, and the image with the new render, so the
+	 * three never disagree. Returns false when the id names nothing this store holds.
+	 */
+	public boolean update(String mapId, Document settings, Document world, byte[] image, String contentType)
+	{
+		ObjectId id = parseId(mapId);
+		if (id == null)
+		{
+			return false;
+		}
+
+		Document update = new Document("settings", settings).append("world", world).append("lastAccessedAt", new Date());
+		if (maps.updateOne(Filters.eq("_id", id), new Document("$set", update)).getMatchedCount() == 0)
+		{
+			return false;
+		}
+
+		if (image != null && image.length > 0)
+		{
+			Document imageDoc = new Document("contentType", contentType).append("data", image).append("updatedAt", new Date());
+			images.updateOne(Filters.eq("_id", id), new Document("$set", imageDoc), new com.mongodb.client.model.UpdateOptions().upsert(true));
+		}
+		Logger.println("Updated stored map " + id.toHexString() + " (" + (image == null ? 0 : image.length) + " image bytes)");
+		return true;
+	}
+
 	/** Returns one stored world, or null when the id names nothing this store holds. Reading also counts as use for retention. */
 	public StoredMap find(String mapId)
 	{

@@ -84,6 +84,11 @@ HTTP API
   containing that point, and a stable `anchor` string for the surrounding area. Anchors are coarse cells, intended as
   the key under which a client stores its own per-location notes; this server stores nothing about them.
 - `POST /api/background-base` — returns a background texture JPEG.
+- `POST /api/world/places` — takes a `MapSettings` body plus a `places` array of `{"name", "x", "y"}` entries and
+  marks each one on the world: a `Landmark` label with a cross marker above it. The world is rendered again from the same
+  seeds, so nothing already on the map moves. Answers with the updated `world`, the canonical `settings` to keep, the
+  `added` names and the re-rendered map as `imageBase64`. Names already on the map are skipped; a point more than 120
+  pixels from land is refused rather than labelling open water, and a point near a coast is snapped onto it.
 
 ## Stored maps (optional)
 
@@ -104,6 +109,10 @@ Stored routes:
 - `GET /api/maps/{id}` — the stored world description and canonical settings, plus `seed` and `createdAt`.
 - `GET /api/maps/{id}/map` — the stored image, byte-for-byte as generated.
 - `POST /api/maps/{id}/route` — same body as `/api/route` minus the settings, because the stored ones are used.
+- `POST /api/maps/{id}/places` — same `places` body as `/api/world/places`, marked on a stored world. The stored
+  description, settings and image are replaced under the **same id**, so the image and route lookups a client already
+  makes pick up the new render; answers with the updated `world` and the `added` names. Requires the token when one is
+  configured.
 - `DELETE /api/maps/{id}` — removes the world and its image; idempotent, answering `success:false` when already gone.
 
 The stored records are two collections: `maps` (settings, world, timestamps) and `map_images` (the JPEG), so a large

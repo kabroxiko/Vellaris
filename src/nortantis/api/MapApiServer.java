@@ -142,12 +142,14 @@ public class MapApiServer
 			config.routes.post("/api/generate", ctx -> ctx.result(String.valueOf(handleGenerate(ctx))));
 			config.routes.post("/api/world", ctx -> ctx.result(String.valueOf(handleWorld(ctx))));
 			config.routes.post("/api/world/map", MapApiServer::handleWorldMap);
+			config.routes.post("/api/world/places", MapApiServer::handleWorldPlaces);
 			config.routes.post("/api/route", MapApiServer::handleRoute);
 			config.routes.post("/api/nearest", MapApiServer::handleNearest);
 			config.routes.post("/api/background-base", MapApiServer::handleBackgroundBase);
 			config.routes.get("/api/maps/{id}", MapApiServer::handleStoredMap);
 			config.routes.get("/api/maps/{id}/map", MapApiServer::handleStoredMapImage);
 			config.routes.post("/api/maps/{id}/route", MapApiServer::handleStoredRoute);
+			config.routes.post("/api/maps/{id}/places", MapApiServer::handleStoredMapPlaces);
 			config.routes.delete("/api/maps/{id}", MapApiServer::handleStoredMapDelete);
 
 			config.routes.exception(Exception.class, (e, ctx) ->
@@ -799,6 +801,215 @@ public class MapApiServer
 		ctx.contentType(CONTENT_TYPE_JSON);
 		ctx.status(200);
 		ctx.result(gson.toJson(response));
+	}
+
+	/** The body of the add-place routes: the places to mark. The stateless route carries the settings in the same document. */
+	private static final class PlacesRequest
+	{
+		List<PlaceMarker.Mark> places;
+	}
+
+	/** What a re-render produced: the world description, the canonical settings that produce it, and the map image. */
+	private static final class PlacesRender
+	{
+		Map<String, Object> world;
+		Map<String, Object> settings;
+		byte[] image;
+		String error;
+	}
+
+	/**
+	 * Marks places on a world the caller describes by settings, and answers with the re-rendered map.
+	 *
+	 * The body is the same settings document /api/world accepts, plus a {@code places} array of {@code {"name", "x", "y"}} entries in the
+	 * coordinate space the world reports. Each place is added as a landmark label with a marker icon above it; the world is rendered again
+	 * from the same seeds, so everything already on the map stays exactly where it was. The answer carries the world description, the
+	 * canonical settings to keep for later calls, and the rendered image, so a caller that holds no database still gets a complete result.
+	 */
+	private static void handleWorldPlaces(Context ctx)
+	{
+		List<PlaceMarker.Mark> marks = parsePlaceMarks(ctx.body());
+		if (marks == null || marks.isEmpty())
+		{
+			writeJsonError(ctx, 400, "Send the settings document with a \"places\" array of {\"name\", \"x\", \"y\"} entries.");
+			return;
+		}
+
+		GenerationRequestContext grc = prepareGenerationRequest(ctx, false);
+		if (grc == null)
+		{
+			return;
+		}
+
+		String problem = PlaceMarker.positionProblem(grc.ctx.settings, marks);
+		if (!problem.isEmpty())
+		{
+			writeJsonError(ctx, 400, problem);
+			return;
+		}
+
+		problem = PlaceMarker.snapToLand(grc.ctx.settings, marks);
+		if (!problem.isEmpty())
+		{
+			writeJsonError(ctx, 400, problem);
+			return;
+		}
+
+		List<String> added = PlaceMarker.add(grc.ctx.settings, marks);
+		if (added.isEmpty())
+		{
+			writeJsonError(ctx, 400, "Every place in the request is already on this map.");
+			return;
+		}
+
+		PlacesRender render = renderWithPlaces(grc.ctx.settings);
+		if (render.error != null)
+		{
+			writeJsonError(ctx, 500, render.error);
+			return;
+		}
+
+		Map<String, Object> response = new LinkedHashMap<>();
+		response.put("success", true);
+		response.put("world", render.world);
+		response.put("settings", render.settings);
+		response.put("added", added);
+		response.put("imageBase64", Base64.getEncoder().encodeToString(render.image));
+		writeQueryResponse(ctx, response);
+	}
+
+	/**
+	 * Marks places on a stored world and replaces its stored description, settings and image.
+	 *
+	 * The map keeps its id and seed, so every caller that already names this map - the game server's image and route lookups - picks up the
+	 * new render without learning a new id. Places already on the map are skipped rather than duplicated.
+	 */
+	private static void handleStoredMapPlaces(Context ctx)
+	{
+		if (!requireStoredMapAccess(ctx))
+		{
+			return;
+		}
+
+		MapStore.StoredMap stored = mapStore.find(ctx.pathParam("id"));
+		if (stored == null)
+		{
+			writeJsonError(ctx, 404, "No stored map has that id.");
+			return;
+		}
+
+		List<PlaceMarker.Mark> marks = parsePlaceMarks(ctx.body());
+		if (marks == null || marks.isEmpty())
+		{
+			writeJsonError(ctx, 400, "Send a \"places\" array of {\"name\", \"x\", \"y\"} entries.");
+			return;
+		}
+		if (stored.settings == null)
+		{
+			writeJsonError(ctx, 409, "This stored map has no settings, so places cannot be marked on it.");
+			return;
+		}
+
+		PlatformFactory.setInstance(new AwtFactory());
+		MapSettings settings;
+		try
+		{
+			settings = MapSettings.fromJson(gson.toJson(stored.settings));
+		}
+		catch (RuntimeException e)
+		{
+			writeJsonError(ctx, 500, "The stored map's settings could not be read: " + ApiUtils.formatExceptionMessage(e));
+			return;
+		}
+		ApiUtils.ensureIconEditsFlag(settings);
+
+		String problem = PlaceMarker.positionProblem(settings, marks);
+		if (!problem.isEmpty())
+		{
+			writeJsonError(ctx, 400, problem);
+			return;
+		}
+
+		problem = PlaceMarker.snapToLand(settings, marks);
+		if (!problem.isEmpty())
+		{
+			writeJsonError(ctx, 400, problem);
+			return;
+		}
+
+		List<String> added = PlaceMarker.add(settings, marks);
+		if (added.isEmpty())
+		{
+			writeJsonError(ctx, 400, "Every place in the request is already on this map.");
+			return;
+		}
+
+		PlacesRender render = renderWithPlaces(settings);
+		if (render.error != null)
+		{
+			writeJsonError(ctx, 500, render.error);
+			return;
+		}
+
+		if (!mapStore.update(stored.id, mapStore.toDocument(render.settings), mapStore.toDocument(render.world), render.image, CONTENT_TYPE_JPEG))
+		{
+			writeJsonError(ctx, 404, "This map was removed while it was being updated.");
+			return;
+		}
+
+		Map<String, Object> response = new LinkedHashMap<>();
+		response.put("success", true);
+		response.put("mapId", stored.id);
+		response.put("world", render.world);
+		response.put("added", added);
+		writeQueryResponse(ctx, response);
+	}
+
+	/** Reads the request's place marks, or null when the body carries no readable places array. */
+	private static List<PlaceMarker.Mark> parsePlaceMarks(String body)
+	{
+		try
+		{
+			PlacesRequest request = gson.fromJson(body, PlacesRequest.class);
+			return request == null ? null : request.places;
+		}
+		catch (com.google.gson.JsonSyntaxException e)
+		{
+			return null;
+		}
+	}
+
+	/**
+	 * Renders the world with its new places and returns everything a caller needs: the description, the canonical settings and the image.
+	 *
+	 * The seeds are untouched, so this is the same world with two more labels rather than a new one.
+	 */
+	private static PlacesRender renderWithPlaces(MapSettings settings)
+	{
+		PlacesRender out = new PlacesRender();
+		GenerationResult generation = generateMap(settings, null, null, true);
+		if (generation.image == null)
+		{
+			out.error = generation.errorMessage;
+			return out;
+		}
+		try
+		{
+			out.world = WorldModel.build(settings, generation.mapParts == null ? null : generation.mapParts.graph);
+			@SuppressWarnings("unchecked")
+			Map<String, Object> canonical = gson.fromJson(resolveBestNortContent(settings), Map.class);
+			out.settings = canonical;
+			out.image = encodeImageAsJpeg(generation.image, null, ApiUtils.DEFAULT_JPEG_QUALITY);
+		}
+		catch (IOException e)
+		{
+			out.error = "Failed to encode the map image: " + e.getClass().getSimpleName();
+		}
+		finally
+		{
+			generation.image.close();
+		}
+		return out;
 	}
 
 	/**
