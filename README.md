@@ -82,8 +82,32 @@ HTTP API
   to see what was used.
 - `POST /api/nearest` — takes a `MapSettings` body plus `x` and `y`, and returns the nearest named place, the region
   containing that point, and a stable `anchor` string for the surrounding area. Anchors are coarse cells, intended as
-  the key under which a client stores its own per-location notes; this server stores nothing.
+  the key under which a client stores its own per-location notes; this server stores nothing about them.
 - `POST /api/background-base` — returns a background texture JPEG.
+
+## Stored maps (optional)
+
+By default the service is stateless: every answer carries the world and the settings that produced it. A deployment
+that sets `VELLARIS_MONGO_URI` can also keep generated maps and hand out an id for them, so a client no longer has to
+store a megabyte of settings per map or send them back for every route query.
+
+| Variable | Meaning |
+| --- | --- |
+| `VELLARIS_MONGO_URI` | MongoDB connection string. Unset keeps the service stateless. |
+| `VELLARIS_MONGO_DB` | Database name; defaults to `vellaris` when the connection string does not name one. |
+| `VELLARIS_API_TOKEN` | Optional shared secret. When set, every `/api/maps/*` call must send `X-Vellaris-Token`. |
+| `VELLARIS_MAP_TTL_SECONDS` | Optional retention: maps expire this long after their last read. Zero or unset keeps them. |
+
+Stored routes:
+- `POST /api/world?persist=true` — same answer as `/api/world`, plus `mapId`. The world description, its canonical
+  settings and the rendered image are stored under that id. Requires a database and, when configured, the token.
+- `GET /api/maps/{id}` — the stored world description and canonical settings, plus `seed` and `createdAt`.
+- `GET /api/maps/{id}/map` — the stored image, byte-for-byte as generated.
+- `POST /api/maps/{id}/route` — same body as `/api/route` minus the settings, because the stored ones are used.
+- `DELETE /api/maps/{id}` — removes the world and its image; idempotent, answering `success:false` when already gone.
+
+The stored records are two collections: `maps` (settings, world, timestamps) and `map_images` (the JPEG), so a large
+image can never push the description past MongoDB's document limit.
 
 ## Map raster size
 

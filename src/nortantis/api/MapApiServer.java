@@ -57,6 +57,15 @@ public class MapApiServer
 	private static final String CONTENT_TYPE_JSON = "application/json";
 	private static final String CONTENT_TYPE_JPEG = "image/jpeg";
 	private static final String MSG_FAILED_TO_PARSE_CONFIG = "Failed to parse config";
+	private static final String MSG_MAPS_UNAVAILABLE = "This map service is not configured to store maps (set VELLARIS_MONGO_URI on the server).";
+	private static final String MSG_MAPS_UNAUTHORIZED = "The map service requires a valid X-Vellaris-Token header for stored maps.";
+
+	/** Shared secret for the stored-map routes, when the deployment sets one. */
+	private static final String MAP_TOKEN_ENV = "VELLARIS_API_TOKEN";
+	private static final String MAP_TOKEN_HEADER = "X-Vellaris-Token";
+
+	/** Stored-world persistence, or null when the service runs stateless (the default). */
+	private static MapStore mapStore;
 
 	// Thread-safe holder for the supplier used to create MapCreator instances.
 	// Use AtomicReference so updates are atomic and visible across threads
@@ -86,6 +95,10 @@ public class MapApiServer
 		// have a valid ResourceBundle available even before any request-level
 		// language handling occurs.
 		nortantis.i18n.Translation.initialize();
+
+		// Storing maps is opt-in: without a database the API generates and answers exactly as it did before.
+		mapStore = MapStore.fromEnvironment();
+		Logger.println(mapStore == null ? "Map persistence is off (set " + MapStore.MONGO_URI_ENV + " to store generated maps)" : "Map persistence is on");
 
 		// Create and configure the Javalin app (routes declared inside config.routes)
 		Javalin app = Javalin.create(config ->
@@ -131,6 +144,10 @@ public class MapApiServer
 			config.routes.post("/api/route", MapApiServer::handleRoute);
 			config.routes.post("/api/nearest", MapApiServer::handleNearest);
 			config.routes.post("/api/background-base", MapApiServer::handleBackgroundBase);
+			config.routes.get("/api/maps/{id}", MapApiServer::handleStoredMap);
+			config.routes.get("/api/maps/{id}/map", MapApiServer::handleStoredMapImage);
+			config.routes.post("/api/maps/{id}/route", MapApiServer::handleStoredRoute);
+			config.routes.delete("/api/maps/{id}", MapApiServer::handleStoredMapDelete);
 
 			config.routes.exception(Exception.class, (e, ctx) ->
 			{
@@ -147,6 +164,10 @@ public class MapApiServer
 			try
 			{
 				app.stop();
+				if (mapStore != null)
+				{
+					mapStore.close();
+				}
 			}
 			finally
 			{
@@ -357,6 +378,10 @@ public class MapApiServer
 	 * Pass {@code includeImage=true} to also receive the rendered map, which is what a client that shows the map to players wants. Asking
 	 * for it here rather than calling /api/generate separately keeps the map and the world description from being generated twice, so they
 	 * are guaranteed to be the same world.
+	 *
+	 * Pass {@code persist=true} to store the world, its settings and its rendered image under an id, which is then returned as
+	 * {@code mapId}; later requests can read them by that id instead of sending the settings again. Persistence needs a database and is
+	 * refused with a clear answer when none is configured, rather than silently answering without an id.
 	 */
 	private static Object handleWorld(Context ctx)
 	{
@@ -367,6 +392,16 @@ public class MapApiServer
 		}
 
 		boolean includeImage = parseBooleanFlag(ctx.queryParam("includeImage"));
+		boolean persist = parseBooleanFlag(ctx.queryParam("persist"));
+		if (persist)
+		{
+			String problem = storedMapAccessProblem(ctx);
+			if (!problem.isEmpty())
+			{
+				ctx.status(MSG_MAPS_UNAVAILABLE.equals(problem) ? 503 : 403);
+				return gson.toJson(new ApiResponse(false, problem, null, null));
+			}
+		}
 		Integer imageMaxDimension;
 		float imageQuality;
 		try
@@ -422,6 +457,16 @@ public class MapApiServer
 			response.put("world", WorldModel.build(grc.ctx.settings, generation.mapParts == null ? null : generation.mapParts.graph));
 			response.put("settings", canonicalSettings);
 
+			if (persist)
+			{
+				// The player-facing image is stored at full size; a caller that only wants a preview asks for it separately.
+				byte[] imageBytes = encodeImageAsJpeg(generation.image, null, ApiUtils.DEFAULT_JPEG_QUALITY);
+				@SuppressWarnings("unchecked")
+				Map<String, Object> world = (Map<String, Object>) response.get("world");
+				String mapId = mapStore.save(grc.ctx.settings.randomSeed, mapStore.toDocument(canonicalSettings), mapStore.toDocument(world), imageBytes, CONTENT_TYPE_JPEG);
+				response.put("mapId", mapId);
+			}
+
 			if (includeImage)
 			{
 				// Base64 costs a third again in transfer size, so default to a preview-sized image unless the caller asks for more.
@@ -437,6 +482,12 @@ public class MapApiServer
 			Logger.println("Failed to encode the world's map image: " + ioe);
 			ctx.status(500);
 			return gson.toJson(new ApiResponse(false, "Failed to encode the map image: " + ioe.getClass().getSimpleName(), null, null));
+		}
+		catch (RuntimeException e)
+		{
+			Logger.println("Failed to store the world: " + e);
+			ctx.status(503);
+			return gson.toJson(new ApiResponse(false, "The map could not be stored: " + ApiUtils.formatExceptionMessage(e), null, null));
 		}
 		finally
 		{
@@ -617,6 +668,176 @@ public class MapApiServer
 	{
 		RouteModel.PointRequest request = parseBodyAs(ctx, RouteModel.PointRequest.class);
 		handleWorldQuery(ctx, (settings, graph) -> RouteModel.nearest(settings, graph, request));
+	}
+
+	/**
+	 * Returns one stored world: the description a client reads, the canonical settings that produce it, and the seed it came from.
+	 *
+	 * This is the read side of {@code /api/world?persist=true}. A caller that holds only the id can recover everything the world response
+	 * carried without keeping a copy of its own.
+	 */
+	private static void handleStoredMap(Context ctx)
+	{
+		if (!requireStoredMapAccess(ctx))
+		{
+			return;
+		}
+
+		MapStore.StoredMap stored = mapStore.find(ctx.pathParam("id"));
+		if (stored == null)
+		{
+			writeJsonError(ctx, 404, "No stored map has that id.");
+			return;
+		}
+
+		Map<String, Object> response = new LinkedHashMap<>();
+		response.put("success", true);
+		response.put("mapId", stored.id);
+		response.put("seed", stored.seed);
+		if (stored.createdAt != null)
+		{
+			response.put("createdAt", stored.createdAt.toInstant().toString());
+		}
+		if (stored.world != null)
+		{
+			response.put("world", stored.world);
+		}
+		if (stored.settings != null)
+		{
+			response.put("settings", stored.settings);
+		}
+
+		ctx.contentType(CONTENT_TYPE_JSON);
+		ctx.status(200);
+		ctx.result(gson.toJson(response));
+	}
+
+	/**
+	 * Returns the rendered image of a stored world, exactly as it was generated.
+	 *
+	 * A world is fully determined by its settings, so this image cannot drift from the description the same id returns.
+	 */
+	private static void handleStoredMapImage(Context ctx)
+	{
+		if (!requireStoredMapAccess(ctx))
+		{
+			return;
+		}
+
+		MapStore.StoredImage image = mapStore.findImage(ctx.pathParam("id"));
+		if (image == null)
+		{
+			writeJsonError(ctx, 404, "No stored map image has that id.");
+			return;
+		}
+
+		ctx.contentType(image.contentType);
+		ctx.status(200);
+		ctx.result(image.data);
+	}
+
+	/**
+	 * Routes inside a stored world, using the settings that generated it instead of a copy the caller would have to send again.
+	 *
+	 * The stored settings describe a generated world by definition, so the graph is rebuilt without rendering anything.
+	 */
+	private static void handleStoredRoute(Context ctx)
+	{
+		if (!requireStoredMapAccess(ctx))
+		{
+			return;
+		}
+
+		MapStore.StoredMap stored = mapStore.find(ctx.pathParam("id"));
+		if (stored == null || stored.settings == null)
+		{
+			writeJsonError(ctx, 404, "No stored map has that id.");
+			return;
+		}
+
+		RouteModel.RouteRequest request = parseBodyAs(ctx, RouteModel.RouteRequest.class);
+
+		PlatformFactory.setInstance(new AwtFactory());
+		MapSettings settings;
+		try
+		{
+			settings = MapSettings.fromJson(gson.toJson(stored.settings));
+		}
+		catch (RuntimeException e)
+		{
+			writeJsonError(ctx, 500, "The stored map's settings could not be read: " + ApiUtils.formatExceptionMessage(e));
+			return;
+		}
+		ApiUtils.ensureIconEditsFlag(settings);
+		if (!hasPlaceNames(settings))
+		{
+			writeJsonError(ctx, 409, "The stored map has no named places, so a route cannot be resolved in it.");
+			return;
+		}
+
+		WorldGraph graph = buildGraphOnly(settings);
+		writeQueryResponse(ctx, RouteModel.route(settings, graph, request));
+	}
+
+	/** Removes a stored world and its image; answering success=false when it was already gone, so a delete stays idempotent. */
+	private static void handleStoredMapDelete(Context ctx)
+	{
+		if (!requireStoredMapAccess(ctx))
+		{
+			return;
+		}
+
+		boolean deleted = mapStore.delete(ctx.pathParam("id"));
+		Map<String, Object> response = new LinkedHashMap<>();
+		response.put("success", deleted);
+		if (!deleted)
+		{
+			response.put("message", "No stored map has that id.");
+		}
+
+		ctx.contentType(CONTENT_TYPE_JSON);
+		ctx.status(200);
+		ctx.result(gson.toJson(response));
+	}
+
+	/**
+	 * Returns "" when stored maps may be read or written, or the message to answer with.
+	 *
+	 * The stored routes are reachable from wherever the service is published, so a deployment that sets VELLARIS_API_TOKEN requires the
+	 * header on every one of them. Without a token the ids are the only secret: they are unguessable, which is enough for reading a map a
+	 * caller already knows the id of, but a public host should still set a token before exposing the write route.
+	 */
+	private static String storedMapAccessProblem(Context ctx)
+	{
+		if (mapStore == null)
+		{
+			return MSG_MAPS_UNAVAILABLE;
+		}
+
+		String expected = System.getenv(MAP_TOKEN_ENV);
+		if (expected == null || expected.isBlank())
+		{
+			return "";
+		}
+
+		String given = ctx.header(MAP_TOKEN_HEADER);
+		if (given != null && expected.trim().equals(given.trim()))
+		{
+			return "";
+		}
+		return MSG_MAPS_UNAUTHORIZED;
+	}
+
+	/** Writes the refusal when stored maps are unavailable or unauthorized, and reports whether the request may continue. */
+	private static boolean requireStoredMapAccess(Context ctx)
+	{
+		String problem = storedMapAccessProblem(ctx);
+		if (problem.isEmpty())
+		{
+			return true;
+		}
+		writeJsonError(ctx, MSG_MAPS_UNAVAILABLE.equals(problem) ? 503 : 403, problem);
+		return false;
 	}
 
 	/**
