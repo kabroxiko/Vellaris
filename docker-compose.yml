@@ -1,0 +1,67 @@
+# Vellaris + MongoDB on one Docker network.
+#
+# `docker compose up -d` starts the map service and the database it stores maps in, and hands the service the
+# database's container name instead of localhost: inside a container, localhost is the container itself, which is
+# why a URI pointing at localhost cannot reach a database running in another container.
+#
+# Copy docker/.env.example to .env in this directory before starting; compose reads it for the ${...} values below.
+# The DungeonMaster API is not part of this stack: it runs from its own repository on the host and reaches Mongo on
+# the published port, and the map service on VELLARIS_PORT.
+
+services:
+  mongo:
+    image: mongo:6.0
+    restart: unless-stopped
+    environment:
+      # The connection string uses authSource=admin, so this user is created in the admin database.
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER:-vellaris}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:-vellaris}
+    volumes:
+      - mongo_data:/data/db
+    ports:
+      # Host-only by default: the game server runs on this machine. Change MONGO_BIND to reach it from elsewhere.
+      - "${MONGO_BIND:-127.0.0.1}:${MONGO_PORT:-27017}:27017"
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - vellaris
+
+  vellaris:
+    # Build from this repository instead with `build: .` when running a local checkout.
+    image: ghcr.io/kabroxiko/vellaris:${VELLARIS_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+    ports:
+      - "${VELLARIS_PORT:-8080}:8081"
+    environment:
+      # The database's service name, resolved on this compose network; not localhost.
+      VELLARIS_MONGO_URI: "mongodb://${MONGO_ROOT_USER:-vellaris}:${MONGO_ROOT_PASSWORD:-vellaris}@mongo:27017/${VELLARIS_MONGO_DB:-vellaris}?authSource=admin"
+      VELLARIS_MONGO_DB: ${VELLARIS_MONGO_DB:-vellaris}
+      # Shared secret for /api/maps/*. Set the same value as DM_VELLARIS_TOKEN on the game server.
+      VELLARIS_API_TOKEN: ${VELLARIS_API_TOKEN:-}
+      # Seconds after a stored map's last read before it expires; 0 keeps maps forever.
+      VELLARIS_MAP_TTL_SECONDS: ${VELLARIS_MAP_TTL_SECONDS:-0}
+      JAVA_OPTS: "${JAVA_OPTS:--Xms2g -Xmx2g -XX:+UseG1GC}"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8081/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    networks:
+      - vellaris
+
+networks:
+  vellaris:
+
+volumes:
+  # Reuse the volume an existing `docker run` Mongo wrote to by setting MONGO_DATA_VOLUME to its name; otherwise the
+  # stack starts with an empty database. See the README for moving an existing database over.
+  mongo_data:
+    name: ${MONGO_DATA_VOLUME:-vellaris_mongo_data}

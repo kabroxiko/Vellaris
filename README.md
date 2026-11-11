@@ -109,6 +109,44 @@ Stored routes:
 The stored records are two collections: `maps` (settings, world, timestamps) and `map_images` (the JPEG), so a large
 image can never push the description past MongoDB's document limit.
 
+## Docker Compose (service + database)
+
+`docker-compose.yml` runs the map service and the MongoDB it stores maps in, on one network:
+
+```bash
+cp docker/.env.example .env       # password, shared token, port
+docker compose up -d
+docker compose logs -f vellaris   # "Map persistence is on", then Javalin's listening line
+```
+
+The service reaches Mongo as `mongo:27017` over the compose network. A URI with `localhost` would point at the
+container itself and fail with `Connection refused`, which is the usual symptom of running the two containers with
+`docker run` instead of a shared network.
+
+The DungeonMaster API stays outside this stack (it runs from its own repository on the host). Point it at the
+published port and the shared secret:
+
+```dotenv
+DM_MONGODB_URI=mongodb://vellaris:<password>@127.0.0.1:27017/vellaris?authSource=admin
+DM_VELLARIS_URL=http://127.0.0.1:8080
+DM_VELLARIS_TOKEN=<same value as VELLARIS_API_TOKEN>
+```
+
+### Moving an existing database
+
+A fresh volume starts empty. If Mongo was previously run with `docker run`, reuse its volume rather than starting
+over:
+
+```bash
+docker inspect mongodb --format '{{range .Mounts}}{{.Name}} {{end}}'   # note the volume name
+# add it to .env as MONGO_DATA_VOLUME=<name>
+docker rm -f mongodb vellaris
+docker compose up -d
+```
+
+If the old container used a volume you do not want to reuse, copy the data with `mongodump`/`mongorestore` before
+removing it; the README of the game server covers the same database.
+
 ## Map raster size
 
 The pixel size of a rendered map is set by `generatedWidth` / `generatedHeight` in the settings, which act as a bounding
