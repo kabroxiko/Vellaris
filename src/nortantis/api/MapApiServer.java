@@ -98,7 +98,8 @@ public class MapApiServer
 
 		// Storing maps is opt-in: without a database the API generates and answers exactly as it did before.
 		mapStore = MapStore.fromEnvironment();
-		Logger.println(mapStore == null ? "Map persistence is off (set " + MapStore.MONGO_URI_ENV + " to store generated maps)" : "Map persistence is on");
+		Logger.println(mapStore == null ? "Map persistence is off (set " + MapStore.MONGO_URI_ENV + " to store generated maps)"
+				: "Map persistence is configured; the database is contacted on the first stored-map request");
 
 		// Create and configure the Javalin app (routes declared inside config.routes)
 		Javalin app = Javalin.create(config ->

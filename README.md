@@ -136,7 +136,7 @@ Then start the stack:
 ```bash
 cp docker/.env.example .env       # password, shared token, port
 docker compose up -d
-docker compose logs -f vellaris   # "Map persistence is on", then Javalin's listening line
+docker compose logs -f vellaris   # "Map persistence is configured", then Javalin's listening line
 ```
 
 The service reaches Mongo as `mongo:27017` over the compose network. A URI with `localhost` would point at the
@@ -166,6 +166,28 @@ docker compose up -d
 
 If the old container used a volume you do not want to reuse, copy the data with `mongodump`/`mongorestore` before
 removing it; the README of the game server covers the same database.
+
+### If `mongo` does not resolve
+
+`UnknownHostException: mongo: Name or service not known` means the database container is not on this stack's network,
+so there is no `mongo` host for the service to reach. Check in this order:
+
+```bash
+docker compose ps -a          # is mongo Up/healthy, or Created/Exited?
+docker compose logs mongo     # port 27017 already allocated, permissions, failed init
+docker ps -a | grep 27017     # an old `docker run` Mongo still holding the port
+```
+
+The usual cause is a Mongo container left over from `docker run`: it still publishes 27017, so the compose `mongo`
+service cannot start, never joins the network, and its name never resolves. Note the old volume first (see above), then
+replace the containers:
+
+```bash
+docker compose down
+docker rm -f mongodb vellaris
+docker compose up -d
+docker compose ps
+```
 
 ## Map raster size
 
