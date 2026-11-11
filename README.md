@@ -111,7 +111,27 @@ image can never push the description past MongoDB's document limit.
 
 ## Docker Compose (service + database)
 
-`docker-compose.yml` runs the map service and the MongoDB it stores maps in, on one network:
+`docker-compose.yml` runs the map service and the MongoDB it stores maps in, on one network.
+
+### Get the files without cloning
+
+The stack is two files. Download them straight from the repository's `main` branch — no `git clone` needed:
+
+```bash
+curl -fsSL -o docker-compose.yml https://raw.githubusercontent.com/kabroxiko/Vellaris/main/docker-compose.yml
+curl -fsSL --create-dirs -o docker/.env.example https://raw.githubusercontent.com/kabroxiko/Vellaris/main/docker/.env.example
+```
+
+A whole tree as a snapshot is also fine when you do not want Git history:
+
+```bash
+curl -fsSL https://github.com/kabroxiko/Vellaris/archive/refs/heads/main.tar.gz | tar -xz --strip-components=1
+```
+
+From the web UI, open each file, press **Raw**, and save it under the same relative path (`docker-compose.yml` and
+`docker/.env.example`).
+
+Then start the stack:
 
 ```bash
 cp docker/.env.example .env       # password, shared token, port
