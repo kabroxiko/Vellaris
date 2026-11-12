@@ -1448,7 +1448,86 @@ public class IconDrawer
 			}
 		}
 
+		cities.addAll(ensureEveryRegionHasACity(cityNames, artPackForCities, cityTypeToUse));
+
 		return cities;
+	}
+
+	/**
+	 * Guarantees every political region at least one settlement.
+	 *
+	 * City placement is a probability over the whole map, so a small, remote or mountainous region can end up with none at all, and a realm
+	 * with no town on it is a realm the players cannot name, travel to or rule from. Each region left without a city gets the best center
+	 * it has: water at hand first, then open ground, then higher ground, and nearest the region's middle within that, so the added town
+	 * sits where a town would plausibly be rather than on the first polygon in the list. Only centers that pass the same checks a generated
+	 * city passes are used, so the draw step cannot unmark the town this method just placed.
+	 */
+	private List<IconDrawTask> ensureEveryRegionHasACity(List<String> cityNames, String artPackForCities, String cityTypeToUse)
+	{
+		List<IconDrawTask> added = new ArrayList<>();
+		if (graph.regions == null || graph.regions.isEmpty() || cityNames.isEmpty())
+		{
+			return added;
+		}
+
+		for (Region region : graph.regions.values())
+		{
+			List<Center> centers = new ArrayList<>(region.getCenters());
+			if (centers.isEmpty() || centers.stream().anyMatch(c -> c.isCity))
+			{
+				continue;
+			}
+
+			Point middle = WorldGraph.findCentroid(region.getCenters());
+			centers.removeIf(c -> !canHostAGeneratedCity(c));
+			centers.sort(Comparator.<Center>comparingInt(this::settlementSuitability).thenComparingDouble(c -> middle == null ? 0.0 : c.loc.distanceTo(middle)));
+
+			boolean placed = false;
+			for (Center candidate : centers)
+			{
+				String cityName = cityNames.get(rand.nextInt(cityNames.size()));
+				FreeIcon icon = new FreeIcon(resolutionScale, candidate.loc, 1.0, IconType.cities, artPackForCities, cityTypeToUse, cityName, candidate.index, fillColorsByType.get(IconType.cities),
+						iconFilterColorsByType.get(IconType.cities), maximizeOpacityByType.get(IconType.cities), fillWithColorByType.get(IconType.cities));
+				IconDrawTask task = toIconDrawTask(icon);
+				if (task == null || isContentBottomTouchingWater(task) || isNeighborACity(candidate))
+				{
+					continue;
+				}
+				candidate.isCity = true;
+				freeIcons.addOrReplace(icon);
+				added.add(task);
+				placed = true;
+				break;
+			}
+			if (!placed)
+			{
+				Logger.println("Region " + region.id + " has no center that can hold a city, so it is drawn without one.");
+			}
+		}
+		return added;
+	}
+
+	/** Whether a generated city may stand on this center at all: land, away from the region borders that are drawn. */
+	private boolean canHostAGeneratedCity(Center c)
+	{
+		return !c.isWater && !c.isBorder && c.neighbors.stream().noneMatch(n -> n.isBorder);
+	}
+
+	/**
+	 * How well a center suits the town a region must have. Water at hand is what settlements grow on; a peak is only used when a region has
+	 * nothing flatter, because a realm with no town at all is worse than one whose town is high in the hills.
+	 */
+	private int settlementSuitability(Center c)
+	{
+		if (c.isRiver() || c.isCoast)
+		{
+			return 0;
+		}
+		if (!c.isHill && !c.isMountain)
+		{
+			return 1;
+		}
+		return c.isHill ? 2 : 3;
 	}
 
 	/**
