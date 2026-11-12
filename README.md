@@ -64,11 +64,14 @@ HTTP API
 
 The routes below take a settings body in either of two shapes. A **short** document names only the choices the generator
 panel offers — `dimension` (`Square`, `Sixteen_by_9`, `Golden_Ratio`), `worldSize`, `landShape`, `regionCount`,
-`cityProbability`, `drawRegionColors`, `artPack`, `cityIconSetName`, `books`, `language` — and describes a kind of map:
-`/api/generate`, `/api/generate-settings`, `/api/world` and `/api/world/map` invent the full settings around it (add
-`randomSeed` to pin which world comes out). A **full** document is the canonical settings those routes answer with, and
-it is what `/api/route`, `/api/nearest` and `/api/world/places` need, because they must name the one world the caller
-means.
+`cityProbability`, `artPack`, `cityIconSetName`, `books`, `language` — plus the rendering choices the generator would
+otherwise make at random: `drawRegionBoundaries`, `drawRegionColors`, `drawBorder`, `frayedBorder`, `coastShadingLevel`,
+`coastlineWidth`, `lineStyle`, `drawGridOverlay`, `gridOverlayShape`, `gridOverlayRowOrColCount`,
+`gridOverlayLineWidth`, `gridOverlayLayer` and `drawVoronoiGridOverlayOnlyOnLand`. Anything it leaves out is invented.
+It describes a kind of map: `/api/generate`, `/api/generate-settings`, `/api/world` and `/api/world/map` invent the full
+settings around it (add `randomSeed` to pin which world comes out). A **full** document is the canonical settings those
+routes answer with, and it is what `/api/route`, `/api/nearest` and `/api/world/places` need, because they must name the
+one world the caller means.
 
 - `POST /api/generate-settings` — returns a fresh random `MapSettings` JSON document.
 - `POST /api/generate` — renders a map from a `MapSettings` body and returns JSON with a base64 JPEG.

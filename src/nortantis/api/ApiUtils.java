@@ -26,6 +26,7 @@ public final class ApiUtils
 		String landShape;
 		Integer regionCount;
 		Boolean drawRegionColors;
+		Boolean drawRegionBoundaries;
 		Double cityProbability;
 		List<String> books;
 		String artPack;
@@ -35,6 +36,19 @@ public final class ApiUtils
 		 * wants "a map like this" sends; present means the caller wants this exact world again.
 		 */
 		Long randomSeed;
+		// The rest pin rendering choices the generator would otherwise decide at random, so a caller can ask for a map that always has
+		// political regions drawn, a decorative border, shaded shores or a grid, instead of one draw in four having them.
+		Boolean drawBorder;
+		Boolean frayedBorder;
+		Integer coastShadingLevel;
+		Double coastlineWidth;
+		String lineStyle;
+		Boolean drawGridOverlay;
+		String gridOverlayShape;
+		Integer gridOverlayRowOrColCount;
+		Integer gridOverlayLineWidth;
+		String gridOverlayLayer;
+		Boolean drawVoronoiGridOverlayOnlyOnLand;
 	}
 
 	public static void ensureIconEditsFlag(MapSettings settings)
@@ -75,14 +89,7 @@ public final class ApiUtils
 			settings.cityIconTypeName = p.cityIconSetName;
 		if (p.landShape != null && !p.landShape.isEmpty())
 		{
-			try
-			{
-				settings.landShape = nortantis.LandShape.valueOf(p.landShape);
-			}
-			catch (IllegalArgumentException ignored)
-			{
-				// ignore invalid
-			}
+			settings.landShape = parseEnum(nortantis.LandShape.class, p.landShape, settings.landShape);
 		}
 		if (p.regionCount != null)
 			settings.regionCount = p.regionCount;
@@ -93,6 +100,45 @@ public final class ApiUtils
 		applyDimensionOverride(p, settings);
 		if (p.drawRegionColors != null)
 			settings.drawRegionColors = p.drawRegionColors;
+		if (p.drawRegionBoundaries != null)
+			settings.drawRegionBoundaries = p.drawRegionBoundaries;
+		if (p.drawBorder != null)
+			settings.drawBorder = p.drawBorder;
+		if (p.frayedBorder != null)
+			settings.frayedBorder = p.frayedBorder;
+		if (p.coastShadingLevel != null)
+			settings.coastShadingLevel = p.coastShadingLevel;
+		if (p.coastlineWidth != null)
+			settings.coastlineWidth = p.coastlineWidth;
+		if (p.lineStyle != null && !p.lineStyle.isEmpty())
+			settings.lineStyle = parseEnum(nortantis.MapSettings.LineStyle.class, p.lineStyle, settings.lineStyle);
+		if (p.drawGridOverlay != null)
+			settings.drawGridOverlay = p.drawGridOverlay;
+		if (p.gridOverlayShape != null && !p.gridOverlayShape.isEmpty())
+			settings.gridOverlayShape = parseEnum(nortantis.GridOverlayShape.class, p.gridOverlayShape, settings.gridOverlayShape);
+		if (p.gridOverlayRowOrColCount != null)
+			settings.gridOverlayRowOrColCount = p.gridOverlayRowOrColCount;
+		if (p.gridOverlayLineWidth != null)
+			settings.gridOverlayLineWidth = p.gridOverlayLineWidth;
+		if (p.gridOverlayLayer != null && !p.gridOverlayLayer.isEmpty())
+			settings.gridOverlayLayer = parseEnum(nortantis.MapSettings.GridOverlayLayer.class, p.gridOverlayLayer, settings.gridOverlayLayer);
+		if (p.drawVoronoiGridOverlayOnlyOnLand != null)
+			settings.drawVoronoiGridOverlayOnlyOnLand = p.drawVoronoiGridOverlayOnlyOnLand;
+	}
+
+	/**
+	 * Reads an enum the way settings documents write one: a name, with spaces where the display name has them.
+	 */
+	private static <E extends Enum<E>> E parseEnum(Class<E> type, String value, E fallback)
+	{
+		try
+		{
+			return Enum.valueOf(type, value.trim().replace(' ', '_'));
+		}
+		catch (IllegalArgumentException e)
+		{
+			return fallback;
+		}
 	}
 
 	public static void applyDimensionOverride(RandomMapParameters p, MapSettings settings)

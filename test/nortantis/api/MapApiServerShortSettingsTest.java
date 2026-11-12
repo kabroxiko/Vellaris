@@ -27,7 +27,18 @@ class MapApiServerShortSettingsTest
 			  "worldSize": 28000,
 			  "landShape": "Continents",
 			  "regionCount": 11,
+			  "drawRegionBoundaries": true,
 			  "drawRegionColors": true,
+			  "drawBorder": true,
+			  "coastShadingLevel": 42,
+			  "coastlineWidth": 2.7,
+			  "lineStyle": "SplinesWithSmoothedCoastlines",
+			  "drawGridOverlay": true,
+			  "gridOverlayShape": "Horizontal hexes",
+			  "gridOverlayRowOrColCount": 16,
+			  "gridOverlayLineWidth": 3,
+			  "gridOverlayLayer": "Under icons",
+			  "drawVoronoiGridOverlayOnlyOnLand": true,
 			  "cityProbability": 0.00625,
 			  "artPack": "nortantis",
 			  "cityIconSetName": "middle ages",
@@ -61,6 +72,38 @@ class MapApiServerShortSettingsTest
 		assertTrue(settings.books.contains("Ancient Egypt"));
 		// It was answered by inventing settings, so the graph and the world description have to exist too.
 		assertNotNull(generationContextOf(context), "a generated request must carry the context queries render from");
+	}
+
+	@Test
+	void shortDocumentPinsTheRenderingTheGeneratorWouldRandomise() throws Exception
+	{
+		// Region boundaries, region colours, the border, shaded shores and a grid are drawn in only some of the generator's
+		// draws; a document that names them must get them every time.
+		MapSettings settings = settingsOf(prepare(SHORT_DOCUMENT, true));
+
+		assertTrue(settings.drawRegionBoundaries);
+		assertTrue(settings.drawRegionColors);
+		assertTrue(settings.drawBorder);
+		assertEquals(42, settings.coastShadingLevel);
+		assertEquals(2.7, settings.coastlineWidth, 1e-9);
+		assertEquals(MapSettings.LineStyle.SplinesWithSmoothedCoastlines, settings.lineStyle);
+		assertTrue(settings.drawGridOverlay);
+		// Names are read with the spaces the settings document writes, so "Horizontal hexes" and "Horizontal_hexes" both work.
+		assertEquals(nortantis.GridOverlayShape.Horizontal_hexes, settings.gridOverlayShape);
+		assertEquals(16, settings.gridOverlayRowOrColCount);
+		assertEquals(3, settings.gridOverlayLineWidth);
+		assertEquals(MapSettings.GridOverlayLayer.Under_icons, settings.gridOverlayLayer);
+		assertTrue(settings.drawVoronoiGridOverlayOnlyOnLand);
+	}
+
+	@Test
+	void anUnreadableNameKeepsTheGeneratorsChoice() throws Exception
+	{
+		String body = SHORT_DOCUMENT.replace("SplinesWithSmoothedCoastlines", "Not_A_Line_Style");
+
+		MapSettings settings = settingsOf(prepare(body, true));
+
+		assertNotNull(settings.lineStyle, "a value the generator does not know must not leave the setting empty");
 	}
 
 	@Test
