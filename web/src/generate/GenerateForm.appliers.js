@@ -126,6 +126,7 @@ export function applyGridAndColoringHoisted(parsedSettings, ctx) {
 
 export function applyBordersFrayedAndGrungeHoisted(parsedSettings, ctx) {
   const {
+    drawBorder,
     borderWidth,
     borderPosition,
     borderColorOption,
@@ -140,6 +141,7 @@ export function applyBordersFrayedAndGrungeHoisted(parsedSettings, ctx) {
     mergeColor: mergeColorFromCtx,
   } = ctx
   const merge = mergeColorFromCtx || mergeColor
+  if (typeof drawBorder === 'boolean') parsedSettings.drawBorder = drawBorder
   parsedSettings.borderWidth = Number(borderWidth)
   parsedSettings.borderPosition = borderPosition
   parsedSettings.borderColorOption = borderColorOption

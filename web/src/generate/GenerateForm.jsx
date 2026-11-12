@@ -990,6 +990,7 @@ function GenerateForm({ uiLanguage = 'en' }) {
     drawVoronoiGridOverlayOnlyOnLand,
     landColoringMethod,
     mergeColor,
+    drawBorder,
     borderWidth,
     borderPosition,
     borderColorOption,

@@ -48,6 +48,7 @@ export default function mergeUiIntoParsed(parsedSettings, opts) {
   })
 
   applyBordersFrayedAndGrungeHoisted(parsedSettings, {
+    drawBorder: opts.drawBorder,
     borderWidth: opts.borderWidth,
     borderPosition: opts.borderPosition,
     borderColorOption: opts.borderColorOption,
