@@ -68,9 +68,6 @@ panel offers — `dimension` (`Square`, `Sixteen_by_9`, `Golden_Ratio`), `worldS
 otherwise make at random: `drawRegionBoundaries`, `drawRegionColors`, `drawBorder`, `frayedBorder`, `coastShadingLevel`,
 `coastlineWidth`, `lineStyle`, `drawGridOverlay`, `gridOverlayShape`, `gridOverlayRowOrColCount`,
 `gridOverlayLineWidth`, `gridOverlayLayer` and `drawVoronoiGridOverlayOnlyOnLand`. Anything it leaves out is invented.
-Add `generatedWidth` and/or `generatedHeight` to pin the picture size in pixels: the named dimension sets the shape
-(16:9 is 4096 wide), and these override it, which is how a caller renders a map bigger than the presets for a screen
-that will zoom into it. One side alone keeps the dimension's aspect ratio; sizes are clamped to 256–16384 per side.
 It describes a kind of map: `/api/generate`, `/api/generate-settings`, `/api/world` and `/api/world/map` invent the full
 settings around it (add `randomSeed` to pin which world comes out). A **full** document is the canonical settings those
 routes answer with, and it is what `/api/route`, `/api/nearest` and `/api/world/places` need, because they must name the
