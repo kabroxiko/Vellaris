@@ -28,7 +28,7 @@ class MapApiServerBatchTest
 	void runFocusedMapApiServerChecks() throws Exception
 	{
 		// Basic params parsing check
-		Object parseResult = MapApiServerParamsTest.MethodInvoker.invokeStatic("nortantis.api.MapApiServer", "tryParseParams", new Class<?>[] { String.class }, "}{");
+		Object parseResult = MapApiServerParamsTest.MethodInvoker.invokeStatic("nortantis.api.MapApiServer", "tryParseJsonObject", new Class<?>[] { String.class }, "}{");
 		assertNull(parseResult);
 
 		// paramsContainGenerationFields

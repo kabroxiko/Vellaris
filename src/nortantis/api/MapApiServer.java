@@ -1,6 +1,8 @@
 package nortantis.api;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import nortantis.BackgroundGenerator;
 import nortantis.FractalBGGenerator;
 import nortantis.IconDrawer;
@@ -354,7 +356,7 @@ public class MapApiServer
 	{
 		// request header logging removed
 
-		GenerationRequestContext grc = prepareGenerationRequest(ctx, false);
+		GenerationRequestContext grc = prepareGenerationRequest(ctx, true);
 		if (grc == null)
 		{
 			return gson.toJson(new ApiResponse(false, MSG_FAILED_TO_PARSE_CONFIG, null, null));
@@ -388,7 +390,7 @@ public class MapApiServer
 	 */
 	private static Object handleWorld(Context ctx)
 	{
-		GenerationRequestContext grc = prepareGenerationRequest(ctx, false);
+		GenerationRequestContext grc = prepareGenerationRequest(ctx, true);
 		if (grc == null)
 		{
 			return gson.toJson(new ApiResponse(false, MSG_FAILED_TO_PARSE_CONFIG, null, null));
@@ -579,7 +581,7 @@ public class MapApiServer
 	 */
 	private static void handleWorldMap(Context ctx)
 	{
-		GenerationRequestContext grc = prepareGenerationRequest(ctx, false);
+		GenerationRequestContext grc = prepareGenerationRequest(ctx, true);
 		if (grc == null)
 		{
 			ctx.contentType(CONTENT_TYPE_JSON);
@@ -1800,11 +1802,20 @@ public class MapApiServer
 	}
 
 	/**
-	 * Parse request and prepare a GenerationRequestContext. If allowGenerateRandomSettings is true, the helper will generate random
-	 * settings when params are provided and no settings are included. If false, the request must include settings (or an uploaded .nort)
-	 * and the function will attempt to load them into a GenerationContext via loadSettings. Returns null and sets response status on error.
+	 * Parse request and prepare a GenerationRequestContext.
+	 *
+	 * The body is either a full settings document - the canonical JSON a world was generated from - or the short document the random-map
+	 * panel offers, which names only the few choices a person makes: dimension, world size, land shape, region count, city frequency, art
+	 * pack, city icon set, books and language. A short document describes the kind of map to invent, so it is answered by generating a
+	 * fresh settings object around it.
+	 *
+	 * @param acceptShortSettings
+	 *            Whether the short document may be answered by inventing settings. Endpoints that only render a world accept it; endpoints
+	 *            that query an existing world do not, because a short document carries no seed and would name a different world each call.
+	 *
+	 *            Returns null and sets the response status on error.
 	 */
-	private static GenerationRequestContext prepareGenerationRequest(Context ctx, boolean allowGenerateRandomSettings)
+	private static GenerationRequestContext prepareGenerationRequest(Context ctx, boolean acceptShortSettings)
 	{
 		String body = ctx.body();
 		if (body.isBlank())
@@ -1815,45 +1826,72 @@ public class MapApiServer
 
 		PlatformFactory.setInstance(new AwtFactory());
 
-		ApiUtils.RandomMapParameters params = tryParseParams(body);
-
-		if (allowGenerateRandomSettings && paramsContainGenerationFields(params))
+		JsonObject root = tryParseJsonObject(body);
+		if (root == null)
 		{
+			ctx.status(400);
+			return null;
+		}
+
+		ApiUtils.RandomMapParameters params = gson.fromJson(root, ApiUtils.RandomMapParameters.class);
+
+		if (isShortSettingsDocument(root) && paramsContainGenerationFields(params))
+		{
+			if (!acceptShortSettings)
+			{
+				// A short document names no seed, so it cannot refer to the world the caller means.
+				ctx.status(400);
+				return null;
+			}
 			return buildContextFromParams(params);
 		}
 
 		return buildContextFromNortBody(body, params, ctx);
 	}
 
-	// Helper: attempt to parse the request body as RandomMapParameters
-	private static ApiUtils.RandomMapParameters tryParseParams(String body)
+	// Helper: parse the request body as a JSON object, or null when it is not JSON
+	private static JsonObject tryParseJsonObject(String body)
 	{
 		try
 		{
-			return gson.fromJson(body, ApiUtils.RandomMapParameters.class);
+			var element = JsonParser.parseString(body);
+			return element.isJsonObject() ? element.getAsJsonObject() : null;
 		}
-		catch (com.google.gson.JsonSyntaxException e)
+		catch (RuntimeException e)
 		{
 			return null;
 		}
 	}
 
+	/**
+	 * True when the body names a kind of map instead of describing one.
+	 *
+	 * Every settings document Vellaris writes carries "version"; the short document cannot, because it is expanded into a settings object
+	 * by the server. The version stamp is therefore what tells the two apart.
+	 */
+	private static boolean isShortSettingsDocument(JsonObject root)
+	{
+		return !root.has("version");
+	}
+
 	// Helper: quick check whether parsed params contain any generation fields
 	private static boolean paramsContainGenerationFields(ApiUtils.RandomMapParameters p)
 	{
-		return p != null && (p.language != null || p.dimension != null || p.worldSize != null || p.landShape != null || p.regionCount != null || p.cityProbability != null
-				|| (p.books != null && !p.books.isEmpty()));
+		return p != null && (p.language != null || p.dimension != null || p.worldSize != null || p.landShape != null || p.regionCount != null || p.cityProbability != null || p.randomSeed != null
+				|| p.artPack != null || p.cityIconSetName != null || (p.books != null && !p.books.isEmpty()));
 	}
 
-	// Build GenerationRequestContext when params-driven generation is requested
+	// Build GenerationRequestContext when the request names a kind of map rather than describing one
 	private static GenerationRequestContext buildContextFromParams(ApiUtils.RandomMapParameters params)
 	{
-		GenerationRequestContext out = new GenerationRequestContext();
-		out.settings = generateRandomMapSettings(params);
+		MapSettings settings = generateRandomMapSettings(params);
 		if (params.language != null && !params.language.isEmpty())
 		{
-			out.settings.language = params.language;
+			settings.language = params.language;
 		}
+		GenerationRequestContext out = new GenerationRequestContext();
+		out.settings = settings;
+		out.ctx = new GenerationContext(settings);
 		return out;
 	}
 

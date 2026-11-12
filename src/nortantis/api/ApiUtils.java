@@ -30,6 +30,11 @@ public final class ApiUtils
 		List<String> books;
 		String artPack;
 		String cityIconSetName;
+		/**
+		 * Seed for every random choice the generated settings make. Absent means the server picks one, which is what a caller that only
+		 * wants "a map like this" sends; present means the caller wants this exact world again.
+		 */
+		Long randomSeed;
 	}
 
 	public static void ensureIconEditsFlag(MapSettings settings)
@@ -55,6 +60,15 @@ public final class ApiUtils
 	{
 		if (p == null || settings == null)
 			return;
+		if (p.randomSeed != null)
+		{
+			// The seeds move together so the graph, the background, the regions and the names all belong to the same world.
+			settings.randomSeed = p.randomSeed;
+			settings.backgroundRandomSeed = p.randomSeed;
+			settings.regionsRandomSeed = p.randomSeed;
+			settings.textRandomSeed = p.randomSeed;
+			settings.frayedBorderSeed = p.randomSeed;
+		}
 		if (p.worldSize != null)
 			settings.worldSize = p.worldSize;
 		if (p.cityIconSetName != null && !p.cityIconSetName.isEmpty())

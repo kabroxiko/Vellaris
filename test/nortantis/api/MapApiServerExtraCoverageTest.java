@@ -64,9 +64,9 @@ class MapApiServerExtraCoverageTest
 	}
 
 	@Test
-	void testTryParseParamsInvalidJsonReturnsNull() throws Exception
+	void testTryParseJsonObjectInvalidJsonReturnsNull() throws Exception
 	{
-		Method tryParse = MapApiServer.class.getDeclaredMethod("tryParseParams", String.class);
+		Method tryParse = MapApiServer.class.getDeclaredMethod("tryParseJsonObject", String.class);
 		tryParse.setAccessible(true);
 		Object out = tryParse.invoke(null, "{not: valid json}");
 		assertNull(out);

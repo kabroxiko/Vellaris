@@ -93,17 +93,26 @@ class MapApiServerTest
 
 	// Additional ApiUtils behavior tests via reflection
 	@Test
-	void testTryParseParams_and_paramsContainGenerationFields() throws Exception
+	void testTryParseJsonObject_and_paramsContainGenerationFields() throws Exception
 	{
 		String json = "{\"language\":\"en\", \"worldSize\": 5}";
-		Method tryParse = MapApiServer.class.getDeclaredMethod("tryParseParams", String.class);
-		tryParse.setAccessible(true);
-		Object params = tryParse.invoke(null, json);
-		assertNotNull(params);
+		com.google.gson.JsonObject root = (com.google.gson.JsonObject) invokeOnMapApi("tryParseJsonObject", new Class[] { String.class }, json);
+		assertNotNull(root);
 
-		Method pCheck = MapApiServer.class.getDeclaredMethod("paramsContainGenerationFields", params.getClass());
-		pCheck.setAccessible(true);
-		Object hasFields = pCheck.invoke(null, params);
+		ApiUtils.RandomMapParameters params = new com.google.gson.Gson().fromJson(root, ApiUtils.RandomMapParameters.class);
+
+		Boolean hasFields = (Boolean) invokeOnMapApi("paramsContainGenerationFields", new Class[] { ApiUtils.RandomMapParameters.class }, params);
 		assertEquals(Boolean.TRUE, hasFields);
+	}
+
+	@Test
+	void testParamsContainGenerationFieldsDetectsArtPack() throws Exception
+	{
+		// A document that names only the art pack still describes a kind of map, not a world.
+		ApiUtils.RandomMapParameters p = new ApiUtils.RandomMapParameters();
+		p.artPack = "nortantis";
+
+		Boolean b = (Boolean) invokeOnMapApi("paramsContainGenerationFields", new Class[] { ApiUtils.RandomMapParameters.class }, p);
+		assertTrue(b);
 	}
 }

@@ -8,11 +8,30 @@ import java.lang.reflect.Field;
 class MapApiServerParamsTest
 {
 	@Test
-	void testTryParseParamsInvalidJsonReturnsNull() throws Exception
+	void testTryParseJsonObjectInvalidJsonReturnsNull() throws Exception
 	{
 		// Call static helper statically
-		Object result = MethodInvoker.invokeStatic("nortantis.api.MapApiServer", "tryParseParams", new Class<?>[] { String.class }, "}{");
+		Object result = MethodInvoker.invokeStatic("nortantis.api.MapApiServer", "tryParseJsonObject", new Class<?>[] { String.class }, "}{");
 		assertNull(result);
+	}
+
+	@Test
+	void testTryParseJsonObjectRejectsNonObjectJson() throws Exception
+	{
+		Object result = MethodInvoker.invokeStatic("nortantis.api.MapApiServer", "tryParseJsonObject", new Class<?>[] { String.class }, "[1, 2]");
+		assertNull(result);
+	}
+
+	@Test
+	void testIsShortSettingsDocument() throws Exception
+	{
+		// A document Vellaris wrote is a settings document; the short one names only a few choices and has no version.
+		Class<?> jsonObjectClass = com.google.gson.JsonObject.class;
+		assertEquals(Boolean.TRUE, MethodInvoker.invokeStatic("nortantis.api.MapApiServer", "isShortSettingsDocument", new Class<?>[] { jsonObjectClass }, new com.google.gson.JsonObject()));
+
+		com.google.gson.JsonObject full = new com.google.gson.JsonObject();
+		full.addProperty("version", "3.18");
+		assertEquals(Boolean.FALSE, MethodInvoker.invokeStatic("nortantis.api.MapApiServer", "isShortSettingsDocument", new Class<?>[] { jsonObjectClass }, full));
 	}
 
 	@Test

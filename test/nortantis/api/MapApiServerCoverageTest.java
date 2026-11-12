@@ -19,9 +19,10 @@ class MapApiServerCoverageTest
 	{
 		String json = "{\"dimension\":\"Square\",\"cityProbability\":0.1,\"books\":[\"One\",\"Two\"]}";
 
-		Method tryParse = MapApiServer.class.getDeclaredMethod("tryParseParams", String.class);
+		Method tryParse = MapApiServer.class.getDeclaredMethod("tryParseJsonObject", String.class);
 		tryParse.setAccessible(true);
-		Object params = tryParse.invoke(null, json);
+		com.google.gson.JsonObject root = (com.google.gson.JsonObject) tryParse.invoke(null, json);
+		Object params = new com.google.gson.Gson().fromJson(root, ApiUtils.RandomMapParameters.class);
 		assertNotNull(params);
 
 		// verify the parsed dimension field exists and equals "Square"
