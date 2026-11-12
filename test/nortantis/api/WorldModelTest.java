@@ -233,7 +233,7 @@ public class WorldModelTest
 		assertNotNull(surroundings, "a place on a generated graph reports the ground around it");
 		assertTrue(surroundings.get("terrain") instanceof String, "the terrain a place stands on is reported");
 		assertFalse(((String) surroundings.get("terrain")).isEmpty(), "the terrain label is never blank");
-		for (String flag : Arrays.asList("coastal", "lake", "river", "mountains", "island"))
+		for (String flag : Arrays.asList("coastal", "lake", "river", "riverNearby", "mountains", "island"))
 		{
 			assertTrue(surroundings.get(flag) instanceof Boolean, flag + " is reported as a boolean");
 		}

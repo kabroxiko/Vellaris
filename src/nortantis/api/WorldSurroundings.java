@@ -38,6 +38,12 @@ public final class WorldSurroundings
 	 */
 	public static final int WATER_SAMPLE_DEPTH = 2;
 
+	/**
+	 * How many cells out a river still counts as near. A river is a landmark a settlement relates to even when it does not reach it, so it
+	 * is sampled wider than the sea and reported apart from the river the place actually stands on.
+	 */
+	public static final int RIVER_SAMPLE_DEPTH = 2;
+
 	/** A landmass below this share of the world's land is reported as an island, provided it does not reach the map edge. */
 	public static final double ISLAND_LAND_SHARE = 0.1;
 
@@ -80,8 +86,9 @@ public final class WorldSurroundings
 	 * answers for one point.
 	 *
 	 * The returned map carries {@code terrain} and, only when it differs, {@code nearbyTerrain}; the booleans {@code coastal},
-	 * {@code lake}, {@code river}, {@code mountains} and {@code island}. A caller renders those fields into prose; it never has to
-	 * interpret the graph itself.
+	 * {@code lake}, {@code river}, {@code riverNearby}, {@code mountains} and {@code island}. {@code river} means a river runs along this
+	 * place's own edge; {@code riverNearby} means one is close but does not reach it. A caller renders those fields into prose; it never
+	 * has to interpret the graph itself.
 	 */
 	public Map<String, Object> describe(Center place)
 	{
@@ -114,6 +121,7 @@ public final class WorldSurroundings
 		}
 
 		TerrainType nearbyTerrain = TerrainType.dominant(landNearby);
+		boolean riverAtPlace = place.isRiver();
 
 		Map<String, Object> surroundings = new LinkedHashMap<>();
 		surroundings.put("terrain", terrainAtPlace.label);
@@ -123,7 +131,8 @@ public final class WorldSurroundings
 		}
 		surroundings.put("coastal", coastal);
 		surroundings.put("lake", lake);
-		surroundings.put("river", hasRiver(place));
+		surroundings.put("river", riverAtPlace);
+		surroundings.put("riverNearby", !riverAtPlace && hasRiverWithin(place, RIVER_SAMPLE_DEPTH));
 		surroundings.put("mountains", mountains);
 		surroundings.put("island", isIsland(place));
 		return surroundings;
@@ -163,19 +172,17 @@ public final class WorldSurroundings
 	}
 
 	/**
-	 * Whether the place stands beside a river. Rivers run along cell edges, so a centre reports one when it borders a river itself or
-	 * shares an edge with a centre that does; the two-hop test is what turns "a river crosses this cell's neighbour" into "this place is on
-	 * the river".
+	 * Whether a river runs along an edge of some centre within {@code depth} hops of the place, the place itself excluded.
+	 *
+	 * Rivers run along cell edges, so a centre reports one only when one of its own edges carries it. Whether the place itself stands on a
+	 * river is a separate answer ({@link Center#isRiver()}); this test is what turns "a river crosses the next cell over" into "a river is
+	 * near" without claiming the settlement reaches it.
 	 */
-	private static boolean hasRiver(Center center)
+	private static boolean hasRiverWithin(Center start, int depth)
 	{
-		if (center.isRiver())
+		for (Center center : nearbyCenters(start, depth))
 		{
-			return true;
-		}
-		for (Center neighbor : center.neighbors)
-		{
-			if (neighbor.isRiver())
+			if (center != start && center.isRiver())
 			{
 				return true;
 			}
