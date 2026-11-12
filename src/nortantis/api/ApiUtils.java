@@ -49,6 +49,14 @@ public final class ApiUtils
 		Integer gridOverlayLineWidth;
 		String gridOverlayLayer;
 		Boolean drawVoronoiGridOverlayOnlyOnLand;
+		/**
+		 * Explicit picture size in pixels. {@link #dimension} names a fixed size (16:9 is 4096 wide), which is a sensible default but soft
+		 * on a large screen or when the picture is zoomed into. Every coordinate the world reports is a fraction of the picture, so asking
+		 * for more pixels sharpens the picture and changes nothing about the world. One side alone keeps the aspect ratio the dimension
+		 * already set, and these win over it when both are given.
+		 */
+		Integer generatedWidth;
+		Integer generatedHeight;
 	}
 
 	public static void ensureIconEditsFlag(MapSettings settings)
@@ -98,6 +106,7 @@ public final class ApiUtils
 		if (p.books != null && !p.books.isEmpty())
 			settings.books = new java.util.HashSet<>(p.books);
 		applyDimensionOverride(p, settings);
+		applyExplicitRenderDimensions(p, settings);
 		if (p.drawRegionColors != null)
 			settings.drawRegionColors = p.drawRegionColors;
 		if (p.drawRegionBoundaries != null)
@@ -160,6 +169,56 @@ public final class ApiUtils
 		{
 			// ignore invalid
 		}
+	}
+
+	/**
+	 * Smallest and largest picture side a short document may ask for. The lower bound keeps a map readable; the upper one keeps a
+	 * request from asking the renderer for an image big enough to exhaust the process, which is a server concern rather than the
+	 * caller's, since the caller only ever means "sharper than the preset".
+	 */
+	public static final int MIN_RENDER_DIMENSION = 256;
+
+	public static final int MAX_RENDER_DIMENSION = 16384;
+
+	/**
+	 * Applies an explicit picture size from a short document, after the named dimension has set the aspect ratio.
+	 *
+	 * Both sides given are used as given. One side given keeps the ratio the settings already carry, so a caller that only knows the
+	 * width it wants does not have to repeat the height.
+	 */
+	public static void applyExplicitRenderDimensions(RandomMapParameters p, MapSettings settings)
+	{
+		if (p == null || settings == null)
+			return;
+		boolean hasWidth = p.generatedWidth != null && p.generatedWidth > 0;
+		boolean hasHeight = p.generatedHeight != null && p.generatedHeight > 0;
+		if (!hasWidth && !hasHeight)
+			return;
+
+		int width = hasWidth ? clampRenderDimension(p.generatedWidth) : 0;
+		int height = hasHeight ? clampRenderDimension(p.generatedHeight) : 0;
+		double aspect = (settings.generatedWidth > 0 && settings.generatedHeight > 0) ? (double) settings.generatedWidth / settings.generatedHeight : 16.0 / 9.0;
+
+		if (width > 0 && height > 0)
+		{
+			settings.generatedWidth = width;
+			settings.generatedHeight = height;
+		}
+		else if (width > 0)
+		{
+			settings.generatedWidth = width;
+			settings.generatedHeight = clampRenderDimension((int) Math.round(width / aspect));
+		}
+		else
+		{
+			settings.generatedHeight = height;
+			settings.generatedWidth = clampRenderDimension((int) Math.round(height * aspect));
+		}
+	}
+
+	private static int clampRenderDimension(int value)
+	{
+		return Math.max(MIN_RENDER_DIMENSION, Math.min(MAX_RENDER_DIMENSION, value));
 	}
 
 	public static void disableFileTextureIfNeeded(MapSettings fallback)

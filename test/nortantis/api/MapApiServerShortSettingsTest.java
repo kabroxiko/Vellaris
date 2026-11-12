@@ -121,6 +121,19 @@ class MapApiServerShortSettingsTest
 	}
 
 	@Test
+	void aShortDocumentMayAskForABiggerPictureThanTheDimensionPreset() throws Exception
+	{
+		// A caller that shows the map large (a table zooming into it) needs more pixels than 4096; the dimension still names the
+		// shape, so the world is the same one.
+		String body = SHORT_DOCUMENT.replaceFirst("\\{", "{\n  \"generatedWidth\": 6144,\n  \"generatedHeight\": 3456,");
+
+		MapSettings settings = settingsOf(prepare(body, true));
+
+		assertEquals(6144, settings.generatedWidth);
+		assertEquals(3456, settings.generatedHeight);
+	}
+
+	@Test
 	void endpointsThatQueryAWorldRejectTheShortDocument() throws Exception
 	{
 		// A short document names no world, so answering it here would silently describe a different one than the caller means.
