@@ -15,6 +15,7 @@ import javax.imageio.ImageWriter;
 import javax.imageio.stream.ImageOutputStream;
 import nortantis.geom.Dimension;
 import nortantis.MapSettings;
+import nortantis.SettingsGenerator;
 
 public final class ApiUtils
 {
@@ -49,6 +50,16 @@ public final class ApiUtils
 		Integer gridOverlayLineWidth;
 		String gridOverlayLayer;
 		Boolean drawVoronoiGridOverlayOnlyOnLand;
+		/**
+		 * Which ocean effect to draw along the coasts. Generated settings roll for it, so a caller that wants waves on every map pins it
+		 * here. Accepts the same names the canonical settings document writes: None, Ripples, ConcentricWaves.
+		 */
+		String oceanEffect;
+		Integer oceanWavesLevel;
+		Integer concentricWaveCount;
+		Boolean fadeConcentricWaves;
+		Boolean jitterToConcentricWaves;
+		Boolean brokenLinesForConcentricWaves;
 	}
 
 	public static void ensureIconEditsFlag(MapSettings settings)
@@ -124,7 +135,56 @@ public final class ApiUtils
 			settings.gridOverlayLayer = parseEnum(nortantis.MapSettings.GridOverlayLayer.class, p.gridOverlayLayer, settings.gridOverlayLayer);
 		if (p.drawVoronoiGridOverlayOnlyOnLand != null)
 			settings.drawVoronoiGridOverlayOnlyOnLand = p.drawVoronoiGridOverlayOnlyOnLand;
+		applyOceanEffectOverrides(p, settings);
 	}
+
+	private static void applyOceanEffectOverrides(RandomMapParameters p, MapSettings settings)
+	{
+		if (p.oceanEffect != null && !p.oceanEffect.isEmpty())
+		{
+			MapSettings.OceanWaves requested = normalizeRequestedWaveType(p.oceanEffect, settings.oceanWavesType);
+			settings.oceanWavesType = requested;
+			if (requested != MapSettings.OceanWaves.None)
+			{
+				// Generated settings only shade the ocean as a substitute for waves, so asking for waves drops the substitute.
+				settings.oceanShadingLevel = 0;
+			}
+			if (requested == MapSettings.OceanWaves.ConcentricWaves && settings.concentricWaveCount <= 0)
+			{
+				settings.concentricWaveCount = SettingsGenerator.minConcentricWaveCountToGenerate;
+			}
+		}
+		if (p.oceanWavesLevel != null)
+			settings.oceanWavesLevel = p.oceanWavesLevel;
+		if (p.concentricWaveCount != null)
+			settings.concentricWaveCount = p.concentricWaveCount;
+		if (p.fadeConcentricWaves != null)
+			settings.fadeConcentricWaves = p.fadeConcentricWaves;
+		if (p.jitterToConcentricWaves != null)
+			settings.jitterToConcentricWaves = p.jitterToConcentricWaves;
+		if (p.brokenLinesForConcentricWaves != null)
+			settings.brokenLinesForConcentricWaves = p.brokenLinesForConcentricWaves;
+	}
+
+	/**
+	 * Resolves the ocean effect a settings document asks for, folding the two retired names onto what replaced them the way full settings
+	 * documents are read.
+	 */
+	@SuppressWarnings("deprecation")
+	private static MapSettings.OceanWaves normalizeRequestedWaveType(String value, MapSettings.OceanWaves fallback)
+	{
+		MapSettings.OceanWaves requested = parseEnum(MapSettings.OceanWaves.class, value, fallback);
+		if (requested == MapSettings.OceanWaves.Blur)
+		{
+			return MapSettings.OceanWaves.None;
+		}
+		if (requested == MapSettings.OceanWaves.FadingConcentricWaves)
+		{
+			return MapSettings.OceanWaves.ConcentricWaves;
+		}
+		return requested;
+	}
+
 
 	/**
 	 * Reads an enum the way settings documents write one: a name, with spaces where the display name has them.

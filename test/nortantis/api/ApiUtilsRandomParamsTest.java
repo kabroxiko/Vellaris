@@ -51,6 +51,66 @@ class ApiUtilsRandomParamsTest
 	}
 
 	@Test
+	void testApplyRandomMapParameterOverrides_pinsConcentricWaves()
+	{
+		nortantis.platform.PlatformFactory.setInstance(new nortantis.platform.awt.AwtFactory());
+		MapSettings settings = new MapSettings();
+		settings.oceanWavesType = MapSettings.OceanWaves.None;
+		settings.oceanShadingLevel = 4;
+		settings.concentricWaveCount = 0;
+
+		ApiUtils.RandomMapParameters p = new ApiUtils.RandomMapParameters();
+		p.oceanEffect = "ConcentricWaves";
+
+		ApiUtils.applyRandomMapParameterOverrides(p, settings);
+
+		assertEquals(MapSettings.OceanWaves.ConcentricWaves, settings.oceanWavesType);
+		assertTrue(settings.hasConcentricWaves());
+		assertEquals(SettingsGenerator.minConcentricWaveCountToGenerate, settings.concentricWaveCount);
+		// The randomized shading substitutes for waves, so asking for waves drops it.
+		assertEquals(0, settings.oceanShadingLevel);
+	}
+
+	@Test
+	void testApplyRandomMapParameterOverrides_waveTuning()
+	{
+		nortantis.platform.PlatformFactory.setInstance(new nortantis.platform.awt.AwtFactory());
+		MapSettings settings = new MapSettings();
+		settings.oceanWavesType = MapSettings.OceanWaves.ConcentricWaves;
+		settings.concentricWaveCount = 2;
+
+		ApiUtils.RandomMapParameters p = new ApiUtils.RandomMapParameters();
+		p.oceanWavesLevel = 30;
+		p.concentricWaveCount = 4;
+		p.fadeConcentricWaves = false;
+		p.jitterToConcentricWaves = true;
+		p.brokenLinesForConcentricWaves = true;
+
+		ApiUtils.applyRandomMapParameterOverrides(p, settings);
+
+		assertEquals(30, settings.oceanWavesLevel);
+		assertEquals(4, settings.concentricWaveCount);
+		assertFalse(settings.fadeConcentricWaves);
+		assertTrue(settings.jitterToConcentricWaves);
+		assertTrue(settings.brokenLinesForConcentricWaves);
+	}
+
+	@Test
+	void testApplyRandomMapParameterOverrides_unknownWaveTypeKeepsGeneratedOne()
+	{
+		nortantis.platform.PlatformFactory.setInstance(new nortantis.platform.awt.AwtFactory());
+		MapSettings settings = new MapSettings();
+		settings.oceanWavesType = MapSettings.OceanWaves.ConcentricWaves;
+
+		ApiUtils.RandomMapParameters p = new ApiUtils.RandomMapParameters();
+		p.oceanEffect = "NotARealWaveType";
+
+		ApiUtils.applyRandomMapParameterOverrides(p, settings);
+
+		assertEquals(MapSettings.OceanWaves.ConcentricWaves, settings.oceanWavesType);
+	}
+
+	@Test
 	void testDisableFileTextureAndCustomBorder()
 	{
 		java.util.Random rand = new java.util.Random(2);

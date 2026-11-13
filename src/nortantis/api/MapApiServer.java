@@ -1879,7 +1879,7 @@ public class MapApiServer
 	{
 		return p != null && (p.language != null || p.dimension != null || p.worldSize != null || p.landShape != null || p.regionCount != null || p.cityProbability != null || p.randomSeed != null
 				|| p.artPack != null || p.cityIconSetName != null || p.drawRegionColors != null || p.drawRegionBoundaries != null || p.drawBorder != null || p.drawGridOverlay != null
-				|| (p.books != null && !p.books.isEmpty()));
+				|| p.oceanEffect != null || p.oceanWavesLevel != null || p.concentricWaveCount != null || p.books != null && !p.books.isEmpty());
 	}
 
 	// Build GenerationRequestContext when the request names a kind of map rather than describing one

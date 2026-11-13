@@ -66,7 +66,9 @@ The routes below take a settings body in either of two shapes. A **short** docum
 panel offers — `dimension` (`Square`, `Sixteen_by_9`, `Golden_Ratio`), `worldSize`, `landShape`, `regionCount`,
 `cityProbability`, `artPack`, `cityIconSetName`, `books`, `language` — plus the rendering choices the generator would
 otherwise make at random: `drawRegionBoundaries`, `drawRegionColors`, `drawBorder`, `frayedBorder`, `coastShadingLevel`,
-`coastlineWidth`, `lineStyle`, `drawGridOverlay`, `gridOverlayShape`, `gridOverlayRowOrColCount`,
+`coastlineWidth`, `lineStyle`, `oceanEffect` (`None`, `Ripples` or `ConcentricWaves`), `oceanWavesLevel`,
+`concentricWaveCount`, `fadeConcentricWaves`, `jitterToConcentricWaves`, `brokenLinesForConcentricWaves`,
+`drawGridOverlay`, `gridOverlayShape`, `gridOverlayRowOrColCount`,
 `gridOverlayLineWidth`, `gridOverlayLayer` and `drawVoronoiGridOverlayOnlyOnLand`. Anything it leaves out is invented.
 It describes a kind of map: `/api/generate`, `/api/generate-settings`, `/api/world` and `/api/world/map` invent the full
 settings around it (add `randomSeed` to pin which world comes out). A **full** document is the canonical settings those
