@@ -72,8 +72,8 @@ otherwise make at random: `drawRegionBoundaries`, `drawRegionColors`, `drawBorde
 `gridOverlayLineWidth`, `gridOverlayLayer` and `drawVoronoiGridOverlayOnlyOnLand`. Anything it leaves out is invented.
 It describes a kind of map: `/api/generate`, `/api/generate-settings`, `/api/world` and `/api/world/map` invent the full
 settings around it (add `randomSeed` to pin which world comes out). A **full** document is the canonical settings those
-routes answer with, and it is what `/api/route`, `/api/nearest` and `/api/world/places` need, because they must name the
-one world the caller means.
+routes answer with, and it is what `/api/route`, `/api/nearest`, `/api/find` and `/api/world/places` need, because they
+must name the one world the caller means.
 
 - `POST /api/generate-settings` — returns a fresh random `MapSettings` JSON document.
 - `POST /api/generate` — renders a map from a `MapSettings` body and returns JSON with a base64 JPEG.
@@ -85,6 +85,11 @@ one world the caller means.
   icons (trees, hills, mountains, dunes) are never mistaken for a place's drawing.
   Pass `?includeImage=true` to also get the rendered map as `imageBase64`; that image is identical to the one
   `/api/generate` returns for the same settings, and generating both in one call avoids rendering the world twice.
+  The answer also carries `terrain`: a coarse picture of the land as rows of characters, one per cell, with the
+  `legend` that decodes them, the cell size in resolution-invariant units, and the note that says which corner is
+  north-west. A capital letter is the same terrain on the coast — land that touches the sea — so a reader with no
+  other information can find the nearest shore. Each place and region also carries `gridColumn`/`gridRow`, its cell in
+  that picture, so nobody has to divide coordinates by a cell size to find a name on the land.
 - `POST /api/world/map` — generates a map from a `MapSettings` body and returns the raw JPEG as `image/jpeg`. This is the
   map you show to players, so it is **not** downscaled: you get the size the render produced. Pass `?maxDimension=N` to
   request a smaller copy, and `?quality=1..100` (default 92) to trade fidelity for size. `/api/world?includeImage=true`
@@ -97,9 +102,20 @@ one world the caller means.
   `reachable: false` rather than inventing a route. Because the map has no inherent physical scale, `travel.days`
   assumes `mapUnitsPerDay` of open ground per day; override it to match your world, and read `travel.assumptions`
   to see what was used.
-- `POST /api/nearest` — takes a `MapSettings` body plus `x` and `y`, and returns the nearest named place, the region
-  containing that point, and a stable `anchor` string for the surrounding area. Anchors are coarse cells, intended as
-  the key under which a client stores its own per-location notes; this server stores nothing about them.
+- `POST /api/nearest` — takes a `MapSettings` body plus `x` and `y`, and returns the ground at that point
+  (`surroundings`: its terrain, and whether it is on the coast, beside a lake, on or near a river, by mountains or on
+  an island), the nearest named place, the region containing that point, and a stable `anchor` string for the
+  surrounding area. Anchors are coarse cells, intended as the key under which a client stores its own per-location
+  notes; this server stores nothing about them.
+- `POST /api/find` — takes a `MapSettings` body plus `from` (either `{"name":"..."}` or `{"x":..,"y":..}`) and
+  what to look for, and answers where the nearest such ground is. The criteria are properties of the map rather than
+  of any setting: `terrain` (any of `ocean`, `lake`, `mountain`, `hills`, `marsh`, `forest`, `desert`, `arctic`,
+  `plains`), `coast` (land that touches the sea), `river`, `lake` (a lake shore) and `water`. Every criterion given must
+  hold. `limit` (default 3, at most 20) bounds the answers, `maxDistance` bounds the search and `spacing` (default 60
+  units) keeps two answers from being two cells of the same beach. Each match carries its coordinates, distance and
+  compass `direction`, its terrain, its region and the nearest named place to it, so a caller can say "the shore is a
+  short walk west of you, and the closest thing built on it is the fishing village of X". This is what answers a
+  question about a kind of place rather than a named one; the nearest coast is usually not the nearest coastal town.
 - `POST /api/background-base` — returns a background texture JPEG.
 - `POST /api/world/places` — takes a `MapSettings` body plus a `places` array of `{"name", "x", "y"}` entries and
   marks each one on the world: a `Landmark` label with a cross marker above it. The world is rendered again from the same
@@ -126,6 +142,8 @@ Stored routes:
 - `GET /api/maps/{id}` — the stored world description and canonical settings, plus `seed` and `createdAt`.
 - `GET /api/maps/{id}/map` — the stored image, byte-for-byte as generated.
 - `POST /api/maps/{id}/route` — same body as `/api/route` minus the settings, because the stored ones are used.
+- `POST /api/maps/{id}/find` — same body as `/api/find` minus the settings. Unlike a route, a search needs no place
+  names: "where is the coast" is a question about the land, so it works on a world with nothing named on it.
 - `POST /api/maps/{id}/places` — same `places` body as `/api/world/places`, marked on a stored world. The stored
   description, settings and image are replaced under the **same id**, so the image and route lookups a client already
   makes pick up the new render; answers with the updated `world` and the `added` names. Requires the token when one is

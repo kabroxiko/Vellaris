@@ -147,10 +147,12 @@ public class MapApiServer
 			config.routes.post("/api/world/places", MapApiServer::handleWorldPlaces);
 			config.routes.post("/api/route", MapApiServer::handleRoute);
 			config.routes.post("/api/nearest", MapApiServer::handleNearest);
+			config.routes.post("/api/find", MapApiServer::handleFind);
 			config.routes.post("/api/background-base", MapApiServer::handleBackgroundBase);
 			config.routes.get("/api/maps/{id}", MapApiServer::handleStoredMap);
 			config.routes.get("/api/maps/{id}/map", MapApiServer::handleStoredMapImage);
 			config.routes.post("/api/maps/{id}/route", MapApiServer::handleStoredRoute);
+			config.routes.post("/api/maps/{id}/find", MapApiServer::handleStoredFind);
 			config.routes.post("/api/maps/{id}/places", MapApiServer::handleStoredMapPlaces);
 			config.routes.delete("/api/maps/{id}", MapApiServer::handleStoredMapDelete);
 
@@ -666,13 +668,25 @@ public class MapApiServer
 	}
 
 	/**
-	 * Describes what is at a point: the nearest named place, the region containing it, and a stable anchor a caller can key its own notes
-	 * on.
+	 * Describes what is at a point: the ground there, the nearest named place, the region containing it, and a stable anchor a caller can
+	 * key its own notes on.
 	 */
 	private static void handleNearest(Context ctx)
 	{
 		RouteModel.PointRequest request = parseBodyAs(ctx, RouteModel.PointRequest.class);
 		handleWorldQuery(ctx, (settings, graph) -> RouteModel.nearest(settings, graph, request));
+	}
+
+	/**
+	 * Finds the nearest ground that matches a description - the nearest coast, forest, river or lake - from a point or a named place.
+	 *
+	 * This is what answers a question about a kind of place rather than a named one, which is most of what a caller standing in the world
+	 * actually asks: the shore may be an hour away with nothing built on it, while the nearest named settlement on a coast is a day off.
+	 */
+	private static void handleFind(Context ctx)
+	{
+		WorldSearch.MatchRequest request = parseBodyAs(ctx, WorldSearch.MatchRequest.class);
+		handleWorldQuery(ctx, (settings, graph) -> WorldSearch.nearestMatch(settings, graph, request));
 	}
 
 	/**
@@ -753,35 +767,73 @@ public class MapApiServer
 			return;
 		}
 
-		MapStore.StoredMap stored = mapStore.find(ctx.pathParam("id"));
-		if (stored == null || stored.settings == null)
+		MapSettings settings = storedSettingsOrNull(ctx);
+		if (settings == null)
 		{
-			writeJsonError(ctx, 404, "No stored map has that id.");
 			return;
 		}
-
-		RouteModel.RouteRequest request = parseBodyAs(ctx, RouteModel.RouteRequest.class);
-
-		PlatformFactory.setInstance(new AwtFactory());
-		MapSettings settings;
-		try
-		{
-			settings = MapSettings.fromJson(gson.toJson(stored.settings));
-		}
-		catch (RuntimeException e)
-		{
-			writeJsonError(ctx, 500, "The stored map's settings could not be read: " + ApiUtils.formatExceptionMessage(e));
-			return;
-		}
-		ApiUtils.ensureIconEditsFlag(settings);
 		if (!hasPlaceNames(settings))
 		{
 			writeJsonError(ctx, 409, "The stored map has no named places, so a route cannot be resolved in it.");
 			return;
 		}
 
+		RouteModel.RouteRequest request = parseBodyAs(ctx, RouteModel.RouteRequest.class);
 		WorldGraph graph = buildGraphOnly(settings);
 		writeQueryResponse(ctx, RouteModel.route(settings, graph, request));
+	}
+
+	/**
+	 * Finds the nearest matching ground inside a stored world.
+	 *
+	 * A search needs no place names - "where is the coast" is a question about the land, not about what has been named on it - so this
+	 * works on worlds that a route cannot be measured in at all.
+	 */
+	private static void handleStoredFind(Context ctx)
+	{
+		if (!requireStoredMapAccess(ctx))
+		{
+			return;
+		}
+
+		MapSettings settings = storedSettingsOrNull(ctx);
+		if (settings == null)
+		{
+			return;
+		}
+
+		WorldSearch.MatchRequest request = parseBodyAs(ctx, WorldSearch.MatchRequest.class);
+		WorldGraph graph = buildGraphOnly(settings);
+		writeQueryResponse(ctx, WorldSearch.nearestMatch(settings, graph, request));
+	}
+
+	/**
+	 * Reads a stored map's settings, answering with the refusal itself and returning null when they cannot be used.
+	 *
+	 * Both stored query endpoints need exactly this, and answering the error here keeps them from drifting apart in what they report for a
+	 * missing map.
+	 */
+	private static MapSettings storedSettingsOrNull(Context ctx)
+	{
+		MapStore.StoredMap stored = mapStore.find(ctx.pathParam("id"));
+		if (stored == null || stored.settings == null)
+		{
+			writeJsonError(ctx, 404, "No stored map has that id.");
+			return null;
+		}
+
+		PlatformFactory.setInstance(new AwtFactory());
+		try
+		{
+			MapSettings settings = MapSettings.fromJson(gson.toJson(stored.settings));
+			ApiUtils.ensureIconEditsFlag(settings);
+			return settings;
+		}
+		catch (RuntimeException e)
+		{
+			writeJsonError(ctx, 500, "The stored map's settings could not be read: " + ApiUtils.formatExceptionMessage(e));
+			return null;
+		}
 	}
 
 	/** Removes a stored world and its image; answering success=false when it was already gone, so a delete stays idempotent. */

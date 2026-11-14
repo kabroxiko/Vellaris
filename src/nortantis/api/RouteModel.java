@@ -157,7 +157,10 @@ public class RouteModel
 	}
 
 	/**
-	 * Describes a single point: the nearest named place, the region containing it, and the anchor to key notes on.
+	 * Describes a single point: the ground there, the nearest named place, the region containing it, and the anchor to key notes on.
+	 *
+	 * The ground is what makes this answer worth asking for. A caller standing away from any settlement needs to know what it is standing
+	 * on - shore, forest, open water - and the nearest name cannot tell it that.
 	 */
 	public static Map<String, Object> nearest(MapSettings settings, WorldGraph graph, PointRequest request)
 	{
@@ -198,6 +201,18 @@ public class RouteModel
 		{
 			Center center = graph.findClosestCenter(new Point(query.x * resolution, query.y * resolution), false);
 			result.put("region", describeRegion(settings, graph, center == null ? null : center.region));
+
+			// The ground at the point, in the same terms the world description uses for its places. Without it a caller asking
+			// "is there a beach here?" only knows the nearest name, and has to infer the shore from a town that may be hours away.
+			WorldSurroundings surroundings = WorldSurroundings.forWorld(graph);
+			if (surroundings != null)
+			{
+				Map<String, Object> ground = surroundings.describe(center);
+				if (ground != null)
+				{
+					result.put("surroundings", ground);
+				}
+			}
 		}
 
 		return result;
@@ -424,14 +439,14 @@ public class RouteModel
 	}
 
 	/** A resolved endpoint: the graph centre it snapped to, plus the coordinates and name the caller asked for. */
-	private static class Resolved
+	static class Resolved
 	{
 		Center center;
 		Point invariant;
 		String name;
 	}
 
-	private static Resolved resolve(WorldGraph graph, MapSettings settings, Endpoint endpoint, double resolution)
+	static Resolved resolve(WorldGraph graph, MapSettings settings, Endpoint endpoint, double resolution)
 	{
 		if (graph == null || endpoint == null)
 		{
@@ -471,7 +486,7 @@ public class RouteModel
 		return resolved;
 	}
 
-	private static Map<String, Object> describe(Resolved resolved, double anchorCellSize)
+	static Map<String, Object> describe(Resolved resolved, double anchorCellSize)
 	{
 		Map<String, Object> description = new LinkedHashMap<>();
 		description.put("name", resolved.name);
@@ -481,7 +496,7 @@ public class RouteModel
 		return description;
 	}
 
-	private static Map<String, Object> describeRegion(MapSettings settings, WorldGraph graph, nortantis.Region region)
+	static Map<String, Object> describeRegion(MapSettings settings, WorldGraph graph, nortantis.Region region)
 	{
 		if (region == null)
 		{
@@ -509,7 +524,7 @@ public class RouteModel
 	}
 
 	/** The place names a caller could have meant, so a failed lookup is self-explanatory. */
-	private static List<String> placeNames(MapSettings settings, int limit)
+	static List<String> placeNames(MapSettings settings, int limit)
 	{
 		List<String> names = new ArrayList<>();
 		if (settings.edits == null || settings.edits.text == null)
@@ -549,7 +564,7 @@ public class RouteModel
 		return null;
 	}
 
-	private static MapText closestPlace(MapSettings settings, Point query)
+	static MapText closestPlace(MapSettings settings, Point query)
 	{
 		if (settings.edits == null || settings.edits.text == null)
 		{
@@ -642,7 +657,10 @@ public class RouteModel
 		return value == null || value <= 0 ? fallback : value;
 	}
 
-	private static double round(double value)
+	/**
+	 * Rounds coordinates for the reported answers. Two decimal places is well below one pixel at any resolution the server renders at.
+	 */
+	static double round(double value)
 	{
 		return Math.round(value * 100.0) / 100.0;
 	}

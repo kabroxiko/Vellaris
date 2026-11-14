@@ -86,9 +86,11 @@ public final class WorldSurroundings
 	 * answers for one point.
 	 *
 	 * The returned map carries {@code terrain} and, only when it differs, {@code nearbyTerrain}; the booleans {@code coastal},
-	 * {@code lake}, {@code river}, {@code riverNearby}, {@code mountains} and {@code island}. {@code river} means a river runs along this
-	 * place's own edge; {@code riverNearby} means one is close but does not reach it. A caller renders those fields into prose; it never
-	 * has to interpret the graph itself.
+	 * {@code lake}, {@code seaNearby}, {@code lakeNearby}, {@code river}, {@code riverNearby}, {@code mountains} and {@code island}.
+	 * {@code coastal} and {@code lake} are about this place's own cell - it sits on that water - while {@code seaNearby} and
+	 * {@code lakeNearby} mean the water is a few cells away without reaching the place. {@code river} means a river runs along this place's
+	 * own edge; {@code riverNearby} means one is close but does not reach it. A caller renders those fields into prose; it never has to
+	 * interpret the graph itself.
 	 */
 	public Map<String, Object> describe(Center place)
 	{
@@ -111,14 +113,21 @@ public final class WorldSurroundings
 			mountains |= terrain == TerrainType.MOUNTAIN;
 		}
 
-		boolean coastal = false;
-		boolean lake = false;
+		boolean seaNearby = false;
+		boolean lakeNearby = false;
 		for (Center center : nearbyCenters(place, WATER_SAMPLE_DEPTH))
 		{
 			TerrainType terrain = TerrainType.classify(center);
-			coastal |= terrain == TerrainType.OCEAN;
-			lake |= terrain == TerrainType.LAKE;
+			seaNearby |= terrain == TerrainType.OCEAN;
+			lakeNearby |= terrain == TerrainType.LAKE;
 		}
+
+		// "On the coast" is a claim about this very cell: it is land that shares an edge with the sea. Water a few cells away is a
+		// different and much weaker fact - a place a mile inland has the sea "nearby" and no shore - so it is reported apart from the
+		// coast rather than as it. A caller asking whether there is a beach at a point needs the strict answer, and it has to be the same
+		// answer the extent search gives for the same question.
+		boolean coastal = TerrainType.isCoastal(place);
+		boolean lake = TerrainType.isLakeside(place);
 
 		TerrainType nearbyTerrain = TerrainType.dominant(landNearby);
 		boolean riverAtPlace = place.isRiver();
@@ -131,6 +140,8 @@ public final class WorldSurroundings
 		}
 		surroundings.put("coastal", coastal);
 		surroundings.put("lake", lake);
+		surroundings.put("seaNearby", !terrainAtPlace.water && seaNearby && !coastal);
+		surroundings.put("lakeNearby", !terrainAtPlace.water && lakeNearby && !lake);
 		surroundings.put("river", riverAtPlace);
 		surroundings.put("riverNearby", !riverAtPlace && hasRiverWithin(place, RIVER_SAMPLE_DEPTH));
 		surroundings.put("mountains", mountains);

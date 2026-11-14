@@ -83,6 +83,18 @@ public class WorldModel
 		world.put("regions", regions);
 		world.put("roads", roads);
 
+		// The shape of the land itself, coarse enough to read. A list of names says nothing about where the sea is, so a
+		// reader that only has the list cannot answer "which way is the coast" - it can only point at a named place that
+		// happens to be coastal, which is a different question with a different answer.
+		Map<String, Object> terrain = TerrainGrid.build(settings, graph);
+		if (terrain != null)
+		{
+			world.put("terrain", terrain);
+			// Cell coordinates, so a reader can find a place on the picture without dividing coordinates itself.
+			annotateGridCells(places, terrain, "x", "y");
+			annotateGridCells(regions, terrain, "centerX", "centerY");
+		}
+
 		Map<String, Object> counts = new LinkedHashMap<>();
 		counts.put("places", places.size());
 		counts.put("regions", regions.size());
@@ -90,6 +102,37 @@ public class WorldModel
 		world.put("counts", counts);
 
 		return world;
+	}
+
+	/**
+	 * Adds {@code gridColumn} and {@code gridRow} to entries that carry a point, so a place can be found on the terrain raster by reading
+	 * its cell rather than by dividing its coordinates by the cell size.
+	 *
+	 * A point outside the grid is left unannotated: reporting a cell that does not contain it would send a reader to the wrong part of the
+	 * map.
+	 */
+	private static void annotateGridCells(List<Map<String, Object>> entries, Map<String, Object> terrain, String xKey, String yKey)
+	{
+		int columns = ((Number) terrain.get("columns")).intValue();
+		int rows = ((Number) terrain.get("rows")).intValue();
+		double cellWidth = ((Number) terrain.get("cellWidth")).doubleValue();
+		double cellHeight = ((Number) terrain.get("cellHeight")).doubleValue();
+
+		for (Map<String, Object> entry : entries)
+		{
+			if (!(entry.get(xKey) instanceof Number) || !(entry.get(yKey) instanceof Number))
+			{
+				continue;
+			}
+			int column = (int) Math.floor(((Number) entry.get(xKey)).doubleValue() / cellWidth);
+			int row = (int) Math.floor(((Number) entry.get(yKey)).doubleValue() / cellHeight);
+			if (column < 0 || column >= columns || row < 0 || row >= rows)
+			{
+				continue;
+			}
+			entry.put("gridColumn", column);
+			entry.put("gridRow", row);
+		}
 	}
 
 	/**
