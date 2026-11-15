@@ -23,8 +23,8 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * Projects a generated map into a compact description of the world: the named places, the political regions with their names, and the roads
- * between them.
+ * Projects a generated map into a compact description of the world: the named places, the political regions with their names, the
+ * continents and islands those regions sit on, and the roads between them.
  *
  * This exists because the canonical {@link MapSettings} JSON is the editor's format, not a description of a world. It carries tens of
  * thousands of index-keyed center edits, which is unusable as context for a language model and awkward for a client to traverse. This
@@ -75,12 +75,18 @@ public class WorldModel
 		world.put("imageWidth", settings.generatedWidth);
 		world.put("imageHeight", settings.generatedHeight);
 
-		List<Map<String, Object>> places = buildPlaces(settings, graph, WorldSurroundings.forWorld(graph));
-		List<Map<String, Object>> regions = buildRegions(settings, graph);
+		// One division of the land answers both questions the descriptions ask: whether a place is on an island, and which regions share
+		// a continent. Computing it once keeps the two answers identical, and a second flood fill would double the work for nothing.
+		WorldLandmasses landmasses = WorldLandmasses.forWorld(graph);
+
+		List<Map<String, Object>> places = buildPlaces(settings, graph, WorldSurroundings.forWorld(graph, landmasses));
+		List<Map<String, Object>> regions = buildRegions(settings, graph, landmasses);
 		List<Map<String, Object>> roads = buildRoads(settings);
+		List<Map<String, Object>> landmassEntries = buildLandmasses(landmasses, regions);
 
 		world.put("places", places);
 		world.put("regions", regions);
+		world.put("landmasses", landmassEntries);
 		world.put("roads", roads);
 
 		// The shape of the land itself, coarse enough to read. A list of names says nothing about where the sea is, so a
@@ -98,6 +104,7 @@ public class WorldModel
 		Map<String, Object> counts = new LinkedHashMap<>();
 		counts.put("places", places.size());
 		counts.put("regions", regions.size());
+		counts.put("landmasses", landmassEntries.size());
 		counts.put("roads", roads.size());
 		world.put("counts", counts);
 
@@ -277,8 +284,11 @@ public class WorldModel
 	 * attributed to the region containing the point where it was placed. A region with no label of its own reports a null name. Each entry
 	 * reports {@code "type": "Region"} so a client knows the name is a territory rather than a settlement, and the terrain most of the
 	 * territory is, so a campaign built on regions knows what each one can grow, mine or trade.
+	 *
+	 * Each entry also names the landmass it sits on, which is what says whether two territories can be walked between at all. The landmass
+	 * itself is described once, by {@link #buildLandmasses}.
 	 */
-	private static List<Map<String, Object>> buildRegions(MapSettings settings, WorldGraph graph)
+	private static List<Map<String, Object>> buildRegions(MapSettings settings, WorldGraph graph, WorldLandmasses landmasses)
 	{
 		List<Map<String, Object>> regions = new ArrayList<>();
 		if (graph == null || graph.regions == null)
@@ -301,6 +311,7 @@ public class WorldModel
 			entry.put("type", "Region");
 			entry.put("terrain", dominantRegionTerrain(region));
 			entry.put("color", regionColorHex(settings, region.id));
+			entry.put("landmassId", landmasses == null ? WorldLandmasses.NONE : landmasses.idOfRegion(region));
 
 			Point centroid = region.getCenters().isEmpty() ? null : WorldGraph.findCentroid(region.getCenters());
 			if (centroid != null)
@@ -314,6 +325,53 @@ public class WorldModel
 		}
 
 		return regions;
+	}
+
+	/**
+	 * The continents and islands that carry at least one region, which is the answer to "which of these territories are on the same land".
+	 *
+	 * Every entry lists the regions it holds, so a reader can group them without joining two lists itself, and says whether the land is an
+	 * island or part of a continent, because that decides whether the territories on it are cut off from the rest of the world.
+	 *
+	 * Land with no region on it is left out: a rock with no territory on it is not a place a campaign can put a conflict, and the terrain
+	 * grid already draws the coast of every one of them. An empty list means the world has no regions, not that it has no land.
+	 */
+	private static List<Map<String, Object>> buildLandmasses(WorldLandmasses landmasses, List<Map<String, Object>> regions)
+	{
+		List<Map<String, Object>> entries = new ArrayList<>();
+		if (landmasses == null)
+		{
+			return entries;
+		}
+
+		Map<Integer, List<Integer>> regionIdsByLandmass = new HashMap<>();
+		for (Map<String, Object> region : regions)
+		{
+			if (region.get("landmassId") instanceof Number id && id.intValue() != WorldLandmasses.NONE)
+			{
+				regionIdsByLandmass.computeIfAbsent(id.intValue(), key -> new ArrayList<>()).add(((Number) region.get("id")).intValue());
+			}
+		}
+
+		for (WorldLandmasses.Landmass landmass : landmasses.landmasses())
+		{
+			List<Integer> regionIds = regionIdsByLandmass.get(landmass.getId());
+			if (regionIds == null)
+			{
+				continue;
+			}
+
+			Map<String, Object> entry = new LinkedHashMap<>();
+			entry.put("id", landmass.getId());
+			// "continent" or "island" rather than a boolean, so the reader does not have to remember which way round the flag goes.
+			entry.put("kind", landmass.isIsland() ? "island" : "continent");
+			entry.put("landCells", landmass.getLandCells());
+			entry.put("regionCount", regionIds.size());
+			entry.put("regionIds", regionIds);
+			entries.add(entry);
+		}
+
+		return entries;
 	}
 
 	/**

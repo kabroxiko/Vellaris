@@ -83,6 +83,11 @@ must name the one world the caller means.
   A place's `x`/`y` is where the map draws it: the centre of its pictogram when it has one, and its label when it has
   none. A marker saying "the party is here" therefore lands on the town rather than on the word beside it, and scenery
   icons (trees, hills, mountains, dunes) are never mistaken for a place's drawing.
+  Regions are grouped by the land they stand on: every region reports the `landmassId` it belongs to, and the answer's
+  `landmasses` lists each continent and island that holds a region, numbered largest first, with its `kind`
+  (`continent` or `island`), its `landCells`, and the `regionIds` on it. Two regions with one landmass share continuous
+  land; two under different landmasses are across water. Land that meets the map edge is a cut-off continent rather than
+  an island, and a landmass smaller than a tenth of the world's land is an island only if it never reaches the edge.
   Pass `?includeImage=true` to also get the rendered map as `imageBase64`; that image is identical to the one
   `/api/generate` returns for the same settings, and generating both in one call avoids rendering the world twice.
   The answer also carries `terrain`: a coarse picture of the land as rows of characters, one per cell, with the

@@ -23,6 +23,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -261,6 +262,83 @@ public class WorldModelTest
 	}
 
 	@Test
+	public void regionsReportWhichLandmassTheyShare()
+	{
+		double resolution = 0.75;
+		MapSettings settings = loadSettings(resolution);
+		WorldGraph graph = MapCreator.createGraphForUnitTests(settings);
+
+		Map<String, Object> world = WorldModel.build(settings, graph);
+
+		@SuppressWarnings("unchecked")
+		List<Map<String, Object>> regions = (List<Map<String, Object>>) world.get("regions");
+		@SuppressWarnings("unchecked")
+		List<Map<String, Object>> landmasses = (List<Map<String, Object>>) world.get("landmasses");
+
+		assertFalse(regions.isEmpty(), "the test map has regions");
+		assertFalse(landmasses.isEmpty(), "the land under the regions is divided into continents and islands");
+
+		Map<Integer, Map<String, Object>> landmassById = new HashMap<>();
+		for (Map<String, Object> landmass : landmasses)
+		{
+			int id = ((Number) landmass.get("id")).intValue();
+			assertNull(landmassById.put(id, landmass), "each landmass is reported once, so an id identifies one piece of land");
+			assertTrue("continent".equals(landmass.get("kind")) || "island".equals(landmass.get("kind")), "a landmass is a continent or an island");
+			assertTrue(((Number) landmass.get("landCells")).intValue() > 0, "a landmass holds land");
+			assertTrue(((Number) landmass.get("regionCount")).intValue() > 0, "a landmass is reported only when a region sits on it");
+		}
+
+		for (Map<String, Object> region : regions)
+		{
+			Object landmassId = region.get("landmassId");
+			assertTrue(landmassId instanceof Number, "every region names the landmass it sits on");
+			Map<String, Object> landmass = landmassById.get(((Number) landmassId).intValue());
+			assertNotNull(landmass, "the landmass a region names is one of the reported ones");
+
+			@SuppressWarnings("unchecked")
+			List<Integer> regionIds = (List<Integer>) landmass.get("regionIds");
+			assertTrue(regionIds.contains(((Number) region.get("id")).intValue()), "the landmass lists every region it holds");
+			assertEquals(regionIds.size(), ((Number) landmass.get("regionCount")).intValue());
+		}
+
+		// Ids are handed out largest landmass first, so reading down the list reads the world from its main continent to its isles.
+		for (int i = 1; i < landmasses.size(); i++)
+		{
+			assertTrue(((Number) landmasses.get(i - 1).get("landCells")).intValue() >= ((Number) landmasses.get(i).get("landCells")).intValue(), "landmasses are reported largest first");
+		}
+	}
+
+	@Test
+	public void aPlaceAndItsRegionAgreeAboutWhetherTheyAreOnAnIsland()
+	{
+		double resolution = 0.75;
+		MapSettings settings = loadSettings(resolution);
+		WorldGraph graph = MapCreator.createGraphForUnitTests(settings);
+
+		Center inRegion = graph.centers.stream().filter(center -> !center.isWater && center.region != null).findFirst().orElseThrow();
+		settings.edits.text.add(new MapText("Brookhollow", new Point(inRegion.loc.x / resolution, inRegion.loc.y / resolution), 0.0, TextType.City, null, null, null, 0.0, 0, null, 0.0));
+
+		Map<String, Object> world = WorldModel.build(settings, graph);
+
+		@SuppressWarnings("unchecked")
+		List<Map<String, Object>> places = (List<Map<String, Object>>) world.get("places");
+		@SuppressWarnings("unchecked")
+		List<Map<String, Object>> regions = (List<Map<String, Object>>) world.get("regions");
+		@SuppressWarnings("unchecked")
+		List<Map<String, Object>> landmasses = (List<Map<String, Object>>) world.get("landmasses");
+
+		@SuppressWarnings("unchecked")
+		Map<String, Object> surroundings = (Map<String, Object>) places.get(0).get("surroundings");
+		Map<String, Object> region = findRegion(regions, inRegion.region.id);
+
+		int landmassId = ((Number) region.get("landmassId")).intValue();
+		Map<String, Object> landmass = landmasses.stream().filter(entry -> ((Number) entry.get("id")).intValue() == landmassId).findFirst().orElseThrow();
+
+		// The place's own island flag and its region's landmass are two readings of one division of the land, so they cannot disagree.
+		assertEquals("island".equals(landmass.get("kind")), surroundings.get("island"), "a place on an island's landmass reads as an island, and one on a continent does not");
+	}
+
+	@Test
 	public void buildToleratesAMissingGraph()
 	{
 		MapSettings settings = loadSettings(1.0);
@@ -275,6 +353,7 @@ public class WorldModelTest
 
 		assertEquals(1, places.size());
 		assertTrue(regions.isEmpty(), "Without a graph there is no region geometry to report");
+		assertTrue(((List<?>) world.get("landmasses")).isEmpty(), "Without a graph there is no land to divide into continents and islands");
 		assertFalse(places.get(0).containsKey("surroundings"), "Without a graph there is no ground to describe, so nothing is invented");
 		assertEquals(WorldModel.COORDINATE_SPACE, world.get("coordinateSpace"));
 	}

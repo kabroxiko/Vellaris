@@ -3,9 +3,7 @@ package nortantis.api;
 import nortantis.WorldGraph;
 import nortantis.graph.voronoi.Center;
 
-import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Deque;
 import java.util.EnumMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -44,14 +42,11 @@ public final class WorldSurroundings
 	 */
 	public static final int RIVER_SAMPLE_DEPTH = 2;
 
-	/** A landmass below this share of the world's land is reported as an island, provided it does not reach the map edge. */
-	public static final double ISLAND_LAND_SHARE = 0.1;
+	private final WorldLandmasses landmasses;
 
-	private final int islandCellLimit;
-
-	private WorldSurroundings(int islandCellLimit)
+	private WorldSurroundings(WorldLandmasses landmasses)
 	{
-		this.islandCellLimit = islandCellLimit;
+		this.landmasses = landmasses;
 	}
 
 	/**
@@ -62,21 +57,20 @@ public final class WorldSurroundings
 	 */
 	public static WorldSurroundings forWorld(WorldGraph graph)
 	{
-		if (graph == null || graph.centers.isEmpty())
+		return forWorld(graph, WorldLandmasses.forWorld(graph));
+	}
+
+	/**
+	 * Prepares the shared state from a division of the land the caller already has, so a world's places and its regions are described from
+	 * the same landmasses instead of two flood fills that could disagree.
+	 */
+	public static WorldSurroundings forWorld(WorldGraph graph, WorldLandmasses landmasses)
+	{
+		if (graph == null || graph.centers == null || graph.centers.isEmpty() || landmasses == null)
 		{
 			return null;
 		}
-
-		int landCells = 0;
-		for (Center center : graph.centers)
-		{
-			if (!center.isWater)
-			{
-				landCells++;
-			}
-		}
-		int islandCellLimit = Math.max(1, (int) Math.round(landCells * ISLAND_LAND_SHARE));
-		return new WorldSurroundings(islandCellLimit);
+		return new WorldSurroundings(landmasses);
 	}
 
 	/**
@@ -150,6 +144,16 @@ public final class WorldSurroundings
 	}
 
 	/**
+	 * Whether the land the place stands on is an island rather than part of a continent.
+	 *
+	 * The answer comes from the world's landmasses, so a place and the region it is in cannot disagree about what they stand on.
+	 */
+	private boolean isIsland(Center place)
+	{
+		return landmasses.isIsland(place);
+	}
+
+	/**
 	 * The centres within {@code depth} hops of a place, nearest first. Breadth-first over neighbour links is what makes the radius
 	 * scale-free: cells are never further apart than their neighbours, so a hop count means the same on a small island and on a continent.
 	 */
@@ -199,44 +203,5 @@ public final class WorldSurroundings
 			}
 		}
 		return false;
-	}
-
-	/**
-	 * Whether the land the place stands on is an island: a landmass that stops growing before it covers {@link #ISLAND_LAND_SHARE} of the
-	 * world's land and never reaches the map edge.
-	 *
-	 * Land that meets the map edge is a cut-off continent rather than an island, and land that grows past the cell limit is simply too
-	 * large to call one, which is why the search abandons it as soon as the limit is passed instead of walking a whole continent.
-	 */
-	private boolean isIsland(Center start)
-	{
-		if (start.isWater)
-		{
-			return false;
-		}
-
-		Set<Center> seen = new HashSet<>();
-		Deque<Center> frontier = new ArrayDeque<>();
-		seen.add(start);
-		frontier.add(start);
-
-		int landCells = 0;
-		while (!frontier.isEmpty())
-		{
-			Center center = frontier.poll();
-			landCells++;
-			if (landCells > islandCellLimit || center.isBorder)
-			{
-				return false;
-			}
-			for (Center neighbor : center.neighbors)
-			{
-				if (!neighbor.isWater && seen.add(neighbor))
-				{
-					frontier.add(neighbor);
-				}
-			}
-		}
-		return true;
 	}
 }
